@@ -3,5 +3,11 @@
     "app/**/*.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/chat-digest",
+      "schedule": "0 8 * * *"
+    }
+  ]
 }

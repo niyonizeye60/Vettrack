@@ -6,6 +6,7 @@ import "./globals.css"
 import GoogleAnalytics from "@/components/analytics/google-analytics"
 import BodyWrapper from "@/components/layout/body-wrapper"
 import { LanguageProvider } from "@/contexts/LanguageContext"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -45,6 +46,7 @@ export default function RootLayout({
         <LanguageProvider>
           <BodyWrapper>{children}</BodyWrapper>
         </LanguageProvider>
+        <Toaster />
       </body>
     </html>
   )
