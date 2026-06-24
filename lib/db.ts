@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb"
 
 // Add fallback for MongoDB URI with a dummy value that will be overridden by environment variables
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://placeholder:placeholder@placeholder.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://placeholder:placeholder@placeholder.mongodb.net/myFirstDatabase?retryWrites=true&w=majoritymongodb+srv://niyonizeyetheophile90_db_user:JX5XPaIUucYtmVs1@cluster1.rgjh2oe.mongodb.net/?appName=Cluster1";
 
 const options = {
   maxPoolSize: 10,
