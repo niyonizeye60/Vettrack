@@ -54,7 +54,7 @@
     "kerberos": "latest",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.509.0",
-    "mongodb": "^6.21.0",
+    "mongodb": "^6.16.0",
     "mongodb-client-encryption": "latest",
     "next": "^14.2.0",
     "next-auth": "^4.24.11",
