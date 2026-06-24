@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertModal } from "@/components/ui/AlertModal"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 export function useUserStatus() {
+  const { t } = useLanguage()
   const router = useRouter()
   const [showAlert, setShowAlert] = useState(false)
 
@@ -48,8 +50,8 @@ export function useUserStatus() {
     <AlertModal
       isOpen={showAlert}
       onClose={handleAlertClose}
-      title="Account Suspended"
-      message="Your account has been suspended. Please contact the administrator for assistance."
+      title={t('user.accountSuspendedTitle')}
+      message={t('user.accountSuspendedDesc')}
       type="error"
     />
   )

@@ -33,7 +33,7 @@ export default function ContactInfo() {
           <Mail className="h-6 w-6 text-primary shrink-0 mt-0.5 mr-3" />
           <div>
             <h3 className="font-semibold mb-1">{t('common.email')}</h3>
-            <p className="text-gray-600">ntdm2050@gmail.com</p>
+            <p className="text-gray-600">info@vettrack.rw</p>
           </div>
         </div>
 

@@ -1134,15 +1134,25 @@ export async function generateSystemNotifications() {
       })
     }
 
-    // Insert notifications
+    // Insert notifications — only if not already created today
     if (notifications.length > 0) {
-      const notificationsWithTimestamp = notifications.map(n => ({
-        ...n,
-        read: false,
-        createdAt: new Date()
-      }))
-      
-      await db.collection("notifications").insertMany(notificationsWithTimestamp)
+      const startOfDay = new Date(now)
+      startOfDay.setHours(0, 0, 0, 0)
+
+      const notificationsWithTimestamp = await Promise.all(
+        notifications.map(async n => {
+          const existing = await db.collection("notifications").findOne({
+            title: n.title,
+            createdAt: { $gte: startOfDay }
+          })
+          return existing ? null : { ...n, read: false, deletedBy: [], expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000), createdAt: new Date() }
+        })
+      )
+
+      const toInsert = notificationsWithTimestamp.filter(Boolean)
+      if (toInsert.length > 0) {
+        await db.collection("notifications").insertMany(toInsert)
+      }
     }
 
     return { success: true, count: notifications.length }
@@ -1468,6 +1478,8 @@ export async function createSystemNotification(data: {
       ...data,
       priority: data.priority || "normal",
       read: false,
+      deletedBy: [],
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       createdAt: new Date()
     }
 
@@ -1555,6 +1567,8 @@ export async function sendBulkNotification(templateId: string, targetUsers: stri
       type: template.type,
       priority: template.priority,
       read: false,
+      deletedBy: [],
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
       createdAt: new Date()
     }))
 

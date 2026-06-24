@@ -10,7 +10,7 @@ const mockTickets = [
   {
     id: "1",
     title: "Login Issues",
-    farmer: "John Doe",
+    farmer: "Nkusi Jean",
     priority: "high",
     status: "open",
     createdAt: "2024-01-22 10:30 AM"

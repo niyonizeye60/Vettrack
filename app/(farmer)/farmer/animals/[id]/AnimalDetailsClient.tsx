@@ -80,6 +80,10 @@ export function AnimalDetailsClient({ animal, animalId }: AnimalDetailsClientPro
               <p>{animal.class}</p>
             </div>
             <div>
+              <h3 className="text-sm font-medium text-gray-500">{t('animal.earTagId')}</h3>
+              <p>{animal.earTagId || t('farmer.notAvailable')}</p>
+            </div>
+            <div>
               <h3 className="text-sm font-medium text-gray-500">{t('animal.location')}</h3>
               <p>{animal.district}, {animal.sector}</p>
             </div>
@@ -94,6 +98,18 @@ export function AnimalDetailsClient({ animal, animalId }: AnimalDetailsClientPro
             <div>
               <h3 className="text-sm font-medium text-gray-500">{t('animal.phone')}</h3>
               <p>{animal.phoneNumber}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">{t('farmer.acquisitionType')}</h3>
+              <p>{t(`farmer.${animal.acquisitionType}`)}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">{t('farmer.gender')}</h3>
+              <p>{t(`farmer.${animal.gender}`)}</p>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-500">{t('farmer.insuranceId')}</h3>
+              <p>{animal.insuranceId || t('farmer.notAvailable')}</p>
             </div>
             <div className="col-span-2">
               <h3 className="text-sm font-medium text-gray-500">{t('animal.registeredOn')}</h3>

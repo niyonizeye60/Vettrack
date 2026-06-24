@@ -30,6 +30,8 @@ interface SuperAdminDashboardClientProps {
     userStats: {
       farmer?: number
       doctor?: number
+      admin?: number
+      superadmin?: number
     }
     consultationStats: {
       accepted?: number
@@ -119,7 +121,7 @@ export default function SuperAdminDashboardClient({ stats, recentActivities }: S
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-blue-700">
-                  {t('superadmin.farmers')}: {stats.userStats.farmer || 0} | {t('superadmin.doctors')}: {stats.userStats.doctor || 0}
+                  {t('superadmin.farmers')}: {stats.userStats.farmer || 0} | {t('superadmin.doctors')}: {stats.userStats.doctor || 0} | {t('superadmin.admin')}: {stats.userStats.admin || 0} | {t('superadmin.superadmins')}: {stats.userStats.superadmin || 0}
                 </span>
                 <TrendingUp className="h-3 w-3 text-blue-600" />
               </div>

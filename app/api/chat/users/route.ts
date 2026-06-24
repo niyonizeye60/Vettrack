@@ -20,7 +20,7 @@ export async function GET() {
     const users = await db.collection("users").find(
       {
         role: targetRole,
-        status: "active",
+        status: { $nin: ["suspended", "inactive"] },
         _id: { $ne: new ObjectId(currentUser._id) }
       },
       {

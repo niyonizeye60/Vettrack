@@ -10,12 +10,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Bell, MessageSquare } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface ConsultationDetailsProps {
   id: string;
 }
 
 export default async function ConsultationDetails({ id }: ConsultationDetailsProps) {
+  const { t } = useLanguage();
   const currentUser = await getCurrentUser();
   
   // Redirect if not logged in or not a farmer
@@ -59,9 +61,9 @@ export default async function ConsultationDetails({ id }: ConsultationDetailsPro
   return (
     <div className="space-y-6 p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Consultation Details</h1>
+        <h1 className="text-2xl font-bold">{t('farmer.consultationDetails')}</h1>
         <Button asChild variant="outline" size="sm">
-          <Link href="/farmer/consultations">Back to All Consultations</Link>
+          <Link href="/farmer/consultations">{t('farmer.backToAllConsultations')}</Link>
         </Button>
       </div>
       
@@ -81,7 +83,7 @@ export default async function ConsultationDetails({ id }: ConsultationDetailsPro
               <AlertTitle>
                 {consultation.status === "accepted" ? "Accepted" : 
                  consultation.status === "rejected" ? "Rejected" : 
-                 consultation.status === "completed" ? "Completed" : ""} with feedback
+                 consultation.status === "completed" ? "Completed" : ""} {t('farmer.withFeedback')}
               </AlertTitle>
               <AlertDescription>
                 {consultation.feedback}
@@ -91,42 +93,42 @@ export default async function ConsultationDetails({ id }: ConsultationDetailsPro
           
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Full Name</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.fullName')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.fullName}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Phone Number</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.phoneNumber')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.phoneNumber}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Service</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.service')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.service}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Doctor</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.doctor')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{doctorName}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Date</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.date')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.date}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Time</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.time')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.time}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Type</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.type')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.type}</dd>
             </div>
             
             <div>
-              <dt className="text-sm font-medium text-gray-500">Status</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.status')}</dt>
               <dd className="mt-1 text-sm text-gray-900">
                 <Badge className={getStatusColor(consultation.status)}>
                   {consultation.status}
@@ -135,7 +137,7 @@ export default async function ConsultationDetails({ id }: ConsultationDetailsPro
             </div>
             
             <div className="md:col-span-2">
-              <dt className="text-sm font-medium text-gray-500">Created At</dt>
+              <dt className="text-sm font-medium text-gray-500">{t('farmer.createdAt')}</dt>
               <dd className="mt-1 text-sm text-gray-900">
                 {new Date(consultation.createdAt).toLocaleString()}
               </dd>
@@ -146,12 +148,12 @@ export default async function ConsultationDetails({ id }: ConsultationDetailsPro
           <CardFooter className="flex justify-end space-x-4 pt-4 border-t">
             <Button asChild variant="secondary" size="lg">
               <Link href={`/farmer/consultations/${id}/edit`}>
-                Edit Consultation
+                {t('farmer.editConsultation')}
               </Link>
             </Button>
             <Button asChild variant="destructive" size="lg">
               <Link href={`/farmer/consultations/${id}/delete`}>
-                Delete Consultation
+                {t('farmer.deleteConsultation')}
               </Link>
             </Button>
           </CardFooter>

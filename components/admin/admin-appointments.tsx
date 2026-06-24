@@ -16,9 +16,9 @@ import { useLanguage } from "@/contexts/LanguageContext"
 const mockAppointments = [
   {
     id: "1",
-    farmer: "John Doe",
-    doctor: "Dr. Sarah Wilson",
-    animal: "Cow - Bella",
+    farmer: "Manzi",
+    doctor: "Dr. Nkusi Jean",
+    animal: "Cow - Ntuganye",
     date: "2024-01-22",
     time: "10:00 AM",
     status: "scheduled",
@@ -395,9 +395,9 @@ export default function AdminAppointments() {
                   <SelectValue placeholder={t('appointments.selectFarmer')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="john">John Doe</SelectItem>
-                  <SelectItem value="mary">Mary Johnson</SelectItem>
-                  <SelectItem value="peter">Peter Smith</SelectItem>
+                  <SelectItem value="john">Nkusi William</SelectItem>
+                  <SelectItem value="mary">Mugabo Vincent</SelectItem>
+                  <SelectItem value="peter">Sano Garnauld</SelectItem>
                 </SelectContent>
               </Select>
             </div>

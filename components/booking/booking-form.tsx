@@ -191,7 +191,7 @@ export default function BookingForm() {
               <p className="text-green-700 text-sm">{submitStatus.message}</p>
             </div>
             <div className="space-y-2 text-sm text-gray-600 mb-6">
-              <p>📧 Confirmation sent to: ntdm2050@gmail.com</p>
+              <p>📧 Confirmation sent to: info@vettrack.rw</p>
               <p>📱 We will contact you at: {phone}</p>
               <p>📅 Requested date: {date?.toLocaleDateString()}</p>
               <p>🕐 Requested time: {selectedTimeSlot}</p>

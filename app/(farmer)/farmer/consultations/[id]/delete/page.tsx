@@ -35,7 +35,7 @@ export default async function DeleteConsultationPage({ params }: PageProps) {
   
   return (
     <div className="max-w-xl mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Delete Consultation</h1>
+      {/* <h1 className="text-2xl font-bold mb-6">Delete Consultation</h1> */}
       <DeleteConsultationForm 
         consultation={consultation} 
         farmerId={farmerId} 

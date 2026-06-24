@@ -37,6 +37,7 @@ import SuperAdminSidebar from "@/components/superadmin/super-admin-sidebar"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { LanguageSwitcher } from "@/components/ui/language-switcher"
 import { getNotifications, markNotificationRead, generateSystemNotifications } from "@/lib/actions/superadmin"
+import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
 
 interface SuperAdminHeaderProps {
   user: {
@@ -148,6 +149,7 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
 
   return (
     <header className="w-full h-full">
+      <PresenceHeartbeat />
       <div className="flex h-full items-center justify-between px-3 sm:px-6">
         {/* Left side - Mobile menu + Logo */}
         <div className="flex items-center space-x-2 sm:space-x-4">

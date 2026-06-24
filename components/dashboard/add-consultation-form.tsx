@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useLanguage } from "@/contexts/LanguageContext"
+
 
 interface Doctor {
   _id: string
@@ -23,6 +25,7 @@ interface AddConsultationFormProps {
 }
 
 export default function AddConsultationForm({ doctors, farmerId }: AddConsultationFormProps) {
+  const { t } = useLanguage()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -52,46 +55,46 @@ export default function AddConsultationForm({ doctors, farmerId }: AddConsultati
   return (
     <Card>
       <CardHeader>
-        <CardTitle>New Consultation</CardTitle>
+        <CardTitle>{t('farmer.newConsultation')}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="fullName">{t('farmer.fullName')}</Label>
               <Input
                 id="fullName"
                 name="fullName"
-                placeholder="Enter your full name"
+                placeholder={t("farmer.enterFullName")}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Label htmlFor="phoneNumber">{t('farmer.phoneNumber')}</Label>
               <Input
                 id="phoneNumber"
                 name="phoneNumber"
-                placeholder="Enter your phone number"
+                placeholder={t('farmer.enterPhoneNumber')}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="service">Service</Label>
+              <Label htmlFor="service">{t('farmer.service')}</Label>
               <Input
                 id="service"
                 name="service"
-                placeholder="Enter service required"
+                placeholder={t("farmer.enterService")}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="doctor">Select Doctor</Label>
+              <Label htmlFor="doctor">{t('farmer.selectDoctor')}</Label>
               <Select name="doctor" required>
                 <SelectTrigger id="doctor">
-                  <SelectValue placeholder="Select a doctor" />
+                  <SelectValue placeholder={t('farmer.selectDoctor')} />
                 </SelectTrigger>
                 <SelectContent>
                   {doctors.map((doc) => (
@@ -104,7 +107,7 @@ export default function AddConsultationForm({ doctors, farmerId }: AddConsultati
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">{t('farmer.date')}</Label>
               <Input
                 id="date"
                 name="date"
@@ -114,7 +117,7 @@ export default function AddConsultationForm({ doctors, farmerId }: AddConsultati
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="time">Time</Label>
+              <Label htmlFor="time">{t('farmer.time')}</Label>
               <Input
                 id="time"
                 name="time"
@@ -124,14 +127,14 @@ export default function AddConsultationForm({ doctors, farmerId }: AddConsultati
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Consultation Type</Label>
+              <Label htmlFor="type">{t('farmer.consultationType')}</Label>
               <Select name="type" required>
                 <SelectTrigger id="type">
-                  <SelectValue placeholder="Select consultation type" />
+                  <SelectValue placeholder={t('farmer.selectConsultationType')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Virtual">Virtual</SelectItem>
-                  <SelectItem value="In-Person">In-Person</SelectItem>
+                  <SelectItem value="Virtual">{t('farmer.virtual')}</SelectItem>
+                  <SelectItem value="In-Person">{t('farmer.inPerson')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -139,7 +142,7 @@ export default function AddConsultationForm({ doctors, farmerId }: AddConsultati
 
           <div className="flex justify-end space-x-4">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Booking..." : "Book Consultation"}
+              {isSubmitting ? "Booking..." : (t('farmer.bookConsultation'))}
             </Button>
           </div>
         </form>

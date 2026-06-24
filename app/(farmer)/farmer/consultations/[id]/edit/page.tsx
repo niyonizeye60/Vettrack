@@ -39,12 +39,12 @@ export default async function EditConsultationPage({ params }: PageProps) {
   return (
     <div className="max-w-xl mx-auto py-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Edit Consultation</h1>
+        {/* <h1 className="text-2xl font-bold">Edit Consultation</h1> */}
         <Link 
           href={`/farmer/consultations/${id}`} 
           className="text-sm text-blue-600 hover:text-blue-800"
         >
-          Cancel and return to details
+          {/* Cancel and return to details */}
         </Link>
       </div>
       <EditConsultationForm 

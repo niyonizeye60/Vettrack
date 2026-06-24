@@ -2,13 +2,17 @@
 
 import { Button } from "@/components/ui/button"
 import { UserNav } from "@/app/(veterinary)/veterinary/components/user-nav"
-import { Bell, Search, Menu, Stethoscope, Heart } from "lucide-react"
+import { Bell, Search, Menu, Stethoscope, Heart, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { getCurrentUser } from "@/lib/actions/auth"
+import { useToast } from "@/hooks/use-toast"
+import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
+import { playChatNotificationSound } from "@/lib/notification-sound"
 import Link from "next/link"
 import {
   DropdownMenu,
@@ -16,36 +20,159 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+const NOTIFICATIONS_POLL_MS = 10000
+const SEARCH_DEBOUNCE_MS = 300
+
+interface PatientResult {
+  id: string
+  name: string
+  phone: string
+}
+
+interface AppointmentResult {
+  id: string
+  fullName: string
+  service: string
+  date: string
+  status: string
+}
+
 interface VeterinaryHeaderProps {
   onMenuClick: () => void
 }
 
 export function VeterinaryHeader({ onMenuClick }: VeterinaryHeaderProps) {
+  const router = useRouter()
   const [showSearch, setShowSearch] = useState(false)
   const { t } = useLanguage()
+  const { toast } = useToast()
   const [notifications, setNotifications] = useState<any[]>([])
   const [notificationCount, setNotificationCount] = useState(0)
   const [notificationOpen, setNotificationOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const seenChatNotificationIds = useRef<Set<string> | null>(null)
+
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<{ patients: PatientResult[]; appointments: AppointmentResult[] } | null>(null)
+  const [searching, setSearching] = useState(false)
 
   useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | undefined
+
     async function fetchUser() {
       try {
         const userData = await getCurrentUser()
         setUser(userData)
         if (userData?._id) {
-          fetchNotifications(userData._id)
-          const interval = setInterval(() => {
-            fetchNotifications(userData._id)
-          }, 3000)
-          return () => clearInterval(interval)
+          const userId = userData._id.toString()
+          fetchNotifications(userId)
+          intervalId = setInterval(() => {
+            fetchNotifications(userId)
+          }, NOTIFICATIONS_POLL_MS)
         }
       } catch (error) {
         console.error("Error fetching user:", error)
       }
     }
     fetchUser()
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
   }, [])
+
+  // Debounced live search across this doctor's patients and appointments
+  useEffect(() => {
+    const query = searchQuery.trim()
+    if (!query) {
+      setSearchResults(null)
+      setSearching(false)
+      return
+    }
+    setSearching(true)
+    const timeout = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/veterinary/search?q=${encodeURIComponent(query)}`)
+        const data = await response.json()
+        if (response.ok) setSearchResults(data)
+      } catch (error) {
+        console.error('Error searching:', error)
+      } finally {
+        setSearching(false)
+      }
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timeout)
+  }, [searchQuery])
+
+  const closeSearch = () => {
+    setShowSearch(false)
+    setSearchQuery("")
+    setSearchResults(null)
+  }
+
+  const goToPatient = (patient: PatientResult) => {
+    closeSearch()
+    router.push(`/veterinary/patients?q=${encodeURIComponent(patient.name)}`)
+  }
+
+  const goToAppointment = (appointment: AppointmentResult) => {
+    closeSearch()
+    router.push(`/veterinary/appointments?q=${encodeURIComponent(appointment.fullName)}`)
+  }
+
+  const renderSearchResults = () => {
+    if (!searchQuery.trim()) return null
+    const hasResults = (searchResults?.patients.length || 0) > 0 || (searchResults?.appointments.length || 0) > 0
+    return (
+      <div className="absolute top-full left-0 right-0 mt-1 bg-white text-gray-900 rounded-md shadow-lg border max-h-80 overflow-y-auto z-50">
+        {searching ? (
+          <div className="p-4 flex justify-center">
+            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+          </div>
+        ) : !hasResults ? (
+          <div className="p-4 text-center text-sm text-gray-400">{t('vet.noResultsFound')}</div>
+        ) : (
+          <>
+            {searchResults!.patients.length > 0 && (
+              <div>
+                <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">{t('vet.patients')}</div>
+                {searchResults!.patients.map(patient => (
+                  <div
+                    key={patient.id}
+                    className="px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => goToPatient(patient)}
+                  >
+                    <p className="text-sm font-medium truncate">{patient.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{patient.phone}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {searchResults!.appointments.length > 0 && (
+              <div>
+                <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50">{t('vet.appointments')}</div>
+                {searchResults!.appointments.map(appointment => (
+                  <div
+                    key={appointment.id}
+                    className="px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => goToAppointment(appointment)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium truncate">{appointment.fullName}</p>
+                      <Badge variant="outline" className="text-xs ml-2 shrink-0">{appointment.status}</Badge>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate">{appointment.service}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
 
   const fetchNotifications = async (userId: string) => {
     try {
@@ -66,8 +193,24 @@ export function VeterinaryHeader({ onMenuClick }: VeterinaryHeaderProps) {
           message: n.message,
           time: new Date(n.createdAt).toLocaleDateString(),
           read: n.read,
-          type: 'notification'
+          type: 'notification',
+          rawType: n.type
         }))
+
+        const chatNotifications: typeof formattedNotifications = formattedNotifications.filter(
+          (n: typeof formattedNotifications[number]) => n.rawType === 'chat'
+        )
+        if (seenChatNotificationIds.current === null) {
+          seenChatNotificationIds.current = new Set(chatNotifications.map((n: typeof formattedNotifications[number]) => n._id))
+        } else {
+          const newChatNotifications = chatNotifications.filter(
+            (n: typeof formattedNotifications[number]) => !seenChatNotificationIds.current!.has(n._id)
+          )
+          newChatNotifications.forEach((n: typeof formattedNotifications[number]) => toast({ title: n.title, description: n.message }))
+          if (newChatNotifications.length > 0) playChatNotificationSound()
+          chatNotifications.forEach((n: typeof formattedNotifications[number]) => seenChatNotificationIds.current!.add(n._id))
+        }
+
         allNotifications = [...allNotifications, ...formattedNotifications]
       }
       
@@ -97,24 +240,35 @@ export function VeterinaryHeader({ onMenuClick }: VeterinaryHeaderProps) {
     if (notificationId.startsWith('announcement-')) {
       return
     }
-    
+
+    // Optimistic update - mark as read immediately
+    setNotifications(prev =>
+      prev.map(n => n._id === notificationId ? { ...n, read: true } : n)
+    )
+    setNotificationCount(prev => Math.max(0, prev - 1))
+
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' })
-      setNotifications(prev => 
-        prev.map(n => n._id === notificationId ? { ...n, read: true } : n)
-      )
-      setNotificationCount(prev => Math.max(0, prev - 1))
-      
-      if (user?._id) {
-        setTimeout(() => fetchNotifications(user._id), 1000)
+      const response = await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' })
+      if (!response.ok) {
+        // Revert optimistic update on failure
+        setNotifications(prev =>
+          prev.map(n => n._id === notificationId ? { ...n, read: false } : n)
+        )
+        setNotificationCount(prev => prev + 1)
       }
     } catch (error) {
       console.error("Error marking notification as read:", error)
+      // Revert optimistic update on error
+      setNotifications(prev =>
+        prev.map(n => n._id === notificationId ? { ...n, read: false } : n)
+      )
+      setNotificationCount(prev => prev + 1)
     }
   }
 
   return (
     <header className="sticky top-0 z-30 bg-gradient-to-r from-blue-600 to-blue-700 border-b border-blue-800 shadow-lg">
+      <PresenceHeartbeat />
       <div className="flex h-16 items-center justify-between px-4 lg:px-6">
         {/* Left side */}
         <div className="flex items-center space-x-4">
@@ -150,12 +304,15 @@ export function VeterinaryHeader({ onMenuClick }: VeterinaryHeaderProps) {
         {/* Right side */}
         <div className="flex items-center space-x-2">
           {/* Search */}
-          <div className="hidden md:block">
+          <div className="hidden md:block relative">
             {showSearch ? (
               <Input
                 placeholder={t('vet.searchPatients')}
                 className="w-64 bg-white/10 border-white/20 text-white placeholder:text-blue-100"
-                onBlur={() => setShowSearch(false)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && closeSearch()}
+                onBlur={closeSearch}
                 autoFocus
               />
             ) : (
@@ -168,10 +325,17 @@ export function VeterinaryHeader({ onMenuClick }: VeterinaryHeaderProps) {
                 <Search className="h-5 w-5" />
               </Button>
             )}
+            {showSearch && renderSearchResults()}
           </div>
 
-          <Button variant="ghost" size="icon" className="md:hidden text-white hover:bg-blue-500">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden text-white hover:bg-blue-500"
+            onClick={() => showSearch ? closeSearch() : setShowSearch(true)}
+          >
             <Search className="h-5 w-5" />
+            <span className="sr-only">{t('vet.search')}</span>
           </Button>
 
           {/* Language Switcher */}
@@ -250,6 +414,21 @@ export function VeterinaryHeader({ onMenuClick }: VeterinaryHeaderProps) {
           <UserNav />
         </div>
       </div>
+
+      {showSearch && (
+        <div className="md:hidden px-4 pb-3 relative">
+          <Input
+            placeholder={t('vet.searchPatients')}
+            className="w-full bg-white/10 border-white/20 text-white placeholder:text-blue-100"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && closeSearch()}
+            onBlur={closeSearch}
+            autoFocus
+          />
+          {renderSearchResults()}
+        </div>
+      )}
     </header>
   )
 }

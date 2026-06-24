@@ -14,8 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { createNotificationTemplate, sendBulkNotification, scheduleNotification, deleteNotificationTemplate } from "@/lib/actions/superadmin"
-import { Plus, Send, Clock, FileText, Users, Calendar, Trash2 } from "lucide-react"
+import { Plus, Send, Clock, FileText, Users, Calendar, Trash2, RotateCcw, Eye, Search } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface NotificationsPageClientProps {
   initialTemplates: any[]
@@ -39,6 +40,13 @@ export default function NotificationsPageClient({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null)
+  const [sentNotifications, setSentNotifications] = useState<any[]>([])
+  const [sentLoading, setSentLoading] = useState(false)
+  const [permanentDeleteId, setPermanentDeleteId] = useState<string | null>(null)
+  const [restoreId, setRestoreId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkAction, setBulkAction] = useState<"delete" | "restore" | null>(null)
+  const [userSearch, setUserSearch] = useState("")
 
   const [templateForm, setTemplateForm] = useState({
     name: "",
@@ -154,8 +162,14 @@ export default function NotificationsPageClient({
     )
   }
 
+  const filteredUsers = users.filter(u =>
+    u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.role.toLowerCase().includes(userSearch.toLowerCase())
+  )
+
   const selectAllUsers = () => {
-    setSelectedUsers(users.map(u => u._id))
+    setSelectedUsers(filteredUsers.map(u => u._id))
   }
 
   const clearSelection = () => {
@@ -185,6 +199,98 @@ export default function NotificationsPageClient({
       setIsSubmitting(false)
       setDeleteDialogOpen(false)
       setTemplateToDelete(null)
+    }
+  }
+
+  const fetchSentNotifications = async () => {
+    setSentLoading(true)
+    try {
+      const res = await fetch(`/api/notifications?userId=superadmin&role=superadmin&superadmin=true`)
+      const data = await res.json()
+      setSentNotifications(data.success ? data.notifications : [])
+    } catch {
+      setSentNotifications([])
+    } finally {
+      setSentLoading(false)
+    }
+  }
+
+  const handlePermanentDelete = async (id: string) => {
+    try {
+      await fetch(`/api/notifications?id=${id}&permanent=true`, { method: 'DELETE' })
+      setSentNotifications(prev => prev.filter(n => n._id !== id))
+      toast({ title: "Deleted", description: "Notification permanently deleted" })
+    } catch {
+      toast({ title: "Error", description: "Failed to delete", variant: "destructive" })
+    } finally {
+      setPermanentDeleteId(null)
+    }
+  }
+
+  const handleRestore = async (id: string) => {
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
+      if (!res.ok) throw new Error()
+      await fetchSentNotifications()
+      toast({ title: "Restored", description: "Notification restored and expiry reset to 48h" })
+    } catch {
+      toast({ title: "Error", description: "Failed to restore", variant: "destructive" })
+    } finally {
+      setRestoreId(null)
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === sentNotifications.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sentNotifications.map(n => n._id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    try {
+      await Promise.all([...selectedIds].map(id =>
+        fetch(`/api/notifications?id=${id}&permanent=true`, { method: 'DELETE' })
+      ))
+      setSentNotifications(prev => prev.filter(n => !selectedIds.has(n._id)))
+      toast({ title: "Deleted", description: `${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} permanently deleted` })
+      setSelectedIds(new Set())
+    } catch {
+      toast({ title: "Error", description: "Bulk delete failed", variant: "destructive" })
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
+  const handleBulkRestore = async () => {
+    try {
+      await Promise.all([...selectedIds].map(id =>
+        fetch('/api/notifications', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        })
+      ))
+      await fetchSentNotifications()
+      toast({ title: "Restored", description: `${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} restored` })
+      setSelectedIds(new Set())
+    } catch {
+      toast({ title: "Error", description: "Bulk restore failed", variant: "destructive" })
+    } finally {
+      setBulkAction(null)
     }
   }
 
@@ -219,6 +325,7 @@ export default function NotificationsPageClient({
         <TabsList>
           <TabsTrigger value="templates">{t('superadmin.templates') || 'Templates'}</TabsTrigger>
           <TabsTrigger value="scheduled">{t('superadmin.scheduled') || 'Scheduled'}</TabsTrigger>
+          <TabsTrigger value="manage" onClick={fetchSentNotifications}>Manage Sent</TabsTrigger>
         </TabsList>
 
         <TabsContent value="templates" className="space-y-4">
@@ -306,7 +413,184 @@ export default function NotificationsPageClient({
             </div>
           )}
         </TabsContent>
+
+        {/* Manage Sent Tab */}
+        <TabsContent value="manage" className="space-y-4">
+          {sentLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+            </div>
+          ) : sentNotifications.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Eye className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Sent Notifications</h3>
+                <p className="text-gray-600">No notifications have been sent yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              {/* Bulk action toolbar */}
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border-b border-emerald-100 rounded-t-lg">
+                  <span className="text-sm font-medium text-emerald-700">{selectedIds.size} selected</span>
+                  <div className="flex gap-2 ml-auto">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                      onClick={() => setBulkAction('restore')}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      Restore Selected
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 text-red-600 border-red-300 hover:bg-red-50"
+                      onClick={() => setBulkAction('delete')}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete Selected
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-gray-500"
+                      onClick={() => setSelectedIds(new Set())}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={selectedIds.size === sentNotifications.length && sentNotifications.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                          aria-label="Select all"
+                        />
+                      </TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Sent</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sentNotifications.map(n => {
+                      const now = Date.now()
+                      const isDeleted = n.deletedBy?.length > 0
+                      const isExpired = n.expiresAt ? new Date(n.expiresAt).getTime() < now : false
+                      const isSelected = selectedIds.has(n._id)
+                      return (
+                        <TableRow key={n._id} className={isSelected ? 'bg-emerald-50/60' : isDeleted ? 'bg-red-50/40' : isExpired ? 'bg-amber-50/40' : ''}>
+                          <TableCell>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(n._id)}
+                              aria-label="Select row"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <p className="font-medium text-sm">{n.title}</p>
+                            <p className="text-xs text-gray-500 truncate max-w-[180px]">{n.message}</p>
+                          </TableCell>
+                          <TableCell><Badge variant="outline">{n.type}</Badge></TableCell>
+                          <TableCell><Badge variant="outline">{n.priority}</Badge></TableCell>
+                          <TableCell className="text-xs text-gray-500">{new Date(n.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-xs text-gray-500">{n.expiresAt ? new Date(n.expiresAt).toLocaleDateString() : '—'}</TableCell>
+                          <TableCell>
+                            {isDeleted ? (
+                              <Badge className="bg-red-100 text-red-700 text-xs">Deleted by {n.deletedBy.length} user{n.deletedBy.length > 1 ? 's' : ''}</Badge>
+                            ) : isExpired ? (
+                              <Badge className="bg-amber-100 text-amber-700 text-xs">Expired</Badge>
+                            ) : (
+                              <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {(isDeleted || isExpired) && (
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-emerald-50" title="Restore" onClick={() => setRestoreId(n._id)}>
+                                  <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-red-50" title="Permanently Delete" onClick={() => setPermanentDeleteId(n._id)}>
+                                <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
+
+      {/* Bulk Action Confirmation Dialog */}
+      <Dialog open={!!bulkAction} onOpenChange={open => !open && setBulkAction(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulkAction === 'restore' ? 'Restore Selected Notifications' : 'Delete Selected Notifications'}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkAction === 'restore'
+                ? `This will restore ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} and reset their expiry to 48 hours from now.`
+                : `This will permanently delete ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''}. This cannot be undone.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setBulkAction(null)}>Cancel</Button>
+            {bulkAction === 'restore' ? (
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleBulkRestore}>Restore</Button>
+            ) : (
+              <Button variant="destructive" onClick={handleBulkDelete}>Delete Permanently</Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permanent Delete Dialog */}
+      <Dialog open={!!permanentDeleteId} onOpenChange={open => !open && setPermanentDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permanently Delete Notification</DialogTitle>
+            <DialogDescription>This will permanently delete the notification for all users. This cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setPermanentDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => permanentDeleteId && handlePermanentDelete(permanentDeleteId)}>Delete Permanently</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore Dialog */}
+      <Dialog open={!!restoreId} onOpenChange={open => !open && setRestoreId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restore Notification</DialogTitle>
+            <DialogDescription>This will restore the notification and reset its expiry to 48 hours from now. It will become visible to users again.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setRestoreId(null)}>Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => restoreId && handleRestore(restoreId)}>Restore</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Template Dialog */}
       <Dialog open={isCreateTemplateOpen} onOpenChange={setIsCreateTemplateOpen}>
@@ -447,8 +731,19 @@ export default function NotificationsPageClient({
                   </Button>
                 </div>
               </div>
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search by name, email or role..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
               <div className="max-h-60 overflow-y-auto border rounded-lg p-3 space-y-2">
-                {users.map((user) => (
+                {filteredUsers.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">No users match your search.</p>
+                ) : filteredUsers.map((user) => (
                   <div key={user._id} className="flex items-center space-x-2">
                     <Checkbox
                       id={user._id}

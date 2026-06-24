@@ -22,6 +22,9 @@ type Animal = {
   phoneNumber: string;
   price: number;
   status: string;
+  acquisitionType?: string;
+  earTagId?: string;
+  insuranceId?: string;
 }
 
 interface EditAnimalFormProps {
@@ -75,7 +78,11 @@ export default function EditAnimalForm({ animal, userId }: EditAnimalFormProps) 
     ownerName: animal.ownerName,
     phoneNumber: animal.phoneNumber,
     price: animal.price.toString(),
-    status: animal.status || "Healthy"
+    status: animal.status || "Healthy",
+    acquisitionType: animal.acquisitionType || "",
+    earTagId: animal.earTagId || "",
+    insuranceId: animal.insuranceId || "",
+    gender: (animal as any).gender || "",
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,6 +230,54 @@ export default function EditAnimalForm({ animal, userId }: EditAnimalFormProps) 
                 placeholder="Enter price"
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="earTagId">{t('animal.earTagId')}</Label>
+              <Input
+                id="earTagId"
+                name="earTagId"
+                value={formData.earTagId}
+                onChange={handleChange}
+                placeholder="Enter ear tag ID"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="insuranceId">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs font-normal">(optional)</span></Label>
+              <Input
+                id="insuranceId"
+                name="insuranceId"
+                value={formData.insuranceId}
+                onChange={handleChange}
+                placeholder="Enter insurance ID"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender</Label>
+              <Select value={formData.gender} onValueChange={(value) => handleSelectChange("gender", value)} required>
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="acquisitionType">{t('farmer.acquisitionType')}</Label>
+              <Select value={formData.acquisitionType} onValueChange={(value) => handleSelectChange("acquisitionType", value)} required>
+                <SelectTrigger id="acquisitionType">
+                  <SelectValue placeholder={t('farmer.selectAcquisitionType')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bought">{t('farmer.bought')}</SelectItem>
+                  <SelectItem value="born">{t('farmer.born')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

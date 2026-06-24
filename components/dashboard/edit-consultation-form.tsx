@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface Doctor {
   _id: string
@@ -38,6 +39,7 @@ interface EditConsultationFormProps {
 }
 
 export default function EditConsultationForm({ consultation, doctors, farmerId }: EditConsultationFormProps) {
+  const { t } = useLanguage()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -66,24 +68,24 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Edit Consultation</CardTitle>
+        <CardTitle>{t('farmer.editConsultation')}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="fullName">{t('farmer.fullName')}</Label>
               <Input
                 id="fullName"
                 name="fullName"
-                placeholder="Enter your full name"
+                placeholder={t("farmer.enterFullName")}
                 defaultValue={consultation.fullName}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Label htmlFor="phoneNumber">{t('farmer.phoneNumber')}</Label>
               <Input
                 id="phoneNumber"
                 name="phoneNumber"
@@ -94,7 +96,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="service">Service</Label>
+              <Label htmlFor="service">{t('farmer.service')}</Label>
               <Input
                 id="service"
                 name="service"
@@ -105,7 +107,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="doctor">Select Doctor</Label>
+              <Label htmlFor="doctor">{t('farmer.selectDoctor')}</Label>
               <Select name="doctor" defaultValue={consultation.doctor} required>
                 <SelectTrigger id="doctor">
                   <SelectValue placeholder="Select a doctor" />
@@ -121,7 +123,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">{t('farmer.date')}</Label>
               <Input
                 id="date"
                 name="date"
@@ -132,7 +134,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="time">Time</Label>
+              <Label htmlFor="time">{t('farmer.time')}</Label>
               <Input
                 id="time"
                 name="time"
@@ -143,14 +145,14 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Consultation Type</Label>
+              <Label htmlFor="type">{t('farmer.consultationType')}</Label>
               <Select name="type" defaultValue={consultation.type} required>
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select consultation type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Virtual">Virtual</SelectItem>
-                  <SelectItem value="In-Person">In-Person</SelectItem>
+                  <SelectItem value="Virtual">{t('farmer.virtual')}</SelectItem>
+                  <SelectItem value="In-Person">{t('farmer.inPerson')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -162,10 +164,10 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
               variant="outline"
               onClick={() => router.push(`/farmer/consultations/${consultation._id}`)}
             >
-              Cancel
+              {t('farmer.cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Updating..." : "Update Consultation"}
+              {isSubmitting ? "Updating..." : (t('farmer.updateConsultation'))}
             </Button>
           </div>
         </form>

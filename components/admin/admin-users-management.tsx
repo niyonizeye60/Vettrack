@@ -354,7 +354,7 @@ export default function AdminUsersManagement() {
                 <Label htmlFor="name">{t('admin.fullName')}</Label>
                 <Input
                   id="name"
-                  placeholder="John Doe"
+                  placeholder="Nkusi Jean"
                   value={newUser.name}
                   onChange={(e) => setNewUser({...newUser, name: e.target.value})}
                   required

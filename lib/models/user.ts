@@ -10,6 +10,8 @@ export interface User {
   status: "active" | "suspended" | "inactive"
   createdAt: Date
   updatedAt: Date
+  resetTokenHash?: string
+  resetTokenExpiresAt?: Date
 }
 
 export interface FarmerProfile extends User {

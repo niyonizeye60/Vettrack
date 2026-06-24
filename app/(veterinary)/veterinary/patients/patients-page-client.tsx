@@ -1,10 +1,13 @@
 "use client"
 
+import { useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { MessageSquare, Phone, MapPin, Heart, User, Stethoscope, Activity, PawPrint } from "lucide-react"
+import { MessageSquare, Phone, MapPin, Heart, User, Stethoscope, Activity, PawPrint, Search } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
 
@@ -28,13 +31,25 @@ interface PatientsPageClientProps {
   totalConsultations: number
 }
 
-export default function PatientsPageClient({ 
-  patients, 
-  activePatients, 
-  totalAnimals, 
-  totalConsultations 
+export default function PatientsPageClient({
+  patients,
+  activePatients,
+  totalAnimals,
+  totalConsultations
 }: PatientsPageClientProps) {
   const { t } = useLanguage()
+  const searchParams = useSearchParams()
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '')
+
+  const filteredPatients = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase()
+    if (!query) return patients
+    return patients.filter(p =>
+      p.name?.toLowerCase().includes(query) ||
+      p.phone?.toLowerCase().includes(query) ||
+      p.district?.toLowerCase().includes(query)
+    )
+  }, [patients, searchTerm])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -50,6 +65,17 @@ export default function PatientsPageClient({
           </div>
         </div>
         <p className="text-gray-600 ml-14">{t('vet.comprehensivePatient')}</p>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-6 max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input
+          placeholder={t('vet.searchPatients')}
+          className="pl-9 bg-white"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {/* Clinical Stats */}
@@ -109,8 +135,8 @@ export default function PatientsPageClient({
 
       {/* Patient Records */}
       <div className="grid gap-6">
-        {patients.length > 0 ? (
-          patients.map((patient) => (
+        {filteredPatients.length > 0 ? (
+          filteredPatients.map((patient) => (
             <Card key={patient.id} className="shadow-md border-0 bg-white hover:shadow-lg transition-shadow">
               <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b">
                 <div className="flex items-center justify-between">
@@ -227,10 +253,14 @@ export default function PatientsPageClient({
               <div className="p-4 bg-gray-100 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
                 <Heart className="h-10 w-10 text-gray-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">{t('vet.noPatientsYet')}</h3>
-              <p className="text-gray-500 max-w-md mx-auto">
-                {t('vet.patientRegistryDesc')}
-              </p>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                {searchTerm.trim() ? t('vet.noResultsFound') : t('vet.noPatientsYet')}
+              </h3>
+              {!searchTerm.trim() && (
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {t('vet.patientRegistryDesc')}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

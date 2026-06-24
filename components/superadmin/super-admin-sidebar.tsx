@@ -5,16 +5,17 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileText, 
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
   Settings,
   Shield,
   BarChart3,
   Edit3,
   Bell,
-  Download
+  Download,
+  ShieldAlert
 } from "lucide-react"
 
 
@@ -62,6 +63,11 @@ export default function SuperAdminSidebar({ onNavigate }: SuperAdminSidebarProps
       name: t('superadmin.reviewConsultations'),
       href: "/superadmin/consultations",
       icon: FileText,
+    },
+    {
+      name: t('superadmin.chatModeration') || 'Chat Moderation',
+      href: "/superadmin/moderation",
+      icon: ShieldAlert,
     },
     {
       name: t('superadmin.settings'),

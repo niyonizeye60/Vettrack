@@ -4,10 +4,11 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Bell, Check, ArrowLeft } from "lucide-react"
+import { Bell, Check, ArrowLeft, Trash2, Clock } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
 import Link from "next/link"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 interface Notification {
   _id: string
@@ -17,6 +18,17 @@ interface Notification {
   priority: string
   read: boolean
   createdAt: string
+  expiresAt?: string
+}
+
+function getTimeLeft(expiresAt?: string) {
+  if (!expiresAt) return null
+  const diff = new Date(expiresAt).getTime() - Date.now()
+  if (diff <= 0) return "Expired"
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  if (hours > 0) return `Expires in ${hours}h ${minutes}m`
+  return `Expires in ${minutes}m`
 }
 
 export default function FarmerNotificationsPage() {
@@ -24,6 +36,13 @@ export default function FarmerNotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const stored = localStorage.getItem('farmer-dismissed-notifications')
+    if (stored) setDismissedIds(new Set(JSON.parse(stored)))
+  }, [])
 
   useEffect(() => {
     async function fetchData() {
@@ -32,11 +51,7 @@ export default function FarmerNotificationsPage() {
         setUser(userData)
         if (userData?._id) {
           await fetchNotifications(userData._id)
-          // Set up real-time polling
-          const interval = setInterval(() => {
-            fetchNotifications(userData._id)
-          }, 10000) // Poll every 10 seconds
-          
+          const interval = setInterval(() => fetchNotifications(userData._id), 10000)
           return () => clearInterval(interval)
         }
       } catch (error) {
@@ -54,18 +69,14 @@ export default function FarmerNotificationsPage() {
         fetch(`/api/notifications?userId=${userId}&role=farmer`),
         fetch('/api/announcements')
       ])
-      
       const notificationsData = await notificationsRes.json()
       const announcementsData = await announcementsRes.json()
-      
+
       let allNotifications: Notification[] = []
-      
-      // Add regular notifications
-      if (notificationsData.success && notificationsData.notifications) {
+
+      if (notificationsData.success && notificationsData.notifications)
         allNotifications = [...allNotifications, ...notificationsData.notifications]
-      }
-      
-      // Add announcements as notifications
+
       if (announcementsData.success && announcementsData.announcements) {
         const announcementNotifications = announcementsData.announcements.map((a: any) => ({
           _id: `announcement-${a._id}`,
@@ -78,67 +89,61 @@ export default function FarmerNotificationsPage() {
         }))
         allNotifications = [...allNotifications, ...announcementNotifications]
       }
-      
-      // Sort by creation date
+
       allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      setNotifications(allNotifications)
+
+      // If a notification comes back from API it means superadmin restored it — remove from dismissed
+      const restoredIds = allNotifications.map(n => n._id).filter(id => dismissedIds.has(id))
+      if (restoredIds.length > 0) {
+        const updated = new Set(dismissedIds)
+        restoredIds.forEach(id => updated.delete(id))
+        setDismissedIds(updated)
+        localStorage.setItem('farmer-dismissed-notifications', JSON.stringify([...updated]))
+      }
+
+      setNotifications(allNotifications.filter(n => !dismissedIds.has(n._id)))
     } catch (error) {
       console.error("Error fetching notifications:", error)
     }
   }
 
   const markAsRead = async (notificationId: string) => {
-    // Optimistic update - mark as read immediately
-    setNotifications(prev => 
-      prev.map(n => n._id === notificationId ? { ...n, read: true } : n)
-    )
-    
-    // Don't make API call for announcements
-    if (notificationId.startsWith('announcement-')) {
-      return
-    }
-    
+    setNotifications(prev => prev.map(n => n._id === notificationId ? { ...n, read: true } : n))
+    if (notificationId.startsWith('announcement-')) return
     try {
       const response = await fetch(`/api/notifications/${notificationId}/read`, { method: 'POST' })
-      
-      if (!response.ok) {
-        // Revert optimistic update on failure
-        setNotifications(prev => 
-          prev.map(n => n._id === notificationId ? { ...n, read: false } : n)
-        )
-      }
-    } catch (error) {
-      console.error("Error marking notification as read:", error)
-      // Revert optimistic update on error
-      setNotifications(prev => 
-        prev.map(n => n._id === notificationId ? { ...n, read: false } : n)
-      )
+      if (!response.ok)
+        setNotifications(prev => prev.map(n => n._id === notificationId ? { ...n, read: false } : n))
+    } catch {
+      setNotifications(prev => prev.map(n => n._id === notificationId ? { ...n, read: false } : n))
     }
   }
 
   const markAllAsRead = async () => {
-    // Optimistic update - mark all non-announcements as read immediately
-    const previousNotifications = notifications
-    setNotifications(prev => prev.map(n => 
-      n._id.startsWith('announcement-') ? n : { ...n, read: true }
-    ))
-    
+    const prev = notifications
+    setNotifications(p => p.map(n => n._id.startsWith('announcement-') ? n : { ...n, read: true }))
     try {
-      const response = await fetch(`/api/notifications/mark-all-read`, {
+      const res = await fetch(`/api/notifications/mark-all-read`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user._id, role: 'farmer' })
       })
-      
-      if (!response.ok) {
-        // Revert optimistic update on failure
-        setNotifications(previousNotifications)
-      }
-    } catch (error) {
-      console.error("Error marking all as read:", error)
-      // Revert optimistic update on error
-      setNotifications(previousNotifications)
+      if (!res.ok) setNotifications(prev)
+    } catch {
+      setNotifications(prev)
     }
+  }
+
+  const handleDelete = async (id: string) => {
+    const newDismissed = new Set(dismissedIds).add(id)
+    setDismissedIds(newDismissed)
+    localStorage.setItem('farmer-dismissed-notifications', JSON.stringify([...newDismissed]))
+    setNotifications(prev => prev.filter(n => n._id !== id))
+
+    if (!id.startsWith('announcement-')) {
+      await fetch(`/api/notifications?id=${id}&userId=${user._id}`, { method: 'DELETE' })
+    }
+    setDeleteId(null)
   }
 
   const getPriorityColor = (priority: string) => {
@@ -156,11 +161,7 @@ export default function FarmerNotificationsPage() {
         <div className="max-w-4xl mx-auto">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-24 bg-gray-200 rounded"></div>
-              ))}
-            </div>
+            {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-200 rounded"></div>)}
           </div>
         </div>
       </div>
@@ -187,11 +188,7 @@ export default function FarmerNotificationsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              onClick={() => user?._id && fetchNotifications(user._id)} 
-              variant="ghost" 
-              size="sm"
-            >
+            <Button onClick={() => user?._id && fetchNotifications(user._id)} variant="ghost" size="sm">
               ↻ {t('farmer.refresh') || 'Refresh'}
             </Button>
             {notifications.some(n => !n.read && !n._id.startsWith('announcement-')) && (
@@ -213,46 +210,86 @@ export default function FarmerNotificationsPage() {
               </CardContent>
             </Card>
           ) : (
-            notifications.map((notification) => (
-              <Card 
-                key={notification._id} 
-                className={`cursor-pointer transition-all hover:shadow-md ${
-                  !notification.read ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : ''
-                }`}
-                onClick={() => !notification.read && markAsRead(notification._id)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <CardTitle className={`text-lg ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
-                      {notification.title}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={getPriorityColor(notification.priority)}>
-                        {notification.priority}
-                      </Badge>
-                      <Badge variant="outline">
-                        {notification.type}
-                      </Badge>
-                      {!notification.read && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                      )}
+            notifications.map((notification) => {
+              const timeLeft = getTimeLeft(notification.expiresAt)
+              const isExpiringSoon = notification.expiresAt &&
+                (new Date(notification.expiresAt).getTime() - Date.now()) < 6 * 60 * 60 * 1000
+              return (
+                <Card
+                  key={notification._id}
+                  className={`transition-all hover:shadow-md ${
+                    !notification.read ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : ''
+                  }`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle
+                        className={`text-lg cursor-pointer ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}
+                        onClick={() => !notification.read && markAsRead(notification._id)}
+                      >
+                        {notification.title}
+                      </CardTitle>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="outline" className={getPriorityColor(notification.priority)}>
+                          {notification.priority}
+                        </Badge>
+                        <Badge variant="outline">{notification.type}</Badge>
+                        {!notification.read && <div className="w-2 h-2 bg-blue-500 rounded-full" />}
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 w-7 p-0 hover:bg-red-50"
+                          onClick={() => setDeleteId(notification._id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-700 mb-3">{notification.message}</p>
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <span>{new Date(notification.createdAt).toLocaleString()}</span>
-                    <span className={notification.read ? 'text-green-600' : 'text-blue-600'}>
-                      {notification.read ? 'Read' : 'Unread'}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-700 mb-3">{notification.message}</p>
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <span>{new Date(notification.createdAt).toLocaleString()}</span>
+                      <div className="flex items-center gap-3">
+                        {timeLeft && (
+                          <span className={`flex items-center gap-1 text-xs ${
+                            isExpiringSoon ? 'text-red-500 font-medium' : 'text-gray-400'
+                          }`}>
+                            <Clock className="h-3 w-3" />
+                            {timeLeft}
+                          </span>
+                        )}
+                        <span className={notification.read ? 'text-green-600' : 'text-blue-600'}>
+                          {notification.read ? 'Read' : 'Unread'}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })
           )}
         </div>
       </div>
+
+      <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Notification</AlertDialogTitle>
+            <AlertDialogDescription>
+              This notification will be hidden from your view. The super admin can still see it and restore it if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteId && handleDelete(deleteId)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

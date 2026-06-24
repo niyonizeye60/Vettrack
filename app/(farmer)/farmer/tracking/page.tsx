@@ -1,11 +1,13 @@
 "use client"
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart } from "recharts"
 import { useEffect, useState } from "react"
-import { Activity, MapPin, Heart, RefreshCw, Thermometer, Database, Download, FileText, FileSpreadsheet, Eye, EyeOff } from "lucide-react"
+import { Activity, MapPin, Heart, RefreshCw, Thermometer, Database, Download, FileText, FileSpreadsheet, Eye, EyeOff, User } from "lucide-react"
 import { DistributionChart } from "@/components/distribution-chart"
 import { RwandaMap } from "@/components/rwanda-map"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { getCurrentUser } from "@/lib/actions/auth"
+import { getCurrentUser as getAuthUser } from "@/lib/auth"
 
 // Define our data types based on API response
 type Channel = {
@@ -59,9 +61,10 @@ export default function PetTrackingPage() {
   const [results, setResults] = useState<number>(20)
   const [configLoading, setConfigLoading] = useState(true)
   const [showApiKey, setShowApiKey] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ name: string; email?: string; phone?: string } | null>(null)
   const role = "farmer" // TODO: Replace with dynamic role detection if needed
 
-  // Fetch config from API on mount
+  // Fetch config and user data from API on mount
   useEffect(() => {
     async function fetchConfig() {
       setConfigLoading(true)
@@ -78,7 +81,26 @@ export default function PetTrackingPage() {
         setConfigLoading(false)
       }
     }
+
+    async function fetchUser() {
+      try {
+        const userData = await getAuthUser()
+        if (userData) {
+          // cast to any for optional fields not declared on the User type (e.g. phone)
+          const u = userData as any
+          setCurrentUser({
+            name: u.name ?? userData.name,
+            email: u.email ?? userData.email,
+            phone: u.phone ?? undefined
+          })
+        }
+      } catch (err) {
+        console.error('Failed to fetch user data:', err)
+      }
+    }
+
     fetchConfig()
+    fetchUser()
   }, [])
 
   // Save config to API
@@ -218,7 +240,7 @@ export default function PetTrackingPage() {
     else if (bpm < 60) statusKey = "Low"
     else if (bpm <= 100) statusKey = "Normal"
     else if (bpm <= 130) statusKey = "Elevated"
-    
+
     acc[statusKey] = (acc[statusKey] || 0) + 1
     return acc
   }, {})
@@ -265,38 +287,128 @@ export default function PetTrackingPage() {
       const jsPDF = (await import('jspdf')).default
       const doc = new jsPDF()
 
-      // Header
-      doc.setFontSize(20)
-      doc.text(t('farmer.animalHealthMonitoringReport'), 20, 30)
+      // Header background
+      doc.setFillColor(22, 163, 74) // emerald-600
+      doc.rect(32, 5, 210, 30, 'F')
 
-      doc.setFontSize(12)
-      doc.text(`${t('farmer.animal')}: ${apiResponse?.channel.name || t('farmer.unknown')}`, 20, 50)
-      doc.text(`${t('farmer.generated')}: ${new Date().toLocaleString()}`, 20, 60)
-      doc.text(`${t('farmer.channelId')}: ${deviceId}`, 20, 70)
+      // Logo (if available)
+      try {
+        const logoImg = new Image()
+        logoImg.crossOrigin = 'anonymous'
+        logoImg.src = '/logo/Vet print.png'
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve
+          logoImg.onerror = reject
+        })
+        doc.addImage(logoImg, 'PNG', 15, 8, 35, 24)
+      } catch (error) {
+        console.log('Logo not loaded:', error)
+      }
 
-      // Stats
-      doc.setFontSize(14)
-      doc.text(t('farmer.healthSummary'), 20, 90)
+      // Header text
+      doc.setTextColor(255, 255, 255) // white
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text(t('farmer.animalHealthMonitoringReport'), 52, 20)
+
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Vettrack', 52, 28)
+
+      // Reset text color for body
+      doc.setTextColor(55, 65, 81) // gray-700
+      doc.setFontSize(11)
+      doc.text(`${t('farmer.animal')}: ${apiResponse?.channel.name || t('farmer.unknown')}`, 20, 55)
+      doc.text(`${t('farmer.generated')}: ${new Date().toLocaleString()}`, 20, 65)
+      doc.text(`${t('farmer.genName')}: ${currentUser?.name || 'Unknown User'}`, 20, 75)
+      doc.text(`${t('farmer.channelId')}: ${deviceId}`, 20, 85)
+
+      // Health Summary section
+      doc.setFillColor(248, 250, 252) // slate-50
+      doc.rect(15, 95, 180, 60, 'F')
+      doc.setDrawColor(226, 232, 240) // slate-200
+      doc.rect(15, 95, 180, 60, 'S')
+
+      doc.setTextColor(22, 163, 74) // emerald-600
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(t('farmer.healthSummary'), 20, 108)
+
+      doc.setTextColor(55, 65, 81) // gray-700
       doc.setFontSize(10)
-      doc.text(`${t('farmer.latest')} ${getFieldLabel('field1')}: ${latestBpm}`, 20, 105)
-      doc.text(`${t('farmer.average')} ${getFieldLabel('field1')}: ${averageBpm}`, 20, 115)
-      doc.text(`${t('farmer.latest')} ${t('farmer.temperature')}: ${latestTemperature || 'N/A'}°C`, 20, 125)
-      doc.text(`${t('farmer.locationCoverage')}: ${locationPercentage}%`, 20, 135)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${t('farmer.latest')} ${getFieldLabel('field1')}: ${latestBpm}`, 20, 120)
+      doc.text(`${t('farmer.average')} ${getFieldLabel('field1')}: ${averageBpm}`, 20, 130)
+      doc.text(`${t('farmer.latest')} ${t('farmer.temperature')}: ${latestTemperature || 'N/A'}°C`, 20, 140)
+      doc.text(`${t('farmer.locationCoverage')}: ${locationPercentage}%`, 20, 150)
 
-      // Recent data
-      doc.setFontSize(14)
-      doc.text(t('farmer.recentReadings'), 20, 155)
+      // Recent Readings section
+      doc.setTextColor(22, 163, 74) // emerald-600
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(t('farmer.recentReadings'), 20, 175)
+
+      doc.setTextColor(55, 65, 81) // gray-700
       doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
 
-      let yPos = 170
+      let yPos = 185
       data.slice(-15).forEach((item, index) => {
         if (yPos > 280) {
           doc.addPage()
           yPos = 20
         }
-        doc.text(`${new Date(item.timestamp).toLocaleString()} - BPM: ${item.bpm}, Temp: ${item.temperature || 'N/A'}°C`, 20, yPos)
-        yPos += 10
+        const status = getBpmStatus(item.bpm)
+        const statusColor: [number, number, number] = status.color === '#10B981' ? [16, 185, 129] :
+          status.color === '#EF4444' ? [239, 68, 68] :
+            status.color === '#F59E0B' ? [245, 158, 11] :
+              status.color === '#3B82F6' ? [59, 130, 246] : [156, 163, 175]
+
+        doc.setTextColor(...statusColor)
+        doc.text(`● `, 20, yPos)
+        doc.setTextColor(55, 65, 81)
+        doc.text(`${new Date(item.timestamp).toLocaleString()} - BPM: ${item.bpm}, Temp: ${item.temperature || 'N/A'}°C`, 25, yPos)
+        yPos += 8
       })
+
+      // Footer
+      const pageHeight = doc.internal.pageSize.height
+      doc.setFillColor(248, 250, 252) // slate-50
+      doc.rect(0, pageHeight - 25, 210, 25, 'F')
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      doc.setTextColor(55, 65, 81) // gray-700
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+
+      // Contact info
+      const contactInfo = `Contact Vettrack Support`
+      const emailInfo = `Email: info@vettrack.rw`
+      const phoneInfo = `Phone:+250 78 072 1800 `
+
+      const baseY = pageHeight - 22;
+      const lineHeight = 5;
+      const centerX = pageWidth / 2;
+
+      doc.text(contactInfo, centerX, baseY, { align: 'center' });
+      doc.text(emailInfo, centerX, baseY + lineHeight, { align: 'center' });
+      doc.text(phoneInfo, centerX, baseY + lineHeight * 2, { align: 'center' });
+
+      doc.textWithLink(
+        'Website: www.vettrack.rw | Generated by Vettrack System',
+        centerX,
+        baseY + lineHeight * 3,
+        { align: 'center', url: 'https://www.vettrack.rw' }
+      );
+
+      doc.text(
+        `© ${new Date().getFullYear()} Vettrack. All rights reserved.`,
+        centerX,
+        baseY + lineHeight * 4,
+        { align: 'center' }
+      );
+
 
       doc.save(`health-report-${new Date().toISOString().split('T')[0]}.pdf`)
     } catch (error) {
@@ -334,6 +446,7 @@ export default function PetTrackingPage() {
 
       // Animal info sheet
       const animalInfo = {
+        [t('farmer.genName')]: currentUser?.name || 'Unknown User',
         [t('farmer.animal')]: apiResponse?.channel.name || t('farmer.unknown'),
         [t('farmer.channelId')]: deviceId,
         [t('farmer.reportDate')]: new Date().toLocaleString(),
@@ -574,14 +687,14 @@ export default function PetTrackingPage() {
                   </div>
                   <span
                     className={`px-3 py-1 text-xs font-semibold rounded-full ${bpmStatus.color === "#10B981"
-                        ? "bg-green-100 text-green-800"
-                        : bpmStatus.color === "#EF4444"
-                          ? "bg-red-100 text-red-800"
-                          : bpmStatus.color === "#F59E0B"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : bpmStatus.color === "#3B82F6"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
+                      ? "bg-green-100 text-green-800"
+                      : bpmStatus.color === "#EF4444"
+                        ? "bg-red-100 text-red-800"
+                        : bpmStatus.color === "#F59E0B"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : bpmStatus.color === "#3B82F6"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
                       }`}
                   >
                     {bpmStatus.label}
@@ -598,14 +711,14 @@ export default function PetTrackingPage() {
                   </div>
                   <span
                     className={`px-3 py-1 text-xs font-semibold rounded-full ${temperatureStatus.color === "#10B981"
-                        ? "bg-green-100 text-green-800"
-                        : temperatureStatus.color === "#EF4444"
-                          ? "bg-red-100 text-red-800"
-                          : temperatureStatus.color === "#F59E0B"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : temperatureStatus.color === "#3B82F6"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
+                      ? "bg-green-100 text-green-800"
+                      : temperatureStatus.color === "#EF4444"
+                        ? "bg-red-100 text-red-800"
+                        : temperatureStatus.color === "#F59E0B"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : temperatureStatus.color === "#3B82F6"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
                       }`}
                   >
                     {temperatureStatus.label}
@@ -780,14 +893,14 @@ export default function PetTrackingPage() {
                               <div className="flex flex-col gap-1">
                                 <span
                                   className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${bpmStatus.color === "#10B981"
-                                      ? "bg-green-100 text-green-800"
-                                      : bpmStatus.color === "#EF4444"
-                                        ? "bg-red-100 text-red-800"
-                                        : bpmStatus.color === "#F59E0B"
-                                          ? "bg-yellow-100 text-yellow-800"
-                                          : bpmStatus.color === "#3B82F6"
-                                            ? "bg-blue-100 text-blue-800"
-                                            : "bg-gray-100 text-gray-800"
+                                    ? "bg-green-100 text-green-800"
+                                    : bpmStatus.color === "#EF4444"
+                                      ? "bg-red-100 text-red-800"
+                                      : bpmStatus.color === "#F59E0B"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : bpmStatus.color === "#3B82F6"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : "bg-gray-100 text-gray-800"
                                     }`}
                                 >
                                   {getFieldLabel("field1")}: {bpmStatus.label}
@@ -795,14 +908,14 @@ export default function PetTrackingPage() {
                                 {item.hasTemperature && (
                                   <span
                                     className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${tempStatus.color === "#10B981"
-                                        ? "bg-green-100 text-green-800"
-                                        : tempStatus.color === "#EF4444"
-                                          ? "bg-red-100 text-red-800"
-                                          : tempStatus.color === "#F59E0B"
-                                            ? "bg-yellow-100 text-yellow-800"
-                                            : tempStatus.color === "#3B82F6"
-                                              ? "bg-blue-100 text-blue-800"
-                                              : "bg-gray-100 text-gray-800"
+                                      ? "bg-green-100 text-green-800"
+                                      : tempStatus.color === "#EF4444"
+                                        ? "bg-red-100 text-red-800"
+                                        : tempStatus.color === "#F59E0B"
+                                          ? "bg-yellow-100 text-yellow-800"
+                                          : tempStatus.color === "#3B82F6"
+                                            ? "bg-blue-100 text-blue-800"
+                                            : "bg-gray-100 text-gray-800"
                                       }`}
                                   >
                                     {getFieldLabel("field4")}: {tempStatus.label}

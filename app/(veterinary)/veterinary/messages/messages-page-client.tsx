@@ -19,7 +19,7 @@ export default function MessagesPageClient() {
             <p className="text-purple-600 font-medium">{t('vet.messages')}</p>
           </div>
         </div>
-        <p className="text-gray-600 ml-14">{t('farmer.communicateVeterinarians')}</p>
+        <p className="text-gray-600 ml-14">{t('vet.communicateFarmers')}</p>
       </div>
       
       <MessagesPanel />

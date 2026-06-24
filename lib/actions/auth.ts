@@ -8,7 +8,7 @@ import { sendWelcomeEmail } from "../email" // Import the email function
 export async function registerUser(formData: FormData) {
   try {
     const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital") // Explicitly specify database name
+    const db = client.db("ntdm_animal_hospital") 
 
     const role = formData.get("role") as "farmer" | "doctor" | "admin" | "superadmin"
 
@@ -16,7 +16,7 @@ export async function registerUser(formData: FormData) {
     const userData = {
       name: formData.get("name"),
       email: formData.get("email"),
-      password: formData.get("password"), // In a real app, this would be hashed
+      password: formData.get("password"),
       phone: formData.get("phone"),
       role,
       status: "active",

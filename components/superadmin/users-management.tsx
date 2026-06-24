@@ -935,7 +935,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                   id="create-name"
                   value={createUserData.name}
                   onChange={(e) => setCreateUserData({...createUserData, name: e.target.value})}
-                  placeholder="John Doe"
+                  placeholder="Nkusi Jean"
                   required
                 />
               </div>

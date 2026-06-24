@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Bell } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface Consultation {
   _id: string
@@ -23,6 +24,7 @@ interface DeleteConsultationFormProps {
 }
 
 export default function DeleteConsultationForm({ consultation, farmerId }: DeleteConsultationFormProps) {
+  const { t } = useLanguage()
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -48,26 +50,26 @@ export default function DeleteConsultationForm({ consultation, farmerId }: Delet
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-red-600">Confirm Deletion</CardTitle>
+        <CardTitle className="text-red-600">{t('farmer.confirmDelete')}</CardTitle>
       </CardHeader>
       <CardContent>
         <Alert variant="destructive" className="mb-6">
           <Bell className="h-4 w-4" />
-          <AlertTitle>Warning</AlertTitle>
+          <AlertTitle>{t('farmer.warning')}</AlertTitle>
           <AlertDescription>
-            You are about to delete this consultation. This action cannot be undone.
+            {t('farmer.deleteConsultationConfirm')}. {t('farmer.deleteConsultationConfirmDesc')}.
           </AlertDescription>
         </Alert>
         
         <div className="space-y-3">
           <div>
-            <span className="font-semibold">Service:</span> {consultation.service}
+            <span className="font-semibold">{t('farmer.service')}:</span> {consultation.service}
           </div>
           <div>
-            <span className="font-semibold">Name:</span> {consultation.fullName}
+            <span className="font-semibold">{t('farmer.name')}:</span> {consultation.fullName}
           </div>
           <div>
-            <span className="font-semibold">Date:</span> {consultation.date} at {consultation.time}
+            <span className="font-semibold">{t('farmer.date')}:</span> {consultation.date} {t('farmer.at')} {consultation.time}
           </div>
         </div>
       </CardContent>
@@ -76,14 +78,14 @@ export default function DeleteConsultationForm({ consultation, farmerId }: Delet
           variant="outline"
           onClick={() => router.push(`/farmer/consultations/${consultation._id}`)}
         >
-          Cancel
+          {t('farmer.cancel')}
         </Button>
         <Button
           variant="destructive"
           onClick={handleDelete}
           disabled={isDeleting}
         >
-          {isDeleting ? "Deleting..." : "Confirm Delete"}
+          {isDeleting ? "Deleting..." : (t('farmer.confirmDelete'))}
         </Button>
       </CardFooter>
     </Card>

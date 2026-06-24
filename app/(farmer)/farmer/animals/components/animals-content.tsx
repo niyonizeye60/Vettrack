@@ -5,8 +5,15 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { MoreVertical } from "lucide-react"
 import { Bell } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu"
 
 interface AnimalsContentProps {
   animals: any[]
@@ -30,7 +37,7 @@ export default function AnimalsContent({ animals }: AnimalsContentProps) {
           </Button>
         </div>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>{t('farmer.animalsInventory')}</CardTitle>
@@ -53,8 +60,12 @@ export default function AnimalsContent({ animals }: AnimalsContentProps) {
                   <TableHead>{t('farmer.name')}</TableHead>
                   <TableHead>{t('farmer.type')}</TableHead>
                   <TableHead>{t('farmer.breed')}</TableHead>
+                  <TableHead>{t('farmer.insuranceId')}</TableHead>
+                  <TableHead>{t('animal.earTagId')}</TableHead>
+                  <TableHead>{t('farmer.acquisitionType')}</TableHead>
                   <TableHead>{t('farmer.location')}</TableHead>
                   <TableHead>{t('farmer.status')}</TableHead>
+                  <TableHead>{t('farmer.gender')}</TableHead>
                   <TableHead>{t('farmer.price')}</TableHead>
                   <TableHead>{t('farmer.actions')}</TableHead>
                 </TableRow>
@@ -65,6 +76,9 @@ export default function AnimalsContent({ animals }: AnimalsContentProps) {
                     <TableCell className="font-medium">{animal.name}</TableCell>
                     <TableCell>{animal.type}</TableCell>
                     <TableCell>{animal.breed}</TableCell>
+                    <TableCell>{animal.insuranceId}</TableCell>
+                    <TableCell>{animal.earTagId}</TableCell>
+                    <TableCell>{animal.acquisitionType}</TableCell>
                     <TableCell>{animal.district}, {animal.sector}</TableCell>
                     <TableCell>
                       <Badge
@@ -73,32 +87,42 @@ export default function AnimalsContent({ animals }: AnimalsContentProps) {
                           animal.status === "Healthy"
                             ? "bg-green-100 text-green-800"
                             : animal.status === "Sick"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : animal.status === "Under Treatment"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : animal.status === "Under Treatment"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-gray-100 text-gray-800"
                         }
                       >
                         {animal.status === "Healthy" ? t('farmer.healthy') :
-                         animal.status === "Sick" ? t('farmer.sick') :
-                         animal.status === "Under Treatment" ? t('farmer.underTreatment') :
-                         animal.status}
+                          animal.status === "Sick" ? t('farmer.sick') :
+                            animal.status === "Under Treatment" ? t('farmer.underTreatment') :
+                              animal.status}
                       </Badge>
                     </TableCell>
+                    <TableCell>{animal.gender ? t(`farmer.${animal.gender}`) : t('farmer.undefined')}</TableCell>
                     <TableCell>RWF {animal.price}</TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/farmer/animals/${animal._id}`}>
-                            {t('farmer.viewDetails')}
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/farmer/animals/edit/${animal._id}`}>
-                            {t('farmer.edit')}
-                          </Link>
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/farmer/animals/${animal._id}`}>
+                              {t("farmer.viewDetails")}
+                            </Link>
+                          </DropdownMenuItem>
+
+                          <DropdownMenuItem asChild>
+                            <Link href={`/farmer/animals/edit/${animal._id}`}>
+                              {t("farmer.edit")}
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
