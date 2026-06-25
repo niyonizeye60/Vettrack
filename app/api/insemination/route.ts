@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { farmerId, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, deliveredBabies, vetName, vetOrigin, date, notes } = body
+    const { farmerId, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, deliveredBabies, vetName, vetOrigin, date, notes, previousRecordId } = body
     if (!farmerId || !date) return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
 
     const client = await clientPromise
@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
       vetName: vetName || null,
       vetOrigin: vetOrigin || null,
       date, notes: notes || null,
+      previousRecordId: previousRecordId || null,
+      pregnancyFailed: false,
       createdAt: new Date(),
     }
 
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, deliveredBabies, vetName, vetOrigin, date, notes } = body
+    const { id, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, deliveredBabies, vetName, vetOrigin, date, notes, previousRecordId, pregnancyFailed } = body
     if (!id) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
 
     const client = await clientPromise
@@ -66,7 +68,7 @@ export async function PUT(req: NextRequest) {
 
     await db.collection("insemination_records").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { animalId: animalId || null, animalName: animalName || null, semenTypes: semenTypes || [], semenPrice: semenPrice ? Number(semenPrice) : null, vetPrice: vetPrice ? Number(vetPrice) : null, injectionTime: injectionTime || null, expectedBirthDate: expectedBirthDate || null, deliveredBabies: deliveredBabies != null ? Number(deliveredBabies) : null, vetName: vetName || null, vetOrigin: vetOrigin || null, date, notes: notes || null, updatedAt: new Date() } }
+      { $set: { animalId: animalId || null, animalName: animalName || null, semenTypes: semenTypes || [], semenPrice: semenPrice ? Number(semenPrice) : null, vetPrice: vetPrice ? Number(vetPrice) : null, injectionTime: injectionTime || null, expectedBirthDate: expectedBirthDate || null, deliveredBabies: deliveredBabies != null ? Number(deliveredBabies) : null, vetName: vetName || null, vetOrigin: vetOrigin || null, date, notes: notes || null, previousRecordId: previousRecordId || null, pregnancyFailed: !!pregnancyFailed, updatedAt: new Date() } }
     )
     return NextResponse.json({ success: true })
   } catch {

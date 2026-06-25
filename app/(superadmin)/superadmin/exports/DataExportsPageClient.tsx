@@ -7,22 +7,38 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
-import { 
-  exportUsers, 
-  exportConsultations, 
-  exportSystemLogs, 
+import {
+  exportUsers,
+  exportConsultations,
+  exportSystemLogs,
   exportSystemReport,
   scheduleDataExport
 } from "@/lib/actions/superadmin"
-import { 
-  Download, 
-  Users, 
-  FileText, 
-  Activity, 
-  BarChart3, 
+import {
+  Download,
+  Users,
+  FileText,
+  Activity,
+  BarChart3,
   Calendar,
-  Clock
+  Clock,
+  Database,
+  Upload,
+  ShieldAlert,
+  Eye,
+  EyeOff
 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -62,6 +78,15 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
     frequency: 'weekly',
     email: ''
   })
+
+  const [isDownloadingBackup, setIsDownloadingBackup] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importConnectionString, setImportConnectionString] = useState("")
+  const [importTargetDatabase, setImportTargetDatabase] = useState("")
+  const [showConnectionString, setShowConnectionString] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ database: string; summary: Record<string, any> } | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
 
   const downloadCSV = (data: any[], filename: string) => {
     if (data.length === 0) {
@@ -117,7 +142,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       const result = await exportUsers(filters)
       
       if (result.success) {
-        downloadCSV(result.data, 'users-export')
+        downloadCSV(result.data || [], 'users-export')
         toast({ title: "Success", description: `Exported ${result.count} users` })
       } else {
         toast({ title: "Error", description: result.message || 'Failed to export users', variant: "destructive" })
@@ -147,7 +172,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       const result = await exportConsultations(filters)
       
       if (result.success) {
-        downloadCSV(result.data, 'consultations-export')
+        downloadCSV(result.data || [], 'consultations-export')
         toast({ title: "Success", description: `Exported ${result.count} consultations` })
       } else {
         toast({ title: "Error", description: result.message || 'Failed to export consultations', variant: "destructive" })
@@ -175,7 +200,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       const result = await exportSystemLogs(filters)
       
       if (result.success) {
-        downloadCSV(result.data, 'system-logs-export')
+        downloadCSV(result.data || [], 'system-logs-export')
         toast({ title: "Success", description: `Exported ${result.count} log entries` })
       } else {
         toast({ title: "Error", description: result.message || 'Failed to export logs', variant: "destructive" })
@@ -229,6 +254,44 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
     }
   }
 
+  const handleDownloadBackup = () => {
+    setIsDownloadingBackup(true)
+    toast({ title: "Preparing backup", description: "Your full database backup download will start shortly." })
+    window.location.href = "/api/superadmin/database/export"
+    setTimeout(() => setIsDownloadingBackup(false), 3000)
+  }
+
+  const handleImport = async () => {
+    if (!importFile || !importConnectionString.trim()) return
+
+    setIsImporting(true)
+    setImportResult(null)
+    setImportError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", importFile)
+      formData.append("connectionString", importConnectionString.trim())
+      if (importTargetDatabase.trim()) formData.append("targetDatabase", importTargetDatabase.trim())
+
+      const res = await fetch("/api/superadmin/database/import", { method: "POST", body: formData })
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Import failed")
+      }
+
+      setImportResult(data)
+      toast({ title: "Import complete", description: `Data imported into "${data.database}"` })
+    } catch (error: any) {
+      const message = error?.message || "Import failed"
+      setImportError(message)
+      toast({ title: "Error", description: message, variant: "destructive" })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -241,6 +304,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
         <TabsList>
           <TabsTrigger value="manual">{t('superadmin.manualExports') || 'Manual Exports'}</TabsTrigger>
           <TabsTrigger value="scheduled">{t('superadmin.scheduledExports') || 'Scheduled Exports'}</TabsTrigger>
+          <TabsTrigger value="backup">{t('superadmin.databaseBackup') || 'Database Backup'}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manual" className="space-y-6">
@@ -502,6 +566,147 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
                 <Calendar className="w-4 h-4 mr-2" />
                 {t('superadmin.scheduleExport') || 'Schedule Export'}
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="backup" className="space-y-6">
+          {/* Full Database Export */}
+          <Card className="border-amber-200">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Database className="w-5 h-5 mr-2" />
+                {t('superadmin.exportFullDatabase') || 'Export Full Database'}
+              </CardTitle>
+              <CardDescription>
+                {t('superadmin.exportFullDatabaseDesc') ||
+                  "Downloads every collection and document in the database — including users, sessions, chats, and all other records — as a single compressed backup file."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
+                <ShieldAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  {t('superadmin.exportFullDatabaseWarning') ||
+                    'This file contains sensitive data (including account credentials and private messages). Store it securely and delete it once your migration is complete.'}
+                </span>
+              </div>
+              <Button onClick={handleDownloadBackup} disabled={isDownloadingBackup}>
+                <Download className="w-4 h-4 mr-2" />
+                {isDownloadingBackup
+                  ? (t('superadmin.startingDownload') || 'Starting download...')
+                  : (t('superadmin.downloadFullBackup') || 'Download Full Backup')}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Full Database Import */}
+          <Card className="border-red-200">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Upload className="w-5 h-5 mr-2" />
+                {t('superadmin.importDatabaseBackup') || 'Import Database Backup'}
+              </CardTitle>
+              <CardDescription>
+                {t('superadmin.importDatabaseBackupDesc') ||
+                  "Restores a backup file into a different MongoDB Atlas cluster — for example, when moving this project to a new database. Documents that already exist in the target (matched by _id) are left untouched; only missing ones are inserted."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3">
+                <ShieldAlert className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  {t('superadmin.importConnectionStringWarning') ||
+                    'The connection string below is sent to the server only to perform this import and is never stored or logged. Double-check it points at the correct (new) cluster before continuing.'}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('superadmin.backupFile') || 'Backup file'}</Label>
+                <Input
+                  type="file"
+                  accept=".gz,.ndjson,.json"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('superadmin.newDbConnectionString') || 'New database connection string'}</Label>
+                <div className="relative">
+                  <Input
+                    type={showConnectionString ? "text" : "password"}
+                    value={importConnectionString}
+                    onChange={(e) => setImportConnectionString(e.target.value)}
+                    placeholder="mongodb+srv://user:password@new-cluster.mongodb.net"
+                    className="pr-10"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConnectionString((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    aria-label={showConnectionString ? "Hide connection string" : "Show connection string"}
+                  >
+                    {showConnectionString ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t('superadmin.targetDatabaseName') || 'Target database name (optional)'}</Label>
+                <Input
+                  value={importTargetDatabase}
+                  onChange={(e) => setImportTargetDatabase(e.target.value)}
+                  placeholder={t('superadmin.targetDatabaseNamePlaceholder') || "Defaults to the database name recorded in the backup"}
+                />
+              </div>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    disabled={!importFile || !importConnectionString.trim() || isImporting}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {isImporting
+                      ? (t('superadmin.importing') || 'Importing...')
+                      : (t('superadmin.importIntoNewDatabase') || 'Import Into New Database')}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t('superadmin.confirmImportTitle') || 'Import into the new database?'}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t('superadmin.confirmImportDesc') ||
+                        `This will connect to the connection string you entered and insert every document from "${importFile?.name ?? 'the selected backup file'}" into it. Documents that already exist there are skipped, not overwritten. Make sure the connection string is correct before continuing.`}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{t('superadmin.cancel') || 'Cancel'}</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleImport} className="bg-red-600 hover:bg-red-700 text-white">
+                      {t('superadmin.confirmImportAction') || 'Yes, import now'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {importError && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-3">{importError}</div>
+              )}
+
+              {importResult && (
+                <div className="text-sm bg-green-50 border border-green-200 rounded-md p-3 space-y-1">
+                  <p className="font-medium text-green-800">
+                    {(t('superadmin.importedInto') || 'Imported into')} "{importResult.database}"
+                  </p>
+                  {Object.entries(importResult.summary).map(([name, stats]: [string, any]) => (
+                    <p key={name} className="text-green-700">
+                      {name}: {stats.documentsInserted} inserted, {stats.documentsSkipped} already existed
+                      {stats.indexesCreated ? `, ${stats.indexesCreated} indexes created` : ""}
+                    </p>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -31,6 +31,8 @@ interface InseminationRecord {
   vetOrigin: string | null
   date: string
   notes: string | null
+  previousRecordId?: string | null
+  pregnancyFailed?: boolean | null
 }
 
 const SEMEN_TYPES = ["Sexed Freisian", "Sexed Jersey", "Ordinary Freisian", "Ordinary Jersey", "Fleckv", "Girolando"]
@@ -94,6 +96,9 @@ export default function InseminationPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [genderAlertAnimal, setGenderAlertAnimal] = useState<Animal | null>(null)
   const [semenTypeOpen, setSemenTypeOpen] = useState(false)
+  const [reinseminateFrom, setReinseminateFrom] = useState<InseminationRecord | null>(null)
+  const [reinseminateConfirm, setReinseminateConfirm] = useState<InseminationRecord | null>(null)
+  const [activeTab, setActiveTab] = useState("record")
 
   // Form fields
   const [animalId, setAnimalId] = useState("")
@@ -111,12 +116,13 @@ export default function InseminationPage() {
   const [notes, setNotes] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Pregnant animal IDs — those with a future expectedBirthDate and no deliveredBabies yet
+  // Pregnant animal IDs — those with a future expectedBirthDate, no deliveredBabies yet,
+  // and not explicitly marked as a failed pregnancy (which frees the animal up for re-insemination)
   const pregnantAnimalIds = useMemo(() => {
     const now = today
     return new Set(
       records
-        .filter(r => r.animalId && r.expectedBirthDate && r.expectedBirthDate >= now && !r.deliveredBabies)
+        .filter(r => r.animalId && r.expectedBirthDate && r.expectedBirthDate >= now && !r.deliveredBabies && !r.pregnancyFailed)
         .map(r => r.animalId as string)
     )
   }, [records])
@@ -202,7 +208,7 @@ export default function InseminationPage() {
     setAnimalId(""); setInsuranceId(""); setEarTagId(""); setSemenTypes([]); setSemenPrice(""); setVetPrice("")
     setInjectionTime(""); setExpectedBirthDate(""); setDeliveredBabies(""); setVetName(""); setVetOrigin("")
     setDate(today); setNotes(""); setErrors({}); setEditRecord(null)
-    setSemenTypeOpen(false)
+    setSemenTypeOpen(false); setReinseminateFrom(null)
   }
 
   const handleSubmit = async () => {
@@ -222,6 +228,9 @@ export default function InseminationPage() {
       semenTypes, semenPrice, vetPrice, injectionTime,
       expectedBirthDate, deliveredBabies: deliveredBabies ? Number(deliveredBabies) : null,
       vetName, vetOrigin, date, notes,
+      // Preserve lineage/outcome on edit; attach lineage to the previous attempt when re-inseminating
+      previousRecordId: editRecord ? (editRecord.previousRecordId || null) : (reinseminateFrom?._id || null),
+      pregnancyFailed: editRecord ? !!editRecord.pregnancyFailed : false,
     }
 
     if (editRecord) {
@@ -233,6 +242,34 @@ export default function InseminationPage() {
     await fetchRecords(user._id.toString())
     resetForm()
     setSaving(false)
+  }
+
+  // Mark the previous attempt as a failed pregnancy (keeping it in history) and
+  // pre-fill a fresh insemination record for the same animal.
+  const handleReinseminate = async (r: InseminationRecord) => {
+    await fetch("/api/insemination", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: r._id,
+        animalId: r.animalId, animalName: r.animalName, semenTypes: r.semenTypes,
+        semenPrice: r.semenPrice, vetPrice: r.vetPrice, injectionTime: r.injectionTime,
+        expectedBirthDate: r.expectedBirthDate, deliveredBabies: r.deliveredBabies,
+        vetName: r.vetName, vetOrigin: r.vetOrigin, date: r.date, notes: r.notes,
+        previousRecordId: r.previousRecordId || null,
+        pregnancyFailed: true,
+      }),
+    })
+    await fetchRecords(user._id.toString())
+
+    resetForm()
+    setReinseminateFrom(r)
+    setAnimalId(r.animalId || "")
+    const animal = animals.find(a => a._id === r.animalId)
+    setInsuranceId(animal?.insuranceId || "")
+    setEarTagId(animal?.earTagId || "")
+    if (animal?.type?.toLowerCase() === "cow") setExpectedBirthDate(calcExpectedBirth(today))
+    setActiveTab("record")
   }
 
   const handleEdit = (r: InseminationRecord) => {
@@ -274,18 +311,21 @@ export default function InseminationPage() {
   )
 
   // Per-cow summary for reports
-  const cowSummary = useMemo(() => {
-    const map: Record<string, { name: string; inseminations: number; babies: number; totalCost: number; lastDate: string }> = {}
-    records.forEach(r => {
+  const summarizeByAnimal = (list: InseminationRecord[]) => {
+    const map: Record<string, { name: string; inseminations: number; failedAttempts: number; babies: number; totalCost: number; lastDate: string }> = {}
+    list.forEach(r => {
       const key = r.animalId || "general"
-      if (!map[key]) map[key] = { name: r.animalName || "General", inseminations: 0, babies: 0, totalCost: 0, lastDate: "" }
+      if (!map[key]) map[key] = { name: r.animalName || "General", inseminations: 0, failedAttempts: 0, babies: 0, totalCost: 0, lastDate: "" }
       map[key].inseminations += 1
+      if (r.pregnancyFailed) map[key].failedAttempts += 1
       map[key].babies += r.deliveredBabies || 0
       map[key].totalCost += (r.semenPrice || 0) + (r.vetPrice || 0)
       if (!map[key].lastDate || r.date > map[key].lastDate) map[key].lastDate = r.date
     })
     return Object.values(map).sort((a, b) => b.inseminations - a.inseminations)
-  }, [records])
+  }
+
+  const cowSummary = useMemo(() => summarizeByAnimal(records), [records])
 
   const getAnimalInsuranceId = (id: string | null) =>
     animals.find(a => a._id === id)?.insuranceId || "—"
@@ -293,6 +333,22 @@ export default function InseminationPage() {
   // Export
   const [exportOpen, setExportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [exportAnimalFilter, setExportAnimalFilter] = useState("")
+
+  const exportFilteredRecords = useMemo(
+    () => exportAnimalFilter ? records.filter(r => r.animalId === exportAnimalFilter) : records,
+    [records, exportAnimalFilter]
+  )
+  const exportSummary = useMemo(() => summarizeByAnimal(exportFilteredRecords), [exportFilteredRecords])
+  const exportTotalBabies = useMemo(
+    () => exportFilteredRecords.reduce((s, r) => s + (r.deliveredBabies || 0), 0),
+    [exportFilteredRecords]
+  )
+  const exportTotalCost = useMemo(
+    () => exportFilteredRecords.reduce((s, r) => s + (r.semenPrice || 0) + (r.vetPrice || 0), 0),
+    [exportFilteredRecords]
+  )
+  const exportAnimalName = exportAnimalFilter ? animals.find(a => a._id === exportAnimalFilter)?.name || "" : ""
 
   const exportToPDF = async () => {
     setExporting(true)
@@ -310,7 +366,7 @@ export default function InseminationPage() {
       } catch { }
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(16); doc.setFont("helvetica", "bold")
-      doc.text("Insemination Report", 45, 18)
+      doc.text(exportAnimalName ? `Insemination Report — ${exportAnimalName}` : "Insemination Report", 45, 18)
       doc.setFontSize(10); doc.setFont("helvetica", "normal")
       doc.text("NTDM Animal Hospital", 45, 27)
 
@@ -325,9 +381,9 @@ export default function InseminationPage() {
       doc.setTextColor(22, 163, 74); doc.setFontSize(11); doc.setFont("helvetica", "bold")
       doc.text("Summary", 20, 77)
       doc.setTextColor(55, 65, 81); doc.setFont("helvetica", "normal"); doc.setFontSize(10)
-      doc.text(`Total Records: ${records.length}`, 20, 87)
-      doc.text(`Total Babies Delivered: ${totalBabies}`, 80, 87)
-      doc.text(`Total Cost: RWF ${totalCost.toLocaleString()}`, 145, 87)
+      doc.text(`Total Records: ${exportFilteredRecords.length}`, 20, 87)
+      doc.text(`Total Babies Delivered: ${exportTotalBabies}`, 80, 87)
+      doc.text(`Total Cost: RWF ${exportTotalCost.toLocaleString()}`, 145, 87)
 
       // Per-cow summary table
       let y = 106
@@ -337,12 +393,13 @@ export default function InseminationPage() {
       y += 6
 
       const summaryCols = {
-        animal: { x: 18, width: 25 },
-        insurance: { x: 45, width: 30 },
-        earTag: { x: 80, width: 25 },
-        inseminations: { x: 112, width: 20 },
-        babies: { x: 145, width: 20 },
-        cost: { x: 170, width: 20 },
+        animal: { x: 17, width: 20 },
+        insurance: { x: 39, width: 22 },
+        earTag: { x: 63, width: 18 },
+        inseminations: { x: 84, width: 16 },
+        failed: { x: 103, width: 14 },
+        babies: { x: 120, width: 14 },
+        cost: { x: 138, width: 26 },
       }
 
       doc.setFillColor(22, 163, 74)
@@ -352,13 +409,14 @@ export default function InseminationPage() {
       doc.text("Animal", summaryCols.animal.x, y)
       doc.text("Insurance ID", summaryCols.insurance.x, y)
       doc.text("Ear Tag ID", summaryCols.earTag.x, y)
-      doc.text("Inseminations", summaryCols.inseminations.x, y)
+      doc.text("Insem.", summaryCols.inseminations.x, y)
+      doc.text("Failed", summaryCols.failed.x, y)
       doc.text("Babies", summaryCols.babies.x, y)
       doc.text("Cost", summaryCols.cost.x, y)
       doc.setFont("helvetica", "normal")
       y += 8
 
-      cowSummary.forEach((c, i) => {
+      exportSummary.forEach((c, i) => {
         const animal = animals.find(a => a.name === c.name)
 
         const animalLines = doc.splitTextToSize(c.name || "—", summaryCols.animal.width)
@@ -376,6 +434,8 @@ export default function InseminationPage() {
         doc.text(insuranceLines, summaryCols.insurance.x, y)
         doc.text(earTagLines, summaryCols.earTag.x, y)
         doc.text(String(c.inseminations), summaryCols.inseminations.x, y)
+        doc.setTextColor(220, 38, 38)
+        doc.text(c.failedAttempts > 0 ? String(c.failedAttempts) : "—", summaryCols.failed.x, y)
         doc.setTextColor(22, 163, 74)
         doc.text(String(c.babies), summaryCols.babies.x, y)
         doc.setTextColor(55, 65, 81)
@@ -415,14 +475,14 @@ export default function InseminationPage() {
         doc.text("Vet Price", detailCols.vetPrice.x, y)
         doc.text("Exp. Birth", detailCols.expectedBirth.x, y)
         doc.text("Babies", detailCols.babies.x, y)
-        doc.text("Days to Birth", detailCols.daysToBirth.x, y)
+        doc.text("Outcome", detailCols.daysToBirth.x, y)
         doc.setFont("helvetica", "normal")
         y += 8
       }
 
       drawDetailHeader()
 
-      records.forEach((r, i) => {
+      exportFilteredRecords.forEach((r, i) => {
         const semenText = Array.isArray(r.semenTypes) ? r.semenTypes.join(", ") : r.semenTypes || "—"
         const semenLines = doc.splitTextToSize(semenText, detailCols.semen.width)
         const animalLines = doc.splitTextToSize(r.animalName || "General", detailCols.animal.width)
@@ -432,7 +492,10 @@ export default function InseminationPage() {
         let daysToBirthText = "—"
         let daysToBirthColor: [number, number, number] = [156, 163, 175] // gray
 
-        if (r.expectedBirthDate && r.deliveredBabies == null) {
+        if (r.pregnancyFailed) {
+          daysToBirthText = "Not Pregnant"
+          daysToBirthColor = [220, 38, 38]   // red
+        } else if (r.expectedBirthDate && r.deliveredBabies == null) {
           const diffDays = Math.ceil(
             (new Date(r.expectedBirthDate).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0))
             / (1000 * 60 * 60 * 24)
@@ -512,7 +575,7 @@ export default function InseminationPage() {
 
       drawVetHeader()
 
-      records.forEach((r, i) => {
+      exportFilteredRecords.forEach((r, i) => {
         const animalLines = doc.splitTextToSize(r.animalName || "General", vetCols.animal.width)
         const vetNameLines = doc.splitTextToSize(r.vetName || "—", vetCols.vetName.width)
         const originLines = doc.splitTextToSize(r.vetOrigin || "—", vetCols.vetOrigin.width)
@@ -551,7 +614,8 @@ export default function InseminationPage() {
         doc.text(`Page ${page} of ${totalPages}`, pageWidth - 15, pageHeight - 7, { align: "right" })
       }
 
-      doc.save(`insemination-report-${today}.pdf`)
+      const pdfSuffix = exportAnimalName ? `-${exportAnimalName.replace(/\s+/g, "_")}` : ""
+      doc.save(`insemination-report${pdfSuffix}-${today}.pdf`)
       setExportOpen(false)
     } catch (err) {
       console.error("PDF export failed:", err)
@@ -567,21 +631,22 @@ export default function InseminationPage() {
       const wb = XLSX.utils.book_new()
 
       // Sheet 1 — Per-cow summary with babies counter
-      const summaryData = cowSummary.map(c => ({
+      const summaryData = exportSummary.map(c => ({
         Animal: c.name,
         "Insurance ID": animals.find(a => a.name === c.name)?.insuranceId || "—",
         "Ear Tag ID": animals.find(a => a.name === c.name)?.earTagId || "—",
         "Total Inseminations": c.inseminations,
+        "Failed Attempts": c.failedAttempts,
         "Calfs Born": c.babies,
         "Total Cost (RWF)": c.totalCost,
         "Last Insemination": c.lastDate,
       }))
       const ws1 = XLSX.utils.json_to_sheet(summaryData)
-      ws1["!cols"] = [20, 22, 22, 14, 20, 20].map(w => ({ wch: w }))
+      ws1["!cols"] = [20, 22, 22, 14, 14, 20, 20].map(w => ({ wch: w }))
       XLSX.utils.book_append_sheet(wb, ws1, "Per-Cow Summary")
 
       // Sheet 2 — All records
-      const recordsData = records.map(r => ({
+      const recordsData = exportFilteredRecords.map(r => ({
         Date: r.date,
         Animal: r.animalName || "General",
         "Insurance ID": getAnimalInsuranceId(r.animalId),
@@ -592,16 +657,18 @@ export default function InseminationPage() {
         "Injection Time": r.injectionTime || "—",
         "Expected Birth Date": r.expectedBirthDate || "—",
         "Babies Delivered": r.deliveredBabies ?? "—",
+        Outcome: r.pregnancyFailed ? "Not Pregnant" : r.deliveredBabies != null ? "Delivered" : "Pending",
+        "Re-attempt Of": r.previousRecordId ? (records.find(x => x._id === r.previousRecordId)?.date || "—") : "—",
         Vet: r.vetName || "—",
         Organization: r.vetOrigin || "—",
         Notes: r.notes || "—",
       }))
       const ws2 = XLSX.utils.json_to_sheet(recordsData)
-      ws2["!cols"] = [14, 18, 22, 22, 18, 16, 16, 20, 18, 20, 22, 30].map(w => ({ wch: w }))
+      ws2["!cols"] = [14, 18, 22, 22, 18, 16, 16, 20, 18, 20, 16, 16, 22, 30].map(w => ({ wch: w }))
       XLSX.utils.book_append_sheet(wb, ws2, "All Records")
 
       // Sheet 3 — Vet & Injection Details
-      const vetData = records.map(r => ({
+      const vetData = exportFilteredRecords.map(r => ({
         Date: r.date,
         Animal: r.animalName || "General",
         "Vet Name": r.vetName || "—",
@@ -613,7 +680,8 @@ export default function InseminationPage() {
       ws3["!cols"] = [14, 22, 28, 32, 18, 40].map(w => ({ wch: w }))
       XLSX.utils.book_append_sheet(wb, ws3, "Vet & Injection Details")
 
-      XLSX.writeFile(wb, `insemination-report-${today}.xlsx`)
+      const excelSuffix = exportAnimalName ? `-${exportAnimalName.replace(/\s+/g, "_")}` : ""
+      XLSX.writeFile(wb, `insemination-report${excelSuffix}-${today}.xlsx`)
       setExportOpen(false)
     } catch (err) {
       console.error("Excel export failed:", err)
@@ -681,7 +749,7 @@ export default function InseminationPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="record">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-3 w-full max-w-md">
           <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> Record</TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> History</TabsTrigger>
@@ -698,6 +766,14 @@ export default function InseminationPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {reinseminateFrom && (
+                <div className="flex items-center justify-between gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                  <span>
+                    Re-inseminating <strong>{reinseminateFrom.animalName || "this animal"}</strong> — the attempt on {reinseminateFrom.date} did not result in pregnancy. That record has been kept in History.
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={resetForm} className="text-amber-700 hover:bg-amber-100 shrink-0">Cancel</Button>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                 {/* Animal — only non-pregnant females */}
@@ -926,7 +1002,7 @@ export default function InseminationPage() {
                       <TableHead>Semen Price</TableHead>
                       <TableHead>Vet Price</TableHead>
                       <TableHead>Injection Time</TableHead>
-                      <TableHead>Expected Birth In</TableHead>
+                      <TableHead>Expected Birth / Outcome</TableHead>
                       <TableHead>Babies</TableHead>
                       <TableHead>Vet</TableHead>
                       <TableHead>Organization</TableHead>
@@ -939,7 +1015,14 @@ export default function InseminationPage() {
                     ) : filteredRecords.map(r => (
                       <TableRow key={r._id}>
                         <TableCell className="text-sm">{r.date}</TableCell>
-                        <TableCell className="text-sm">{r.animalName || <span className="text-gray-400">General</span>}</TableCell>
+                        <TableCell className="text-sm">
+                          {r.animalName || <span className="text-gray-400">General</span>}
+                          {r.previousRecordId && (
+                            <Badge variant="outline" className="ml-1.5 bg-amber-50 text-amber-700 border-amber-200 text-[10px]" title="Follows a failed attempt">
+                              Re-attempt
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {(r.semenTypes || []).map(t => (
@@ -951,11 +1034,15 @@ export default function InseminationPage() {
                         <TableCell className="text-sm">{r.vetPrice != null ? r.vetPrice : <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell className="text-sm">{r.injectionTime || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell>
-                          {r.expectedBirthDate
-                            ? r.deliveredBabies != null
+                          {r.deliveredBabies != null
+                            ? r.expectedBirthDate
                               ? <span className="text-xs text-gray-400">{r.expectedBirthDate}</span>
-                              : <BirthCountdown targetDate={r.expectedBirthDate} />
-                            : <span className="text-gray-400">—</span>
+                              : <span className="text-gray-400">—</span>
+                            : r.pregnancyFailed
+                              ? <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-xs">Not Pregnant</Badge>
+                              : r.expectedBirthDate
+                                ? <BirthCountdown targetDate={r.expectedBirthDate} />
+                                : <span className="text-gray-400">—</span>
                           }
                         </TableCell>
                         <TableCell className="text-center font-semibold text-sky-700">
@@ -965,6 +1052,11 @@ export default function InseminationPage() {
                         <TableCell className="text-sm">{r.vetOrigin || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            {r.deliveredBabies == null && (
+                              <Button size="sm" variant="ghost" onClick={() => setReinseminateConfirm(r)} className="h-8 w-8 p-0 hover:bg-amber-50" title="Re-inseminate">
+                                <Syringe className="h-3.5 w-3.5 text-amber-600" />
+                              </Button>
+                            )}
                             <Button size="sm" variant="ghost" onClick={() => handleEdit(r)} className="h-8 w-8 p-0 hover:bg-emerald-50">
                               <Pencil className="h-3.5 w-3.5 text-emerald-600" />
                             </Button>
@@ -1011,6 +1103,7 @@ export default function InseminationPage() {
                       <TableRow>
                         <TableHead>Animal</TableHead>
                         <TableHead>Inseminations</TableHead>
+                        <TableHead>Failed Attempts</TableHead>
                         <TableHead>Calf(s) Born</TableHead>
                         <TableHead>Total Cost (RWF)</TableHead>
                         <TableHead>Last Date</TableHead>
@@ -1018,11 +1111,12 @@ export default function InseminationPage() {
                     </TableHeader>
                     <TableBody>
                       {cowSummary.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-6 text-gray-400">No data</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-gray-400">No data</TableCell></TableRow>
                       ) : cowSummary.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">{c.name}</TableCell>
                           <TableCell className="text-emerald-700 font-semibold">{c.inseminations}</TableCell>
+                          <TableCell className="text-red-600 font-semibold">{c.failedAttempts > 0 ? c.failedAttempts : "—"}</TableCell>
                           <TableCell className="text-sky-700 font-semibold">{c.babies > 0 ? c.babies : "—"}</TableCell>
                           <TableCell>{c.totalCost > 0 ? c.totalCost.toLocaleString() : "—"}</TableCell>
                           <TableCell className="text-sm text-gray-500">{c.lastDate}</TableCell>
@@ -1093,20 +1187,34 @@ export default function InseminationPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Animal</label>
+              <Select value={exportAnimalFilter || "all"} onValueChange={v => setExportAnimalFilter(v === "all" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Animals" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Animals</SelectItem>
+                  {femaleAnimals.map(a => (
+                    <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
               <div className="text-sm space-y-1">
-                <p className="font-medium text-emerald-700">Preview</p>
+                <p className="font-medium text-emerald-700">Preview{exportAnimalName ? ` — ${exportAnimalName}` : ""}</p>
                 <p className="text-gray-600">
-                  {records.length} records &bull; {totalBabies} calf(s) born &bull; {cowSummary.length} animal(s)
+                  {exportFilteredRecords.length} records &bull; {exportTotalBabies} calf(s) born &bull; {exportSummary.length} animal(s)
                 </p>
-                <p className="text-gray-600">Total cost: <strong className="text-emerald-700">RWF {totalCost.toLocaleString()}</strong></p>
+                <p className="text-gray-600">Total cost: <strong className="text-emerald-700">RWF {exportTotalCost.toLocaleString()}</strong></p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-1">
               <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-xl">Cancel</Button>
               <Button
                 onClick={exportToExcel}
-                disabled={exporting || records.length === 0}
+                disabled={exporting || exportFilteredRecords.length === 0}
                 className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
@@ -1114,7 +1222,7 @@ export default function InseminationPage() {
               </Button>
               <Button
                 onClick={exportToPDF}
-                disabled={exporting || records.length === 0}
+                disabled={exporting || exportFilteredRecords.length === 0}
                 className="col-span-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl gap-2"
               >
                 <FileText className="h-4 w-4" />
@@ -1124,6 +1232,31 @@ export default function InseminationPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Re-inseminate Confirm Dialog */}
+      <AlertDialog open={!!reinseminateConfirm} onOpenChange={open => !open && setReinseminateConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Re-insemination</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark the attempt on <strong>{reinseminateConfirm?.date}</strong> for{" "}
+              <strong>{reinseminateConfirm?.animalName || "this animal"}</strong> as <strong>Not Pregnant</strong> (kept in History) and open a new insemination record for the same animal. Do you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setReinseminateConfirm(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (reinseminateConfirm) handleReinseminate(reinseminateConfirm)
+                setReinseminateConfirm(null)
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Yes, Re-inseminate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Gender Alert Dialog */}
       <AlertDialog open={!!genderAlertAnimal} onOpenChange={open => !open && setGenderAlertAnimal(null)}>
