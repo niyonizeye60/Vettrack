@@ -157,7 +157,7 @@ export default function FarmerNotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 p-4">
+      <div className="bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 rounded-2xl p-4 min-h-full">
         <div className="max-w-4xl mx-auto">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-200 rounded w-1/3"></div>
@@ -169,7 +169,7 @@ export default function FarmerNotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 p-4">
+    <div className="bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 rounded-2xl p-4 min-h-full">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

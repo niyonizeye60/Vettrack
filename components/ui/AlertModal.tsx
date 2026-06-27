@@ -49,7 +49,7 @@ export function AlertModal({ isOpen, onClose, title, message, type = "warning" }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative bg-white rounded-lg shadow-xl border-2 ${getBorderColor()} max-w-md w-full mx-4 animate-in fade-in-0 zoom-in-95 duration-200`}>
         <div className="flex items-center justify-between p-6 border-b border-gray-200">

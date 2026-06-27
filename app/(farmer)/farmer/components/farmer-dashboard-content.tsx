@@ -72,7 +72,7 @@ export default function FarmerDashboardContent({
     .slice(0, 6)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 p-4 md:p-6">
+    <div className="bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 rounded-2xl p-4 min-h-full">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* System Announcements */}
         <AnnouncementsBanner />

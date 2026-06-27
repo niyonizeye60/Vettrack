@@ -5,17 +5,20 @@ import FarmerHeader from "./components/farmer-header";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import UserStatusChecker from "./components/user-status-checker";
+import { MobileSidebarProvider } from "./components/mobile-sidebar-context";
 
 export default function FarmerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <UserStatusChecker />
-      <FarmerSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <FarmerHeader />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">{children}</main>
+    <MobileSidebarProvider>
+      <div className="flex min-h-screen bg-gray-50">
+        <UserStatusChecker />
+        <FarmerSidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <FarmerHeader />
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">{children}</main>
+        </div>
       </div>
-    </div>
+    </MobileSidebarProvider>
   );
 }
 

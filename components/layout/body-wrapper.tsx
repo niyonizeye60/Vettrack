@@ -15,7 +15,7 @@ export default function BodyWrapper({ children }: { children: React.ReactNode })
   return (
     <Suspense>
       {!isDashboard && <Header />}
-      <main>{children}</main>
+      {isDashboard ? children : <main>{children}</main>}
       {isPublicPage && <Footer />}
       {isPublicPage && <WhatsAppWidget />}
     </Suspense>
