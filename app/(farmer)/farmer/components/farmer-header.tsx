@@ -48,14 +48,15 @@ export default function FarmerHeader() {
     async function fetchUser() {
       try {
         const userData = await getCurrentUser()
-        setUser(userData)
+        setUser(userData ? { ...userData, _id: String(userData._id) } as HeaderUser : null)
         if (userData?._id) {
-          fetchNotifications(userData._id)
+          const userId = String(userData._id)
+          fetchNotifications(userId)
           // Set up polling for notifications
           const interval = setInterval(() => {
-            fetchNotifications(userData._id)
+            fetchNotifications(userId)
           }, 10000) // Poll every 10 seconds
-          
+
           return () => clearInterval(interval)
         }
       } catch (error) {
