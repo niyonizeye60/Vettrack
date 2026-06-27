@@ -1,12 +1,12 @@
 "use client"
 
-import LoginForm from "@/components/auth/login-form"
+import ForgotPasswordForm from "@/components/auth/forgot-password-form"
 import Image from "next/image"
 import { useLanguage } from "@/contexts/LanguageContext"
 
-export default function LoginContent() {
+export default function ForgotPasswordContent() {
   const { t } = useLanguage()
-  
+
   return (
     <div className="min-h-screen flex pt-20">
       <div className="hidden lg:block lg:w-1/2 relative">
@@ -18,16 +18,16 @@ export default function LoginContent() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center">
           <div className="p-12 max-w-md">
-            <h1 className="text-4xl font-bold text-white mb-6">{t('auth.welcomeBack')}</h1>
+            <h1 className="text-4xl font-bold text-white mb-6">{t('auth.resetPasswordHeading')}</h1>
             <p className="text-white/90 text-lg">
-              {t('auth.loginWelcomeDesc')}
+              {t('auth.forgotPasswordWelcomeDesc')}
             </p>
           </div>
         </div>
       </div>
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <LoginForm />
+          <ForgotPasswordForm />
         </div>
       </div>
     </div>

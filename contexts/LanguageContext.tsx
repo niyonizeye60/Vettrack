@@ -273,6 +273,8 @@ const translations = {
     // Password Reset
     'auth.forgotPassword': 'Forgot Password?',
     'auth.forgotPasswordDesc': "Don't worry. We'll help you reset your password.",
+    'auth.resetPasswordHeading': 'Reset Your Password',
+    'auth.forgotPasswordWelcomeDesc': "No worries, we'll send you a link to get back into your account in no time",
     'auth.emailSent': 'Email Sent Successfully',
     'auth.resetLinkSent': 'If an account exists with this email, you will receive a password reset link within a few minutes.',
     'auth.checkSpamFolder': 'Please check your spam folder if you do not see the email.',
@@ -1627,6 +1629,8 @@ const translations = {
     // Password Reset
     'auth.forgotPassword': 'Wibagiwe Ijambo Ryibanga?',
     'auth.forgotPasswordDesc': 'Ntugire ubwoba. Turagufasha mu guhindura ijambo ryibanga.',
+    'auth.resetPasswordHeading': 'Hindura Ijambo Ryibanga',
+    'auth.forgotPasswordWelcomeDesc': 'Ntugire ubwoba, turaguha link igufasha kongera kwinjira muri konti yawe vuba',
     'auth.emailSent': 'Imeyili Yoherejwe Neza',
     'auth.resetLinkSent': 'Niba konti ifite imeyili, uzahaura ubutumwa bwo gushyira ijambo ryibanga rishya mu gihembwe cy\'iminota mike.',
     'auth.checkSpamFolder': 'Nyamuneka reba ufolder yikinini meyili niba ibutumwa ntiri.',

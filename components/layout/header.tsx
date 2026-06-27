@@ -25,8 +25,9 @@ export default function Header() {
     { name: t('nav.contact'), href: "/contact" },
   ]
 
-  // Force black nav items on Login, Register, and any Blog page
-  const forceBlackNav = pathname === "/login" || pathname === "/register" || pathname.startsWith("/blog/");
+  // Force black nav items on Login, Register, password recovery, and any Blog page
+  const isAuthPage = pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password";
+  const forceBlackNav = isAuthPage || pathname.startsWith("/blog/");
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10)
@@ -37,7 +38,7 @@ export default function Header() {
   return (
     <header
       className={`fixed w-full z-50 transition-all duration-300 animate-fadeIn ${
-        isScrolled ? "bg-white/95 backdrop-blur-md shadow-md py-2" : "bg-transparent py-4"
+        isAuthPage ? "bg-white/95 backdrop-blur-md shadow-md py-2" : isScrolled ? "bg-white/95 backdrop-blur-md shadow-md py-2" : "bg-transparent py-4"
       }`}
     >
       <div className="container-custom">
@@ -63,9 +64,7 @@ export default function Header() {
                 href={item.href}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-300 hover:scale-105 transform ${
                   pathname === item.href
-                    ? isScrolled
-                      ? "text-white bg-primary shadow-md"
-                      : "text-white bg-primary shadow-md"
+                    ? "text-white bg-primary shadow-md"
                     : forceBlackNav
                       ? "text-black hover:text-white hover:bg-primary/80"
                       : isScrolled

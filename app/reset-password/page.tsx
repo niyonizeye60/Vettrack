@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic"
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex pt-20">
       <div className="hidden lg:block lg:w-1/2 relative">
         <Image
           src="https://images.unsplash.com/photo-1568572933382-74d440642117?w=1200&h=1600&fit=crop&crop=focalpoint&auto=format&q=80"

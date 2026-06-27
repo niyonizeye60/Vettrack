@@ -8,7 +8,7 @@ export default function RegisterContent() {
   const { t } = useLanguage()
   
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex pt-20">
       <div className="hidden lg:block lg:w-1/2 relative">
         <Image
           src="https://images.unsplash.com/photo-1605152276897-4f618f831968?w=1200&h=1600&fit=crop&crop=focalpoint&auto=format&q=80"
