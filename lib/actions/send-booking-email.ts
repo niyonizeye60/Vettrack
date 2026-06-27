@@ -30,23 +30,32 @@ export async function sendBookingEmail(bookingData: BookingData) {
       throw new Error("Missing required email configuration. Please check environment variables.")
     }
 
-    // Create transporter using Gmail SMTP
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number.parseInt(process.env.SMTP_PORT || "587"),
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    })
+    // Create transporter using webmail SMTP
+    const nodemailer = require("nodemailer");
 
-    console.log("Transporter created successfully")
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false, // Port 587 uses STARTTLS
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+  tls: {
+    rejectUnauthorized: false,
+  },
+});
 
-    // Verify connection
-    await transporter.verify()
-    console.log("SMTP connection verified")
+// Verify SMTP connection
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("SMTP Error:", error);
+  } else {
+    console.log("SMTP server is ready to send emails.");
+  }
+});
 
+module.exports = transporter;
     // Get service label from the booking data
     const getServiceLabel = (serviceValue: string) => {
       const serviceCategories = [
