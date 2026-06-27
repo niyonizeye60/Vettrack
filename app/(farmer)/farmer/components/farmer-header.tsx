@@ -3,8 +3,8 @@
 import { logoutUser } from "@/lib/actions/auth"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useRouter } from "next/navigation"
-import { Bell, Menu, X, User, LogOut, Settings, Home, Calendar, MilkIcon as Cow } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Bell, Menu, User, LogOut, Settings, Home, Calendar, MilkIcon as Cow } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useLanguage } from "@/contexts/LanguageContext"
 import NotificationCenter from "@/components/ui/notification-center"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
+import { useToast } from "@/hooks/use-toast"
+import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
+import { playChatNotificationSound } from "@/lib/notification-sound"
+import { useMobileSidebar } from "./mobile-sidebar-context"
 
 interface HeaderUser {
   _id: string
@@ -30,13 +34,15 @@ interface HeaderUser {
 
 export default function FarmerHeader() {
   const { t } = useLanguage()
+  const { toast } = useToast()
   const router = useRouter()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { toggleMobileSidebar } = useMobileSidebar()
   const [user, setUser] = useState<HeaderUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [notifications, setNotifications] = useState<any[]>([])
   const [notificationCount, setNotificationCount] = useState(0)
   const [notificationOpen, setNotificationOpen] = useState(false)
+  const seenChatNotificationIds = useRef<Set<string> | null>(null)
 
   useEffect(() => {
     async function fetchUser() {
@@ -81,8 +87,24 @@ export default function FarmerHeader() {
           message: n.message,
           time: new Date(n.createdAt).toLocaleDateString(),
           read: n.read,
-          type: 'notification'
+          type: 'notification',
+          rawType: n.type
         }))
+
+        const chatNotifications: typeof formattedNotifications = formattedNotifications.filter(
+          (n: typeof formattedNotifications[number]) => n.rawType === 'chat'
+        )
+        if (seenChatNotificationIds.current === null) {
+          seenChatNotificationIds.current = new Set(chatNotifications.map((n: typeof formattedNotifications[number]) => n._id))
+        } else {
+          const newChatNotifications = chatNotifications.filter(
+            (n: typeof formattedNotifications[number]) => !seenChatNotificationIds.current!.has(n._id)
+          )
+          newChatNotifications.forEach((n: typeof formattedNotifications[number]) => toast({ title: n.title, description: n.message }))
+          if (newChatNotifications.length > 0) playChatNotificationSound()
+          chatNotifications.forEach((n: typeof formattedNotifications[number]) => seenChatNotificationIds.current!.add(n._id))
+        }
+
         allNotifications = [...allNotifications, ...formattedNotifications]
       }
       
@@ -150,11 +172,6 @@ export default function FarmerHeader() {
     }
   }
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen((prev) => !prev)
-  }
-
- 
 
   if (loading) {
     return (
@@ -174,39 +191,51 @@ export default function FarmerHeader() {
 
   return (
     <header className="bg-gradient-to-r from-emerald-600 to-green-600 shadow-lg text-white sticky top-0 z-50 border-b border-emerald-500/20">
+      <PresenceHeartbeat />
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
-          {/* Logo and Brand */}
-          <Link href="/farmer" className="flex items-center space-x-3 group">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-2 group-hover:bg-white/20 transition-all duration-200">
-              <Cow className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold leading-tight">{t('farmer.farmer')}</h1>
-              <span className="text-xs text-emerald-100 font-medium hidden sm:block">
-                {user?.name ? `${t('farmer.welcomeBack')}, ${user.name.split(" ")[0]}` : `${t('farmer.welcomeBack')}, ${t('farmer.farmer')}`}
-              </span>
-            </div>
-          </Link>
+          <div className="flex items-center space-x-2">
+            {/* Sidebar Toggle - Mobile only */}
+            <button
+              onClick={toggleMobileSidebar}
+              className="md:hidden -ml-1 p-2 rounded-lg hover:bg-white/10 transition-colors"
+              aria-label="Toggle navigation menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            {/* Logo and Brand */}
+            <Link href="/farmer" className="flex items-center space-x-3 group">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-2 group-hover:bg-white/20 transition-all duration-200">
+                <Cow className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold leading-tight">{t('farmer.farmer')}</h1>
+                <span className="text-xs text-emerald-100 font-medium hidden sm:block">
+                  {user?.name ? `${t('farmer.welcomeBack')}, ${user.name.split(" ")[0]}` : `${t('farmer.welcomeBack')}, ${t('farmer.farmer')}`}
+                </span>
+              </div>
+            </Link>
+          </div>
 
 
           {/* Right Side Actions */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-1 sm:space-x-3">
             {/* Language Switcher */}
             <LanguageSwitcher />
-            
+
             {/* Notifications */}
             <DropdownMenu open={notificationOpen} onOpenChange={setNotificationOpen}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="relative text-white hover:bg-white/10 hover:text-white p-2 h-auto"
+                  className="relative text-white hover:bg-white/10 hover:text-white p-2 h-8 w-8 sm:h-auto sm:w-auto"
                   aria-label={t('farmer.notifications')}
                 >
-                  <Bell className="h-5 w-5" />
+                  <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
                   {notificationCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 bg-amber-500 hover:bg-amber-500 text-xs flex items-center justify-center">
+                    <Badge className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 p-0 bg-amber-500 hover:bg-amber-500 text-xs flex items-center justify-center">
                       {notificationCount > 9 ? "9+" : notificationCount}
                     </Badge>
                   )}
@@ -268,115 +297,51 @@ export default function FarmerHeader() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Profile Dropdown - Desktop */}
-            <div className="hidden md:block">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center space-x-2 text-white hover:bg-white/10 hover:text-white p-2 h-auto"
-                  >
-                    <Avatar className="h-8 w-8 border-2 border-emerald-200">
-                      <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user?.name || "User"} />
-                      <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                        {user?.name ? user.name.charAt(0).toUpperCase() : "F"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="hidden lg:block font-medium text-sm">{user?.name?.split(" ")[0] || t('farmer.farmer')}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user?.name || t('farmer.farmer')}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/farmer/profile" className="flex items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>{t('farmer.profile')}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/farmer/settings" className="flex items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>{t('farmer.settings')}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>{t('farmer.logout')}</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden text-white hover:bg-white/10 hover:text-white p-2 h-auto"
-              onClick={toggleMobileMenu}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
+            {/* Profile Dropdown - All screen sizes */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="flex items-center space-x-2 text-white hover:bg-white/10 hover:text-white p-2 h-auto"
+                >
+                  <Avatar className="h-8 w-8 border-2 border-emerald-200">
+                    <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user?.name || "User"} />
+                    <AvatarFallback className="bg-emerald-500 text-white text-sm">
+                      {user?.name ? user.name.charAt(0).toUpperCase() : "F"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden lg:block font-medium text-sm">{user?.name?.split(" ")[0] || t('farmer.farmer')}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user?.name || t('farmer.farmer')}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/farmer/profile" className="flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>{t('farmer.profile')}</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/farmer/settings" className="flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>{t('farmer.settings')}</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>{t('farmer.logout')}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-emerald-500/20">
-            <div className="pt-4 space-y-2">
-              {/* User Info */}
-              <div className="flex items-center space-x-3 px-3 py-2 mb-4">
-                <Avatar className="h-10 w-10 border-2 border-emerald-200">
-                  <AvatarImage src="/placeholder.svg?height=40&width=40" alt={user?.name || "User"} />
-                  <AvatarFallback className="bg-emerald-500 text-white">
-                    {user?.name ? user.name.charAt(0).toUpperCase() : "F"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium text-white">{user?.name || t('farmer.farmer')}</p>
-                  <p className="text-xs text-emerald-100">{user?.email}</p>
-                </div>
-              </div>
-
-              {/* Navigation Links */}
-             
-
-              {/* Mobile Actions */}
-              <div className="pt-4 border-t border-emerald-500/20 space-y-2">
-                <Link
-                  href="/farmer/profile"
-                  className="flex items-center space-x-3 px-3 py-3 rounded-lg text-emerald-100 hover:text-white hover:bg-white/10 transition-all duration-200"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <User className="h-5 w-5" />
-                  <span className="font-medium">{t('farmer.profile')}</span>
-                </Link>
-                <Link
-                  href="/farmer/settings"
-                  className="flex items-center space-x-3 px-3 py-3 rounded-lg text-emerald-100 hover:text-white hover:bg-white/10 transition-all duration-200"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Settings className="h-5 w-5" />
-                  <span className="font-medium">{t('farmer.settings')}</span>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center space-x-3 px-3 py-3 rounded-lg text-red-200 hover:text-red-100 hover:bg-red-500/20 transition-all duration-200 w-full text-left"
-                >
-                  <LogOut className="h-5 w-5" />
-                  <span className="font-medium">{t('farmer.logout')}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </header>
   )
