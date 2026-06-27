@@ -15,13 +15,14 @@ import {
 import { useState, useEffect } from "react";
 import { Activity, Trash2, ShieldAlert, Syringe } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useMobileSidebar } from "./mobile-sidebar-context";
 
 export default function FarmerSidebar() {
   const { t } = useLanguage();
   const pathname = usePathname();
+  const { mobileOpen, setMobileOpen } = useMobileSidebar();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // Check if mobile on initial load and resize
@@ -54,11 +55,6 @@ export default function FarmerSidebar() {
     { href: "/farmer/messages", label: t('farmer.messages'), icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ];
 
-  // Toggle sidebar visibility on mobile
-  const toggleMobileMenu = () => {
-    setMobileOpen(!mobileOpen);
-  };
-
   // Toggle sidebar collapse state
   const toggleSidebar = () => {
     setCollapsed(!collapsed);
@@ -67,26 +63,13 @@ export default function FarmerSidebar() {
   // Determine if sidebar should be shown
   const showSidebar = (isMobile && mobileOpen) || !isMobile;
 
-  // Mobile menu button visible only on small screens
-  const mobileMenuButton = (
-    <button
-      onClick={toggleMobileMenu}
-      className="fixed top-20 left-4 md:hidden z-50 bg-emerald-600 text-white p-3 rounded-lg shadow-xl hover:bg-emerald-700 transition-colors border-2 border-white"
-      aria-label="Toggle navigation menu"
-    >
-      <Menu className="h-5 w-5" />
-    </button>
-  );
-
   if (!mounted) return null;
 
   return (
     <>
-      {mobileMenuButton}
-
       {showSidebar && (
         <div className={`
-          ${isMobile ? "fixed inset-0 z-50" : "sticky top-0 h-screen z-30"} 
+          ${isMobile ? "fixed inset-0 z-[60]" : "sticky top-0 h-screen z-30"}
           flex
         `}>
           {/* Overlay for mobile */}
@@ -98,16 +81,16 @@ export default function FarmerSidebar() {
           )}
 
           <nav className={`
-            ${collapsed ? "w-16" : "w-64"} 
-            ${isMobile ? "w-64 ml-0 mt-16" : ""} 
-            bg-white shadow-lg z-10 transition-all duration-300 
-            flex flex-col ${isMobile ? "h-[calc(100vh-4rem)]" : "h-full"}
+            ${collapsed ? "w-16" : "w-64"}
+            ${isMobile ? "w-64 ml-0" : ""}
+            bg-white shadow-lg z-10 transition-all duration-300
+            flex flex-col h-full
             border-r border-gray-200
             relative
           `}>
             {/* Sidebar header */}
             <div className="p-3 sm:p-4 border-b border-gray-100 flex items-center justify-between">
-              {!collapsed && (
+              {(!collapsed || isMobile) && (
                 <div className="font-bold text-emerald-700 text-sm sm:text-base">{t('farmer.portal')}</div>
               )}
               {!isMobile && (
@@ -127,7 +110,9 @@ export default function FarmerSidebar() {
             {/* Navigation items */}
             <ul className="space-y-1 pt-3 sm:pt-4 flex-1 overflow-y-auto px-2 sm:px-0">
               {navItems.map((item) => {
-                const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                const isActive = item.href === "/farmer"
+                  ? pathname === "/farmer"
+                  : pathname === item.href || pathname?.startsWith(`${item.href}/`);
 
                 return (
                   <li key={item.href}>
@@ -154,7 +139,7 @@ export default function FarmerSidebar() {
 
             {/* Footer section */}
             <div className="p-3 sm:p-4 border-t border-gray-100 text-xs text-gray-500">
-              {!collapsed && (
+              {(!collapsed || isMobile) && (
                 <p className="text-center sm:text-left">© {new Date().getFullYear()} {t('farmer.portal')}</p>
               )}
             </div>
