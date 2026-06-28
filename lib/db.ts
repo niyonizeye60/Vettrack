@@ -1,7 +1,10 @@
 import { MongoClient } from "mongodb"
 
-// Add fallback for MongoDB URI with a dummy value that will be overridden by environment variables
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://niyonizeyetheophile90_db_user:JX5XPaIUucYtmVs1@cluster1.rgjh2oe.mongodb.net/?appName=Cluster1";
+if (!process.env.MONGODB_URI) {
+  throw new Error("Missing required environment variable: MONGODB_URI")
+}
+
+const MONGODB_URI = process.env.MONGODB_URI;
 
 const options = {
   maxPoolSize: 10,
