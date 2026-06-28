@@ -30,19 +30,14 @@ export async function sendBookingEmail(bookingData: BookingData) {
       throw new Error("Missing required email configuration. Please check environment variables.")
     }
 
-    // Create transporter using webmail SMTP
-    const nodemailer = require("nodemailer");
-
+// Create transporter using Gmail SMTP
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false, // Port 587 uses STARTTLS
+  port: Number.parseInt(process.env.SMTP_PORT || "587"),
+  secure: false, // true for 465, false for other ports
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD,
-  },
-  tls: {
-    rejectUnauthorized: false,
   },
 });
 
