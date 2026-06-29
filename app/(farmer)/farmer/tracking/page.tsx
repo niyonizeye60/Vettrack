@@ -486,21 +486,21 @@ export default function PetTrackingPage() {
   }
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl p-4 min-h-full">
+    <div className="bg-gradient-to-br from-emerald-50 via-sky-50 to-indigo-50 rounded-2xl p-4 min-h-full">
       <div className="mx-auto max-w-7xl">
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
-                  <Heart className="w-8 h-8 text-white" />
+                <div className="p-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl">
+                  <Heart className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  <h1 className="text-2xl font-bold text-gray-900">
                     {apiResponse?.channel.name || t('farmer.cowHealthMonitor')}
                   </h1>
-                  <p className="text-gray-600 mt-1">{t('farmer.realTimeTracking')}</p>
+                  <p className="text-sm text-gray-500">{t('farmer.realTimeTracking')}</p>
                 </div>
               </div>
               {apiResponse && (
@@ -556,7 +556,7 @@ export default function PetTrackingPage() {
         {/* Configuration Panel */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
             {t('farmer.dataSourceConfig')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -564,7 +564,7 @@ export default function PetTrackingPage() {
               <label className="block text-sm font-medium text-gray-700">{t('farmer.channelId')}</label>
               <input
                 type="text"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                 value={deviceId}
                 onChange={(e) => setDeviceId(e.target.value)}
                 onBlur={saveConfig}
@@ -577,7 +577,7 @@ export default function PetTrackingPage() {
               <div className="relative">
                 <input
                   type={showApiKey ? "text" : "password"}
-                  className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   onBlur={saveConfig}
@@ -598,14 +598,14 @@ export default function PetTrackingPage() {
               <div className="flex gap-2">
                 <input
                   type="number"
-                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
                   value={results}
                   onChange={(e) => setResults(Number.parseInt(e.target.value) || 20)}
                   min="1"
                   max="8000"
                 />
                 <button
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-lg"
+                  className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-700 hover:to-green-700 transition-all duration-200 font-medium shadow-lg"
                   onClick={fetchSensorData}
                 >
                   {t('farmer.fetch')}
@@ -618,20 +618,22 @@ export default function PetTrackingPage() {
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="text-center">
-              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+              <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-gray-600 font-medium">{t('farmer.loadingSensorData')}</p>
             </div>
           </div>
         ) : data.length === 0 ? (
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-12 text-center">
-            <div className="text-6xl mb-4">📡</div>
+            <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-full bg-emerald-50">
+              <Database className="w-6 h-6 text-emerald-600" />
+            </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-2">{t('farmer.noDataAvailable')}</h3>
             <p className="text-gray-600 mb-6">
               {t('farmer.noSensorData')}
             </p>
             <button
               onClick={fetchSensorData}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-lg"
+              className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-700 hover:to-green-700 transition-all duration-200 font-medium shadow-lg"
             >
               {t('farmer.tryAgain')}
             </button>

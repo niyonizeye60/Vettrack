@@ -2,10 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/actions/auth";
 import { getConsultationById, getDoctorsList } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import EditConsultationForm from "@/components/dashboard/edit-consultation-form";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: {
@@ -39,12 +41,12 @@ export default async function EditConsultationPage({ params }: PageProps) {
   return (
     <div className="max-w-xl mx-auto py-8">
       <div className="mb-6 flex items-center justify-between">
-        {/* <h1 className="text-2xl font-bold">Edit Consultation</h1> */}
-        <Link 
-          href={`/farmer/consultations/${id}`} 
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
-          {/* Cancel and return to details */}
+        <h1 className="text-2xl font-bold text-gray-900">Edit Consultation</h1>
+        <Link href={`/farmer/consultations/${id}`}>
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
         </Link>
       </div>
       <EditConsultationForm 

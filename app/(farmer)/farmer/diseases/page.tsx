@@ -426,7 +426,7 @@ export default function DiseaseManagementPage() {
       } catch { }
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-      doc.text('Disease Management Report', 45, 18)
+      doc.text(t('farmer.diseaseManagementReportTitle'), 45, 18)
       doc.setFontSize(10); doc.setFont('helvetica', 'normal')
       doc.text('NTDM Animal Hospital', 45, 27)
 
@@ -936,7 +936,7 @@ export default function DiseaseManagementPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-r from-red-500 to-rose-600 rounded-xl">
+        <div className="p-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl">
           <ShieldAlert className="h-6 w-6 text-white" />
         </div>
         <div>
@@ -1114,7 +1114,7 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <Button onClick={handleSubmit} disabled={saving} className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl px-6">
+                  <Button onClick={handleSubmit} disabled={saving} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl px-6">
                     {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
                   </Button>
                   {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-xl">Cancel</Button>}
@@ -1408,7 +1408,7 @@ export default function DiseaseManagementPage() {
             <div className="flex justify-end">
               <Button
                 onClick={() => setExportOpen(true)}
-                className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl gap-2"
+                className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl gap-2"
               >
                 <Download className="h-4 w-4" />
                 Export Report
@@ -1677,7 +1677,7 @@ export default function DiseaseManagementPage() {
               <Button
                 onClick={exportToPDF}
                 disabled={exporting}
-                className="col-span-2 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white gap-2"
+                className="col-span-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white gap-2"
               >
                 <FileText className="h-4 w-4" />
                 {exporting ? 'Exporting...' : 'Export PDF'}

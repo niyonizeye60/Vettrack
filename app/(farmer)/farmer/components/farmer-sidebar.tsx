@@ -89,14 +89,17 @@ export default function FarmerSidebar() {
             relative
           `}>
             {/* Sidebar header */}
-            <div className="p-3 sm:p-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="h-16 px-3 sm:px-4 border-b border-gray-100 flex items-center justify-between gap-2">
               {(!collapsed || isMobile) && (
-                <div className="font-bold text-emerald-700 text-sm sm:text-base">{t('farmer.portal')}</div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <UserCircle className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 flex-shrink-0" />
+                  <span className="font-bold text-emerald-700 text-base sm:text-lg leading-tight tracking-tight min-w-0">{t('farmer.portal')}</span>
+                </div>
               )}
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
-                  className="p-1 rounded hover:bg-gray-100 transition-colors"
+                  className="p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
                   aria-label="Toggle sidebar"
                 >
                   <Menu
@@ -130,7 +133,7 @@ export default function FarmerSidebar() {
                       `}
                     >
                       <span className="flex-shrink-0">{item.icon}</span>
-                      {(!collapsed || isMobile) && <span className="text-sm sm:text-base truncate">{item.label}</span>}
+                      {(!collapsed || isMobile) && <span className="text-base truncate">{item.label}</span>}
                     </Link>
                   </li>
                 );

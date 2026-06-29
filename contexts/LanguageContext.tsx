@@ -567,6 +567,22 @@ const translations = {
     'farmer.deleteConsultationConfirm': 'You are about to delete this consultation',
     'farmer.deleteConsultationConfirmDesc': 'This action cannot be undone',
 
+    // Farmer Settings & Notifications
+    'farmer.manageAccountSettings': 'Manage your account settings and preferences',
+    'farmer.changePassword': 'Change Password',
+    'farmer.leaveBlankPassword': 'Leave blank to keep current password',
+    'farmer.saving': 'Saving...',
+    'farmer.saveChanges': 'Save Changes',
+    'farmer.reset': 'Reset',
+    'farmer.read': 'Read',
+    'farmer.unread': 'Unread',
+    'farmer.deleteNotification': 'Delete Notification',
+    'farmer.deleteNotificationConfirm': 'This notification will be hidden from your view. The super admin can still see it and restore it if needed.',
+    'farmer.milkProductionReportTitle': 'Milk Production Report',
+    'farmer.wasteManagementReportTitle': 'Waste Management Report',
+    'farmer.diseaseManagementReportTitle': 'Disease Management Report',
+    'farmer.inseminationReportTitle': 'Insemination Report',
+
     // Farmer Consultation
     'farmer.enterFullName': 'Enter your full name',
     'farmer.enterService': 'Enter service',
@@ -1916,6 +1932,22 @@ const translations = {
     'farmer.at': 'saa',
     'farmer.deleteConsultationConfirm': 'Ugiye gusiba iyi randevu',
     'farmer.deleteConsultationConfirmDesc': 'Ibi ntibishobora gusubizwa inyuma',
+
+    // Farmer Settings & Notifications
+    'farmer.manageAccountSettings': 'Genzura amagenamiterere n\'ibyo ukunda kuri konti yawe',
+    'farmer.changePassword': 'Hindura Ijambo ry\'Ibanga',
+    'farmer.leaveBlankPassword': 'Reka ubusa niba udashaka guhindura ijambo ry\'ibanga',
+    'farmer.saving': 'Birabikwa...',
+    'farmer.saveChanges': 'Bika Impinduka',
+    'farmer.reset': 'Subiza',
+    'farmer.read': 'Yasomwe',
+    'farmer.unread': 'Ntiyasomwe',
+    'farmer.deleteNotification': 'Siba Imenyesha',
+    'farmer.deleteNotificationConfirm': 'Iri menyesha rizahishwa ku ireba ryawe. Umuyobozi mukuru arashobora kuribona akarisubiza.',
+    'farmer.milkProductionReportTitle': 'Raporo y\'Umusaruro w\'Amata',
+    'farmer.wasteManagementReportTitle': 'Raporo y\'Imicungire y\'Imyanda',
+    'farmer.diseaseManagementReportTitle': 'Raporo y\'Imicungire y\'Indwara',
+    'farmer.inseminationReportTitle': 'Raporo y\'Itera',
 
     // Farmer Consulation
     'farmer.enterFullName': 'Injiza amazina yawe yose',

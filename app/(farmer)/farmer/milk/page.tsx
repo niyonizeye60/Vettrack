@@ -227,7 +227,7 @@ export default function MilkProductionPage() {
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
-      doc.text('Milk Production Report', 45, 18)
+      doc.text(t('farmer.milkProductionReportTitle'), 45, 18)
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.text('NTDM Animal Hospital', 45, 27)

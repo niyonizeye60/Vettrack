@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Syringe, Plus, Pencil, Trash2, History, ChevronDown, Baby, FlaskConical, BarChart3, Download, FileText } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null }
 interface Vet { _id: string; name: string; specialization: string }
@@ -84,6 +85,7 @@ function BirthCountdown({ targetDate }: { targetDate: string }) {
 }
 
 export default function InseminationPage() {
+  const { t } = useLanguage()
   const [user, setUser] = useState<any>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
   const [vets, setVets] = useState<Vet[]>([])
@@ -366,7 +368,7 @@ export default function InseminationPage() {
       } catch { }
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(16); doc.setFont("helvetica", "bold")
-      doc.text(exportAnimalName ? `Insemination Report — ${exportAnimalName}` : "Insemination Report", 45, 18)
+      doc.text(exportAnimalName ? `${t('farmer.inseminationReportTitle')} — ${exportAnimalName}` : t('farmer.inseminationReportTitle'), 45, 18)
       doc.setFontSize(10); doc.setFont("helvetica", "normal")
       doc.text("NTDM Animal Hospital", 45, 27)
 

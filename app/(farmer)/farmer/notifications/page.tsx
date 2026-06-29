@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Bell, Check, ArrowLeft, Trash2, Clock } from "lucide-react"
+import { Bell, Check, ArrowLeft, Trash2, Clock, RefreshCw } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
 import Link from "next/link"
@@ -50,8 +50,9 @@ export default function FarmerNotificationsPage() {
         const userData = await getCurrentUser()
         setUser(userData)
         if (userData?._id) {
-          await fetchNotifications(userData._id)
-          const interval = setInterval(() => fetchNotifications(userData._id), 10000)
+          const userId = String(userData._id)
+          await fetchNotifications(userId)
+          const interval = setInterval(() => fetchNotifications(userId), 10000)
           return () => clearInterval(interval)
         }
       } catch (error) {
@@ -184,12 +185,12 @@ export default function FarmerNotificationsPage() {
                 <Bell className="h-6 w-6" />
                 {t('farmer.notifications') || 'Notifications'}
               </h1>
-              <p className="text-gray-600">{notifications.length} {t('farmer.totalNotifications')}</p>
+              <p className="text-sm text-gray-500">{notifications.length} {t('farmer.totalNotifications')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={() => user?._id && fetchNotifications(user._id)} variant="ghost" size="sm">
-              ↻ {t('farmer.refresh') || 'Refresh'}
+              <RefreshCw className="h-4 w-4 mr-1" /> {t('farmer.refresh') || 'Refresh'}
             </Button>
             {notifications.some(n => !n.read && !n._id.startsWith('announcement-')) && (
               <Button onClick={markAllAsRead} variant="outline" size="sm">
@@ -259,7 +260,7 @@ export default function FarmerNotificationsPage() {
                           </span>
                         )}
                         <span className={notification.read ? 'text-green-600' : 'text-blue-600'}>
-                          {notification.read ? 'Read' : 'Unread'}
+                          {notification.read ? t('farmer.read') : t('farmer.unread')}
                         </span>
                       </div>
                     </div>
@@ -274,18 +275,18 @@ export default function FarmerNotificationsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Notification</AlertDialogTitle>
+            <AlertDialogTitle>{t('farmer.deleteNotification')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This notification will be hidden from your view. The super admin can still see it and restore it if needed.
+              {t('farmer.deleteNotificationConfirm')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId && handleDelete(deleteId)}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

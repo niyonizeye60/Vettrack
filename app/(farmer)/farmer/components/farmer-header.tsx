@@ -3,7 +3,7 @@
 import { logoutUser } from "@/lib/actions/auth"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useRouter } from "next/navigation"
-import { Bell, Menu, User, LogOut, Settings, Home, Calendar, MilkIcon as Cow } from "lucide-react"
+import { Bell, Menu, User, LogOut, Settings, Home, Calendar, MilkIcon as Cow, RefreshCw } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -177,8 +177,8 @@ export default function FarmerHeader() {
   if (loading) {
     return (
       <header className="bg-gradient-to-r from-emerald-600 to-green-600 shadow-lg text-white sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-4">
+          <div className="h-16 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-white/20 rounded-lg animate-pulse"></div>
               <div className="w-32 h-6 bg-white/20 rounded animate-pulse"></div>
@@ -193,8 +193,8 @@ export default function FarmerHeader() {
   return (
     <header className="bg-gradient-to-r from-emerald-600 to-green-600 shadow-lg text-white sticky top-0 z-50 border-b border-emerald-500/20">
       <PresenceHeartbeat />
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto px-4">
+        <div className="h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             {/* Sidebar Toggle - Mobile only */}
             <button
@@ -246,13 +246,14 @@ export default function FarmerHeader() {
                 <div className="p-3 border-b flex items-center justify-between">
                   <h3 className="font-semibold text-sm">{t('farmer.notifications')}</h3>
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       onClick={() => user?._id && fetchNotifications(user._id)}
-                      className="text-xs text-gray-600 hover:text-gray-800"
+                      className="text-gray-600 hover:text-gray-800"
+                      aria-label={t('farmer.refresh') || 'Refresh'}
                     >
-                      ↻
+                      <RefreshCw className="h-3.5 w-3.5" />
                     </button>
-                    <Link href="/farmer/notifications" className="text-xs text-blue-600 hover:text-blue-800">
+                    <Link href="/farmer/notifications" className="text-xs text-emerald-600 hover:text-emerald-800">
                       {t('farmer.viewAll') || 'View All'}
                     </Link>
                   </div>

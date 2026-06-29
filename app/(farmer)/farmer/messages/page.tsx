@@ -9,8 +9,8 @@ export default function MessagesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t('farmer.messages')}</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl font-bold text-gray-900">{t('farmer.messages')}</h1>
+        <p className="text-sm text-gray-500">
           {t('farmer.communicateVeterinarians')}
         </p>
       </div>

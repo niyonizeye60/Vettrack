@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Trash2, Plus, Pencil, BarChart3, History, Weight, ChevronDown, Download, FileText } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface Animal { _id: string; name: string; type: string; insuranceId?: string | null }
 interface WasteRecord {
@@ -41,6 +42,7 @@ const WASTE_COLORS: Record<string, string> = {
 }
 
 export default function WasteManagementPage() {
+  const { t } = useLanguage()
   const [user, setUser] = useState<any>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
   const [records, setRecords] = useState<WasteRecord[]>([])
@@ -214,7 +216,7 @@ export default function WasteManagementPage() {
       } catch { }
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-      doc.text('Waste Management Report', 45, 18)
+      doc.text(t('farmer.wasteManagementReportTitle'), 45, 18)
       doc.setFontSize(10); doc.setFont('helvetica', 'normal')
       doc.text('NTDM Animal Hospital', 45, 27)
 
