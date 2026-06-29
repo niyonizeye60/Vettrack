@@ -86,6 +86,7 @@ export function MessagesPanel() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(true)
+  const [messagesLoading, setMessagesLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [showNewChat, setShowNewChat] = useState(false)
   const [actionError, setActionError] = useState("")
@@ -132,7 +133,11 @@ export function MessagesPanel() {
 
   useEffect(() => {
     if (selectedConversationId) {
-      fetchMessages(selectedConversationId)
+      // Clear the previous conversation's messages immediately so switching
+      // chats never briefly shows the old thread while the new one loads.
+      setMessages([])
+      setMessagesLoading(true)
+      fetchMessages(selectedConversationId).finally(() => setMessagesLoading(false))
     } else {
       setMessages([])
       setOtherUserPresence(null)
@@ -494,6 +499,31 @@ export function MessagesPanel() {
     }
   }
 
+  const formatDateDivider = (dateString: string) => {
+    const date = new Date(dateString)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+
+    if (date.toDateString() === today.toDateString()) return t('farmer.today')
+    if (date.toDateString() === yesterday.toDateString()) return t('farmer.yesterday')
+    return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()
+  }
+
+  const messageItems = useMemo(() => {
+    const items: ({ kind: 'date'; key: string; label: string } | { kind: 'message'; key: string; message: Message })[] = []
+    let lastDateKey: string | null = null
+    for (const message of messages) {
+      const dateKey = new Date(message.createdAt).toDateString()
+      if (dateKey !== lastDateKey) {
+        items.push({ kind: 'date', key: `date-${dateKey}`, label: formatDateDivider(message.createdAt) })
+        lastDateKey = dateKey
+      }
+      items.push({ kind: 'message', key: message.id, message })
+    }
+    return items
+  }, [messages])
+
   const filteredConversations = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     if (!query) return conversations
@@ -528,12 +558,12 @@ export function MessagesPanel() {
   }
 
   return (
-    <div className="space-y-3">
-      {actionError && <p className="text-sm text-red-500">{actionError}</p>}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-300px)] min-h-[500px]">
+    <div className="h-full min-h-0 flex flex-col gap-3">
+      {actionError && <p className="text-sm text-red-500 flex-shrink-0">{actionError}</p>}
+      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
       {/* Conversations List */}
-      <Card className={`md:col-span-1 overflow-hidden flex flex-col ${selectedConversationId ? "hidden md:flex" : "flex"}`}>
-        <div className="p-4 border-b space-y-2">
+      <Card className={`flex-1 min-h-0 overflow-hidden flex flex-col ${selectedConversationId ? "hidden md:flex" : "flex"}`}>
+        <div className="p-4 border-b space-y-2 flex-shrink-0">
           {selectMode ? (
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">
@@ -559,10 +589,10 @@ export function MessagesPanel() {
           ) : (
             <div className="flex justify-between items-center">
               <div className="relative flex-1 mr-2">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder={t('farmer.searchMessages')}
-                  className="pl-8"
+                  className="pl-9 rounded-full bg-gray-50"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -672,10 +702,10 @@ export function MessagesPanel() {
                       )}
                     </div>
                   )}
-                  <div className="relative">
+                  <div className="relative flex-shrink-0">
                     <Avatar>
-                      <AvatarFallback>
-                        {conversation.otherUser.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                      <AvatarFallback className="bg-emerald-100 text-emerald-700 font-medium">
+                        {conversation.otherUser.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     {conversation.otherUser.isOnline && (
@@ -709,10 +739,10 @@ export function MessagesPanel() {
       </Card>
 
       {/* Messages */}
-      <Card className={`md:col-span-2 flex flex-col ${selectedConversationId ? "flex" : "hidden md:flex"}`}>
+      <Card className={`flex-[2] min-h-0 flex flex-col ${selectedConversationId ? "flex" : "hidden md:flex"}`}>
         {selectedConversation ? (
           <>
-            <div className="p-4 border-b flex items-center justify-between space-x-3">
+            <div className="p-4 border-b flex items-center justify-between space-x-3 flex-shrink-0">
               <div className="flex items-center space-x-3 min-w-0">
                 <Button
                   variant="ghost"
@@ -722,10 +752,10 @@ export function MessagesPanel() {
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   <Avatar>
-                    <AvatarFallback>
-                      {selectedConversation.otherUser.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                    <AvatarFallback className="bg-emerald-100 text-emerald-700 font-medium">
+                      {selectedConversation.otherUser.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
                   {isOtherOnline && (
@@ -796,13 +826,28 @@ export function MessagesPanel() {
                 userScrolledRef.current = !isAtBottom
               }}
             >
-              {messages.length === 0 ? (
+              {messagesLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                </div>
+              ) : messageItems.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
                   {t('farmer.noMessagesStart')}
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div key={message.id} className={`group flex ${message.isMe ? "justify-end" : "justify-start"}`}>
+                messageItems.map((item) => {
+                  if (item.kind === 'date') {
+                    return (
+                      <div key={item.key} className="flex items-center justify-center">
+                        <span className="text-xs font-medium text-gray-400 tracking-wide uppercase">
+                          {item.label}
+                        </span>
+                      </div>
+                    )
+                  }
+                  const message = item.message
+                  return (
+                  <div key={item.key} className={`group flex ${message.isMe ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`relative max-w-[80%] p-3 rounded-lg ${
                         message.isMe ? "bg-primary text-primary-foreground" : "bg-gray-100 text-gray-800"
@@ -872,18 +917,19 @@ export function MessagesPanel() {
                       )}
                     </div>
                   </div>
-                ))
+                  )
+                })
               )}
               <div ref={messagesEndRef} />
             </div>
 
             {selectedConversation.isBlocked ? (
-              <div className="p-4 border-t text-center text-sm text-gray-500">
+              <div className="p-4 border-t text-center text-sm text-gray-500 flex-shrink-0">
                 {t('farmer.conversationBlockedNotice')}
               </div>
             ) : (
-              <div className="p-4 border-t">
-                <div className="flex space-x-2">
+              <div className="p-4 border-t flex-shrink-0">
+                <div className="flex items-center space-x-2">
                   <Input
                     placeholder={t('farmer.typeMessage')}
                     value={newMessage}
@@ -894,10 +940,15 @@ export function MessagesPanel() {
                         handleSendMessage()
                       }
                     }}
-                    className="flex-1"
+                    className="flex-1 rounded-full bg-gray-50"
                     disabled={sending}
                   />
-                  <Button onClick={handleSendMessage} size="icon" disabled={sending || !newMessage.trim()}>
+                  <Button
+                    onClick={handleSendMessage}
+                    size="icon"
+                    className="rounded-full flex-shrink-0"
+                    disabled={sending || !newMessage.trim()}
+                  >
                     {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>

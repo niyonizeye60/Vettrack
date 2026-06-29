@@ -585,6 +585,8 @@ const translations = {
     'farmer.profileSaved': 'Profile saved',
     'farmer.profileSavedDesc': 'Your account information has been updated successfully.',
     'farmer.profileSaveFailed': 'Could not save profile',
+    'farmer.today': 'Today',
+    'farmer.yesterday': 'Yesterday',
 
     // Farmer Consultation
     'farmer.enterFullName': 'Enter your full name',
@@ -1954,6 +1956,8 @@ const translations = {
     'farmer.profileSaved': 'Umwirondoro wabitswe',
     'farmer.profileSavedDesc': 'Amakuru ya konti yawe yavuguruwe neza.',
     'farmer.profileSaveFailed': 'Ntibyashobotse kubika umwirondoro',
+    'farmer.today': 'Uyu munsi',
+    'farmer.yesterday': 'Ejo hashize',
 
     // Farmer Consulation
     'farmer.enterFullName': 'Injiza amazina yawe yose',

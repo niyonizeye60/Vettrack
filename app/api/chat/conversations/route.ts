@@ -58,9 +58,10 @@ export async function GET(request: NextRequest) {
           { projection: { name: 1, role: 1 } }
         )
 
-        // Get last message
+        // Get last message - exclude any this user has soft-deleted for themselves,
+        // so the preview falls back to the next most recent remaining message.
         const lastMessage = await db.collection("messages").findOne(
-          { conversationId: conv._id },
+          { conversationId: conv._id, deletedFor: { $nin: [currentUser._id] } },
           { sort: { createdAt: -1 } }
         )
 

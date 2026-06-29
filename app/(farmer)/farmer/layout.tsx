@@ -10,7 +10,7 @@ import { MobileSidebarProvider } from "./components/mobile-sidebar-context";
 export default function FarmerLayout({ children }: { children: React.ReactNode }) {
   return (
     <MobileSidebarProvider>
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="flex h-screen overflow-hidden bg-gray-50">
         <UserStatusChecker />
         <FarmerSidebar />
         <div className="flex-1 flex flex-col min-w-0">
