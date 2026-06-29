@@ -65,6 +65,7 @@ const translations = {
     'common.cancel': 'Cancel',
     'common.edit': 'Edit',
     'common.delete': 'Delete',
+    'common.deleting': 'Deleting...',
     'common.update': 'Update',
     'common.create': 'Create',
     'common.add': 'Add',
@@ -612,6 +613,11 @@ const translations = {
     'animal.registeredOn': 'Registered On',
     'animal.deleteAnimal': 'Delete Animal',
     'animal.editAnimal': 'Edit Animal',
+    'animal.deleteAnimalConfirm': 'You are about to delete {name}',
+    'animal.deleteAnimalConfirmDesc': 'This will permanently remove this animal and cannot be undone',
+    'animal.pregnancyWarningTitle': 'This animal is currently pregnant',
+    'animal.pregnancyWarningDesc': 'There is an active pregnancy record with an expected birth date of {date}. Deleting this animal will also remove that tracking history.',
+    'animal.checkingPregnancy': 'Checking pregnancy status...',
 
     // Veterinary Dashboard
     'vet.dashboard': 'Veterinary Dashboard',
@@ -1441,6 +1447,7 @@ const translations = {
     'common.cancel': 'Hagarika',
     'common.edit': 'Hindura',
     'common.delete': 'Siba',
+    'common.deleting': 'Birasibwa...',
     'common.update': 'Kuvugurura',
     'common.create': 'Kurema',
     'common.add': 'Ongeraho',
@@ -1992,6 +1999,11 @@ const translations = {
     'animal.registeredOn': 'Yanditswe ku wa',
     'animal.deleteAnimal': 'Gusiba Itungo',
     'animal.editAnimal': 'Guhindura Amakuru',
+    'animal.deleteAnimalConfirm': 'Ugiye gusiba {name}',
+    'animal.deleteAnimalConfirmDesc': 'Ibi bizasiba burundu amakuru y\'iri tungo kandi ntibishobora gusubizwa inyuma',
+    'animal.pregnancyWarningTitle': 'Iri tungo ririmo inda',
+    'animal.pregnancyWarningDesc': 'Hari amakuru y\'inda agikurikiranwa, itariki yo kubyara iteganyijwe ni {date}. Gusiba iri tungo bizanasiba ayo makuru.',
+    'animal.checkingPregnancy': 'Kugenzura niba ririmo inda...',
 
     // Veterinary Dashboard
     'vet.dashboard': 'Ikibaho cy\'Umuganga w\'Amatungo',

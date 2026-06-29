@@ -8,7 +8,14 @@
       "Bash(grep -c \"consultations/.*\\\\/delete\" /tmp/detail2.html)",
       "Bash(curl -s -m 20 -o /dev/null -w '%{http_code}\\\\n' -b session=__TRACKED_VAR__ http://localhost:3000/farmer/consultations/__TRACKED_VAR__/delete)",
       "Bash(curl -s -m 20 -b session=776a8553-af18-4c6b-b6ef-b3e02733c9cd http://localhost:3000/farmer/consultations -o /tmp/list3.html -w '%{http_code}\\\\n')",
-      "Bash(curl -s -m 20 -o /dev/null -w '%{http_code}\\\\n' -L -b session=776a8553-af18-4c6b-b6ef-b3e02733c9cd http://localhost:3000/farmer/consultations/6a41f18a7585c4db4d19f117/edit)"
+      "Bash(curl -s -m 20 -o /dev/null -w '%{http_code}\\\\n' -L -b session=776a8553-af18-4c6b-b6ef-b3e02733c9cd http://localhost:3000/farmer/consultations/6a41f18a7585c4db4d19f117/edit)",
+      "Bash(curl -s -m 20 -b session=612a1b6b-b96b-4779-ac40-638b1c37165b http://localhost:3000/farmer/animals/6a41f6a690084d46cf9cdd46 -o /tmp/animal_preg.html -w '%{http_code}\\\\n')",
+      "Bash(curl -s -m 20 -b session=612a1b6b-b96b-4779-ac40-638b1c37165b http://localhost:3000/farmer/animals/6a41f6a690084d46cf9cdd47 -o /tmp/animal_normal.html -w '%{http_code}\\\\n')",
+      "Bash(curl -s -m 20 -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/api/insemination?farmerId=6a41f6a590084d46cf9cdd44\")",
+      "Bash(curl -s -m 20 -o /dev/null -w '%{http_code}\\\\n' -b session=612a1b6b-b96b-4779-ac40-638b1c37165b http://localhost:3000/api/insemination?farmerId=000000000000000000000000)",
+      "Bash(curl -s -m 20 -b session=612a1b6b-b96b-4779-ac40-638b1c37165b http://localhost:3000/api/insemination?farmerId=6a41f6a590084d46cf9cdd44 -w '\\\\nHTTP %{http_code}\\\\n')",
+      "Bash(curl -s -m 15 -w '\\\\nHTTP %{http_code}\\\\n' -b session=d3fc5164-a7a0-478b-8a37-39709d8e7ad5 -X PUT http://localhost:3000/api/milk -H 'Content-Type: application/json' -d '{\"id\":\"6a41fa23582be2545f2a50e4\",\"liters\":999,\"session\":\"Morning\",\"date\":\"2026-06-29\"}')",
+      "Bash(curl -s -m 15 -w '\\\\nHTTP %{http_code}\\\\n' -b session=d3fc5164-a7a0-478b-8a37-39709d8e7ad5 -X DELETE http://localhost:3000/api/milk?id=6a41fa23582be2545f2a50e4)"
     ]
   }
 }

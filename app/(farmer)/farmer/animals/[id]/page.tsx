@@ -35,5 +35,5 @@ export default async function AnimalDetailsPage({ params }: { params: { id: stri
     redirect("/farmer/animals");
   }
 
-  return <AnimalDetailsClient animal={animal} animalId={params.id} />;
+  return <AnimalDetailsClient animal={animal} animalId={params.id} farmerId={currentUser._id.toString()} />;
 } 
