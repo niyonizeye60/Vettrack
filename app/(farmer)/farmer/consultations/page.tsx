@@ -20,7 +20,8 @@ export default async function FarmerConsultationsPage() {
   }
 
   // Get consultations for this farmer only
-  const consultations = await getConsultations(undefined, currentUser._id.toString())
+  const farmerId = currentUser._id.toString()
+  const consultations = await getConsultations(undefined, farmerId)
 
-  return <ConsultationsContent consultations={consultations} />
+  return <ConsultationsContent consultations={consultations} farmerId={farmerId} />
 }

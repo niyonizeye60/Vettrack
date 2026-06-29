@@ -39,9 +39,10 @@ export default async function ConsultationDetailPage({ params }: PageProps) {
   }
 
   return (
-    <ConsultationDetailContent 
+    <ConsultationDetailContent
       consultation={consultation}
       doctorName={doctorName}
+      farmerId={farmerId}
     />
   );
 } 

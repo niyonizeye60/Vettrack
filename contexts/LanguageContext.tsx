@@ -587,6 +587,9 @@ const translations = {
     'farmer.profileSaveFailed': 'Could not save profile',
     'farmer.today': 'Today',
     'farmer.yesterday': 'Yesterday',
+    'farmer.booking': 'Booking...',
+    'farmer.updatingConsultation': 'Updating...',
+    'farmer.deletingConsultation': 'Deleting...',
 
     // Farmer Consultation
     'farmer.enterFullName': 'Enter your full name',
@@ -1958,6 +1961,9 @@ const translations = {
     'farmer.profileSaveFailed': 'Ntibyashobotse kubika umwirondoro',
     'farmer.today': 'Uyu munsi',
     'farmer.yesterday': 'Ejo hashize',
+    'farmer.booking': 'Birasaba...',
+    'farmer.updatingConsultation': 'Birahindurwa...',
+    'farmer.deletingConsultation': 'Birasibwa...',
 
     // Farmer Consulation
     'farmer.enterFullName': 'Injiza amazina yawe yose',

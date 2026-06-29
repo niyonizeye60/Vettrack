@@ -142,7 +142,7 @@ export default function AddConsultationForm({ doctors, farmerId }: AddConsultati
 
           <div className="flex justify-end space-x-4">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Booking..." : (t('farmer.bookConsultation'))}
+              {isSubmitting ? t('farmer.booking') : (t('farmer.bookConsultation'))}
             </Button>
           </div>
         </form>

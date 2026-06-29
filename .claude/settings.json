@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -m 20 -o /dev/null -w \"%{http_code}\\\\n\" -b \"session=test-verify-token\" \"http://localhost:3000/farmer/consultations\")",
+      "Bash(curl -s -m 20 -b session=007a7221-94e2-473f-bbdd-06b61fcb89c1 http://localhost:3000/farmer/consultations -o /tmp/list2.html -w '%{http_code}\\\\n')",
+      "Bash(grep -c \"consultations/.*\\\\/delete\" /tmp/list2.html)",
+      "Bash(curl -s -m 20 -b session=__TRACKED_VAR__ http://localhost:3000/farmer/consultations/__TRACKED_VAR__ -o /tmp/detail2.html -w '%{http_code}\\\\n')",
+      "Bash(grep -c \"consultations/.*\\\\/delete\" /tmp/detail2.html)",
+      "Bash(curl -s -m 20 -o /dev/null -w '%{http_code}\\\\n' -b session=__TRACKED_VAR__ http://localhost:3000/farmer/consultations/__TRACKED_VAR__/delete)",
+      "Bash(curl -s -m 20 -b session=776a8553-af18-4c6b-b6ef-b3e02733c9cd http://localhost:3000/farmer/consultations -o /tmp/list3.html -w '%{http_code}\\\\n')",
+      "Bash(curl -s -m 20 -o /dev/null -w '%{http_code}\\\\n' -L -b session=776a8553-af18-4c6b-b6ef-b3e02733c9cd http://localhost:3000/farmer/consultations/6a41f18a7585c4db4d19f117/edit)"
+    ]
+  }
+}

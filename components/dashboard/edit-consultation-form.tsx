@@ -53,7 +53,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
       const result = await updateConsultation(consultation._id, formData, farmerId)
       
       if (result.success) {
-        router.push(`/farmer/consultations/${consultation._id}`)
+        router.push("/farmer/consultations")
         router.refresh()
       } else {
         console.error("Failed to update consultation", result.error)
@@ -89,7 +89,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
               <Input
                 id="phoneNumber"
                 name="phoneNumber"
-                placeholder="Enter your phone number"
+                placeholder={t('farmer.enterPhoneNumber')}
                 defaultValue={consultation.phoneNumber}
                 required
               />
@@ -100,7 +100,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
               <Input
                 id="service"
                 name="service"
-                placeholder="Enter service required"
+                placeholder={t('farmer.enterService')}
                 defaultValue={consultation.service}
                 required
               />
@@ -110,7 +110,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
               <Label htmlFor="doctor">{t('farmer.selectDoctor')}</Label>
               <Select name="doctor" defaultValue={consultation.doctor} required>
                 <SelectTrigger id="doctor">
-                  <SelectValue placeholder="Select a doctor" />
+                  <SelectValue placeholder={t('farmer.selectDoctor')} />
                 </SelectTrigger>
                 <SelectContent>
                   {doctors.map((doc) => (
@@ -148,7 +148,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
               <Label htmlFor="type">{t('farmer.consultationType')}</Label>
               <Select name="type" defaultValue={consultation.type} required>
                 <SelectTrigger id="type">
-                  <SelectValue placeholder="Select consultation type" />
+                  <SelectValue placeholder={t('farmer.selectConsultationType')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Virtual">{t('farmer.virtual')}</SelectItem>
@@ -162,12 +162,12 @@ export default function EditConsultationForm({ consultation, doctors, farmerId }
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push(`/farmer/consultations/${consultation._id}`)}
+              onClick={() => router.push("/farmer/consultations")}
             >
               {t('farmer.cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Updating..." : (t('farmer.updateConsultation'))}
+              {isSubmitting ? t('farmer.updatingConsultation') : (t('farmer.updateConsultation'))}
             </Button>
           </div>
         </form>

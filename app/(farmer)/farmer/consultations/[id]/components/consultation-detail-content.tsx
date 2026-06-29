@@ -1,20 +1,53 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog"
 import { MessageSquare } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useToast } from "@/hooks/use-toast"
+import { deleteConsultation } from "@/lib/actions"
 
 interface ConsultationDetailContentProps {
   consultation: any
   doctorName: string
+  farmerId: string
 }
 
-export default function ConsultationDetailContent({ consultation, doctorName }: ConsultationDetailContentProps) {
+export default function ConsultationDetailContent({ consultation, doctorName, farmerId }: ConsultationDetailContentProps) {
   const { t } = useLanguage()
+  const { toast } = useToast()
+  const router = useRouter()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      const result = await deleteConsultation(consultation._id, farmerId)
+      if (result.success) {
+        router.push("/farmer/consultations")
+        router.refresh()
+      } else {
+        toast({ title: t('farmer.actionFailed'), variant: "destructive" })
+        setDeleting(false)
+        setDeleteOpen(false)
+      }
+    } catch (error) {
+      console.error("Error deleting consultation:", error)
+      toast({ title: t('farmer.actionFailed'), variant: "destructive" })
+      setDeleting(false)
+      setDeleteOpen(false)
+    }
+  }
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -45,9 +78,9 @@ export default function ConsultationDetailContent({ consultation, doctorName }: 
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('farmer.consultationDetails')}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('farmer.consultationDetails')}</h1>
         <Button asChild variant="outline" size="sm">
           <Link href="/farmer/consultations">{t('farmer.backToAllConsultations')}</Link>
         </Button>
@@ -137,14 +170,33 @@ export default function ConsultationDetailContent({ consultation, doctorName }: 
                 {t('farmer.editConsultation')}
               </Link>
             </Button>
-            <Button asChild variant="destructive" size="lg">
-              <Link href={`/farmer/consultations/${consultation._id}/delete`}>
-                {t('farmer.deleteConsultation')}
-              </Link>
+            <Button variant="destructive" size="lg" onClick={() => setDeleteOpen(true)}>
+              {t('farmer.deleteConsultation')}
             </Button>
           </CardFooter>
         )}
       </Card>
+
+      <AlertDialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('farmer.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('farmer.deleteConsultationConfirm')}. {t('farmer.deleteConsultationConfirmDesc')}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting ? t('farmer.deletingConsultation') : t('farmer.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
