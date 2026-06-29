@@ -2,14 +2,25 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
+import { getCurrentUser } from "@/lib/auth"
 
 const DB = "ntdm_animal_hospital"
 
 export async function GET(req: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const farmerId = searchParams.get("farmerId")
     if (!farmerId) return NextResponse.json({ error: "farmerId required" }, { status: 400 })
+
+    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
+    if (!isStaff && farmerId !== currentUser._id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const client = await clientPromise
     const db = client.db(DB)
@@ -34,11 +45,21 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = await req.json()
     const { farmerId, animalId, animalName, diseaseName, symptoms, treatment, diagnosedDate, resolvedDate, status, notes, veterinarianName, vetOrigin } = body
 
     if (!farmerId || !animalId || !diseaseName || !diagnosedDate)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+
+    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
+    if (!isStaff && farmerId !== currentUser._id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const client = await clientPromise
     const db = client.db(DB)
@@ -70,12 +91,25 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = await req.json()
     const { id, animalId, animalName, diseaseName, symptoms, treatment, diagnosedDate, resolvedDate, status, notes, veterinarianName, vetOrigin } = body
     if (!id) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
 
     const client = await clientPromise
     const db = client.db(DB)
+
+    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
+    if (!isStaff) {
+      const existing = await db.collection("disease_records").findOne({ _id: new ObjectId(id) })
+      if (!existing || existing.farmerId !== currentUser._id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
 
     await db.collection("disease_records").updateOne(
       { _id: new ObjectId(id) },
@@ -103,12 +137,25 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
 
     const client = await clientPromise
     const db = client.db(DB)
+
+    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
+    if (!isStaff) {
+      const existing = await db.collection("disease_records").findOne({ _id: new ObjectId(id) })
+      if (!existing || existing.farmerId !== currentUser._id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
 
     await db.collection("disease_records").deleteOne({ _id: new ObjectId(id) })
     return NextResponse.json({ success: true })
