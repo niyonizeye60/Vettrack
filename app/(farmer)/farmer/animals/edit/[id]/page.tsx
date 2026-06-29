@@ -32,7 +32,6 @@ export default async function EditAnimalPage({ params }: { params: { id: string 
 
   return (
     <div className="max-w-3xl mx-auto p-8">
-      {/* <h1 className="text-2xl font-bold mb-6">Edit Animal</h1> */}
       <EditAnimalForm
         animal={{
           _id: animal._id.toString(),

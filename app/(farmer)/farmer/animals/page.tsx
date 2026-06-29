@@ -14,7 +14,8 @@ export default async function AnimalsPage() {
   }
 
   // Get animals for this farmer only
-  const animals = await getAnimals(currentUser._id.toString());
+  const farmerId = currentUser._id.toString();
+  const animals = await getAnimals(farmerId);
 
-  return <AnimalsContent animals={animals} />;
+  return <AnimalsContent animals={animals} farmerId={farmerId} />;
 }

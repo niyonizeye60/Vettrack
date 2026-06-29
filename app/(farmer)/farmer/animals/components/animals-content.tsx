@@ -1,26 +1,109 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { MoreVertical } from "lucide-react"
-import { Bell } from "lucide-react"
-import { useLanguage } from "@/contexts/LanguageContext"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import Link from "next/link"
+import { Bell, Eye, Pencil, Trash2, AlertTriangle } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
+import { useToast } from "@/hooks/use-toast"
+import { deleteAnimal } from "@/lib/actions"
 
 interface AnimalsContentProps {
   animals: any[]
+  farmerId: string
 }
 
-export default function AnimalsContent({ animals }: AnimalsContentProps) {
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between py-2 border-b border-gray-50 last:border-0">
+      <span className="text-sm text-gray-500 w-36 shrink-0">{label}</span>
+      <span className="text-sm text-right text-gray-800">{value}</span>
+    </div>
+  )
+}
+
+export default function AnimalsContent({ animals, farmerId }: AnimalsContentProps) {
   const { t } = useLanguage()
+  const { toast } = useToast()
+  const router = useRouter()
+
+  const [detailAnimal, setDetailAnimal] = useState<any | null>(null)
+  const [deleteAnimalTarget, setDeleteAnimalTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [inseminationRecords, setInseminationRecords] = useState<any[]>([])
+  const [recordsLoaded, setRecordsLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadInseminationRecords() {
+      try {
+        const res = await fetch(`/api/insemination?farmerId=${farmerId}`)
+        const data = await res.json()
+        if (!cancelled && Array.isArray(data)) setInseminationRecords(data)
+      } catch (error) {
+        console.error("Error loading insemination records:", error)
+      } finally {
+        if (!cancelled) setRecordsLoaded(true)
+      }
+    }
+    loadInseminationRecords()
+    return () => { cancelled = true }
+  }, [farmerId])
+
+  const getPregnancy = (animalId: string) => {
+    const today = new Date().toISOString().split("T")[0]
+    return inseminationRecords.find(
+      (r) =>
+        r.animalId === animalId &&
+        r.expectedBirthDate &&
+        r.expectedBirthDate >= today &&
+        !r.deliveredBabies &&
+        !r.pregnancyFailed
+    )
+  }
+
+  const getStatusColor = (status: string) =>
+    status === "Healthy" ? "bg-green-100 text-green-800" :
+    status === "Sick" ? "bg-yellow-100 text-yellow-800" :
+    status === "Under Treatment" ? "bg-blue-100 text-blue-800" :
+    "bg-gray-100 text-gray-800"
+
+  const getStatusText = (status: string) =>
+    status === "Healthy" ? t('farmer.healthy') :
+    status === "Sick" ? t('farmer.sick') :
+    status === "Under Treatment" ? t('farmer.underTreatment') :
+    status
+
+  const handleDelete = async () => {
+    if (!deleteAnimalTarget) return
+    setDeleting(true)
+    try {
+      const result = await deleteAnimal(deleteAnimalTarget._id, farmerId)
+      if (result.success) {
+        router.refresh()
+      } else {
+        toast({ title: t('farmer.actionFailed'), variant: "destructive" })
+      }
+    } catch (error) {
+      console.error("Error deleting animal:", error)
+      toast({ title: t('farmer.actionFailed'), variant: "destructive" })
+    } finally {
+      setDeleting(false)
+      setDeleteAnimalTarget(null)
+    }
+  }
+
+  const deletePregnancy = deleteAnimalTarget ? getPregnancy(deleteAnimalTarget._id) : null
 
   return (
     <div className="space-y-6 p-8">
@@ -81,48 +164,45 @@ export default function AnimalsContent({ animals }: AnimalsContentProps) {
                     <TableCell>{animal.acquisitionType}</TableCell>
                     <TableCell>{animal.district}, {animal.sector}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          animal.status === "Healthy"
-                            ? "bg-green-100 text-green-800"
-                            : animal.status === "Sick"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : animal.status === "Under Treatment"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-gray-100 text-gray-800"
-                        }
-                      >
-                        {animal.status === "Healthy" ? t('farmer.healthy') :
-                          animal.status === "Sick" ? t('farmer.sick') :
-                            animal.status === "Under Treatment" ? t('farmer.underTreatment') :
-                              animal.status}
+                      <Badge variant="outline" className={getStatusColor(animal.status)}>
+                        {getStatusText(animal.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>{animal.gender ? t(`farmer.${animal.gender}`) : t('farmer.undefined')}</TableCell>
                     <TableCell>RWF {animal.price}</TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/farmer/animals/${animal._id}`}>
-                              {t("farmer.viewDetails")}
-                            </Link>
-                          </DropdownMenuItem>
-
-                          <DropdownMenuItem asChild>
-                            <Link href={`/farmer/animals/edit/${animal._id}`}>
-                              {t("farmer.edit")}
-                            </Link>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-emerald-50"
+                          title={t('farmer.viewDetails')}
+                          onClick={() => setDetailAnimal(animal)}
+                        >
+                          <Eye className="h-3.5 w-3.5 text-emerald-600" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-emerald-50"
+                          title={t('farmer.edit')}
+                          asChild
+                        >
+                          <Link href={`/farmer/animals/edit/${animal._id}`}>
+                            <Pencil className="h-3.5 w-3.5 text-emerald-600" />
+                          </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-red-50"
+                          title={t('farmer.delete')}
+                          disabled={!recordsLoaded}
+                          onClick={() => setDeleteAnimalTarget(animal)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -131,6 +211,87 @@ export default function AnimalsContent({ animals }: AnimalsContentProps) {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!detailAnimal} onOpenChange={(open) => !open && setDetailAnimal(null)}>
+        <DialogContent className="max-w-2xl p-6 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-emerald-600" />
+              {t('animal.details')}
+            </DialogTitle>
+          </DialogHeader>
+
+          {detailAnimal && (
+            <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto pr-2">
+              <div className="border rounded-lg p-4 space-y-1 bg-white">
+                <DetailRow label={t('farmer.name')} value={detailAnimal.name} />
+                <DetailRow label={t('farmer.type')} value={detailAnimal.type} />
+                <DetailRow label={t('animal.breed')} value={detailAnimal.breed} />
+                <DetailRow label={t('animal.class')} value={detailAnimal.class} />
+                <DetailRow label={t('animal.earTagId')} value={detailAnimal.earTagId || t('farmer.notAvailable')} />
+                <DetailRow label={t('farmer.insuranceId')} value={detailAnimal.insuranceId || t('farmer.notAvailable')} />
+                <DetailRow label={t('animal.location')} value={`${detailAnimal.district}, ${detailAnimal.sector}`} />
+                <DetailRow label={t('animal.price')} value={`RWF ${detailAnimal.price}`} />
+                <DetailRow label={t('animal.owner')} value={detailAnimal.ownerName} />
+                <DetailRow label={t('animal.phone')} value={detailAnimal.phoneNumber} />
+                <DetailRow
+                  label={t('farmer.acquisitionType')}
+                  value={detailAnimal.acquisitionType ? t(`farmer.${detailAnimal.acquisitionType}`) : t('farmer.notAvailable')}
+                />
+                <DetailRow
+                  label={t('farmer.gender')}
+                  value={detailAnimal.gender ? t(`farmer.${detailAnimal.gender}`) : t('farmer.undefined')}
+                />
+                <DetailRow
+                  label={t('farmer.status')}
+                  value={
+                    <Badge className={getStatusColor(detailAnimal.status)}>
+                      {getStatusText(detailAnimal.status)}
+                    </Badge>
+                  }
+                />
+                <DetailRow
+                  label={t('animal.registeredOn')}
+                  value={new Date(detailAnimal.createdAt).toLocaleDateString()}
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteAnimalTarget} onOpenChange={(open) => !deleting && !open && setDeleteAnimalTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('farmer.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteAnimalTarget && t('animal.deleteAnimalConfirm').replace('{name}', deleteAnimalTarget.name)}.{" "}
+              {t('animal.deleteAnimalConfirmDesc')}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deletePregnancy && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>{t('animal.pregnancyWarningTitle')}</AlertTitle>
+              <AlertDescription>
+                {t('animal.pregnancyWarningDesc').replace('{date}', deletePregnancy.expectedBirthDate)}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleting ? t('common.deleting') : t('animal.deleteAnimal')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
