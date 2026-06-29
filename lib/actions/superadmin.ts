@@ -3,6 +3,35 @@
 import clientPromise from "../db"
 import { revalidatePath } from "next/cache"
 import { ObjectId } from "mongodb"
+import { hashPassword } from "../password"
+
+interface SystemSettingsDoc {
+  _id: string
+  siteName: string
+  siteEmail: string
+  siteDescription: string
+  autoApproveUsers: boolean
+  requireEmailVerification: boolean
+  allowUserDeletion: boolean
+  enableTwoFactor: boolean
+  sessionTimeout: boolean
+  sessionDuration: number
+  maxLoginAttempts: number
+  maxUsersPerRole: number
+  maxConsultationsPerDay: number
+  maintenanceMode: boolean
+  systemAlerts: boolean
+  userRegistrationAlerts: boolean
+  suspiciousActivityAlerts: boolean
+  backupFrequency: string
+  dataRetention: number
+  smtpHost: string
+  smtpPort: number
+  smtpUser: string
+  smtpPass: string
+  smtpSecure: boolean
+  updatedAt: Date
+}
 
 // Get all users for super admin management
 export async function getAllUsers() {
@@ -553,9 +582,9 @@ export async function updateUserPassword(userId: string, newPassword: string) {
 
     const result = await db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
-          password: newPassword,
+      {
+        $set: {
+          password: await hashPassword(newPassword),
           updatedAt: new Date()
         }
       }
@@ -677,7 +706,7 @@ export async function getRecentActivities() {
       .limit(2)
       .toArray()
 
-    const activities = []
+    const activities: { id: string; type: string; message: string; time: string; createdAt: Date }[] = []
 
     // Add user activities
     recentUsers.forEach(user => {
@@ -1004,7 +1033,7 @@ export async function createAnnouncement(data: {
               } catch (error) {
                 failCount++
                 console.log(`✗ Error sending email to ${user.email}:`, error)
-                return { success: false, error: error.message }
+                return { success: false, error: error instanceof Error ? error.message : String(error) }
               }
             })
             
@@ -1149,7 +1178,9 @@ export async function generateSystemNotifications() {
         })
       )
 
-      const toInsert = notificationsWithTimestamp.filter(Boolean)
+      const toInsert = notificationsWithTimestamp.filter(
+        (n): n is NonNullable<typeof n> => n !== null
+      )
       if (toInsert.length > 0) {
         await db.collection("notifications").insertMany(toInsert)
       }
@@ -1168,7 +1199,7 @@ export async function getSystemSettings() {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    const settings = await db.collection("system_settings").findOne({ _id: "global" })
+    const settings = await db.collection<SystemSettingsDoc>("system_settings").findOne({ _id: "global" })
     
     // Return default settings if none exist
     if (!settings) {
@@ -1200,7 +1231,7 @@ export async function getSystemSettings() {
         updatedAt: new Date()
       }
       
-      await db.collection("system_settings").insertOne(defaultSettings)
+      await db.collection<SystemSettingsDoc>("system_settings").insertOne(defaultSettings)
       return defaultSettings
     }
     
@@ -1217,9 +1248,9 @@ export async function updateSystemSettings(settings: any) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    const result = await db.collection("system_settings").updateOne(
+    const result = await db.collection<SystemSettingsDoc>("system_settings").updateOne(
       { _id: "global" },
-      { 
+      {
         $set: {
           ...settings,
           updatedAt: new Date()

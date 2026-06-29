@@ -582,6 +582,9 @@ const translations = {
     'farmer.wasteManagementReportTitle': 'Waste Management Report',
     'farmer.diseaseManagementReportTitle': 'Disease Management Report',
     'farmer.inseminationReportTitle': 'Insemination Report',
+    'farmer.profileSaved': 'Profile saved',
+    'farmer.profileSavedDesc': 'Your account information has been updated successfully.',
+    'farmer.profileSaveFailed': 'Could not save profile',
 
     // Farmer Consultation
     'farmer.enterFullName': 'Enter your full name',
@@ -1948,6 +1951,9 @@ const translations = {
     'farmer.wasteManagementReportTitle': 'Raporo y\'Imicungire y\'Imyanda',
     'farmer.diseaseManagementReportTitle': 'Raporo y\'Imicungire y\'Indwara',
     'farmer.inseminationReportTitle': 'Raporo y\'Itera',
+    'farmer.profileSaved': 'Umwirondoro wabitswe',
+    'farmer.profileSavedDesc': 'Amakuru ya konti yawe yavuguruwe neza.',
+    'farmer.profileSaveFailed': 'Ntibyashobotse kubika umwirondoro',
 
     // Farmer Consulation
     'farmer.enterFullName': 'Injiza amazina yawe yose',

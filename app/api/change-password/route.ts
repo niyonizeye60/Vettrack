@@ -2,18 +2,17 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
-import { cookies } from "next/headers"
+import { getCurrentUser } from "@/lib/auth"
+import { hashPassword, verifyPassword } from "@/lib/password"
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const userCookie = cookieStore.get('user')
-    
-    if (!userCookie) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
       return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 })
     }
 
-    const currentUser = JSON.parse(userCookie.value)
     const { currentPassword, newPassword } = await request.json()
 
     if (!currentPassword || !newPassword) {
@@ -29,22 +28,22 @@ export async function POST(request: NextRequest) {
 
     // Get user with current password
     const user = await db.collection("users").findOne({ _id: new ObjectId(currentUser._id) })
-    
+
     if (!user) {
       return NextResponse.json({ success: false, message: "User not found" }, { status: 404 })
     }
 
-    // Verify current password (matches superadmin implementation)
-    if (currentPassword !== user.password) {
+    // Verify current password
+    if (!(await verifyPassword(currentPassword, user.password))) {
       return NextResponse.json({ success: false, message: "Current password is incorrect" }, { status: 400 })
     }
 
-    // Update password (matches superadmin updateUserPassword function)
+    // Update password
     const result = await db.collection("users").updateOne(
       { _id: new ObjectId(currentUser._id) },
-      { 
+      {
         $set: {
-          password: newPassword,
+          password: await hashPassword(newPassword),
           updatedAt: new Date()
         }
       }

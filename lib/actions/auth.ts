@@ -3,12 +3,13 @@ import clientPromise from "../db"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { sendWelcomeEmail } from "../email" // Import the email function
+import { hashPassword, verifyPassword, isHashedPassword } from "../password"
 
 // Register a new user
 export async function registerUser(formData: FormData) {
   try {
     const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital") 
+    const db = client.db("ntdm_animal_hospital")
 
     const role = formData.get("role") as "farmer" | "doctor" | "admin" | "superadmin"
 
@@ -16,7 +17,7 @@ export async function registerUser(formData: FormData) {
     const userData = {
       name: formData.get("name"),
       email: formData.get("email"),
-      password: formData.get("password"),
+      password: await hashPassword(formData.get("password") as string),
       phone: formData.get("phone"),
       role,
       status: "active",
@@ -102,14 +103,18 @@ export async function loginUser(formData: FormData) {
     const email = formData.get("email") as string
     const password = formData.get("password") as string
 
-    // In a real app, you would hash the password and compare with the stored hash
-    const user = await db.collection("users").findOne({
-      email,
-      password, // This is insecure - in a real app, use proper password hashing
-    })
+    const user = await db.collection("users").findOne({ email })
 
-    if (!user) {
+    if (!user || !(await verifyPassword(password, user.password))) {
       return { success: false, message: "Invalid email or password" }
+    }
+
+    // Transparently upgrade legacy plain-text passwords to a bcrypt hash on successful login
+    if (!isHashedPassword(user.password)) {
+      await db.collection("users").updateOne(
+        { _id: user._id },
+        { $set: { password: await hashPassword(password) } }
+      )
     }
 
     // Check if user account is suspended or inactive

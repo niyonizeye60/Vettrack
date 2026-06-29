@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import { createHash } from "crypto"
 import clientPromise from "@/lib/db"
+import { hashPassword } from "@/lib/password"
 
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     await db.collection("users").updateOne(
       { _id: user._id },
       {
-        $set: { password, updatedAt: new Date() },
+        $set: { password: await hashPassword(password), updatedAt: new Date() },
         $unset: { resetTokenHash: "", resetTokenExpiresAt: "" },
       }
     )

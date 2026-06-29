@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import { getCurrentUser } from "@/lib/auth";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function FarmerProfilePage() {
   const { t } = useLanguage();
@@ -20,14 +20,12 @@ export default function FarmerProfilePage() {
     <div className="max-w-xl mx-auto py-10 px-4">
       <h1 className="text-2xl font-bold mb-6">{t('farmer.myProfile')}</h1>
       <div className="flex flex-col items-center mb-8">
-        <div className="relative w-28 h-28 mb-3">
-          <Image
-            src="/avatars/01.png" // Always show avatar image
-            alt="Profile"
-            fill
-            className="rounded-full object-cover border-4 border-green-200 bg-white"
-          />
-        </div>
+        <Avatar className="w-28 h-28 mb-3 border-4 border-green-200">
+          <AvatarImage src={user?.image} alt={user?.name || "Profile"} />
+          <AvatarFallback className="bg-emerald-500 text-white text-3xl">
+            {user?.name ? user.name.charAt(0).toUpperCase() : "F"}
+          </AvatarFallback>
+        </Avatar>
         <h2 className="text-xl font-semibold">{user?.name || t('farmer.farmer')}</h2>
         <p className="text-gray-600">{user?.email || "your@email.com"}</p>
       </div>

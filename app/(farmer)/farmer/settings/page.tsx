@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useToast } from "@/hooks/use-toast"
 
 export default function FarmerSettingsPage() {
   const { t } = useLanguage()
+  const { toast } = useToast()
   const [name, setName] = useState<string>("")
   const [email, setEmail] = useState<string>("")
   const [phone, setPhone] = useState<string>("")
@@ -36,36 +38,30 @@ export default function FarmerSettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true)
-      // prefer PATCH to update partially; try common endpoints
       const payload: Record<string, any> = { name, email, phone }
       if (password) payload.password = password
 
-      let res = await fetch("/api/profile", {
+      const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
+      const data = await res.json().catch(() => null)
 
-      if (!res.ok) {
-        // try alternate endpoint
-        res = await fetch("/api/user", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Save failed")
       }
 
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || "Save failed")
-      }
-
-      alert("Profile saved")
+      toast({ title: t('farmer.profileSaved'), description: t('farmer.profileSavedDesc') })
       setPassword("") // clear password field after successful save
       await loadProfile()
     } catch (err: any) {
       console.error(err)
-      alert("Error saving profile: " + (err?.message ?? "unknown"))
+      toast({
+        title: t('farmer.profileSaveFailed'),
+        description: err?.message ?? undefined,
+        variant: "destructive",
+      })
     } finally {
       setSaving(false)
     }
