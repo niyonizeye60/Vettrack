@@ -15,7 +15,8 @@ import {
   Edit3,
   Bell,
   Download,
-  ShieldAlert
+  ShieldAlert,
+  Mail
 } from "lucide-react"
 
 
@@ -68,6 +69,11 @@ export default function SuperAdminSidebar({ onNavigate }: SuperAdminSidebarProps
       name: t('superadmin.chatModeration') || 'Chat Moderation',
       href: "/superadmin/moderation",
       icon: ShieldAlert,
+    },
+    {
+      name: t('superadmin.newsletterSubscribers') || 'Subscribers',
+      href: "/superadmin/subscribers",
+      icon: Mail,
     },
     {
       name: t('superadmin.settings'),

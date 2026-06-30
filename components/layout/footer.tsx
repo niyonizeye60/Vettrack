@@ -1,9 +1,41 @@
+"use client"
+
+import { useState } from "react"
 import Link from "next/link"
-import { Facebook, Instagram, Twitter, MapPin, Phone, Mail, Clock, Youtube, Linkedin } from "lucide-react"
+import { Facebook, Instagram, Twitter, MapPin, Phone, Mail, Clock, Youtube, Linkedin, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function Footer() {
   const { t } = useLanguage()
+  const [email, setEmail] = useState("")
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [message, setMessage] = useState("")
+
+  async function handleSubscribe(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim()) return
+    setStatus("loading")
+    setMessage("")
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setStatus("success")
+        setMessage(data.message)
+        setEmail("")
+      } else {
+        setStatus("error")
+        setMessage(data.message || t('footer.subscribeError'))
+      }
+    } catch {
+      setStatus("error")
+      setMessage(t('footer.subscribeError'))
+    }
+  }
   return (
     <footer className="bg-gray-900 text-white pt-20 pb-10">
       <div className="container-custom">
@@ -164,16 +196,37 @@ export default function Footer() {
             <p className="text-gray-400 mb-6">
               {t('footer.newsletterDesc')}
             </p>
-            <form className="flex flex-col sm:flex-row gap-4">
+            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-4">
               <input
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder={t('footer.emailPlaceholder')}
-                className="flex-grow px-4 py-3 rounded-full bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={status === "loading" || status === "success"}
+                className="flex-grow px-4 py-3 rounded-full bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
+                required
               />
-              <button type="submit" className="btn-primary">
-                {t('footer.subscribe')}
+              <button
+                type="submit"
+                disabled={status === "loading" || status === "success"}
+                className="btn-primary flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {status === "loading" && <Loader2 className="h-4 w-4 animate-spin" />}
+                {status === "loading" ? t('footer.subscribing') : t('footer.subscribe')}
               </button>
             </form>
+            {status === "success" && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-emerald-400 text-sm">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{message}</span>
+              </div>
+            )}
+            {status === "error" && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-red-400 text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{message}</span>
+              </div>
+            )}
           </div>
         </div>
 
