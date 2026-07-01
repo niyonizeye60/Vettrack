@@ -1410,6 +1410,12 @@ const translations = {
     'superadmin.targetDatabaseName': 'Target Database Name',
     'superadmin.targetDatabaseNamePlaceholder': 'Enter target database name',
     'superadmin.importIntoNewDatabase': 'Import into a new database',
+    'superadmin.startingDownload': 'Starting download...',
+    'superadmin.confirmImportTitle': 'Confirm Database Import',
+    'superadmin.confirmImportAction': 'Are you sure you want to import this database backup? This action may overwrite existing data.',
+    'superadmin.confirmImportDesc': 'Please ensure you have a backup of your current database before proceeding.',
+    'superadmin.importing': 'Importing...',
+    'superadmin.importedInto': 'Imported into',
   },
   rw: {
     // Navigation
@@ -2766,6 +2772,11 @@ const translations = {
     'superadmin.targetDatabaseName': 'Izina ry\'Ububiko bw\'Amakuru Rigenewe',
     'superadmin.targetDatabaseNamePlaceholder': 'Injiza izina ry\'ububiko bw\'amakuru rigenewe',
     'superadmin.importIntoNewDatabase': 'Injiza muri Ububiko bw\'Amakuru Bushya',
+    'superadmin.startingDownload': 'Biratangira gukururwa...',
+    'superadmin.confirmImportTitle': 'Uremeza ko ushaka kwinjiza ububiko bw\'amakuru?',
+    'superadmin.confirmImportDesc': 'Iki gikorwa kizasimbuza ububiko bw\'amakuru bwa sisitemu y\'ubu. Nta buryo bwo gusubiza inyuma.',
+    'superadmin.confirmImportAction': 'Emeza',
+    'superadmin.importing': 'Birimo kwinjizwa...',
 
     // Notifications
     'superadmin.notificationManagement': 'Gucunga Imenyesha',
