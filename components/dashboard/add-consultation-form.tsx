@@ -1,15 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { bookConsultation } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLanguage } from "@/contexts/LanguageContext"
-
+import { useToast } from "@/hooks/use-toast"
 
 interface Doctor {
   _id: string
@@ -21,12 +19,14 @@ interface Doctor {
 
 interface AddConsultationFormProps {
   doctors: Doctor[]
-  farmerId?: string
+  farmerId: string
+  onSuccess: () => void
+  onCancel: () => void
 }
 
-export default function AddConsultationForm({ doctors, farmerId }: AddConsultationFormProps) {
+export default function AddConsultationForm({ doctors, farmerId, onSuccess, onCancel }: AddConsultationFormProps) {
   const { t } = useLanguage()
-  const router = useRouter()
+  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -34,119 +34,90 @@ export default function AddConsultationForm({ doctors, farmerId }: AddConsultati
     setIsSubmitting(true)
 
     const formData = new FormData(e.currentTarget)
-    
+
     try {
-      const result = await bookConsultation(formData, farmerId || "")
-      
+      const result = await bookConsultation(formData, farmerId)
       if (result.success) {
-        const redirectPath = farmerId ? "/farmer/consultations" : "/dashboard/consultations"
-        router.push(redirectPath)
-        router.refresh()
+        toast({ title: t('farmer.consultationBooked') || 'Consultation booked', description: t('farmer.consultationBookedDesc') || 'Your consultation has been booked successfully.' })
+        onSuccess()
       } else {
-        console.error("Failed to book consultation")
+        toast({ title: t('common.error'), description: t('farmer.actionFailed'), variant: "destructive" })
       }
-    } catch (error) {
-      console.error("Error booking consultation:", error)
+    } catch {
+      toast({ title: t('common.error'), description: t('farmer.actionFailed'), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('farmer.newConsultation')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="fullName">{t('farmer.fullName')}</Label>
-              <Input
-                id="fullName"
-                name="fullName"
-                placeholder={t("farmer.enterFullName")}
-                required
-              />
-            </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">{t('farmer.phoneNumber')}</Label>
-              <Input
-                id="phoneNumber"
-                name="phoneNumber"
-                placeholder={t('farmer.enterPhoneNumber')}
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-fullName">{t('farmer.fullName')}</Label>
+          <Input id="add-fullName" name="fullName" placeholder={t('farmer.enterFullName')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="service">{t('farmer.service')}</Label>
-              <Input
-                id="service"
-                name="service"
-                placeholder={t("farmer.enterService")}
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-phoneNumber">{t('farmer.phoneNumber')}</Label>
+          <Input id="add-phoneNumber" name="phoneNumber" placeholder={t('farmer.enterPhoneNumber')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="doctor">{t('farmer.selectDoctor')}</Label>
-              <Select name="doctor" required>
-                <SelectTrigger id="doctor">
-                  <SelectValue placeholder={t('farmer.selectDoctor')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {doctors.map((doc) => (
-                    <SelectItem key={doc._id} value={doc._id}>
-                      {doc.name} {doc.specialization ? `(${doc.specialization})` : ""} - {doc.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-service">{t('farmer.service')}</Label>
+          <Input id="add-service" name="service" placeholder={t('farmer.enterService')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="date">{t('farmer.date')}</Label>
-              <Input
-                id="date"
-                name="date"
-                type="date"
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-doctor">{t('farmer.selectDoctor')}</Label>
+          <Select name="doctor" required>
+            <SelectTrigger id="add-doctor">
+              <SelectValue placeholder={t('farmer.selectDoctor')} />
+            </SelectTrigger>
+            <SelectContent>
+              {doctors.map((doc) => (
+                <SelectItem key={doc._id} value={doc._id}>
+                  {doc.name}{doc.specialization ? ` (${doc.specialization})` : ""} — {doc.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="time">{t('farmer.time')}</Label>
-              <Input
-                id="time"
-                name="time"
-                type="time"
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-date">{t('farmer.date')}</Label>
+          <Input id="add-date" name="date" type="date" required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="type">{t('farmer.consultationType')}</Label>
-              <Select name="type" required>
-                <SelectTrigger id="type">
-                  <SelectValue placeholder={t('farmer.selectConsultationType')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Virtual">{t('farmer.virtual')}</SelectItem>
-                  <SelectItem value="In-Person">{t('farmer.inPerson')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-time">{t('farmer.time')}</Label>
+          <Input id="add-time" name="time" type="time" required />
+        </div>
 
-          <div className="flex justify-end space-x-4">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? t('farmer.booking') : (t('farmer.bookConsultation'))}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <div className="space-y-1.5 md:col-span-2">
+          <Label htmlFor="add-type">{t('farmer.consultationType')}</Label>
+          <Select name="type" required>
+            <SelectTrigger id="add-type">
+              <SelectValue placeholder={t('farmer.selectConsultationType')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Virtual">{t('farmer.virtual')}</SelectItem>
+              <SelectItem value="In-Person">{t('farmer.inPerson')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          {t('farmer.cancel')}
+        </Button>
+        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isSubmitting}>
+          {isSubmitting ? t('farmer.booking') : t('farmer.bookConsultation')}
+        </Button>
+      </div>
+    </form>
   )
 }

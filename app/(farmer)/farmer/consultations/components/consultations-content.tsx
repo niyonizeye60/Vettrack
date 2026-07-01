@@ -12,14 +12,24 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import Link from "next/link"
-import { Bell, Stethoscope, Eye, Pencil, Trash2, MessageSquare } from "lucide-react"
+import { Bell, Eye, MessageSquare, Pencil, Plus, Stethoscope, Trash2 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { deleteConsultation } from "@/lib/actions"
+import AddConsultationForm from "@/components/dashboard/add-consultation-form"
+import EditConsultationForm from "@/components/dashboard/edit-consultation-form"
+
+interface Doctor {
+  _id: string
+  name: string
+  email: string
+  specialization: string
+  phone: string
+}
 
 interface ConsultationsContentProps {
   consultations: any[]
+  doctors: Doctor[]
   farmerId: string
 }
 
@@ -32,13 +42,16 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function ConsultationsContent({ consultations, farmerId }: ConsultationsContentProps) {
+export default function ConsultationsContent({ consultations, doctors, farmerId }: ConsultationsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
+
+  const [addOpen, setAddOpen] = useState(false)
+  const [editConsultation, setEditConsultation] = useState<any | null>(null)
+  const [detailConsultation, setDetailConsultation] = useState<any | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [detailConsultation, setDetailConsultation] = useState<any | null>(null)
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -68,8 +81,7 @@ export default function ConsultationsContent({ consultations, farmerId }: Consul
         toast({ title: t('farmer.actionFailed'), variant: "destructive" })
       }
       router.refresh()
-    } catch (error) {
-      console.error("Error deleting consultation:", error)
+    } catch {
       toast({ title: t('farmer.actionFailed'), variant: "destructive" })
     } finally {
       setDeleting(false)
@@ -89,11 +101,10 @@ export default function ConsultationsContent({ consultations, farmerId }: Consul
             <p className="text-sm text-gray-500">{t('farmer.consultationHistory')}</p>
           </div>
         </div>
-        <div className="flex space-x-2">
-          <Button asChild size="sm">
-            <Link href="/farmer/consultations/new">{t('farmer.newConsultation')}</Link>
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Plus className="h-4 w-4 mr-1.5" />
+          {t('farmer.newConsultation')}
+        </Button>
       </div>
 
       <Card>
@@ -106,8 +117,8 @@ export default function ConsultationsContent({ consultations, farmerId }: Consul
               <Bell className="h-8 w-8 mx-auto mb-2 text-gray-400" />
               <p>{t('farmer.noConsultationsYet')}</p>
               <p className="mt-2">
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/farmer/consultations/new">{t('farmer.bookAConsultation')}</Link>
+                <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+                  {t('farmer.bookAConsultation')}
                 </Button>
               </p>
             </div>
@@ -132,9 +143,7 @@ export default function ConsultationsContent({ consultations, farmerId }: Consul
                     <TableCell>{consultation.date}</TableCell>
                     <TableCell>{consultation.time}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {consultation.type}
-                      </Badge>
+                      <Badge variant="outline">{consultation.type}</Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={getStatusColor(consultation.status)}>
@@ -159,11 +168,9 @@ export default function ConsultationsContent({ consultations, farmerId }: Consul
                               variant="ghost"
                               className="h-8 w-8 p-0 hover:bg-emerald-50"
                               title={t('farmer.edit')}
-                              asChild
+                              onClick={() => setEditConsultation(consultation)}
                             >
-                              <Link href={`/farmer/consultations/${consultation._id}/edit`}>
-                                <Pencil className="h-3.5 w-3.5 text-emerald-600" />
-                              </Link>
+                              <Pencil className="h-3.5 w-3.5 text-emerald-600" />
                             </Button>
                             <Button
                               size="sm"
@@ -186,6 +193,40 @@ export default function ConsultationsContent({ consultations, farmerId }: Consul
         </CardContent>
       </Card>
 
+      {/* Add Consultation Dialog */}
+      <Dialog open={addOpen} onOpenChange={(open) => !open && setAddOpen(false)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('farmer.newConsultation')}</DialogTitle>
+          </DialogHeader>
+          <AddConsultationForm
+            doctors={doctors}
+            farmerId={farmerId}
+            onSuccess={() => { setAddOpen(false); router.refresh() }}
+            onCancel={() => setAddOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Consultation Dialog */}
+      <Dialog open={!!editConsultation} onOpenChange={(open) => !open && setEditConsultation(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('farmer.editConsultation')}</DialogTitle>
+          </DialogHeader>
+          {editConsultation && (
+            <EditConsultationForm
+              consultation={editConsultation}
+              doctors={doctors}
+              farmerId={farmerId}
+              onSuccess={() => { setEditConsultation(null); router.refresh() }}
+              onCancel={() => setEditConsultation(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail Dialog */}
       <Dialog open={!!detailConsultation} onOpenChange={(open) => !open && setDetailConsultation(null)}>
         <DialogContent className="max-w-2xl p-6 rounded-2xl">
           <DialogHeader>
@@ -235,6 +276,7 @@ export default function ConsultationsContent({ consultations, farmerId }: Consul
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
