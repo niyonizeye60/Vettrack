@@ -449,6 +449,19 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
                 />
               </div>
             </div>
+            <div>
+              <Label htmlFor="bookingNotificationEmail">Booking Notification Recipient</Label>
+              <Input
+                id="bookingNotificationEmail"
+                type="email"
+                value={formData.bookingNotificationEmail || ''}
+                onChange={(e) => handleInputChange('bookingNotificationEmail', e.target.value)}
+                placeholder="Email that receives new booking notifications"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave empty to send booking notifications to the SMTP account above.
+              </p>
+            </div>
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="smtpSecure">{t('superadmin.useSslTls') || 'Use SSL/TLS'}</Label>
@@ -456,8 +469,8 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
                   {t('superadmin.useSslTlsDesc') || 'Enable secure connection for email sending'}
                 </p>
               </div>
-              <Switch 
-                id="smtpSecure" 
+              <Switch
+                id="smtpSecure"
                 checked={formData.smtpSecure || false}
                 onCheckedChange={(checked) => handleInputChange('smtpSecure', checked)}
               />

@@ -9,8 +9,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Clock, Mail, AlertCircle } from "lucide-react"
+import { Clock, Mail, AlertCircle, MessageCircle } from "lucide-react"
 import { sendBookingEmail } from "@/lib/actions/send-booking-email"
+
+const WHATSAPP_NUMBER = "+250780519960"
+
+const getServiceLabel = (serviceValue: string): string => {
+  for (const category of serviceCategories) {
+    const match = category.options.find((o) => o.value === serviceValue)
+    if (match) return match.label
+  }
+  return serviceValue
+}
 
 // Service categories for the form
 const serviceCategories = [
@@ -80,6 +90,7 @@ export default function BookingForm() {
   const [description, setDescription] = useState("")
   const [whatsappConfirm, setWhatsappConfirm] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [whatsappOpened, setWhatsappOpened] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<{
     type: "success" | "error" | null
     message: string
@@ -113,6 +124,7 @@ export default function BookingForm() {
     setAnimalCount("1")
     setDescription("")
     setWhatsappConfirm(true)
+    setWhatsappOpened(false)
     setSubmitStatus({ type: null, message: "" })
   }
 
@@ -144,9 +156,34 @@ export default function BookingForm() {
       console.log("Email result:", result)
 
       if (result.success) {
+        if (whatsappConfirm) {
+          const serviceLabel = getServiceLabel(selectedService)
+          const msg = [
+            `Hello NTDM Animal Hospital! 🐾`,
+            `I just submitted a consultation booking and would like WhatsApp confirmation.`,
+            ``,
+            `📋 Booking Summary:`,
+            `• Name: ${name}`,
+            `• Service: ${serviceLabel}`,
+            `• Animal: ${animalCount}x ${animalType}`,
+            `• Date: ${date?.toLocaleDateString()}`,
+            `• Time: ${selectedTimeSlot}`,
+            phone ? `• Phone: ${phone}` : "",
+            ``,
+            `Please confirm my appointment. Thank you!`,
+          ]
+            .filter((l) => l !== undefined)
+            .join("\n")
+          window.open(
+            `https://wa.me/${WHATSAPP_NUMBER.replace(/\s+/g, "")}?text=${encodeURIComponent(msg)}`,
+            "_blank"
+          )
+          setWhatsappOpened(true)
+        }
+
         setSubmitStatus({
           type: "success",
-          message: "Booking email sent successfully! We will contact you soon to confirm your appointment.",
+          message: "Booking request sent successfully! We will contact you soon to confirm your appointment.",
         })
 
         // Reset form after 5 seconds
@@ -185,13 +222,23 @@ export default function BookingForm() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-6">
               <Mail className="h-10 w-10 text-green-600" />
             </div>
-            <h3 className="text-2xl font-bold mb-4 text-green-800">Email Sent Successfully!</h3>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-              <p className="text-green-800 font-medium mb-2">✅ Booking details sent to NTDM Animal Hospital</p>
+            <h3 className="text-2xl font-bold mb-4 text-green-800">Booking Submitted!</h3>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <p className="text-green-800 font-medium mb-1">✅ Booking details sent to NTDM Animal Hospital</p>
               <p className="text-green-700 text-sm">{submitStatus.message}</p>
             </div>
+            {whatsappOpened && (
+              <div className="bg-[#e7f8ee] border border-[#25D366] rounded-lg p-4 mb-4 flex items-start gap-3 text-left">
+                <MessageCircle className="h-5 w-5 text-[#25D366] shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-gray-800">WhatsApp opened with your booking summary</p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Send the pre-filled message to receive a WhatsApp confirmation from our team.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="space-y-2 text-sm text-gray-600 mb-6">
-              <p>📧 Confirmation sent to: info@vettrack.rw</p>
               <p>📱 We will contact you at: {phone}</p>
               <p>📅 Requested date: {date?.toLocaleDateString()}</p>
               <p>🕐 Requested time: {selectedTimeSlot}</p>
@@ -380,7 +427,7 @@ export default function BookingForm() {
                 htmlFor="whatsapp"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Send confirmation via WhatsApp
+                Open WhatsApp with my booking summary for quick confirmation
               </label>
             </div>
           </div>
