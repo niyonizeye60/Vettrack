@@ -75,6 +75,7 @@ const translations = {
     'common.yes': 'Yes',
     'common.no': 'No',
     'common.ok': 'OK',
+    'common.optional': 'Optional',
     
     // Home Page
     'home.hero.titleStart': 'Track, Consult, and',
@@ -558,9 +559,20 @@ const translations = {
     'farmer.exportAsExcel': 'Export as Excel',
     'farmer.selectDistrictFirst': 'Select district first',
     'farmer.editAnimal': 'Edit Animal Information',
+    'farmer.addAnimal': 'Add New Animal',
     'farmer.animalName': 'Animal Name',
-    'farmer.diary': 'Diary',
+    'farmer.diary': 'Dairy',
     'farmer.updateAnimal': 'Update Animal',
+    'farmer.updatingAnimal': 'Updating...',
+    'farmer.savingAnimal': 'Saving...',
+    'farmer.animalUpdated': 'Animal Updated',
+    'farmer.animalUpdatedDesc': 'Animal information has been updated successfully.',
+    'farmer.animalAdded': 'Animal Registered',
+    'farmer.animalAddedDesc': 'New animal has been registered successfully.',
+    'farmer.selectGender': 'Select gender',
+    'farmer.selectStatus': 'Select status',
+    'farmer.enterEarTagId': 'Enter ear tag ID',
+    'farmer.enterInsuranceId': 'Enter insurance ID',
     'farmer.selectDoctor': 'Select Doctor',
     'farmer.consultationType': 'Consultation Type',
     'farmer.virtual': 'Virtual',
@@ -1479,6 +1491,7 @@ const translations = {
     'common.yes': 'Yego',
     'common.no': 'Oya',
     'common.ok': 'Sawa',
+    'common.optional': 'Kubushake',
     
     // Home Page
     'home.hero.titleStart': 'Gukurikirana, Gusaba Randevu, no',
@@ -2008,9 +2021,20 @@ const translations = {
 
     // Edit Animal
     'farmer.editAnimal': 'Hindura umwirondoro w\'itungo',
+    'farmer.addAnimal': 'Ongeraho Itungo Rishya',
     'farmer.animalName': 'Izina ry\'itungo',
     'farmer.diary': 'Umukamo',
     'farmer.updateAnimal': 'Vugurura',
+    'farmer.updatingAnimal': 'Bivugururwa...',
+    'farmer.savingAnimal': 'Birabikwa...',
+    'farmer.animalUpdated': 'Itungo Ryavuguruwe',
+    'farmer.animalUpdatedDesc': 'Amakuru y\'itungo yavuguruwe neza.',
+    'farmer.animalAdded': 'Itungo Ryanditswe',
+    'farmer.animalAddedDesc': 'Itungo rishya ryanditswe neza.',
+    'farmer.selectGender': 'Hitamo igitsina',
+    'farmer.selectStatus': 'Hitamo uko bimeze',
+    'farmer.enterEarTagId': 'Andika ID y\'agaca k\'ugutwi',
+    'farmer.enterInsuranceId': 'Andika ID y\'ubwishingizi',
     
     // Animal Details
     'animal.details': 'Amakuru y\'Itungo',

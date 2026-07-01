@@ -12,11 +12,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import Link from "next/link"
-import { Bell, Eye, Pencil, Trash2, AlertTriangle } from "lucide-react"
+import { Bell, Eye, Pencil, Plus, Trash2, AlertTriangle } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { deleteAnimal } from "@/lib/actions"
+import AddAnimalForm from "@/components/dashboard/add-animal-form"
+import EditAnimalForm from "@/components/dashboard/edit-animal-form"
 
 interface AnimalsContentProps {
   animals: any[]
@@ -37,6 +38,8 @@ export default function AnimalsContent({ animals, farmerId }: AnimalsContentProp
   const { toast } = useToast()
   const router = useRouter()
 
+  const [addOpen, setAddOpen] = useState(false)
+  const [editAnimal, setEditAnimal] = useState<any | null>(null)
   const [detailAnimal, setDetailAnimal] = useState<any | null>(null)
   const [deleteAnimalTarget, setDeleteAnimalTarget] = useState<any | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -114,11 +117,10 @@ export default function AnimalsContent({ animals, farmerId }: AnimalsContentProp
             {t('farmer.registeredAnimals')}: <span className="font-semibold">{animals.length}</span>
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button asChild size="sm">
-            <Link href="/farmer/animals/add">{t('farmer.registerNewAnimal')}</Link>
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Plus className="h-4 w-4 mr-1.5" />
+          {t('farmer.registerNewAnimal')}
+        </Button>
       </div>
 
       <Card>
@@ -131,8 +133,8 @@ export default function AnimalsContent({ animals, farmerId }: AnimalsContentProp
               <Bell className="h-8 w-8 mx-auto mb-2 text-gray-400" />
               <p>{t('farmer.noAnimalsYet')}</p>
               <p className="mt-2">
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/farmer/animals/add">{t('farmer.registerAnAnimal')}</Link>
+                <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+                  {t('farmer.registerAnAnimal')}
                 </Button>
               </p>
             </div>
@@ -186,11 +188,9 @@ export default function AnimalsContent({ animals, farmerId }: AnimalsContentProp
                           variant="ghost"
                           className="h-8 w-8 p-0 hover:bg-emerald-50"
                           title={t('farmer.edit')}
-                          asChild
+                          onClick={() => setEditAnimal(animal)}
                         >
-                          <Link href={`/farmer/animals/edit/${animal._id}`}>
-                            <Pencil className="h-3.5 w-3.5 text-emerald-600" />
-                          </Link>
+                          <Pencil className="h-3.5 w-3.5 text-emerald-600" />
                         </Button>
                         <Button
                           size="sm"
@@ -212,6 +212,38 @@ export default function AnimalsContent({ animals, farmerId }: AnimalsContentProp
         </CardContent>
       </Card>
 
+      {/* Add Animal Dialog */}
+      <Dialog open={addOpen} onOpenChange={(open) => !open && setAddOpen(false)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('farmer.addAnimal')}</DialogTitle>
+          </DialogHeader>
+          <AddAnimalForm
+            userId={farmerId}
+            onSuccess={() => { setAddOpen(false); router.refresh() }}
+            onCancel={() => setAddOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Animal Dialog */}
+      <Dialog open={!!editAnimal} onOpenChange={(open) => !open && setEditAnimal(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('farmer.editAnimal')}</DialogTitle>
+          </DialogHeader>
+          {editAnimal && (
+            <EditAnimalForm
+              animal={editAnimal}
+              farmerId={farmerId}
+              onSuccess={() => { setEditAnimal(null); router.refresh() }}
+              onCancel={() => setEditAnimal(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail Dialog */}
       <Dialog open={!!detailAnimal} onOpenChange={(open) => !open && setDetailAnimal(null)}>
         <DialogContent className="max-w-2xl p-6 rounded-2xl">
           <DialogHeader>
@@ -260,6 +292,7 @@ export default function AnimalsContent({ animals, farmerId }: AnimalsContentProp
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteAnimalTarget} onOpenChange={(open) => !deleting && !open && setDeleteAnimalTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

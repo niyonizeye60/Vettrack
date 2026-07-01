@@ -1,57 +1,25 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { registerAnimal } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useToast } from "@/hooks/use-toast"
+import { rwandaData } from "@/lib/rwanda-data"
 
 interface AddAnimalFormProps {
-  userId: string;
+  userId: string
+  onSuccess: () => void
+  onCancel: () => void
 }
 
-const rwandaData = {
-  "Nyarugenge": ["Gitega", "Kanyinya", "Kigali", "Kimisagara", "Mageragere", "Muhima", "Nyakabanda", "Nyamirambo", "Rwezamenyo", "Nyarugenge"],
-  "Gasabo": ["Bumbogo", "Gatsata", "Jali", "Gikomero", "Gisozi", "Jabana", "Kacyiru", "Kimihurura", "Kimironko", "Kinyinya", "Ndera", "Nduba", "Remera", "Rusororo", "Rutunga"],
-  "Kicukiro": ["Gahanga", "Gatenga", "Gikondo", "Kagarama", "Kanombe", "Kicukiro", "Kigarama", "Masaka", "Niboye", "Nyarugunga"],
-  "Nyagatare": ["Gatunda", "Karangazi", "Katabagemu", "Kiyombe", "Matimba", "Mimuli", "Mukama", "Musheli", "Nyagatare", "Rukomo", "Rwempasha", "Rwimiyaga", "Tabagwe"],
-  "Gatsibo": ["Gasange", "Gatsibo", "Gitoki", "Kabarore", "Kageyo", "Kiramuruzi", "Kiziguro", "Muhura", "Murambi", "Ngarama", "Nyagihanga", "Remera", "Rugarama", "Rwimbogo"],
-  "Kayonza": ["Gahini", "Kabare", "Kabarondo", "Mukarange", "Murama", "Murundi", "Mwiri", "Ndego", "Nyamirama", "Rukara", "Ruramira", "Rwinkwavu"],
-  "Kirehe": ["Gatore", "Kigarama", "Kigina", "Kirehe", "Mahama", "Mpanga", "Musaza", "Mushikiri", "Nasho", "Nyamugali", "Nyarubuye"],
-  "Ngoma": ["Gashanda", "Jarama", "Karembo", "Kazo", "Mugesera", "Murama", "Remera", "Rukira", "Rukumberi", "Sake", "Zaza"],
-  "Bugesera": ["Gashora", "Juru", "Kamabuye", "Mayange", "Musenyi", "Mwogo", "Ngeruka", "Ntarama", "Nyamata", "Nyarugenge", "Rilima", "Ruhuha", "Rweru", "Shyara"],
-  "Rwamagana": ["Fumbwe", "Gahengeri", "Gishari", "Karenge", "Kigabiro", "Muhazi", "Munyaga", "Munyiginya", "Musha", "Muyumbu", "Mwulire", "Nyakariro", "Nzige", "Rubona"],
-  "Musanze": ["Busogo", "Cyuve", "Gacaca", "Gashaki", "Gataraga", "Kimonyi", "Kinigi", "Muhoza", "Muko", "Musanze", "Nkotsi", "Nyange", "Remera", "Rwaza", "Shingiro"],
-  "Burera": ["Bungwe", "Butaro", "Cyanika", "Cyeru", "Gahunga", "Gatebe", "Gitovu", "Kagogo", "Kinoni", "Kinyababa", "Kivuye", "Nemba", "Rugarama", "Rugendabari", "Ruhunde", "Rusarabuye", "Rwerere"],
-  "Gakenke": ["Busengo", "Coko", "Cyabingo", "Gakenke", "Gashenyi", "Mugunga", "Janja", "Kamubuga", "Karambo", "Kivuruga", "Mataba", "Minazi", "Muhondo", "Muyongwe", "Nemba", "Ruli", "Rusasa", "Rushashi", "Rusoro"],
-  "Gicumbi": ["Bukure", "Bwisige", "Byumba", "Cyumba", "Gicumbi", "Kaniga", "Manyagiro", "Miyove", "Kageyo", "Mukarange", "Muko", "Mutete", "Nyamiyaga", "Nyundo", "Rubaya", "Rukomo", "Rushaki", "Rutare", "Ruvune", "Rwamiko", "Shangasha"],
-  "Rulindo": ["Base", "Burega", "Bushoki", "Buyoga", "Cyinzuzi", "Cyungo", "Kinihira", "Kisaro", "Masoro", "Mbogo", "Murambi", "Ngoma", "Ntarabana", "Rukozo", "Rusiga", "Shyorongi", "Tumba"],
-  "Nyanza": ["Busasamana", "Busoro", "Cyabakamyi", "Kibirizi", "Kigoma", "Mukingo", "Muyira", "Ntyazo", "Nyagisozi", "Rwabicuma", "Rwdhuha", "Mukingo"],
-  "Gisagara": ["Gikonko", "Gishubi", "Kansi", "Kibayi", "Kigembe", "Mamba", "Muganza", "Mugombwa", "Mukindo", "Musha", "Ndora", "Nyanza", "Save"],
-  "Nyaruguru": ["Cyahinda", "Kibeho", "Kibumbwe", "Kivu", "Macuba", "Mata", "Munini", "Ngera", "Ngoma", "Nyabimata", "Nyagisozi", "Ruramba", "Rusenge", "Rwaniro"],
-  "Huye": ["Gishamvu", "Karama", "Kigoma", "Kinazi", "Maraba", "Mbazi", "Mukura", "Ngoma", "Ruhashya", "Rusatira", "Rwaniro", "Simbi", "Tumba"],
-  "Nyamagabe": ["Buruhukiro", "Cyanika", "Gasaka", "Gatare", "Kaduha", "Kamegeri", "Kibirizi", "Kibumbwe", "Kitabi", "Mbazi", "Munini", "Musebeya", "Mushubi", "Nkomane", "Tare", "Uwinkingi"],
-  "Ruhango": ["Bweramana", "Byimana", "Kabagali", "Kinazi", "Kinihira", "Muhanga", "Mbuye", "Ntongwe", "Ruhango"],
-  "Muhanga": ["Cyeza", "Kiyumba", "Muhanga", "Mukura", "Musambira", "Nyabinoni", "Nyamabuye", "Nyarubaka", "Rongi", "Rugendabari", "Shyogwe"],
-  "Kamonyi": ["Gacurabwenge", "Karama", "Kayenzi", "Kayumbu", "Mugina", "Musambira", "Nyamiyaga", "Nyarubaka", "Runda", "Rugalika", "Rugarika", "Rukoma"],
-  "Karongi": ["Bwishyura", "Gashari", "Gishyita", "Gitesi", "Murambi", "Mutuntu", "Rugabano", "Ruganda", "Rwankuba"],
-  "Rutsiro": ["Boneza", "Gihango", "Kigeyo", "Kivumu", "Manihira", "Mukura", "Musasa", "Mushonyi", "Mushubati", "Nyabirasi", "Ruhango"],
-  "Rubavu": ["Bugeshi", "Busasamana", "Cyanzarwe", "Gisenyi", "Kanama", "Kanzenze", "Mudende", "Nyakiliba", "Nyamyumba", "Rubavu", "Rugerero"],
-  "Nyabihu": ["Bigogwe", "Jenda", "Jomba", "Kabatwa", "Karago", "Kintobo", "Mukamira", "Muringa", "Rambura", "Rugera", "Rurembo", "Shyira"],
-  "Ngororero": ["Bwira", "Gatumba", "Hindiro", "Kabaya", "Kageyo", "Matyazo", "Muhanda", "Muhororo", "Ndaro", "Ngororero", "Nyange", "Sovu"],
-  "Rusizi": ["Butare", "Bugarama", "Gashonga", "Gikundamvura", "Gisuma", "Kamembe", "Muganza", "Mururu", "Nkanka", "Nkombo", "Nkungu", "Nyakabuye", "Nyakarenzo", "Rwimbogo"],
-  "Nyamasheke": ["Bushekeri", "Bushenge", "Cyato", "Gihombo", "Kanjongo", "Karambi", "Karengera", "Kirimbi", "Macuba", "Mahembe", "Nyabitekeri", "Rangiro", "Ruharambuga", "Shangi"]
-}
-
-export default function AddAnimalForm({ userId }: AddAnimalFormProps) {
+export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimalFormProps) {
   const { t } = useLanguage()
-  const router = useRouter()
+  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
@@ -87,224 +55,160 @@ export default function AddAnimalForm({ userId }: AddAnimalFormProps) {
     setIsSubmitting(true)
 
     const form = new FormData()
-    Object.entries(formData).forEach(([key, value]) => {
-      form.append(key, value)
-    })
+    Object.entries(formData).forEach(([key, value]) => form.append(key, value))
 
     try {
       const result = await registerAnimal(form, userId)
       if (result.success) {
-        router.push("/farmer/animals")
-        router.refresh()
+        toast({ title: t('farmer.animalAdded'), description: t('farmer.animalAddedDesc') })
+        onSuccess()
       } else {
-        console.error("Error registering animal:", result.error)
+        toast({ title: t('common.error'), description: result.error || t('farmer.actionFailed'), variant: "destructive" })
       }
-    } catch (error) {
-      console.error("Error registering animal:", error)
+    } catch {
+      toast({ title: t('common.error'), description: t('farmer.actionFailed'), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const optionalLabel = <span className="text-gray-400 text-xs font-normal ml-1">({t('common.optional') || 'optional'})</span>
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('farmer.animalInformation')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">{t('farmer.name')}</Label>
-              <Input
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder={t('farmer.enterAnimalName')}
-                required
-              />
-            </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <div className="space-y-2">
-              <Label htmlFor="type">{t('farmer.animalType')}</Label>
-              <Select value={formData.type} onValueChange={(value) => handleSelectChange("type", value)} required>
-                <SelectTrigger id="type">
-                  <SelectValue placeholder={t('farmer.selectAnimalType')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cow">{t('farmer.cow')}</SelectItem>
-                  <SelectItem value="goat">{t('farmer.goat')}</SelectItem>
-                  <SelectItem value="sheep">{t('farmer.sheep')}</SelectItem>
-                  <SelectItem value="chicken">{t('farmer.chicken')}</SelectItem>
-                  <SelectItem value="dog">{t('farmer.dog')}</SelectItem>
-                  <SelectItem value="cat">{t('farmer.cat')}</SelectItem>
-                  <SelectItem value="other">{t('farmer.other')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-name">{t('farmer.animalName')}</Label>
+          <Input id="add-name" name="name" value={formData.name}
+            onChange={handleChange} placeholder={t('farmer.enterAnimalName')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="breed">{t('farmer.breed')}</Label>
-              <Input
-                id="breed"
-                name="breed"
-                value={formData.breed}
-                onChange={handleChange}
-                placeholder={t('farmer.enterBreed')}
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-type">{t('farmer.animalType')}</Label>
+          <Select value={formData.type} onValueChange={(v) => handleSelectChange("type", v)} required>
+            <SelectTrigger id="add-type"><SelectValue placeholder={t('farmer.selectAnimalType')} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cow">{t('farmer.cow')}</SelectItem>
+              <SelectItem value="goat">{t('farmer.goat')}</SelectItem>
+              <SelectItem value="sheep">{t('farmer.sheep')}</SelectItem>
+              <SelectItem value="chicken">{t('farmer.chicken')}</SelectItem>
+              <SelectItem value="dog">{t('farmer.dog')}</SelectItem>
+              <SelectItem value="cat">{t('farmer.cat')}</SelectItem>
+              <SelectItem value="other">{t('farmer.other')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="class">{t('farmer.class')}</Label>
-              <Select value={formData.class} onValueChange={(value) => handleSelectChange("class", value)} required>
-                <SelectTrigger id="class">
-                  <SelectValue placeholder={t('farmer.selectClass')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dairy">{t('farmer.dairy')}</SelectItem>
-                  <SelectItem value="meat">{t('farmer.meat')}</SelectItem>
-                  <SelectItem value="poultry">{t('farmer.poultry')}</SelectItem>
-                  <SelectItem value="pet">{t('farmer.pet')}</SelectItem>
-                  <SelectItem value="other">{t('farmer.other')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-breed">{t('farmer.breed')}</Label>
+          <Input id="add-breed" name="breed" value={formData.breed}
+            onChange={handleChange} placeholder={t('farmer.enterBreed')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="district">{t('farmer.district')}</Label>
-              <Select
-                value={formData.district}
-                onValueChange={(value) => handleSelectChange("district", value)}
-                required
-              >
-                <SelectTrigger id="district">
-                  <SelectValue placeholder={t('farmer.selectDistrict')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(rwandaData).sort().map((district) => (
-                    <SelectItem key={district} value={district}>{district}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-gender">{t('farmer.gender')}</Label>
+          <Select value={formData.gender} onValueChange={(v) => handleSelectChange("gender", v)} required>
+            <SelectTrigger id="add-gender"><SelectValue placeholder={t('farmer.selectGender')} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="female">{t('farmer.female')}</SelectItem>
+              <SelectItem value="male">{t('farmer.male')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="sector">{t('farmer.sector')}</Label>
-              <Select 
-                value={formData.sector} 
-                onValueChange={(value) => handleSelectChange("sector", value)} 
-                required
-                disabled={!formData.district}
-              >
-                <SelectTrigger id="sector">
-                  <SelectValue placeholder={formData.district ? t('farmer.selectSector') : t('farmer.selectDistrictFirst')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {formData.district && rwandaData[formData.district as keyof typeof rwandaData]?.map((sector) => (
-                    <SelectItem key={sector} value={sector}>{sector}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-class">{t('farmer.class')}</Label>
+          <Select value={formData.class} onValueChange={(v) => handleSelectChange("class", v)} required>
+            <SelectTrigger id="add-class"><SelectValue placeholder={t('farmer.selectClass')} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dairy">{t('farmer.diary')}</SelectItem>
+              <SelectItem value="meat">{t('farmer.meat')}</SelectItem>
+              <SelectItem value="poultry">{t('farmer.poultry')}</SelectItem>
+              <SelectItem value="pet">{t('farmer.pet')}</SelectItem>
+              <SelectItem value="other">{t('farmer.other')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="ownerName">{t('farmer.ownerName')}</Label>
-              <Input
-                id="ownerName"
-                name="ownerName"
-                value={formData.ownerName}
-                onChange={handleChange}
-                placeholder={t('farmer.enterOwnerName')}
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-acquisitionType">{t('farmer.acquisitionType')}</Label>
+          <Select value={formData.acquisitionType} onValueChange={(v) => handleSelectChange("acquisitionType", v)} required>
+            <SelectTrigger id="add-acquisitionType"><SelectValue placeholder={t('farmer.selectAcquisitionType')} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bought">{t('farmer.bought')}</SelectItem>
+              <SelectItem value="born">{t('farmer.born')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">{t('farmer.phoneNumber')}</Label>
-              <Input
-                id="phoneNumber"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                placeholder={t('farmer.enterPhoneNumber')}
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-district">{t('farmer.district')}</Label>
+          <Select value={formData.district} onValueChange={(v) => handleSelectChange("district", v)} required>
+            <SelectTrigger id="add-district"><SelectValue placeholder={t('farmer.selectDistrict')} /></SelectTrigger>
+            <SelectContent>
+              {Object.keys(rwandaData).sort().map((d) => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="price">{t('farmer.priceRWF')}</Label>
-              <Input
-                id="price"
-                name="price"
-                type="number"
-                value={formData.price}
-                onChange={handleChange}
-                placeholder={t('farmer.enterPrice')}
-                required
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-sector">{t('farmer.sector')}</Label>
+          <Select value={formData.sector} onValueChange={(v) => handleSelectChange("sector", v)}
+            required disabled={!formData.district}>
+            <SelectTrigger id="add-sector">
+              <SelectValue placeholder={formData.district ? t('farmer.selectSector') : t('farmer.selectDistrictFirst')} />
+            </SelectTrigger>
+            <SelectContent>
+              {formData.district && rwandaData[formData.district]?.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="earTagId">{t('animal.earTagId')}</Label>
-              <Input
-                id="earTagId"
-                name="earTagId"
-                value={formData.earTagId}
-                onChange={handleChange}
-                placeholder="Enter ear tag ID"
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-ownerName">{t('farmer.ownerName')}</Label>
+          <Input id="add-ownerName" name="ownerName" value={formData.ownerName}
+            onChange={handleChange} placeholder={t('farmer.enterOwnerName')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="insuranceId">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs font-normal">(optional)</span></Label>
-              <Input
-                id="insuranceId"
-                name="insuranceId"
-                value={formData.insuranceId}
-                onChange={handleChange}
-                placeholder="Enter insurance ID"
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-phoneNumber">{t('farmer.phoneNumber')}</Label>
+          <Input id="add-phoneNumber" name="phoneNumber" value={formData.phoneNumber}
+            onChange={handleChange} placeholder={t('farmer.enterPhoneNumber')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="gender">Gender</Label>
-              <Select value={formData.gender} onValueChange={(value) => handleSelectChange("gender", value)} required>
-                <SelectTrigger id="gender">
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="male">Male</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-price">{t('farmer.price')} (RWF)</Label>
+          <Input id="add-price" name="price" type="number" value={formData.price}
+            onChange={handleChange} placeholder={t('farmer.enterPrice')} required />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="acquisitionType">{t('farmer.acquisitionType')}</Label>
-              <Select value={formData.acquisitionType} onValueChange={(value) => handleSelectChange("acquisitionType", value)} required>
-                <SelectTrigger id="acquisitionType">
-                  <SelectValue placeholder={t('farmer.selectAcquisitionType')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bought">{t('farmer.bought')}</SelectItem>
-                  <SelectItem value="born">{t('farmer.born')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-earTagId">{t('animal.earTagId')}{optionalLabel}</Label>
+          <Input id="add-earTagId" name="earTagId" value={formData.earTagId}
+            onChange={handleChange} placeholder={t('farmer.enterEarTagId')} />
+        </div>
 
-          <div className="flex justify-end space-x-4">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-              {t('farmer.cancel')}
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? t('farmer.registering') : t('farmer.registerAnimal')}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <div className="space-y-1.5">
+          <Label htmlFor="add-insuranceId">{t('farmer.insuranceId')}{optionalLabel}</Label>
+          <Input id="add-insuranceId" name="insuranceId" value={formData.insuranceId}
+            onChange={handleChange} placeholder={t('farmer.enterInsuranceId')} />
+        </div>
+
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          {t('farmer.cancel')}
+        </Button>
+        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isSubmitting}>
+          {isSubmitting ? t('farmer.savingAnimal') : t('farmer.registerAnimal')}
+        </Button>
+      </div>
+    </form>
   )
 }
