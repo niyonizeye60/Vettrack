@@ -31,6 +31,7 @@ interface ConsultationsContentProps {
   consultations: any[]
   doctors: Doctor[]
   farmerId: string
+  openAdd?: boolean
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -42,12 +43,12 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function ConsultationsContent({ consultations, doctors, farmerId }: ConsultationsContentProps) {
+export default function ConsultationsContent({ consultations, doctors, farmerId, openAdd }: ConsultationsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
 
-  const [addOpen, setAddOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(openAdd ?? false)
   const [editConsultation, setEditConsultation] = useState<any | null>(null)
   const [detailConsultation, setDetailConsultation] = useState<any | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)

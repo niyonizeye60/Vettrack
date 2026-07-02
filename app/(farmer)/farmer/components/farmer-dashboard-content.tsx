@@ -43,22 +43,25 @@ export default function FarmerDashboardContent({
   const acceptedConsultations = consultations.filter((c) => c.status === "accepted")
   const rejectedConsultations = consultations.filter((c) => c.status === "rejected")
 
-  // Get recent activity (last 6 items - animals registered or consultations booked)
-  const recentAnimals = animals
+  type AnimalActivity = { type: "animal"; name: string; date: string; id: string }
+  type ConsultationActivity = { type: "consultation"; service: string; date: string; id: string; status: string; doctor: string }
+  type Activity = AnimalActivity | ConsultationActivity
+
+  const recentAnimals: AnimalActivity[] = animals
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3)
     .map((animal) => ({
-      type: "animal",
+      type: "animal" as const,
       name: animal.name,
       date: new Date(animal.createdAt).toLocaleDateString(),
       id: animal._id,
     }))
 
-  const recentConsultations = consultations
+  const recentConsultations: ConsultationActivity[] = consultations
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 4)
     .map((consultation) => ({
-      type: "consultation",
+      type: "consultation" as const,
       service: consultation.service,
       date: new Date(consultation.createdAt).toLocaleDateString(),
       id: consultation._id,
@@ -66,8 +69,7 @@ export default function FarmerDashboardContent({
       doctor: consultation.doctor,
     }))
 
-  // Combine and sort recent activity
-  const recentActivity = [...recentAnimals, ...recentConsultations]
+  const recentActivity: Activity[] = [...recentAnimals, ...recentConsultations]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 6)
 
@@ -169,7 +171,7 @@ export default function FarmerDashboardContent({
             asChild
             className="group h-auto py-4 px-6 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-300 border-0"
           >
-            <Link href="/farmer/animals/add" className="flex items-center justify-between w-full">
+            <Link href="/farmer/animals?action=add" className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 p-2 rounded-lg">
                   <PlusCircle className="h-5 w-5" />
@@ -187,7 +189,7 @@ export default function FarmerDashboardContent({
             asChild
             className="group h-auto py-4 px-6 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 shadow-md hover:shadow-lg transform hover:scale-[1.02] transition-all duration-300 border-0"
           >
-            <Link href="/farmer/consultations/new" className="flex items-center justify-between w-full">
+            <Link href="/farmer/consultations?action=add" className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 p-2 rounded-lg">
                   <Calendar className="h-5 w-5" />

@@ -26,8 +26,10 @@ export default function FarmerSettingsPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [bio, setBio] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
 
   async function loadProfile() {
     setLoading(true)
@@ -37,6 +39,7 @@ export default function FarmerSettingsPage() {
         setUser(userData)
         setAvatarPreview(userData.image ?? null)
         setEmail(userData.email ?? "")
+        setPhone((userData as any).phone ?? "")
         setBio((userData as any).bio ?? "")
         const parts = (userData.name ?? "").split(" ")
         setFirstName(parts[0] ?? "")
@@ -79,10 +82,14 @@ export default function FarmerSettingsPage() {
   }
 
   const handleSave = async () => {
+    if (password && password !== confirmPassword) {
+      toast({ title: t("common.error") || "Error", description: t("farmer.passwordMismatch") || "Passwords do not match.", variant: "destructive" })
+      return
+    }
     setSaving(true)
     try {
       const name = [firstName, lastName].filter(Boolean).join(" ").trim() || firstName
-      const payload: Record<string, string> = { name, email, bio }
+      const payload: Record<string, string> = { name, email, phone, bio }
       if (password) payload.password = password
 
       const res = await fetch("/api/profile", {
@@ -98,6 +105,7 @@ export default function FarmerSettingsPage() {
 
       toast({ title: t("farmer.profileUpdated") || "Saved", description: t("farmer.profileUpdatedDesc") || "Your profile has been updated." })
       setPassword("")
+      setConfirmPassword("")
       await loadProfile()
     } catch (err: any) {
       toast({ title: t("common.error") || "Error", description: err?.message ?? "Failed to save", variant: "destructive" })
@@ -196,6 +204,18 @@ export default function FarmerSettingsPage() {
             />
           </div>
 
+          {/* Phone */}
+          <div className="space-y-1.5">
+            <Label htmlFor="phone">{t("farmer.phoneNumber") || "Phone number"}</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={t("farmer.enterPhoneNumber") || "+250 ..."}
+            />
+          </div>
+
           {/* Bio */}
           <div className="space-y-1.5">
             <Label htmlFor="bio">{t("farmer.bio") || "Bio"}</Label>
@@ -209,15 +229,27 @@ export default function FarmerSettingsPage() {
           </div>
 
           {/* Password */}
-          <div className="space-y-1.5">
-            <Label htmlFor="password">{t("farmer.changePassword") || "New password"}</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t("farmer.leaveBlankPassword") || "Leave blank to keep current password"}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="password">{t("farmer.newPassword") || "New password"}</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t("farmer.leaveBlankPassword") || "Leave blank to keep current"}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirmPassword">{t("farmer.confirmPassword") || "Confirm password"}</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder={t("farmer.confirmPassword") || "Repeat new password"}
+              />
+            </div>
           </div>
 
           {/* Save */}

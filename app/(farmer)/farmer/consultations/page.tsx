@@ -11,7 +11,11 @@ export const metadata: Metadata = {
   description: "Manage your veterinary consultations.",
 }
 
-export default async function FarmerConsultationsPage() {
+export default async function FarmerConsultationsPage({
+  searchParams,
+}: {
+  searchParams: { action?: string }
+}) {
   const currentUser = await getCurrentUser()
 
   if (!currentUser || currentUser.role !== "farmer") {
@@ -24,5 +28,12 @@ export default async function FarmerConsultationsPage() {
     getDoctorsList(),
   ])
 
-  return <ConsultationsContent consultations={consultations} doctors={doctors} farmerId={farmerId} />
+  return (
+    <ConsultationsContent
+      consultations={consultations}
+      doctors={doctors}
+      farmerId={farmerId}
+      openAdd={searchParams.action === "add"}
+    />
+  )
 }

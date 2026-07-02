@@ -22,6 +22,7 @@ import EditAnimalForm from "@/components/dashboard/edit-animal-form"
 interface AnimalsContentProps {
   animals: any[]
   farmerId: string
+  openAdd?: boolean
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -33,12 +34,12 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function AnimalsContent({ animals, farmerId }: AnimalsContentProps) {
+export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
 
-  const [addOpen, setAddOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(openAdd ?? false)
   const [editAnimal, setEditAnimal] = useState<any | null>(null)
   const [detailAnimal, setDetailAnimal] = useState<any | null>(null)
   const [deleteAnimalTarget, setDeleteAnimalTarget] = useState<any | null>(null)
@@ -109,7 +110,7 @@ export default function AnimalsContent({ animals, farmerId }: AnimalsContentProp
   const deletePregnancy = deleteAnimalTarget ? getPregnancy(deleteAnimalTarget._id) : null
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t('farmer.myAnimals')}</h1>
