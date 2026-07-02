@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,14 +9,17 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { 
-  Settings, 
-  Database, 
-  Mail, 
-  Shield, 
+import {
+  Settings,
+  Database,
+  Mail,
+  Shield,
   Bell,
   Save,
-  AlertTriangle
+  AlertTriangle,
+  Image,
+  Upload,
+  X
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { updateSystemSettings, performDatabaseAction } from "@/lib/actions/superadmin"
@@ -31,6 +34,9 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState(settings || {})
+  const [bannerPreview, setBannerPreview] = useState<string | null>(settings?.bannerImage ?? null)
+  const [bannerUploading, setBannerUploading] = useState(false)
+  const bannerInputRef = useRef<HTMLInputElement>(null)
   
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }))
@@ -58,6 +64,46 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
       alert(result.message)
     } catch (error) {
       alert('Error performing action')
+    }
+  }
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBannerUploading(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/upload/banner", { method: "POST", body: form })
+      const data = await res.json()
+      if (data.success) {
+        setBannerPreview(data.bannerImage)
+        alert("Banner image updated successfully!")
+        router.refresh()
+      } else {
+        alert("Failed to upload banner: " + (data.message ?? "Unknown error"))
+      }
+    } catch {
+      alert("Error uploading banner")
+    } finally {
+      setBannerUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const handleRemoveBanner = async () => {
+    if (!confirm("Remove the current banner image? The profile page will fall back to the default gradient.")) return
+    try {
+      const res = await fetch("/api/system/banner", { method: "DELETE" })
+      const data = await res.json()
+      if (data.success) {
+        setBannerPreview(null)
+        router.refresh()
+      } else {
+        alert("Failed to remove banner")
+      }
+    } catch {
+      alert("Error removing banner")
     }
   }
 
@@ -475,6 +521,60 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
                 onCheckedChange={(checked) => handleInputChange('smtpSecure', checked)}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Farmer Profile Banner */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Image className="h-5 w-5" />
+              <span>Farmer Profile Banner</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-500">
+              This banner is shown at the top of every farmer's profile page. All farmers see the same image.
+            </p>
+            <div className="relative h-36 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+              {bannerPreview ? (
+                <img src={bannerPreview} alt="Profile banner" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-emerald-600 to-green-500 flex items-center justify-center">
+                  <span className="text-white/70 text-sm">Default gradient (no image set)</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={bannerUploading}
+                onClick={() => bannerInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {bannerUploading ? "Uploading…" : "Upload Banner"}
+              </Button>
+              {bannerPreview && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={handleRemoveBanner}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Remove
+                </Button>
+              )}
+              <span className="text-xs text-gray-400">JPEG, PNG, WebP or GIF · max 5 MB</span>
+            </div>
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleBannerUpload}
+            />
           </CardContent>
         </Card>
 

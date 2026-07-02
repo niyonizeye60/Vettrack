@@ -10,6 +10,13 @@ interface User {
   name: string
   email: string
   status: string
+  phone?: string
+  bio?: string
+  district?: string
+  sector?: string
+  image?: string
+  createdAt?: string | Date
+  [key: string]: unknown
 }
 
 export async function getCurrentUser(): Promise<User | null> {

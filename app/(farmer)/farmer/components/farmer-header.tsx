@@ -30,6 +30,7 @@ interface HeaderUser {
   name: string
   email: string
   role: string
+  image?: string
 }
 
 export default function FarmerHeader() {
@@ -307,9 +308,9 @@ export default function FarmerHeader() {
                   className="flex items-center space-x-2 text-white hover:bg-white/10 hover:text-white p-2 h-auto"
                 >
                   <Avatar className="h-8 w-8 border-2 border-emerald-200">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user?.name || "User"} />
+                    <AvatarImage src={user?.image} alt={user?.name || "User"} />
                     <AvatarFallback className="bg-emerald-500 text-white text-sm">
-                      {user?.name ? user.name.charAt(0).toUpperCase() : "F"}
+                      {user?.name ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "F"}
                     </AvatarFallback>
                   </Avatar>
                   <span className="hidden lg:block font-medium text-sm">{user?.name?.split(" ")[0] || t('farmer.farmer')}</span>

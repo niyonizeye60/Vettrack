@@ -1,28 +1,46 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function FarmerSettingsPage() {
   const { t } = useLanguage()
   const { toast } = useToast()
-  const [name, setName] = useState<string>("")
-  const [email, setEmail] = useState<string>("")
-  const [phone, setPhone] = useState<string>("")
-  const [password, setPassword] = useState<string>("")
-  const [loading, setLoading] = useState<boolean>(true)
-  const [saving, setSaving] = useState<boolean>(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [email, setEmail] = useState("")
+  const [bio, setBio] = useState("")
+  const [password, setPassword] = useState("")
 
   async function loadProfile() {
     setLoading(true)
     try {
       const userData = await getCurrentUser()
       if (userData) {
-        setName(userData.name || "")
-        setEmail(userData.email || "")
-        setPhone(userData.phone || "")
+        setUser(userData)
+        setAvatarPreview(userData.image ?? null)
+        setEmail(userData.email ?? "")
+        setBio((userData as any).bio ?? "")
+        const parts = (userData.name ?? "").split(" ")
+        setFirstName(parts[0] ?? "")
+        setLastName(parts.slice(1).join(" ") ?? "")
       }
     } catch (err) {
       console.error("Failed to load profile:", err)
@@ -31,14 +49,40 @@ export default function FarmerSettingsPage() {
     }
   }
 
-  useEffect(() => {
-    loadProfile()
-  }, [])
+  useEffect(() => { loadProfile() }, [])
+
+  const initials = user?.name
+    ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "?"
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarUploading(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/upload/avatar", { method: "POST", body: form })
+      const data = await res.json()
+      if (data.success) {
+        setAvatarPreview(data.image)
+        toast({ title: t("farmer.profileUpdated") || "Profile updated", description: t("farmer.profileUpdatedDesc") || "Your avatar has been changed." })
+      } else {
+        toast({ title: t("common.error") || "Error", description: data.message ?? "Upload failed", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: t("common.error") || "Error", description: "Upload failed", variant: "destructive" })
+    } finally {
+      setAvatarUploading(false)
+      e.target.value = ""
+    }
+  }
 
   const handleSave = async () => {
+    setSaving(true)
     try {
-      setSaving(true)
-      const payload: Record<string, any> = { name, email, phone }
+      const name = [firstName, lastName].filter(Boolean).join(" ").trim() || firstName
+      const payload: Record<string, string> = { name, email, bio }
       if (password) payload.password = password
 
       const res = await fetch("/api/profile", {
@@ -49,111 +93,145 @@ export default function FarmerSettingsPage() {
       const data = await res.json().catch(() => null)
 
       if (!res.ok || !data?.success) {
-        throw new Error(data?.message || "Save failed")
+        throw new Error(data?.message ?? "Save failed")
       }
 
-      toast({ title: t('farmer.profileSaved'), description: t('farmer.profileSavedDesc') })
-      setPassword("") // clear password field after successful save
+      toast({ title: t("farmer.profileUpdated") || "Saved", description: t("farmer.profileUpdatedDesc") || "Your profile has been updated." })
+      setPassword("")
       await loadProfile()
     } catch (err: any) {
-      console.error(err)
-      toast({
-        title: t('farmer.profileSaveFailed'),
-        description: err?.message ?? undefined,
-        variant: "destructive",
-      })
+      toast({ title: t("common.error") || "Error", description: err?.message ?? "Failed to save", variant: "destructive" })
     } finally {
       setSaving(false)
     }
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse max-w-2xl">
+        <div className="h-6 bg-gray-200 rounded w-32" />
+        <div className="h-4 bg-gray-200 rounded w-56" />
+        <div className="h-64 bg-gray-200 rounded-xl" />
+      </div>
+    )
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {t('farmer.settings')}
-        </h1>
-        <p className="text-sm text-gray-500">{t('farmer.manageAccountSettings')}</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{t("farmer.settings") || "Settings"}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t("farmer.manageAccountSettings") || "Manage your account settings and preferences"}</p>
       </div>
 
-      <div className="bg-white/90 shadow-xl rounded-lg border-0 p-4 sm:p-6 lg:p-8">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4 sm:mb-6 flex items-center gap-2">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-          {t('farmer.myProfile')}
-        </h2>
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle>{t("farmer.profile") || "Profile"}</CardTitle>
+          <p className="text-sm text-gray-500">{t("farmer.profileDesc") || "Update your personal information"}</p>
+        </CardHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <CardContent className="space-y-6">
+          {/* Avatar */}
+          <div className="flex items-center gap-4">
+            <Avatar className="w-16 h-16 border-2 border-gray-100">
+              <AvatarImage src={avatarPreview ?? undefined} alt={user?.name} />
+              <AvatarFallback className="bg-emerald-600 text-white text-xl font-bold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={avatarUploading}
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                {avatarUploading ? "Uploading…" : t("farmer.changeAvatar") || "Change avatar"}
+              </Button>
+              <p className="text-xs text-gray-400 mt-1">
+                {t("farmer.avatarHint") || "JPG, PNG or GIF. Max 2MB."}
+              </p>
+            </div>
+          </div>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">{t('farmer.fullName')}</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-              placeholder={t('farmer.fullName')}
-            />
+          <Separator />
+
+          {/* Name row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="firstName">{t("farmer.firstName") || "First name"}</Label>
+              <Input
+                id="firstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder={t("farmer.firstName") || "First name"}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lastName">{t("farmer.lastName") || "Last name"}</Label>
+              <Input
+                id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={t("farmer.lastName") || "Last name"}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">{t('common.email')}</label>
-            <input
+          {/* Email */}
+          <div className="space-y-1.5">
+            <Label htmlFor="email">{t("common.email") || "Email"}</Label>
+            <Input
+              id="email"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-              placeholder={t('common.email')}
-              type="email"
+              placeholder="you@example.com"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">{t('farmer.phoneNumber')}</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-              placeholder={t('farmer.phoneNumber')}
+          {/* Bio */}
+          <div className="space-y-1.5">
+            <Label htmlFor="bio">{t("farmer.bio") || "Bio"}</Label>
+            <Textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder={t("farmer.bio") || "Tell us a little about yourself"}
+              rows={4}
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">{t('farmer.changePassword')}</label>
-            <input
+          {/* Password */}
+          <div className="space-y-1.5">
+            <Label htmlFor="password">{t("farmer.changePassword") || "New password"}</Label>
+            <Input
+              id="password"
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
-              placeholder={t('farmer.leaveBlankPassword')}
-              type="password"
+              placeholder={t("farmer.leaveBlankPassword") || "Leave blank to keep current password"}
             />
           </div>
-        </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 mt-6 sm:mt-8">
-          <button
-            onClick={handleSave}
-            disabled={saving || loading}
-            className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl hover:from-emerald-700 hover:to-green-700 transition-all duration-200 font-medium shadow-lg disabled:opacity-60 text-sm sm:text-base"
-          >
-            {saving ? t('farmer.saving') : t('farmer.saveChanges')}
-          </button>
-
-          <button
-            onClick={() => {
-              loadProfile()
-              setPassword("")
-            }}
-            className="px-4 sm:px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium text-sm sm:text-base"
-          >
-            {t('farmer.reset')}
-          </button>
-
-          {loading && (
-            <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-gray-500 py-2">
-              <div className="w-4 h-4 border-2 border-emerald-200 border-t-emerald-500 rounded-full animate-spin"></div>
-              {t('common.loading')}
-            </div>
-          )}
-        </div>
-      </div>
+          {/* Save */}
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {saving ? (t("farmer.saving") || "Saving…") : (t("farmer.saveChanges") || "Save Changes")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

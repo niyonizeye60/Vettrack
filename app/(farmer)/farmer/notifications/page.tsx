@@ -204,7 +204,7 @@ export default function FarmerNotificationsPage() {
   if (loading) {
     return (
       <div className="p-8 max-w-4xl mx-auto space-y-4">
-        <div className="animate-pulse space-y-4">
+        <div className="space-y-4 animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/3" />
           <div className="h-4 bg-gray-200 rounded w-1/2" />
           {[1, 2, 3].map((i) => (
@@ -216,7 +216,7 @@ export default function FarmerNotificationsPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
@@ -240,7 +240,7 @@ export default function FarmerNotificationsPage() {
         <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <CardTitle className="text-base font-semibold">
+              <CardTitle>
                 {t("farmer.allNotifications") || "All Notifications"}
               </CardTitle>
               {unreadCount > 0 && (

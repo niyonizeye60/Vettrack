@@ -28,6 +28,7 @@ type Conversation = {
     id: string
     name: string
     role: string
+    image?: string | null
     isOnline: boolean
   }
   lastMessage?: {
@@ -704,6 +705,7 @@ export function MessagesPanel() {
                   )}
                   <div className="relative flex-shrink-0">
                     <Avatar>
+                      <AvatarImage src={conversation.otherUser.image ?? undefined} alt={conversation.otherUser.name} />
                       <AvatarFallback className="bg-emerald-100 text-emerald-700 font-medium">
                         {conversation.otherUser.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
                       </AvatarFallback>
@@ -754,6 +756,7 @@ export function MessagesPanel() {
                 </Button>
                 <div className="relative flex-shrink-0">
                   <Avatar>
+                    <AvatarImage src={selectedConversation.otherUser.image ?? undefined} alt={selectedConversation.otherUser.name} />
                     <AvatarFallback className="bg-emerald-100 text-emerald-700 font-medium">
                       {selectedConversation.otherUser.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
                     </AvatarFallback>

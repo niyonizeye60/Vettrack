@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
         const otherUser = await db.collection("users").findOne(
           { _id: otherParticipantId },
-          { projection: { name: 1, role: 1 } }
+          { projection: { name: 1, role: 1, image: 1 } }
         )
 
         // Get last message - exclude any this user has soft-deleted for themselves,
@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
             id: otherUser?._id.toString(),
             name: otherUser?.name,
             role: otherUser?.role,
+            image: otherUser?.image ?? null,
             isOnline
           },
           lastMessage: lastMessage ? {
