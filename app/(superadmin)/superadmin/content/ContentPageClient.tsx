@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import RichTextEditor from "@/components/ui/rich-text-editor"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -149,7 +149,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
     }
   }
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string): "destructive" | "secondary" | "outline" | "default" => {
     switch (priority) {
       case 'critical': return 'destructive'
       case 'high': return 'secondary'
@@ -173,14 +173,14 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
               {t('superadmin.newAnnouncement') || 'New Announcement'}
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
+          <DialogContent className="max-w-2xl flex flex-col max-h-[90vh]">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>{t('superadmin.createAnnouncement') || 'Create Announcement'}</DialogTitle>
               <DialogDescription>
                 {t('superadmin.createSystemAnnouncement') || 'Create a new system-wide announcement'}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4">
               <div>
                 <Label htmlFor="title">{t('superadmin.title') || 'Title'}</Label>
                 <Input
@@ -191,13 +191,12 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                 />
               </div>
               <div>
-                <Label htmlFor="content">{t('superadmin.content') || 'Content'}</Label>
-                <Textarea
-                  id="content"
+                <Label className="mb-1.5 block">{t('superadmin.content') || 'Content'}</Label>
+                <RichTextEditor
                   value={formData.content}
-                  onChange={(e) => setFormData({...formData, content: e.target.value})}
+                  onChange={(html) => setFormData({...formData, content: html})}
                   placeholder={t('superadmin.announcementContent') || 'Announcement content'}
-                  rows={4}
+                  minHeight={160}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -248,14 +247,14 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                   <Label htmlFor="sendEmail">{t('superadmin.sendEmailNotification') || 'Send email notification to all users'}</Label>
                 </div>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  {t('superadmin.cancel') || 'Cancel'}
-                </Button>
-                <Button onClick={handleCreate} disabled={isSubmitting}>
-                  {isSubmitting ? (t('superadmin.creating') || 'Creating...') : (t('superadmin.create') || 'Create')}
-                </Button>
-              </div>
+            </div>
+            <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                {t('superadmin.cancel') || 'Cancel'}
+              </Button>
+              <Button onClick={handleCreate} disabled={isSubmitting}>
+                {isSubmitting ? (t('superadmin.creating') || 'Creating...') : (t('superadmin.create') || 'Create')}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -316,7 +315,10 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-700 mb-3">{announcement.content}</p>
+                <div
+                  className="text-gray-700 mb-3 text-sm leading-relaxed [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-blue-600 [&_a]:underline"
+                  dangerouslySetInnerHTML={{ __html: announcement.content }}
+                />
                 <div className="text-sm text-gray-500">
                   {t('superadmin.created') || 'Created'}: {new Date(announcement.createdAt).toLocaleDateString()}
                   {announcement.updatedAt && (
@@ -333,14 +335,14 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
 
       {/* Edit Dialog */}
       <Dialog open={!!editingAnnouncement} onOpenChange={() => setEditingAnnouncement(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl flex flex-col max-h-[90vh]">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{t('superadmin.editAnnouncement') || 'Edit Announcement'}</DialogTitle>
             <DialogDescription>
               {t('superadmin.updateAnnouncementDetails') || 'Update announcement details'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-4">
             <div>
               <Label htmlFor="edit-title">{t('superadmin.title') || 'Title'}</Label>
               <Input
@@ -350,18 +352,17 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
               />
             </div>
             <div>
-              <Label htmlFor="edit-content">{t('superadmin.content') || 'Content'}</Label>
-              <Textarea
-                id="edit-content"
+              <Label className="mb-1.5 block">{t('superadmin.content') || 'Content'}</Label>
+              <RichTextEditor
                 value={formData.content}
-                onChange={(e) => setFormData({...formData, content: e.target.value})}
-                rows={4}
+                onChange={(html) => setFormData({...formData, content: html})}
+                minHeight={160}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>{t('superadmin.type') || 'Type'}</Label>
-                <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value})}>
+                <Select value={formData.type} onValueChange={(value: "general" | "maintenance" | "feature" | "security") => setFormData({...formData, type: value})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -375,7 +376,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
               </div>
               <div>
                 <Label>{t('superadmin.priority') || 'Priority'}</Label>
-                <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
+                <Select value={formData.priority} onValueChange={(value: "low" | "normal" | "high" | "critical") => setFormData({...formData, priority: value})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -396,14 +397,14 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
               />
               <Label htmlFor="edit-active">{t('superadmin.activeAnnouncement') || 'Active announcement'}</Label>
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setEditingAnnouncement(null)}>
-                {t('superadmin.cancel') || 'Cancel'}
-              </Button>
-              <Button onClick={handleUpdate} disabled={isSubmitting}>
-                {isSubmitting ? (t('superadmin.updating') || 'Updating...') : (t('superadmin.update') || 'Update')}
-              </Button>
-            </div>
+          </div>
+          <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setEditingAnnouncement(null)}>
+              {t('superadmin.cancel') || 'Cancel'}
+            </Button>
+            <Button onClick={handleUpdate} disabled={isSubmitting}>
+              {isSubmitting ? (t('superadmin.updating') || 'Updating...') : (t('superadmin.update') || 'Update')}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

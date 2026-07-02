@@ -100,7 +100,10 @@ export default function AnnouncementsBanner() {
                       {announcement.priority}
                     </Badge>
                   </div>
-                  <p className="text-sm text-gray-700">{announcement.content}</p>
+                  <div
+                    className="text-sm text-gray-700 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_strong]:font-bold [&_em]:italic [&_a]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-current [&_blockquote]:pl-3 [&_blockquote]:opacity-80"
+                    dangerouslySetInnerHTML={{ __html: announcement.content }}
+                  />
                   <p className="text-xs text-gray-500 mt-1">
                     {new Date(announcement.createdAt).toLocaleDateString()}
                   </p>
