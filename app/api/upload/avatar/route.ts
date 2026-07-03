@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
-import { writeFile, mkdir } from "fs/promises"
-import { join } from "path"
+import { put } from "@vercel/blob"
 import { getCurrentUser } from "@/lib/auth"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    // Delete the previous avatar file before saving the new one
+    // Delete the previous avatar before uploading the new one
     const existing = await db.collection("users").findOne(
       { _id: new ObjectId(currentUser._id) },
       { projection: { image: 1 } }
@@ -40,21 +39,16 @@ export async function POST(req: NextRequest) {
     await deleteStorageFile(existing?.image)
 
     const ext = file.name.split(".").pop() ?? "jpg"
-    const filename = `avatar-${currentUser._id}-${Date.now()}.${ext}`
-    const uploadDir = join(process.cwd(), "public", "avatars")
+    const filename = `avatars/avatar-${currentUser._id}-${Date.now()}.${ext}`
 
-    await mkdir(uploadDir, { recursive: true })
-    const bytes = await file.arrayBuffer()
-    await writeFile(join(uploadDir, filename), Buffer.from(bytes))
-
-    const image = `/avatars/${filename}`
+    const blob = await put(filename, file, { access: "public" })
 
     await db.collection("users").updateOne(
       { _id: new ObjectId(currentUser._id) },
-      { $set: { image, updatedAt: new Date() } }
+      { $set: { image: blob.url, updatedAt: new Date() } }
     )
 
-    return NextResponse.json({ success: true, image })
+    return NextResponse.json({ success: true, image: blob.url })
   } catch (error) {
     console.error("Avatar upload error:", error)
     return NextResponse.json({ success: false, message: "Upload failed" }, { status: 500 })
