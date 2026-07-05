@@ -648,6 +648,7 @@ const translations = {
     'farmer.deletingConsultation': 'Deleting...',
     'farmer.notificationsDesc': 'Manage your notifications and stay updated on your animals\' health and consultations',
     'farmer.allNotifications': 'All Notifications',
+    'farmer.passwordMismatch': 'Passwords do not match',
 
     // Farmer Consultation
     'farmer.enterFullName': 'Enter your full name',
@@ -2179,6 +2180,7 @@ const translations = {
     'farmer.deletingConsultation': 'Birasibwa...',
     'farmer.notificationsDesc': 'Genzura amamenyesha y\'ingenzi yerekeye amatungo yawe, randevu, n\'ibikorwa by\'ubuvuzi bw\'amatungo',
     'farmer.allNotifications': 'Amamenyesha yose',
+    'farmer.passwordMismatch': 'Ijambo ryibanga ntirihuye',
 
     // Farmer Consulation
     'farmer.enterFullName': 'Injiza amazina yawe yose',
