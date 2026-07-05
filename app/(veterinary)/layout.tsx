@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/actions/auth"
 import { redirect } from "next/navigation"
 import ClientManifestHelper from "./page-client-manifest"
 import VeterinaryLayoutClient from "@/components/veterinary/veterinary-layout-client"
-import { VeterinaryLayout } from "@/components/veterinary/veterinary-layout"
 
 export default async function VeterinaryRootLayout({
   children,
@@ -19,10 +18,8 @@ export default async function VeterinaryRootLayout({
 
   return (
     <VeterinaryLayoutClient>
-      <VeterinaryLayout>
-        <ClientManifestHelper />
-        {children}
-      </VeterinaryLayout>
+      <ClientManifestHelper />
+      {children}
     </VeterinaryLayoutClient>
   )
 } 

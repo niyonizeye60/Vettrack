@@ -181,18 +181,28 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    const consultation = {
-      fullName: formData.get("fullName"),
+    const animalId    = formData.get("animalId")   as string | null
+    const animalName  = formData.get("animalName")  as string | null
+    const animalType  = formData.get("animalType")  as string | null
+    const animalBreed = formData.get("animalBreed") as string | null
+
+    const consultation: Record<string, any> = {
+      fullName:    formData.get("fullName"),
       phoneNumber: formData.get("phoneNumber"),
-      service: formData.get("service"),
-      doctor: formData.get("doctor"),
-      date: formData.get("date"),
-      time: formData.get("time"),
-      type: formData.get("type"),
-      status: "pending", // Using lowercase to be consistent
-      createdAt: new Date(),
-      farmerId // Associate this consultation with the farmer who created it
+      service:     formData.get("service"),
+      doctor:      formData.get("doctor"),
+      date:        formData.get("date"),
+      time:        formData.get("time"),
+      type:        formData.get("type"),
+      status:      "pending",
+      createdAt:   new Date(),
+      farmerId,
     }
+
+    if (animalId)    consultation.animalId    = animalId
+    if (animalName)  consultation.animalName  = animalName
+    if (animalType)  consultation.animalType  = animalType
+    if (animalBreed) consultation.animalBreed = animalBreed
 
     await db.collection("consultations").insertOne(consultation)
     revalidatePath("/dashboard/consultations")

@@ -131,7 +131,7 @@ export default function FarmerSettingsPage() {
         <p className="text-sm text-gray-500 mt-0.5">{t("farmer.manageAccountSettings") || "Manage your account settings and preferences"}</p>
       </div>
 
-      <Card className="max-w-2xl">
+      <Card>
         <CardHeader>
           <CardTitle>{t("farmer.profile") || "Profile"}</CardTitle>
           <p className="text-sm text-gray-500">{t("farmer.profileDesc") || "Update your personal information"}</p>
@@ -142,7 +142,7 @@ export default function FarmerSettingsPage() {
           <div className="flex items-center gap-4">
             <Avatar className="w-16 h-16 border-2 border-gray-100">
               <AvatarImage src={avatarPreview ?? undefined} alt={user?.name} />
-              <AvatarFallback className="bg-emerald-600 text-white text-xl font-bold">
+              <AvatarFallback className="bg-green-100 text-green-600 text-xl font-bold">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -257,7 +257,7 @@ export default function FarmerSettingsPage() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-green-600 hover:bg-green-700 text-white"
             >
               {saving ? (t("farmer.saving") || "Saving…") : (t("farmer.saveChanges") || "Save Changes")}
             </Button>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Bell, Eye, Pencil, Plus, Trash2, AlertTriangle } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Bell, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { deleteAnimal } from "@/lib/actions"
@@ -46,6 +47,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
   const [deleting, setDeleting] = useState(false)
   const [inseminationRecords, setInseminationRecords] = useState<any[]>([])
   const [recordsLoaded, setRecordsLoaded] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
     let cancelled = false
@@ -109,106 +111,150 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
 
   const deletePregnancy = deleteAnimalTarget ? getPregnancy(deleteAnimalTarget._id) : null
 
+  const filteredAnimals = animals.filter((a) => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return true
+    return (
+      a.name?.toLowerCase().includes(q) ||
+      a.type?.toLowerCase().includes(q) ||
+      a.breed?.toLowerCase().includes(q) ||
+      a.insuranceId?.toLowerCase().includes(q) ||
+      a.earTagId?.toLowerCase().includes(q)
+    )
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('farmer.myAnimals')}</h1>
-          <p className="text-gray-600 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-gray-900">{t('farmer.myAnimals')}</h1>
+          <p className="text-gray-500 text-sm mt-0.5">
             {t('farmer.registeredAnimals')}: <span className="font-semibold">{animals.length}</span>
           </p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
           <Plus className="h-4 w-4 mr-1.5" />
           {t('farmer.registerNewAnimal')}
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('farmer.animalsInventory')}</CardTitle>
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader className="pb-4 border-b border-gray-100">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <PawPrint className="h-5 w-5 text-green-600" />
+              {t('farmer.animalsInventory')}
+            </CardTitle>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder={t('farmer.searchAnimals') || "Search animals…"}
+                className="pl-9 bg-white h-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {animals.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Bell className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-              <p>{t('farmer.noAnimalsYet')}</p>
-              <p className="mt-2">
+            <div className="text-center py-12">
+              <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                <PawPrint className="h-5 w-5 text-gray-400" />
+              </div>
+              <p className="text-gray-500 text-sm font-medium">{t('farmer.noAnimalsYet')}</p>
+              <p className="mt-3">
                 <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
                   {t('farmer.registerAnAnimal')}
                 </Button>
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('farmer.name')}</TableHead>
-                  <TableHead>{t('farmer.type')}</TableHead>
-                  <TableHead>{t('farmer.breed')}</TableHead>
-                  <TableHead>{t('farmer.insuranceId')}</TableHead>
-                  <TableHead>{t('animal.earTagId')}</TableHead>
-                  <TableHead>{t('farmer.acquisitionType')}</TableHead>
-                  <TableHead>{t('farmer.location')}</TableHead>
-                  <TableHead>{t('farmer.status')}</TableHead>
-                  <TableHead>{t('farmer.gender')}</TableHead>
-                  <TableHead>{t('farmer.price')}</TableHead>
-                  <TableHead>{t('farmer.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {animals.map((animal) => (
-                  <TableRow key={animal._id}>
-                    <TableCell className="font-medium">{animal.name}</TableCell>
-                    <TableCell>{animal.type}</TableCell>
-                    <TableCell>{animal.breed}</TableCell>
-                    <TableCell>{animal.insuranceId}</TableCell>
-                    <TableCell>{animal.earTagId}</TableCell>
-                    <TableCell>{animal.acquisitionType}</TableCell>
-                    <TableCell>{animal.district}, {animal.sector}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusColor(animal.status)}>
-                        {getStatusText(animal.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{animal.gender ? t(`farmer.${animal.gender}`) : t('farmer.undefined')}</TableCell>
-                    <TableCell>RWF {animal.price}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 hover:bg-emerald-50"
-                          title={t('farmer.viewDetails')}
-                          onClick={() => setDetailAnimal(animal)}
-                        >
-                          <Eye className="h-3.5 w-3.5 text-emerald-600" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 hover:bg-emerald-50"
-                          title={t('farmer.edit')}
-                          onClick={() => setEditAnimal(animal)}
-                        >
-                          <Pencil className="h-3.5 w-3.5 text-emerald-600" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 hover:bg-red-50"
-                          title={t('farmer.delete')}
-                          disabled={!recordsLoaded}
-                          onClick={() => setDeleteAnimalTarget(animal)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.name')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.type')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.breed')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.insuranceId')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('animal.earTagId')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.acquisitionType')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.location')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.status')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.gender')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.price')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.actions')}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredAnimals.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-12">
+                        <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                          <PawPrint className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 text-sm font-medium">{t('farmer.noResultsFound') || "No animals match your search"}</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredAnimals.map((animal) => (
+                    <TableRow key={animal._id} className="hover:bg-gray-50/80 transition-colors duration-150">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
+                            <PawPrint className="h-3.5 w-3.5 text-amber-600" />
+                          </div>
+                          <span className="font-medium text-gray-800 text-sm">{animal.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{animal.type}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{animal.breed}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{animal.insuranceId || <span className="text-gray-400">—</span>}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{animal.earTagId || <span className="text-gray-400">—</span>}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{animal.acquisitionType || <span className="text-gray-400">—</span>}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{animal.district}, {animal.sector}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getStatusColor(animal.status)}>
+                          {getStatusText(animal.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{animal.gender ? t(`farmer.${animal.gender}`) : t('farmer.undefined')}</TableCell>
+                      <TableCell className="text-sm text-gray-600">RWF {animal.price}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 flex-nowrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => setDetailAnimal(animal)}
+                          >
+                            {t('farmer.view')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => setEditAnimal(animal)}
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-1" />{t('farmer.edit')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 hover:bg-red-50 shrink-0"
+                            title={t('farmer.delete')}
+                            disabled={!recordsLoaded}
+                            onClick={() => setDeleteAnimalTarget(animal)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -249,7 +295,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
         <DialogContent className="max-w-2xl p-6 rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-emerald-600" />
+              <Eye className="h-5 w-5 text-green-600" />
               {t('animal.details')}
             </DialogTitle>
           </DialogHeader>

@@ -6,18 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Settings, Bell, Lock, Globe, Save } from "lucide-react"
+import { Bell, Lock, Globe, Save, KeyRound } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
-import { toast } from "sonner"
-import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 export default function VeterinarySettingsPage() {
   const { t } = useLanguage()
-  const [user, setUser] = useState<any>(null)
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
   const [settings, setSettings] = useState({
     emailNotifications: true,
     pushNotifications: true,
@@ -25,22 +26,19 @@ export default function VeterinarySettingsPage() {
     marketingEmails: false,
     language: "en",
     timezone: "Africa/Kigali",
-    theme: "light"
   })
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
-    confirmPassword: ""
+    confirmPassword: "",
   })
 
   useEffect(() => {
     async function fetchUser() {
       try {
         const userData = await getCurrentUser()
-        setUser(userData)
-        // Load user settings if available
         if (userData?.settings) {
-          setSettings({ ...settings, ...userData.settings })
+          setSettings((prev) => ({ ...prev, ...(userData as any).settings }))
         }
       } catch (error) {
         console.error("Error fetching user:", error)
@@ -54,19 +52,18 @@ export default function VeterinarySettingsPage() {
   const handleSaveSettings = async () => {
     setSaving(true)
     try {
-      const response = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings })
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings }),
       })
-      
-      if (response.ok) {
-        toast.success("Settings updated successfully")
+      if (res.ok) {
+        toast({ title: t("vet.profileUpdated"), description: t("vet.manageAccountSettings") })
       } else {
-        toast.error("Failed to update settings")
+        toast({ title: t("common.error"), description: "Failed to update settings", variant: "destructive" })
       }
-    } catch (error) {
-      toast.error("Failed to update settings")
+    } catch {
+      toast({ title: t("common.error"), description: "Failed to update settings", variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -74,232 +71,194 @@ export default function VeterinarySettingsPage() {
 
   const handleChangePassword = async () => {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error("New passwords don't match")
+      toast({ title: t("common.error"), description: t("vet.passwordMismatch"), variant: "destructive" })
       return
     }
-    
     if (passwordForm.newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters")
+      toast({ title: t("common.error"), description: "Password must be at least 6 characters", variant: "destructive" })
       return
     }
-
+    setChangingPassword(true)
     try {
-      const response = await fetch('/api/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           currentPassword: passwordForm.currentPassword,
-          newPassword: passwordForm.newPassword
-        })
+          newPassword: passwordForm.newPassword,
+        }),
       })
-      
-      if (response.ok) {
-        toast.success("Password changed successfully")
+      if (res.ok) {
+        toast({ title: t("vet.passwordChanged"), description: t("vet.passwordChangedDesc") })
         setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
       } else {
-        toast.error("Failed to change password")
+        toast({ title: t("common.error"), description: "Failed to change password", variant: "destructive" })
       }
-    } catch (error) {
-      toast.error("Failed to change password")
+    } catch {
+      toast({ title: t("common.error"), description: "Failed to change password", variant: "destructive" })
+    } finally {
+      setChangingPassword(false)
     }
   }
 
+  const notifToggles = [
+    { key: "emailNotifications",     label: t("vet.emailNotifications"),     desc: t("vet.emailNotificationsDesc") },
+    { key: "pushNotifications",      label: t("vet.pushNotifications"),      desc: t("vet.pushNotificationsDesc") },
+    { key: "consultationReminders",  label: t("vet.consultationReminders"),  desc: t("vet.consultationRemindersDesc") },
+    { key: "marketingEmails",        label: t("vet.marketingEmails"),        desc: t("vet.marketingEmailsDesc") },
+  ] as const
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-          </div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-40" />
+        <div className="h-4 bg-gray-200 rounded w-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="h-64 bg-gray-200 rounded-xl" />
+          <div className="h-64 bg-gray-200 rounded-xl" />
         </div>
+        <div className="h-48 bg-gray-200 rounded-xl" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/veterinary">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {t('vet.back') || 'Back'}
+    <div className="space-y-6">
+
+      {/* Page title */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{t("vet.settings")}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t("vet.manageAccountSettings")}</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Notification Preferences */}
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="pb-4 border-b border-gray-100">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <Bell className="h-5 w-5 text-green-600" />
+              {t("vet.notificationPreferences")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-5">
+            {notifToggles.map(({ key, label, desc }) => (
+              <div key={key} className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{label}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                </div>
+                <Switch
+                  checked={settings[key]}
+                  onCheckedChange={(checked) => setSettings({ ...settings, [key]: checked })}
+                  className="flex-shrink-0"
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* General Settings */}
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="pb-4 border-b border-gray-100">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <Globe className="h-5 w-5 text-blue-500" />
+              {t("vet.generalSettings")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-5 space-y-5">
+            <div className="space-y-1.5">
+              <Label>{t("vet.language")}</Label>
+              <Select value={settings.language} onValueChange={(v) => setSettings({ ...settings, language: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="rw">Kinyarwanda</SelectItem>
+                  <SelectItem value="fr">Français</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("vet.timezone")}</Label>
+              <Select value={settings.timezone} onValueChange={(v) => setSettings({ ...settings, timezone: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Africa/Kigali">Kigali (GMT+2)</SelectItem>
+                  <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
+                  <SelectItem value="Africa/Nairobi">Nairobi (GMT+3)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Separator />
+            <Button
+              onClick={handleSaveSettings}
+              disabled={saving}
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? t("vet.saving") : t("vet.saveChanges")}
             </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Settings className="h-6 w-6" />
-              {t('vet.settings') || 'Settings'}
-            </h1>
-            <p className="text-gray-600">Manage your account preferences</p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Notification Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notification Preferences
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Email Notifications</Label>
-                  <p className="text-sm text-gray-600">Receive notifications via email</p>
-                </div>
-                <Switch
-                  checked={settings.emailNotifications}
-                  onCheckedChange={(checked) => setSettings({...settings, emailNotifications: checked})}
+        {/* Security */}
+        <Card className="border border-gray-200 shadow-sm lg:col-span-2">
+          <CardHeader className="pb-4 border-b border-gray-100">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <Lock className="h-5 w-5 text-orange-500" />
+              {t("vet.securitySettings")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2 mb-4">
+              <KeyRound className="h-4 w-4 text-gray-400" />
+              <p className="text-sm font-medium text-gray-700">{t("vet.changePassword")}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="current-password">{t("vet.currentPassword")}</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  placeholder={t("vet.currentPasswordPlaceholder")}
                 />
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Push Notifications</Label>
-                  <p className="text-sm text-gray-600">Receive browser notifications</p>
-                </div>
-                <Switch
-                  checked={settings.pushNotifications}
-                  onCheckedChange={(checked) => setSettings({...settings, pushNotifications: checked})}
+              <div className="space-y-1.5">
+                <Label htmlFor="new-password">{t("vet.newPassword")}</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="••••••••"
                 />
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Consultation Reminders</Label>
-                  <p className="text-sm text-gray-600">Get reminded about upcoming consultations</p>
-                </div>
-                <Switch
-                  checked={settings.consultationReminders}
-                  onCheckedChange={(checked) => setSettings({...settings, consultationReminders: checked})}
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-password">{t("vet.confirmPassword")}</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="••••••••"
                 />
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Marketing Emails</Label>
-                  <p className="text-sm text-gray-600">Receive updates and promotions</p>
-                </div>
-                <Switch
-                  checked={settings.marketingEmails}
-                  onCheckedChange={(checked) => setSettings({...settings, marketingEmails: checked})}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* General Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                General Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Language</Label>
-                <Select value={settings.language} onValueChange={(value) => setSettings({...settings, language: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="rw">Kinyarwanda</SelectItem>
-                    <SelectItem value="fr">Français</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label>Timezone</Label>
-                <Select value={settings.timezone} onValueChange={(value) => setSettings({...settings, timezone: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Africa/Kigali">Kigali (GMT+2)</SelectItem>
-                    <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
-                    <SelectItem value="Africa/Nairobi">Nairobi (GMT+3)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label>Theme</Label>
-                <Select value={settings.theme} onValueChange={(value) => setSettings({...settings, theme: value})}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <Button onClick={handleSaveSettings} disabled={saving} className="w-full">
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? "Saving..." : "Save Settings"}
+            </div>
+            <div className="mt-5 flex justify-end">
+              <Button
+                onClick={handleChangePassword}
+                disabled={changingPassword || !passwordForm.currentPassword || !passwordForm.newPassword}
+                className="bg-green-600 hover:bg-green-700 text-white min-w-36"
+              >
+                <Lock className="h-3.5 w-3.5 mr-1.5" />
+                {changingPassword ? t("vet.saving") : t("vet.changePassword")}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Security Settings */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5" />
-                Security Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="current-password">Current Password</Label>
-                  <Input
-                    id="current-password"
-                    type="password"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
-                    placeholder="Enter current password"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
-                    placeholder="Enter new password"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
-                    placeholder="Confirm new password"
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button onClick={handleChangePassword} variant="outline">
-                  <Lock className="h-4 w-4 mr-2" />
-                  Change Password
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   )

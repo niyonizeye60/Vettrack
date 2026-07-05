@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
@@ -72,7 +72,7 @@ function BirthCountdown({ targetDate }: { targetDate: string }) {
   const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
   const secs = Math.floor((diff % (1000 * 60)) / 1000)
 
-  const urgency = days <= 7 ? "text-amber-600" : "text-emerald-600"
+  const urgency = days <= 7 ? "text-amber-600" : "text-green-600"
 
   return (
     <div className="text-center">
@@ -694,59 +694,58 @@ export default function InseminationPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-green-200 border-t-green-600 rounded-full animate-spin" />
     </div>
   )
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl">
-          <Syringe className="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Insemination</h1>
-          <p className="text-sm text-gray-500">Track artificial insemination records</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Insemination</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Track artificial insemination records</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-emerald-100 uppercase font-medium">Total Records</p>
-              <p className="text-2xl font-bold">{records.length}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Total Records</p>
+              <Syringe className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Syringe className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-gray-900 mt-2">{records.length}</h3>
+            <p className="text-xs text-gray-400 mt-1">All time</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-amber-500 to-orange-500 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-amber-100 uppercase font-medium">Total Cost (RWF)</p>
-              <p className="text-2xl font-bold">{totalCost.toLocaleString()}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Total Cost (RWF)</p>
+              <FlaskConical className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <FlaskConical className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-orange-600 mt-2">{totalCost.toLocaleString()}</h3>
+            <p className="text-xs text-gray-400 mt-1">Cumulative spend</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-purple-100 uppercase font-medium">Expected Births</p>
-              <p className="text-2xl font-bold">{upcoming}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Expected Births</p>
+              <Baby className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Baby className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-green-600 mt-2">{upcoming}</h3>
+            <p className="text-xs text-gray-400 mt-1">Upcoming</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-sky-500 to-blue-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-sky-100 uppercase font-medium">Calf(s) Born</p>
-              <p className="text-2xl font-bold">{totalBabies}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Calf(s) Born</p>
+              <Baby className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Baby className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-blue-600 mt-2">{totalBabies}</h3>
+            <p className="text-xs text-gray-400 mt-1">Confirmed births</p>
           </CardContent>
         </Card>
       </div>
@@ -760,10 +759,10 @@ export default function InseminationPage() {
 
         {/* RECORD TAB */}
         <TabsContent value="record">
-          <Card className="border-0 shadow-xl bg-white/90">
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                <div className="w-2 h-2 bg-green-500 rounded-full" />
                 {editRecord ? "Edit Insemination Record" : "New Insemination Record"}
               </CardTitle>
             </CardHeader>
@@ -841,7 +840,7 @@ export default function InseminationPage() {
                       {semenTypes.length === 0
                         ? <span className="text-gray-400">Select semen type(s)...</span>
                         : semenTypes.map(t => (
-                          <span key={t} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs border bg-emerald-50 text-emerald-700 border-emerald-200">{t}</span>
+                          <span key={t} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs border bg-green-50 text-green-700 border-green-200">{t}</span>
                         ))
                       }
                     </span>
@@ -855,7 +854,7 @@ export default function InseminationPage() {
                             type="checkbox"
                             checked={semenTypes.includes(t)}
                             onChange={() => setSemenTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])}
-                            className="accent-emerald-600 h-4 w-4"
+                            className="accent-green-600 h-4 w-4"
                           />
                           <span className="text-sm">{t}</span>
                         </label>
@@ -896,7 +895,7 @@ export default function InseminationPage() {
                     <label className="text-sm font-medium text-gray-700">Expected Birth Date <span className="text-gray-400 text-xs">optional</span></label>
                     {birthCountdown !== null && (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${birthCountdown > 0
-                        ? "bg-emerald-50 text-emerald-700"
+                        ? "bg-green-50 text-green-700"
                         : birthCountdown === 0
                           ? "bg-amber-50 text-amber-700"
                           : "bg-red-50 text-red-600"
@@ -909,7 +908,7 @@ export default function InseminationPage() {
                   {(() => {
                     const sel = animals.find(a => a._id === animalId)
                     return sel?.type?.toLowerCase() === "cow" && date ? (
-                      <p className="text-xs text-emerald-600">Auto-estimated: AI date + 283 days</p>
+                      <p className="text-xs text-green-600">Auto-estimated: AI date + 283 days</p>
                     ) : null
                   })()}
                 </div>
@@ -960,10 +959,10 @@ export default function InseminationPage() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleSubmit} disabled={saving} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl px-6">
+                <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
                   {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
                 </Button>
-                {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-xl">Cancel</Button>}
+                {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>}
               </div>
             </CardContent>
           </Card>
@@ -971,7 +970,7 @@ export default function InseminationPage() {
 
         {/* HISTORY TAB */}
         <TabsContent value="history">
-          <Card className="border-0 shadow-xl bg-white/90">
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-sky-500 rounded-full" />
@@ -990,7 +989,7 @@ export default function InseminationPage() {
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-1">
                   <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}</p>
-                  <Button variant="outline" onClick={() => { setFilterAnimal(""); setFilterMonth("") }} className="rounded-xl ml-auto text-xs">Clear</Button>
+                  <Button variant="outline" onClick={() => { setFilterAnimal(""); setFilterMonth("") }} className="rounded-lg ml-auto text-xs">Clear</Button>
                 </div>
               </div>
 
@@ -1028,7 +1027,7 @@ export default function InseminationPage() {
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {(r.semenTypes || []).map(t => (
-                              <Badge key={t} variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">{t}</Badge>
+                              <Badge key={t} variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">{t}</Badge>
                             ))}
                           </div>
                         </TableCell>
@@ -1059,8 +1058,8 @@ export default function InseminationPage() {
                                 <Syringe className="h-3.5 w-3.5 text-amber-600" />
                               </Button>
                             )}
-                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r)} className="h-8 w-8 p-0 hover:bg-emerald-50">
-                              <Pencil className="h-3.5 w-3.5 text-emerald-600" />
+                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r)} className="h-8 w-8 p-0 hover:bg-green-50">
+                              <Pencil className="h-3.5 w-3.5 text-green-600" />
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setDeleteId(r._id)} className="h-8 w-8 p-0 hover:bg-red-50">
                               <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -1083,7 +1082,7 @@ export default function InseminationPage() {
             <div className="flex justify-end">
               <Button
                 onClick={() => setExportOpen(true)}
-                className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl gap-2"
+                className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <Download className="h-4 w-4" />
                 Export Report
@@ -1091,7 +1090,7 @@ export default function InseminationPage() {
             </div>
 
             {/* Per-cow summary table */}
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
@@ -1117,7 +1116,7 @@ export default function InseminationPage() {
                       ) : cowSummary.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">{c.name}</TableCell>
-                          <TableCell className="text-emerald-700 font-semibold">{c.inseminations}</TableCell>
+                          <TableCell className="text-green-700 font-semibold">{c.inseminations}</TableCell>
                           <TableCell className="text-red-600 font-semibold">{c.failedAttempts > 0 ? c.failedAttempts : "—"}</TableCell>
                           <TableCell className="text-sky-700 font-semibold">{c.babies > 0 ? c.babies : "—"}</TableCell>
                           <TableCell>{c.totalCost > 0 ? c.totalCost.toLocaleString() : "—"}</TableCell>
@@ -1132,7 +1131,7 @@ export default function InseminationPage() {
 
             {/* Babies per cow bar chart */}
             {cowSummary.some(c => c.babies > 0) && (
-              <Card className="border-0 shadow-xl bg-white/90">
+              <Card className="border border-gray-200 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <div className="w-2 h-2 bg-sky-500 rounded-full" />
@@ -1155,10 +1154,10 @@ export default function InseminationPage() {
 
             {/* Inseminations per cow bar chart */}
             {cowSummary.length > 0 && (
-              <Card className="border-0 shadow-xl bg-white/90">
+              <Card className="border border-gray-200 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
                     Inseminations per Animal
                   </CardTitle>
                 </CardHeader>
@@ -1184,7 +1183,7 @@ export default function InseminationPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-emerald-600" />
+              <FileText className="h-5 w-5 text-green-600" />
               Export Insemination Report
             </DialogTitle>
           </DialogHeader>
@@ -1203,21 +1202,21 @@ export default function InseminationPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="p-3 bg-green-50 rounded-xl border border-green-100">
               <div className="text-sm space-y-1">
-                <p className="font-medium text-emerald-700">Preview{exportAnimalName ? ` — ${exportAnimalName}` : ""}</p>
+                <p className="font-medium text-green-700">Preview{exportAnimalName ? ` — ${exportAnimalName}` : ""}</p>
                 <p className="text-gray-600">
                   {exportFilteredRecords.length} records &bull; {exportTotalBabies} calf(s) born &bull; {exportSummary.length} animal(s)
                 </p>
-                <p className="text-gray-600">Total cost: <strong className="text-emerald-700">RWF {exportTotalCost.toLocaleString()}</strong></p>
+                <p className="text-gray-600">Total cost: <strong className="text-green-700">RWF {exportTotalCost.toLocaleString()}</strong></p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">Cancel</Button>
               <Button
                 onClick={exportToExcel}
                 disabled={exporting || exportFilteredRecords.length === 0}
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                className="rounded-lg bg-green-600 hover:bg-green-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
                 {exporting ? "Exporting..." : "Excel"}
@@ -1225,7 +1224,7 @@ export default function InseminationPage() {
               <Button
                 onClick={exportToPDF}
                 disabled={exporting || exportFilteredRecords.length === 0}
-                className="col-span-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl gap-2"
+                className="col-span-2 bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <FileText className="h-4 w-4" />
                 {exporting ? "Exporting..." : "Export PDF"}

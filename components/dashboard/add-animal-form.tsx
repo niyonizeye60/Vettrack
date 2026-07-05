@@ -205,7 +205,7 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           {t('farmer.cancel')}
         </Button>
-        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isSubmitting}>
+        <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={isSubmitting}>
           {isSubmitting ? t('farmer.savingAnimal') : t('farmer.registerAnimal')}
         </Button>
       </div>

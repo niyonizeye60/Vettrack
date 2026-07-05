@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
-import { put } from "@vercel/blob"
 import { getCurrentUser } from "@/lib/auth"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
@@ -39,16 +38,32 @@ export async function POST(req: NextRequest) {
     await deleteStorageFile(existing?.image)
 
     const ext = file.name.split(".").pop() ?? "jpg"
-    const filename = `avatars/avatar-${currentUser._id}-${Date.now()}.${ext}`
+    const filename = `avatar-${currentUser._id}-${Date.now()}.${ext}`
 
-    const blob = await put(filename, file, { access: "public" })
+    let imageUrl: string
+
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      // Production: upload to Vercel Blob
+      const { put } = await import("@vercel/blob")
+      const blob = await put(`avatars/${filename}`, file, { access: "public" })
+      imageUrl = blob.url
+    } else {
+      // Development: save to public/avatars/
+      const { writeFile, mkdir } = await import("fs/promises")
+      const { join } = await import("path")
+      const dir = join(process.cwd(), "public", "avatars")
+      await mkdir(dir, { recursive: true })
+      const bytes = await file.arrayBuffer()
+      await writeFile(join(dir, filename), Buffer.from(bytes))
+      imageUrl = `/avatars/${filename}`
+    }
 
     await db.collection("users").updateOne(
       { _id: new ObjectId(currentUser._id) },
-      { $set: { image: blob.url, updatedAt: new Date() } }
+      { $set: { image: imageUrl, updatedAt: new Date() } }
     )
 
-    return NextResponse.json({ success: true, image: blob.url })
+    return NextResponse.json({ success: true, image: imageUrl })
   } catch (error) {
     console.error("Avatar upload error:", error)
     return NextResponse.json({ success: false, message: "Upload failed" }, { status: 500 })

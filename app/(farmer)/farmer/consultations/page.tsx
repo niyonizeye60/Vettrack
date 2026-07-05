@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next"
-import { getConsultations, getDoctorsList } from "@/lib/actions"
+import { getConsultations, getDoctorsList, getAnimals } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { redirect } from "next/navigation"
 import ConsultationsContent from "./components/consultations-content"
@@ -23,16 +23,20 @@ export default async function FarmerConsultationsPage({
   }
 
   const farmerId = currentUser._id.toString()
-  const [consultations, doctors] = await Promise.all([
+  const [consultations, doctors, allAnimals] = await Promise.all([
     getConsultations(undefined, farmerId),
     getDoctorsList(),
+    getAnimals(farmerId),
   ])
+
+  const sickAnimals = allAnimals.filter(a => a.status === 'Sick')
 
   return (
     <ConsultationsContent
       consultations={consultations}
       doctors={doctors}
       farmerId={farmerId}
+      sickAnimals={sickAnimals}
       openAdd={searchParams.action === "add"}
     />
   )

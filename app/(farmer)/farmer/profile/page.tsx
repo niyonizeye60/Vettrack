@@ -80,8 +80,8 @@ function ActivityTimeline({ activity, t }: { activity: ActivityItem[]; t: (key: 
               const isAnimal = item.kind === "animal_registered" || item.kind === "animal_updated"
               const isNew = item.kind === "animal_registered" || item.kind === "consultation_booked"
               const Icon = isAnimal ? (isNew ? PawPrint : RefreshCw) : (isNew ? ClipboardPlus : RefreshCw)
-              const iconBg = isAnimal ? "bg-emerald-50" : "bg-sky-50"
-              const iconColor = isAnimal ? "text-emerald-600" : "text-sky-600"
+              const iconBg = isAnimal ? "bg-green-50" : "bg-sky-50"
+              const iconColor = isAnimal ? "text-green-600" : "text-sky-600"
               const kindLabel =
                 item.kind === "animal_registered" ? t("farmer.activityAnimalRegistered") :
                 item.kind === "animal_updated" ? t("farmer.activityAnimalUpdated") :
@@ -123,25 +123,22 @@ function StatCard({
   icon: Icon,
   value,
   label,
-  iconBg,
-  iconColor,
+  valueColor,
 }: {
   icon: React.ElementType
   value: string | number
   label: string
-  iconBg: string
-  iconColor: string
+  valueColor: string
 }) {
   return (
-    <Card className="border border-gray-100">
-      <CardContent className="p-5 flex items-center gap-4">
-        <div className={`h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-          <Icon className={`h-5 w-5 ${iconColor}`} />
+    <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-start justify-between">
+          <p className="text-sm text-gray-500 font-medium">{label}</p>
+          <Icon className="h-5 w-5 text-gray-400 flex-shrink-0" />
         </div>
-        <div>
-          <p className="text-2xl font-bold text-gray-900 leading-tight">{value}</p>
-          <p className="text-sm text-gray-500">{label}</p>
-        </div>
+        <h3 className={`text-3xl font-bold mt-2 ${valueColor}`}>{value}</h3>
+        <p className="text-xs text-gray-400 mt-1">&nbsp;</p>
       </CardContent>
     </Card>
   )
@@ -238,16 +235,16 @@ export default function FarmerProfilePage() {
           {bannerImage ? (
             <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full bg-gradient-to-r from-emerald-600 to-green-500" />
+            <div className="w-full h-full bg-gradient-to-r from-green-600 to-green-500" />
           )}
         </div>
 
         <CardContent className="pt-0 pb-5 px-6">
           {/* Avatar + button row */}
           <div className="flex items-end justify-between -mt-12 mb-4">
-            <Avatar className="w-24 h-24 border-4 border-white shadow-md ring-2 ring-emerald-100">
+            <Avatar className="w-24 h-24 border-4 border-white shadow-md ring-2 ring-green-100">
               <AvatarImage src={user?.image} alt={user?.name || t("farmer.farmer")} />
-              <AvatarFallback className="bg-emerald-600 text-white text-2xl font-bold">
+              <AvatarFallback className="bg-green-100 text-green-600 text-2xl font-bold">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -333,29 +330,25 @@ export default function FarmerProfilePage() {
               icon={PawPrint}
               value={stats.totalAnimals}
               label={t("farmer.totalAnimals")}
-              iconBg="bg-emerald-50"
-              iconColor="text-emerald-600"
+              valueColor="text-gray-900"
             />
             <StatCard
               icon={HeartPulse}
               value={stats.healthyAnimals}
               label={t("farmer.healthyAnimals")}
-              iconBg="bg-green-50"
-              iconColor="text-green-600"
+              valueColor="text-orange-600"
             />
             <StatCard
               icon={Stethoscope}
               value={stats.totalConsultations}
               label={t("farmer.totalConsultations")}
-              iconBg="bg-sky-50"
-              iconColor="text-sky-600"
+              valueColor="text-green-600"
             />
             <StatCard
               icon={Award}
               value={stats.yearsActive}
               label={t("farmer.yearsActive")}
-              iconBg="bg-amber-50"
-              iconColor="text-amber-600"
+              valueColor="text-blue-600"
             />
           </div>
 

@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -251,7 +252,7 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           {t('farmer.cancel')}
         </Button>
-        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isSubmitting}>
+        <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={isSubmitting}>
           {isSubmitting ? t('farmer.updatingAnimal') : t('farmer.updateAnimal')}
         </Button>
       </div>

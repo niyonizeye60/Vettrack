@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Bell, Eye, MessageSquare, Pencil, Plus, Stethoscope, Trash2 } from "lucide-react"
+import { Bell, Eye, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { deleteConsultation } from "@/lib/actions"
@@ -27,10 +27,18 @@ interface Doctor {
   phone: string
 }
 
+interface SickAnimal {
+  _id: string
+  name: string
+  type: string
+  breed: string
+}
+
 interface ConsultationsContentProps {
   consultations: any[]
   doctors: Doctor[]
   farmerId: string
+  sickAnimals: SickAnimal[]
   openAdd?: boolean
 }
 
@@ -43,7 +51,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function ConsultationsContent({ consultations, doctors, farmerId, openAdd }: ConsultationsContentProps) {
+export default function ConsultationsContent({ consultations, doctors, farmerId, sickAnimals, openAdd }: ConsultationsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
@@ -93,30 +101,27 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl">
-            <Stethoscope className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('farmer.myConsultations')}</h1>
-            <p className="text-sm text-gray-500">{t('farmer.consultationHistory')}</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{t('farmer.myConsultations')}</h1>
+          <p className="text-sm text-gray-500">{t('farmer.consultationHistory')}</p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+        <Button size="sm" onClick={() => setAddOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
           <Plus className="h-4 w-4 mr-1.5" />
           {t('farmer.newConsultation')}
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('farmer.consultationHistory')}</CardTitle>
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader className="pb-4 border-b border-gray-100">
+          <CardTitle className="text-base font-semibold text-gray-900">{t('farmer.consultationHistory')}</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {consultations.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Bell className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-              <p>{t('farmer.noConsultationsYet')}</p>
+            <div className="text-center py-10 text-gray-500 px-6">
+              <div className="mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-gray-100">
+                <Bell className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-sm font-medium text-gray-600">{t('farmer.noConsultationsYet')}</p>
               <p className="mt-2">
                 <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
                   {t('farmer.bookAConsultation')}
@@ -124,72 +129,78 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('farmer.service')}</TableHead>
-                  <TableHead>{t('farmer.doctor')}</TableHead>
-                  <TableHead>{t('farmer.date')}</TableHead>
-                  <TableHead>{t('farmer.time')}</TableHead>
-                  <TableHead>{t('farmer.type')}</TableHead>
-                  <TableHead>{t('farmer.status')}</TableHead>
-                  <TableHead>{t('farmer.actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {consultations.map((consultation) => (
-                  <TableRow key={consultation._id}>
-                    <TableCell>{consultation.service}</TableCell>
-                    <TableCell>{consultation.doctor || "-"}</TableCell>
-                    <TableCell>{consultation.date}</TableCell>
-                    <TableCell>{consultation.time}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{consultation.type}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={getStatusColor(consultation.status)}>
-                        {getStatusText(consultation.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 hover:bg-emerald-50"
-                          title={t('farmer.viewDetails')}
-                          onClick={() => setDetailConsultation(consultation)}
-                        >
-                          <Eye className="h-3.5 w-3.5 text-emerald-600" />
-                        </Button>
-                        {consultation.status === "pending" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 hover:bg-emerald-50"
-                              title={t('farmer.edit')}
-                              onClick={() => setEditConsultation(consultation)}
-                            >
-                              <Pencil className="h-3.5 w-3.5 text-emerald-600" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 hover:bg-red-50"
-                              title={t('farmer.delete')}
-                              onClick={() => setDeleteId(consultation._id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.animal')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.service')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.doctor')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.date')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.time')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.type')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.status')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.actions')}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {consultations.map((consultation) => (
+                    <TableRow key={consultation._id} className="hover:bg-gray-50/80 transition-colors duration-150">
+                      <TableCell className="text-sm text-gray-800">
+                        {consultation.animalName
+                          ? <span className="font-medium">{consultation.animalName}<span className="text-gray-400 font-normal"> · {consultation.animalType}</span></span>
+                          : <span className="text-gray-400">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{consultation.service}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{consultation.doctor || <span className="text-gray-400">—</span>}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{consultation.date}</TableCell>
+                      <TableCell className="text-sm text-gray-600">{consultation.time}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{consultation.type}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getStatusColor(consultation.status)}>
+                          {getStatusText(consultation.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 flex-nowrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => setDetailConsultation(consultation)}
+                          >
+                            {t('farmer.view')}
+                          </Button>
+                          {consultation.status === "pending" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="shrink-0"
+                                onClick={() => setEditConsultation(consultation)}
+                              >
+                                <Pencil className="h-3.5 w-3.5 mr-1" />{t('farmer.edit')}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 hover:bg-red-50 shrink-0"
+                                title={t('farmer.delete')}
+                                onClick={() => setDeleteId(consultation._id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -203,6 +214,7 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
           <AddConsultationForm
             doctors={doctors}
             farmerId={farmerId}
+            sickAnimals={sickAnimals}
             onSuccess={() => { setAddOpen(false); router.refresh() }}
             onCancel={() => setAddOpen(false)}
           />
@@ -232,7 +244,7 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
         <DialogContent className="max-w-2xl p-6 rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-emerald-600" />
+              <Eye className="h-5 w-5 text-green-600" />
               {t('farmer.consultationFor')}
             </DialogTitle>
           </DialogHeader>
@@ -254,6 +266,9 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
               <div className="border rounded-lg p-4 space-y-1 bg-white">
                 <DetailRow label={t('farmer.fullName')} value={detailConsultation.fullName} />
                 <DetailRow label={t('farmer.phoneNumber')} value={detailConsultation.phoneNumber} />
+                {detailConsultation.animalName && (
+                  <DetailRow label={t('farmer.animal')} value={`${detailConsultation.animalName} (${detailConsultation.animalType})`} />
+                )}
                 <DetailRow label={t('farmer.service')} value={detailConsultation.service} />
                 <DetailRow label={t('farmer.doctor')} value={detailConsultation.doctor || "-"} />
                 <DetailRow label={t('farmer.date')} value={detailConsultation.date} />

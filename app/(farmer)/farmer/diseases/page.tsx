@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
@@ -50,7 +50,7 @@ const COMMON_DISEASES = [
 const STATUS_STYLES: Record<string, string> = {
   Active: "bg-red-50 text-red-700 border-red-200",
   "Under Treatment": "bg-amber-50 text-amber-700 border-amber-200",
-  Resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  Resolved: "bg-green-50 text-green-700 border-green-200",
 }
 const SESSION_STYLES: Record<string, string> = {
   Morning: "bg-amber-50 text-amber-700 border-amber-200",
@@ -928,59 +928,58 @@ export default function DiseaseManagementPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-green-200 border-t-green-600 rounded-full animate-spin" />
     </div>
   )
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl">
-          <ShieldAlert className="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('farmer.diseases')}</h1>
-          <p className="text-sm text-gray-500">Track illnesses, treatment doses, and costs per animal</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">{t('farmer.diseases')}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Track illnesses, treatment doses, and costs per animal</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-md bg-gradient-to-br from-slate-600 to-slate-700 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-300 uppercase font-medium">Total Cases</p>
-              <p className="text-2xl font-bold">{records.length}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Total Cases</p>
+              <Activity className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Activity className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-gray-900 mt-2">{records.length}</h3>
+            <p className="text-xs text-gray-400 mt-1">All time</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-red-500 to-red-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-red-100 uppercase font-medium">Active</p>
-              <p className="text-2xl font-bold">{activeCount}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Active</p>
+              <AlertCircle className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <AlertCircle className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-orange-600 mt-2">{activeCount}</h3>
+            <p className="text-xs text-gray-400 mt-1">Needs attention</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-amber-500 to-orange-500 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-amber-100 uppercase font-medium">In Treatment</p>
-              <p className="text-2xl font-bold">{underTreatmentCount}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">In Treatment</p>
+              <Clock className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Clock className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-green-600 mt-2">{underTreatmentCount}</h3>
+            <p className="text-xs text-gray-400 mt-1">In progress</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-emerald-100 uppercase font-medium">Total Cost (RWF)</p>
-              <p className="text-2xl font-bold">{totalTreatmentCost.toLocaleString()}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Total Cost (RWF)</p>
+              <DollarSign className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <DollarSign className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-blue-600 mt-2">{totalTreatmentCost.toLocaleString()}</h3>
+            <p className="text-xs text-gray-400 mt-1">Cumulative spend</p>
           </CardContent>
         </Card>
       </div>
@@ -995,7 +994,7 @@ export default function DiseaseManagementPage() {
 
         {/* ── RECORD TAB ── */}
         <TabsContent value="record">
-          <Card className="border-0 shadow-xl bg-white/90">
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-red-500 rounded-full" />
@@ -1114,10 +1113,10 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <Button onClick={handleSubmit} disabled={saving} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl px-6">
+                  <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
                     {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
                   </Button>
-                  {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-xl">Cancel</Button>}
+                  {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>}
                 </div>
               </div>
             </CardContent>
@@ -1128,7 +1127,7 @@ export default function DiseaseManagementPage() {
         <TabsContent value="doses">
           <div className="space-y-6">
             {/* Dose form */}
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-amber-500 rounded-full" />
@@ -1209,7 +1208,7 @@ export default function DiseaseManagementPage() {
                   {/* Auto total */}
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-gray-700">Total Cost (RWF)</label>
-                    <Input readOnly value={(medicinesTotalCost + (Number(vetCost) || 0)).toLocaleString()} className="bg-emerald-50 font-semibold text-emerald-700" />
+                    <Input readOnly value={(medicinesTotalCost + (Number(vetCost) || 0)).toLocaleString()} className="bg-green-50 font-semibold text-green-700" />
                   </div>
 
                   {/* Notes */}
@@ -1220,16 +1219,16 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <Button onClick={handleDoseSubmit} disabled={savingDose} className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl px-6">
+                  <Button onClick={handleDoseSubmit} disabled={savingDose} className="bg-orange-500 hover:bg-orange-600 text-white rounded-lg px-6">
                     {savingDose ? "Saving..." : editDose ? "Update Dose" : "Log Dose"}
                   </Button>
-                  {editDose && <Button variant="outline" onClick={resetDoseForm} className="rounded-xl">Cancel</Button>}
+                  {editDose && <Button variant="outline" onClick={resetDoseForm} className="rounded-lg">Cancel</Button>}
                 </div>
               </CardContent>
             </Card>
 
             {/* Dose history table */}
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -1289,11 +1288,11 @@ export default function DiseaseManagementPage() {
                           </TableCell>
                           <TableCell className="text-sm">{doseMedicineCost(d) > 0 ? doseMedicineCost(d).toLocaleString() : "—"}</TableCell>
                           <TableCell className="text-sm">{d.vetCost > 0 ? d.vetCost.toLocaleString() : "—"}</TableCell>
-                          <TableCell className="font-semibold text-emerald-700">{d.totalCost > 0 ? d.totalCost.toLocaleString() : "—"}</TableCell>
+                          <TableCell className="font-semibold text-green-700">{d.totalCost > 0 ? d.totalCost.toLocaleString() : "—"}</TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => handleEditDose(d)} className="h-8 w-8 p-0 hover:bg-emerald-50">
-                                <Pencil className="h-3.5 w-3.5 text-emerald-600" />
+                              <Button size="sm" variant="ghost" onClick={() => handleEditDose(d)} className="h-8 w-8 p-0 hover:bg-green-50">
+                                <Pencil className="h-3.5 w-3.5 text-green-600" />
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => setDeleteDoseId(d._id)} className="h-8 w-8 p-0 hover:bg-red-50">
                                 <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -1308,11 +1307,11 @@ export default function DiseaseManagementPage() {
 
                 {/* Dose summary footer */}
                 {filteredDoses.length > 0 && (
-                  <div className="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100 flex flex-wrap gap-6 text-sm">
+                  <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-100 flex flex-wrap gap-6 text-sm">
                     <span className="text-gray-600">Total doses: <strong className="text-gray-900">{filteredDoses.reduce((s, d) => s + doseTotalCount(d), 0)}</strong></span>
                     <span className="text-gray-600">Medicine cost: <strong className="text-gray-900">RWF {filteredDoses.reduce((s, d) => s + doseMedicineCost(d), 0).toLocaleString()}</strong></span>
                     <span className="text-gray-600">Vet cost: <strong className="text-gray-900">RWF {filteredDoses.reduce((s, d) => s + d.vetCost, 0).toLocaleString()}</strong></span>
-                    <span className="text-emerald-700 font-semibold">Total: RWF {filteredDoses.reduce((s, d) => s + d.totalCost, 0).toLocaleString()}</span>
+                    <span className="text-green-700 font-semibold">Total: RWF {filteredDoses.reduce((s, d) => s + d.totalCost, 0).toLocaleString()}</span>
                   </div>
                 )}
               </CardContent>
@@ -1322,7 +1321,7 @@ export default function DiseaseManagementPage() {
 
         {/* ── HISTORY TAB ── */}
         <TabsContent value="history">
-          <Card className="border-0 shadow-xl bg-white/90">
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-sky-500 rounded-full" />
@@ -1384,8 +1383,8 @@ export default function DiseaseManagementPage() {
                         <TableCell className="text-sm text-gray-500 max-w-[140px] truncate">{r.treatment || "—"}</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r)} className="h-8 w-8 p-0 hover:bg-emerald-50">
-                              <Pencil className="h-3.5 w-3.5 text-emerald-600" />
+                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r)} className="h-8 w-8 p-0 hover:bg-green-50">
+                              <Pencil className="h-3.5 w-3.5 text-green-600" />
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setDeleteId(r._id)} className="h-8 w-8 p-0 hover:bg-red-50">
                               <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -1408,18 +1407,18 @@ export default function DiseaseManagementPage() {
             <div className="flex justify-end">
               <Button
                 onClick={() => setExportOpen(true)}
-                className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl gap-2"
+                className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <Download className="h-4 w-4" />
                 Export Report
               </Button>
             </div>
             {/* Daily cost breakdown */}
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
                     Daily Treatment Cost
                   </CardTitle>
                   <Select value={reportCaseId || "all"} onValueChange={v => setReportCaseId(v === "all" ? "" : v)}>
@@ -1489,7 +1488,7 @@ export default function DiseaseManagementPage() {
                                 </TableCell>
                                 <TableCell className="text-sm">{eCost > 0 ? `RWF ${eCost.toLocaleString()}` : <span className="text-gray-300">—</span>}</TableCell>
                                 <TableCell className="font-semibold text-gray-800">RWF {row.dayTotal.toLocaleString()}</TableCell>
-                                <TableCell className="font-bold text-emerald-700">RWF {row.runningTotal.toLocaleString()}</TableCell>
+                                <TableCell className="font-bold text-green-700">RWF {row.runningTotal.toLocaleString()}</TableCell>
                               </TableRow>
                             )
                           })}
@@ -1498,7 +1497,7 @@ export default function DiseaseManagementPage() {
                     </div>
 
                     {/* Grand total footer */}
-                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="p-4 bg-green-50 rounded-xl border border-green-100 grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div>
                         <p className="text-gray-500 text-xs uppercase font-medium">Treatment Days</p>
                         <p className="text-xl font-bold text-gray-900">{dailyCostBreakdown.length}</p>
@@ -1517,7 +1516,7 @@ export default function DiseaseManagementPage() {
                       </div>
                       <div>
                         <p className="text-gray-500 text-xs uppercase font-medium">Grand Total</p>
-                        <p className="text-xl font-bold text-emerald-700">
+                        <p className="text-xl font-bold text-green-700">
                           RWF {dailyCostBreakdown.length > 0 ? dailyCostBreakdown[dailyCostBreakdown.length - 1].runningTotal.toLocaleString() : 0}
                         </p>
                       </div>
@@ -1528,7 +1527,7 @@ export default function DiseaseManagementPage() {
             </Card>
 
             {/* Cost per animal summary */}
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
@@ -1557,7 +1556,7 @@ export default function DiseaseManagementPage() {
                             <TableCell>{row.doses}</TableCell>
                             <TableCell>{row.medicineCost.toLocaleString()}</TableCell>
                             <TableCell>{row.vetCost.toLocaleString()}</TableCell>
-                            <TableCell className="font-bold text-emerald-700">{row.total.toLocaleString()}</TableCell>
+                            <TableCell className="font-bold text-green-700">{row.total.toLocaleString()}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1568,7 +1567,7 @@ export default function DiseaseManagementPage() {
             </Card>
 
             {/* Status breakdown pie */}
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-red-500 rounded-full" />
@@ -1593,7 +1592,7 @@ export default function DiseaseManagementPage() {
             </Card>
 
             {/* Most frequent diseases */}
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-amber-500 rounded-full" />
@@ -1658,18 +1657,18 @@ export default function DiseaseManagementPage() {
                     <p className="text-gray-600">
                       {previewRecs.length} case{previewRecs.length !== 1 ? 's' : ''} &bull; {previewDoses.reduce((s, d) => s + doseTotalCount(d), 0)} doses &bull; {previewDaily.length} treatment day{previewDaily.length !== 1 ? 's' : ''}
                     </p>
-                    <p className="text-gray-600">Total cost: <strong className="text-emerald-700">RWF {grandTotal.toLocaleString()}</strong></p>
+                    <p className="text-gray-600">Total cost: <strong className="text-green-700">RWF {grandTotal.toLocaleString()}</strong></p>
                   </div>
                 )
               })()}
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">Cancel</Button>
               <Button
                 onClick={exportToExcel}
                 disabled={exporting}
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                className="rounded-lg bg-green-600 hover:bg-green-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
                 {exporting ? 'Exporting...' : 'Excel'}
@@ -1677,7 +1676,7 @@ export default function DiseaseManagementPage() {
               <Button
                 onClick={exportToPDF}
                 disabled={exporting}
-                className="col-span-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white gap-2"
+                className="col-span-2 bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <FileText className="h-4 w-4" />
                 {exporting ? 'Exporting...' : 'Export PDF'}

@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
-import { put } from "@vercel/blob"
 import { getCurrentUser } from "@/lib/auth"
 import clientPromise from "@/lib/db"
 import { deleteStorageFile } from "@/lib/storage-cleanup"
@@ -42,17 +41,33 @@ export async function POST(req: NextRequest) {
     await deleteStorageFile(existing?.bannerImage)
 
     const ext = file.name.split(".").pop() ?? "jpg"
-    const filename = `banners/banner-system-${Date.now()}.${ext}`
+    const filename = `banner-system-${Date.now()}.${ext}`
 
-    const blob = await put(filename, file, { access: "public" })
+    let bannerUrl: string
+
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      // Production: upload to Vercel Blob
+      const { put } = await import("@vercel/blob")
+      const blob = await put(`banners/${filename}`, file, { access: "public" })
+      bannerUrl = blob.url
+    } else {
+      // Development: save to public/banners/
+      const { writeFile, mkdir } = await import("fs/promises")
+      const { join } = await import("path")
+      const dir = join(process.cwd(), "public", "banners")
+      await mkdir(dir, { recursive: true })
+      const bytes = await file.arrayBuffer()
+      await writeFile(join(dir, filename), Buffer.from(bytes))
+      bannerUrl = `/banners/${filename}`
+    }
 
     await db.collection("system_settings").updateOne(
       globalFilter,
-      { $set: { bannerImage: blob.url, updatedAt: new Date() } },
+      { $set: { bannerImage: bannerUrl, updatedAt: new Date() } },
       { upsert: true }
     )
 
-    return NextResponse.json({ success: true, bannerImage: blob.url })
+    return NextResponse.json({ success: true, bannerImage: bannerUrl })
   } catch (error) {
     console.error("Banner upload error:", error)
     return NextResponse.json({ success: false, message: "Upload failed" }, { status: 500 })

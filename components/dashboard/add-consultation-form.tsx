@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState } from "react"
 import { bookConsultation } from "@/lib/actions"
 import { Button } from "@/components/ui/button"
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
+import { PawPrint } from "lucide-react"
 
 interface Doctor {
   _id: string
@@ -17,23 +19,42 @@ interface Doctor {
   phone: string
 }
 
+interface SickAnimal {
+  _id: string
+  name: string
+  type: string
+  breed: string
+}
+
 interface AddConsultationFormProps {
   doctors: Doctor[]
   farmerId: string
+  sickAnimals: SickAnimal[]
   onSuccess: () => void
   onCancel: () => void
 }
 
-export default function AddConsultationForm({ doctors, farmerId, onSuccess, onCancel }: AddConsultationFormProps) {
+export default function AddConsultationForm({ doctors, farmerId, sickAnimals, onSuccess, onCancel }: AddConsultationFormProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedAnimalId, setSelectedAnimalId] = useState<string>("")
+
+  const selectedAnimal = sickAnimals.find(a => a._id === selectedAnimalId) ?? null
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     const formData = new FormData(e.currentTarget)
+
+    // Inject selected animal metadata into form data
+    if (selectedAnimal) {
+      formData.set("animalId",   selectedAnimal._id)
+      formData.set("animalName", selectedAnimal.name)
+      formData.set("animalType", selectedAnimal.type)
+      formData.set("animalBreed", selectedAnimal.breed ?? "")
+    }
 
     try {
       const result = await bookConsultation(formData, farmerId)
@@ -62,6 +83,35 @@ export default function AddConsultationForm({ doctors, farmerId, onSuccess, onCa
         <div className="space-y-1.5">
           <Label htmlFor="add-phoneNumber">{t('farmer.phoneNumber')}</Label>
           <Input id="add-phoneNumber" name="phoneNumber" placeholder={t('farmer.enterPhoneNumber')} required />
+        </div>
+
+        {/* Sick animal selector — spans full width */}
+        <div className="space-y-1.5 md:col-span-2">
+          <Label htmlFor="add-animal" className="flex items-center gap-1.5">
+            <PawPrint className="h-3.5 w-3.5 text-amber-600" />
+            {t('farmer.sickAnimal')}
+          </Label>
+          {sickAnimals.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              <PawPrint className="h-4 w-4 flex-shrink-0" />
+              {t('farmer.noSickAnimals')}
+            </div>
+          ) : (
+            <Select value={selectedAnimalId} onValueChange={setSelectedAnimalId} required>
+              <SelectTrigger id="add-animal">
+                <SelectValue placeholder={t('farmer.selectSickAnimal')} />
+              </SelectTrigger>
+              <SelectContent>
+                {sickAnimals.map((a) => (
+                  <SelectItem key={a._id} value={a._id}>
+                    {a.name}
+                    {a.type  ? ` · ${a.type}`  : ""}
+                    {a.breed ? ` (${a.breed})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -114,7 +164,11 @@ export default function AddConsultationForm({ doctors, farmerId, onSuccess, onCa
         <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
           {t('farmer.cancel')}
         </Button>
-        <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          className="bg-green-600 hover:bg-green-700 text-white"
+          disabled={isSubmitting || (sickAnimals.length > 0 && !selectedAnimalId)}
+        >
           {isSubmitting ? t('farmer.booking') : t('farmer.bookConsultation')}
         </Button>
       </div>

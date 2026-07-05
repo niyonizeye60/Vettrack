@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
@@ -379,60 +379,58 @@ export default function WasteManagementPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-green-200 border-t-green-600 rounded-full animate-spin" />
     </div>
   )
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl">
-          <Trash2 className="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Waste Management</h1>
-          <p className="text-sm text-gray-500">Track and manage farm waste disposal</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Waste Management</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Track and manage farm waste disposal</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-emerald-100 uppercase font-medium">Total Quantity</p>
-              <p className="text-2xl font-bold">{totalQuantity.toFixed(1)}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Total Quantity</p>
+              <Weight className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Weight className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-gray-900 mt-2">{totalQuantity.toFixed(1)}</h3>
+            <p className="text-xs text-gray-400 mt-1">All time</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-orange-500 to-amber-500 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-orange-100 uppercase font-medium">Home Used</p>
-              <p className="text-2xl font-bold">{totalConsumed.toFixed(1)}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Home Used</p>
+              <Trash2 className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Trash2 className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-orange-600 mt-2">{totalConsumed.toFixed(1)}</h3>
+            <p className="text-xs text-gray-400 mt-1">Not sold</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-sky-500 to-blue-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-sky-100 uppercase font-medium">Sold</p>
-              <p className="text-xl font-bold">{totalSold.toFixed(1)}</p>
-              <p className="text-xs text-sky-100">RWF {totalRevenue.toLocaleString()}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Sold</p>
+              <BarChart3 className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <BarChart3 className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-green-600 mt-2">{totalSold.toFixed(1)}</h3>
+            <p className="text-xs text-gray-400 mt-1">RWF {totalRevenue.toLocaleString()}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-md bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-purple-100 uppercase font-medium">Waste Types</p>
-              <p className="text-2xl font-bold">{totalByType.length}</p>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">Waste Types</p>
+              <Trash2 className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <Trash2 className="h-8 w-8 text-white/40" />
+            <h3 className="text-3xl font-bold text-blue-600 mt-2">{totalByType.length}</h3>
+            <p className="text-xs text-gray-400 mt-1">Distinct types</p>
           </CardContent>
         </Card>
       </div>
@@ -446,10 +444,10 @@ export default function WasteManagementPage() {
 
         {/* RECORD TAB */}
         <TabsContent value="record">
-          <Card className="border-0 shadow-xl bg-white/90">
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                <div className="w-2 h-2 bg-green-500 rounded-full" />
                 {editRecord ? "Edit Waste Record" : "New Waste Record"}
               </CardTitle>
             </CardHeader>
@@ -503,7 +501,7 @@ export default function WasteManagementPage() {
                             type="checkbox"
                             checked={wasteType.includes(w)}
                             onChange={() => setWasteType(prev => prev.includes(w) ? prev.filter(t => t !== w) : [...prev, w])}
-                            className="accent-emerald-600 h-4 w-4"
+                            className="accent-green-600 h-4 w-4"
                           />
                           <span className="text-sm">{w}</span>
                         </label>
@@ -539,7 +537,7 @@ export default function WasteManagementPage() {
                   <label className="text-sm font-medium text-gray-700">Home Use <span className="text-gray-400 text-xs">optional</span></label>
                   <Input type="number" min="0" step="0.1" placeholder="e.g. 10" value={homeConsumption} onChange={e => setHomeConsumption(e.target.value)} />
                   {quantity && homeConsumption && (
-                    <p className="text-xs text-sky-600">Sold: {Math.max(0, Number(quantity) - Number(homeConsumption)).toFixed(1)}</p>
+                    <p className="text-xs text-green-600">Sold: {Math.max(0, Number(quantity) - Number(homeConsumption)).toFixed(1)}</p>
                   )}
                 </div>
 
@@ -552,7 +550,7 @@ export default function WasteManagementPage() {
                 {/* Total amount */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">Total Amount (RWF) <span className="text-gray-400 text-xs">auto-calculated</span></label>
-                  <Input type="number" min="0" placeholder="Auto-calculated" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} className="bg-emerald-50" />
+                  <Input type="number" min="0" placeholder="Auto-calculated" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} className="bg-green-50" />
                 </div>
 
                 {/* Disposal Method */}
@@ -582,10 +580,10 @@ export default function WasteManagementPage() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleSubmit} disabled={saving} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl px-6">
+                <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
                   {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
                 </Button>
-                {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-xl">Cancel</Button>}
+                {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>}
               </div>
             </CardContent>
           </Card>
@@ -593,7 +591,7 @@ export default function WasteManagementPage() {
 
         {/* HISTORY TAB */}
         <TabsContent value="history">
-          <Card className="border-0 shadow-xl bg-white/90">
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-sky-500 rounded-full" />
@@ -613,7 +611,7 @@ export default function WasteManagementPage() {
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-1">
                   <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}</p>
-                  <Button variant="outline" onClick={() => { setFilterType(""); setFilterMonth("") }} className="rounded-xl ml-auto text-xs">Clear</Button>
+                  <Button variant="outline" onClick={() => { setFilterType(""); setFilterMonth("") }} className="rounded-lg ml-auto text-xs">Clear</Button>
                 </div>
               </div>
 
@@ -648,7 +646,7 @@ export default function WasteManagementPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">{r.animalName || <span className="text-gray-400">General</span>}</TableCell>
-                        <TableCell className="font-semibold text-emerald-700">{r.quantity} {r.unit}</TableCell>
+                        <TableCell className="font-semibold text-green-700">{r.quantity} {r.unit}</TableCell>
                         <TableCell className="text-orange-600">{r.homeConsumption ? `${r.homeConsumption} ${r.unit}` : "—"}</TableCell>
                         <TableCell className="text-sky-700 font-medium">{(() => { const s = r.soldQuantity ?? Math.max(0, r.quantity - (r.homeConsumption || 0)); return s > 0 ? `${s.toFixed(1)} ${r.unit}` : "—" })()}</TableCell>
                         <TableCell>{r.pricePerUnit ? r.pricePerUnit : "—"}</TableCell>
@@ -657,8 +655,8 @@ export default function WasteManagementPage() {
                         <TableCell className="text-sm text-gray-500 max-w-[120px] truncate">{r.notes || "—"}</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r)} className="h-8 w-8 p-0 hover:bg-emerald-50">
-                              <Pencil className="h-3.5 w-3.5 text-emerald-600" />
+                            <Button size="sm" variant="ghost" onClick={() => handleEdit(r)} className="h-8 w-8 p-0 hover:bg-green-50">
+                              <Pencil className="h-3.5 w-3.5 text-green-600" />
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setDeleteId(r._id)} className="h-8 w-8 p-0 hover:bg-red-50">
                               <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -681,13 +679,13 @@ export default function WasteManagementPage() {
             <div className="flex justify-end">
               <Button
                 onClick={() => setExportOpen(true)}
-                className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl gap-2"
+                className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <Download className="h-4 w-4" />
                 Export Report
               </Button>
             </div>
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-amber-500 rounded-full" />
@@ -711,7 +709,7 @@ export default function WasteManagementPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-xl bg-white/90">
+            <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
@@ -736,7 +734,7 @@ export default function WasteManagementPage() {
                           <TableCell>
                             <Badge variant="outline" className={WASTE_COLORS[row.type] || WASTE_COLORS.Other}>{row.type}</Badge>
                           </TableCell>
-                          <TableCell className="font-semibold text-emerald-700">{row.quantity.toFixed(1)}</TableCell>
+                          <TableCell className="font-semibold text-green-700">{row.quantity.toFixed(1)}</TableCell>
                           <TableCell>{filteredRecords.filter(r => {
                             const types = Array.isArray(r.wasteType) ? r.wasteType : r.wasteType.split(", ").map(s => s.trim())
                             return types.includes(row.type)
@@ -757,26 +755,26 @@ export default function WasteManagementPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-emerald-600" />
+              <FileText className="h-5 w-5 text-green-600" />
               Export Waste Management Report
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="p-3 bg-green-50 rounded-xl border border-green-100">
               <div className="text-sm space-y-1">
-                <p className="font-medium text-emerald-700">Preview</p>
+                <p className="font-medium text-green-700">Preview</p>
                 <p className="text-gray-600">
                   {filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""} &bull; {totalQuantity.toFixed(1)} total quantity &bull; {totalByType.length} waste type{totalByType.length !== 1 ? "s" : ""}
                 </p>
-                <p className="text-gray-600">Revenue: <strong className="text-emerald-700">RWF {totalRevenue.toLocaleString()}</strong></p>
+                <p className="text-gray-600">Revenue: <strong className="text-green-700">RWF {totalRevenue.toLocaleString()}</strong></p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">Cancel</Button>
               <Button
                 onClick={exportToExcel}
                 disabled={exporting || filteredRecords.length === 0}
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                className="rounded-lg bg-green-600 hover:bg-green-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
                 {exporting ? "Exporting..." : "Excel"}
@@ -784,7 +782,7 @@ export default function WasteManagementPage() {
               <Button
                 onClick={exportToPDF}
                 disabled={exporting || filteredRecords.length === 0}
-                className="col-span-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl gap-2"
+                className="col-span-2 bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <FileText className="h-4 w-4" />
                 {exporting ? "Exporting..." : "Export PDF"}
