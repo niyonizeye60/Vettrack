@@ -937,7 +937,7 @@ export default function DiseaseManagementPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{t('farmer.diseases')}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Track illnesses, treatment doses, and costs per animal</p>
+        <p className="text-sm text-gray-500 mt-0.5">{t('farmer.diseasesDesc')}</p>
       </div>
 
       {/* Summary Cards */}
@@ -945,51 +945,51 @@ export default function DiseaseManagementPage() {
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Total Cases</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.totalCases')}</p>
               <Activity className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-gray-900 mt-2">{records.length}</h3>
-            <p className="text-xs text-gray-400 mt-1">All time</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.allTime')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Active</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.activeDisease')}</p>
               <AlertCircle className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-orange-600 mt-2">{activeCount}</h3>
-            <p className="text-xs text-gray-400 mt-1">Needs attention</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.needsAttention')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">In Treatment</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.inTreatment')}</p>
               <Clock className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-green-600 mt-2">{underTreatmentCount}</h3>
-            <p className="text-xs text-gray-400 mt-1">In progress</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.inProgress')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Total Cost (RWF)</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.totalCostRWF')}</p>
               <DollarSign className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-blue-600 mt-2">{totalTreatmentCost.toLocaleString()}</h3>
-            <p className="text-xs text-gray-400 mt-1">Cumulative spend</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.cumulativeSpend')}</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="record">
         <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> Record</TabsTrigger>
-          <TabsTrigger value="doses" className="flex items-center gap-1"><Syringe className="h-4 w-4" /> Doses</TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> History</TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> Reports</TabsTrigger>
+          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> {t('farmer.tabRecord')}</TabsTrigger>
+          <TabsTrigger value="doses" className="flex items-center gap-1"><Syringe className="h-4 w-4" /> {t('farmer.tabDoses')}</TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> {t('farmer.tabHistory')}</TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> {t('farmer.tabReports')}</TabsTrigger>
         </TabsList>
 
         {/* ── RECORD TAB ── */}
@@ -998,16 +998,16 @@ export default function DiseaseManagementPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-red-500 rounded-full" />
-                {editRecord ? "Edit Disease Record" : "New Disease Record"}
+                {editRecord ? t('farmer.editDiseaseRecord') : t('farmer.newDiseaseRecord')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Animal *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.animal')} *</label>
                   <Select value={animalId} onValueChange={setAnimalId}>
                     <SelectTrigger className={errors.animalId ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select animal..." />
+                      <SelectValue placeholder={t('farmer.selectAnimal')} />
                     </SelectTrigger>
                     <SelectContent>
                       {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
@@ -1017,7 +1017,7 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Insurance ID <span className="text-gray-400 text-xs">auto-detected</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
                     value={insuranceId || (animalId ? "No insurance registered" : "Select an animal first")}
@@ -1026,7 +1026,7 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Ear Tag ID <span className="text-gray-400 text-xs">auto-detected</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
                     value={earTagId || (animalId ? "No ear tag registered" : "Select an animal first")}
@@ -1035,10 +1035,10 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Disease *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.disease')} *</label>
                   <Select value={diseaseName} onValueChange={setDiseaseName}>
                     <SelectTrigger className={errors.diseaseName ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select disease..." />
+                      <SelectValue placeholder={t('farmer.disease')} />
                     </SelectTrigger>
                     <SelectContent>
                       {COMMON_DISEASES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
@@ -1049,13 +1049,13 @@ export default function DiseaseManagementPage() {
 
                 {diseaseName === "Other" && (
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Specify Disease *</label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.specifyDisease')} *</label>
                     <Input placeholder="Enter disease name..." value={customDisease} onChange={e => setCustomDisease(e.target.value)} className={errors.diseaseName ? "border-red-500" : ""} />
                   </div>
                 )}
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Status *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.status')} *</label>
                   <Select value={status} onValueChange={setStatus}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1065,21 +1065,21 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Diagnosed Date *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.diagnosedDate')} *</label>
                   <Input type="date" value={diagnosedDate} onChange={e => setDiagnosedDate(e.target.value)} className={errors.diagnosedDate ? "border-red-500" : ""} />
                   {errors.diagnosedDate && <p className="text-xs text-red-500">{errors.diagnosedDate}</p>}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Resolved Date <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.resolvedDate')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="date" value={resolvedDate} onChange={e => setResolvedDate(e.target.value)} min={diagnosedDate} />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Veterinarian <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.veterinarian')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Select value={veterinarianName || "none"} onValueChange={v => setVeterinarianName(v === "none" ? "" : v)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select veterinarian..." />
+                      <SelectValue placeholder={t('farmer.veterinarian')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">— Not assigned —</SelectItem>
@@ -1093,30 +1093,30 @@ export default function DiseaseManagementPage() {
                 </div>
 
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Vet Origin / Organization <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.vetOrigin')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input placeholder="e.g. RAB, MINAGRI, Private Clinic" value={vetOrigin} onChange={e => setVetOrigin(e.target.value)} />
 
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Symptoms <span className="text-gray-400 text-xs">optional</span></label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.symptoms')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                     <Input placeholder="e.g. fever, loss of appetite, swollen joints..." value={symptoms} onChange={e => setSymptoms(e.target.value)} />
                   </div>
 
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Treatment <span className="text-gray-400 text-xs">optional</span></label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.treatment')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                     <Input placeholder="e.g. antibiotics, vaccination, isolation..." value={treatment} onChange={e => setTreatment(e.target.value)} />
                   </div>
 
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Notes <span className="text-gray-400 text-xs">optional</span></label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                     <Input placeholder="Any additional observations..." value={notes} onChange={e => setNotes(e.target.value)} />
                   </div>
                 </div>
 
                 <div className="flex gap-3 pt-2">
                   <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
-                    {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
+                    {saving ? t('farmer.savingRecord') : editRecord ? t('farmer.updateRecord') : t('farmer.saveRecord')}
                   </Button>
-                  {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>}
+                  {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">{t('farmer.cancel')}</Button>}
                 </div>
               </div>
             </CardContent>
@@ -1131,17 +1131,17 @@ export default function DiseaseManagementPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                  {editDose ? "Edit Treatment Dose" : "Log Treatment Dose"}
+                  {editDose ? t('farmer.editTreatmentDose') : t('farmer.logTreatmentDose')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Disease case selector */}
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Disease Case *</label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.diseaseCase')} *</label>
                     <Select value={doseRecordId} onValueChange={setDoseRecordId}>
                       <SelectTrigger className={doseErrors.doseRecordId ? "border-red-500" : ""}>
-                        <SelectValue placeholder="Select disease case..." />
+                        <SelectValue placeholder={t('farmer.diseaseCase')} />
                       </SelectTrigger>
                       <SelectContent>
                         {records.filter(r => r.status === "Under Treatment").map(r => (
@@ -1156,17 +1156,17 @@ export default function DiseaseManagementPage() {
 
                   {/* Date */}
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">Date *</label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.date')} *</label>
                     <Input type="date" value={doseDate} onChange={e => setDoseDate(e.target.value)} className={doseErrors.doseDate ? "border-red-500" : ""} />
                     {doseErrors.doseDate && <p className="text-xs text-red-500">{doseErrors.doseDate}</p>}
                   </div>
 
                   {/* Session */}
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">Session *</label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.session')} *</label>
                     <Select value={doseSession} onValueChange={setDoseSession}>
                       <SelectTrigger className={doseErrors.doseSession ? "border-red-500" : ""}>
-                        <SelectValue placeholder="Morning / Evening" />
+                        <SelectValue placeholder={t('farmer.session')} />
                       </SelectTrigger>
                       <SelectContent>
                         {SESSIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -1178,7 +1178,7 @@ export default function DiseaseManagementPage() {
                   {/* Medicines administered */}
                   <div className="space-y-2 md:col-span-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium text-gray-700">Medicines Administered *</label>
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.medicinesAdministered')} *</label>
                       <Button type="button" size="sm" variant="outline" onClick={addMedicineRow} className="h-7 text-xs gap-1 rounded-lg">
                         <Plus className="h-3 w-3" /> Add Medicine
                       </Button>
@@ -1201,19 +1201,19 @@ export default function DiseaseManagementPage() {
 
                   {/* Vet cost */}
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">Vet Cost (RWF) <span className="text-gray-400 text-xs">optional</span></label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.vetCost')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                     <Input type="number" min="0" placeholder="0" value={vetCost} onChange={e => setVetCost(e.target.value)} />
                   </div>
 
                   {/* Auto total */}
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">Total Cost (RWF)</label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.totalCostRWF')}</label>
                     <Input readOnly value={(medicinesTotalCost + (Number(vetCost) || 0)).toLocaleString()} className="bg-green-50 font-semibold text-green-700" />
                   </div>
 
                   {/* Notes */}
                   <div className="space-y-1 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Notes <span className="text-gray-400 text-xs">optional</span></label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                     <Input placeholder="Any observations for this dose..." value={doseNotes} onChange={e => setDoseNotes(e.target.value)} />
                   </div>
                 </div>
@@ -1222,7 +1222,7 @@ export default function DiseaseManagementPage() {
                   <Button onClick={handleDoseSubmit} disabled={savingDose} className="bg-orange-500 hover:bg-orange-600 text-white rounded-lg px-6">
                     {savingDose ? "Saving..." : editDose ? "Update Dose" : "Log Dose"}
                   </Button>
-                  {editDose && <Button variant="outline" onClick={resetDoseForm} className="rounded-lg">Cancel</Button>}
+                  {editDose && <Button variant="outline" onClick={resetDoseForm} className="rounded-lg">{t('farmer.cancel')}</Button>}
                 </div>
               </CardContent>
             </Card>
@@ -1237,10 +1237,10 @@ export default function DiseaseManagementPage() {
                   </CardTitle>
                   <Select value={filterDoseRecord || "all"} onValueChange={v => setFilterDoseRecord(v === "all" ? "" : v)}>
                     <SelectTrigger className="w-72">
-                      <SelectValue placeholder="Filter by case..." />
+                      <SelectValue placeholder={t('farmer.diseaseCase')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Cases</SelectItem>
+                      <SelectItem value="all">{t('farmer.allCases')}</SelectItem>
                       {records.map(r => (
                         <SelectItem key={r._id} value={r._id}>
                           {r.animalName} — {r.diseaseName}
@@ -1255,15 +1255,15 @@ export default function DiseaseManagementPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>{t('farmer.date')}</TableHead>
                         <TableHead>Session</TableHead>
-                        <TableHead>Animal</TableHead>
-                        <TableHead>Disease</TableHead>
+                        <TableHead>{t('farmer.animal')}</TableHead>
+                        <TableHead>{t('farmer.disease')}</TableHead>
                         <TableHead>Medicines</TableHead>
                         <TableHead>Med. Cost</TableHead>
                         <TableHead>Vet Cost</TableHead>
                         <TableHead>Total</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>{t('farmer.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1325,22 +1325,22 @@ export default function DiseaseManagementPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                Disease History
+                {t('farmer.diseaseHistory')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl">
                 <Select value={filterStatus || "all"} onValueChange={v => setFilterStatus(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('farmer.allStatuses')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="all">{t('farmer.allStatuses')}</SelectItem>
                     {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterAnimal || "all"} onValueChange={v => setFilterAnimal(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="All Animals" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('farmer.allAnimals')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Animals</SelectItem>
+                    <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
                     {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -1355,20 +1355,20 @@ export default function DiseaseManagementPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Animal</TableHead>
-                      <TableHead>Disease</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{t('farmer.animal')}</TableHead>
+                      <TableHead>{t('farmer.disease')}</TableHead>
+                      <TableHead>{t('farmer.status')}</TableHead>
                       <TableHead>Diagnosed</TableHead>
                       <TableHead>Resolved</TableHead>
                       <TableHead>Veterinarian</TableHead>
                       <TableHead>Vet Origin</TableHead>
-                      <TableHead>Treatment</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('farmer.treatment')}</TableHead>
+                      <TableHead>{t('farmer.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRecords.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-400">No records found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
                     ) : filteredRecords.map(r => (
                       <TableRow key={r._id}>
                         <TableCell className="font-medium">{r.animalName || "—"}</TableCell>
@@ -1423,10 +1423,10 @@ export default function DiseaseManagementPage() {
                   </CardTitle>
                   <Select value={reportCaseId || "all"} onValueChange={v => setReportCaseId(v === "all" ? "" : v)}>
                     <SelectTrigger className="w-full sm:w-80">
-                      <SelectValue placeholder="All cases" />
+                      <SelectValue placeholder={t('farmer.allCases')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Cases</SelectItem>
+                      <SelectItem value="all">{t('farmer.allCases')}</SelectItem>
                       {records.map(r => (
                         <SelectItem key={r._id} value={r._id}>
                           {r.animalName} — {r.diseaseName}
@@ -1457,7 +1457,7 @@ export default function DiseaseManagementPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Date</TableHead>
+                            <TableHead>{t('farmer.date')}</TableHead>
                             <TableHead>Morning Doses</TableHead>
                             <TableHead>Morning Cost</TableHead>
                             <TableHead>Evening Doses</TableHead>
@@ -1542,11 +1542,11 @@ export default function DiseaseManagementPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Animal</TableHead>
+                          <TableHead>{t('farmer.animal')}</TableHead>
                           <TableHead>Total Doses</TableHead>
                           <TableHead>Medicine Cost (RWF)</TableHead>
                           <TableHead>Vet Cost (RWF)</TableHead>
-                          <TableHead>Total Cost (RWF)</TableHead>
+                          <TableHead>{t('farmer.totalCostRWF')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1625,16 +1625,16 @@ export default function DiseaseManagementPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-red-500" />
-              Export Disease Report
+              {t('farmer.exportDiseaseReport')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Disease Case</label>
+              <label className="text-sm font-medium text-gray-700">{t('farmer.diseaseCase')}</label>
               <Select value={exportCaseId} onValueChange={setExportCaseId}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Cases</SelectItem>
+                  <SelectItem value="all">{t('farmer.allCases')}</SelectItem>
                   {records.map(r => (
                     <SelectItem key={r._id} value={r._id}>
                       {r.animalName} — {r.diseaseName} ({r.status})
@@ -1664,7 +1664,7 @@ export default function DiseaseManagementPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">Cancel</Button>
+              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
               <Button
                 onClick={exportToExcel}
                 disabled={exporting}
@@ -1694,7 +1694,7 @@ export default function DiseaseManagementPage() {
             <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1708,7 +1708,7 @@ export default function DiseaseManagementPage() {
             <AlertDialogDescription>Are you sure you want to delete this dose entry? This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteDoseId && handleDeleteDose(deleteDoseId)} className="bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

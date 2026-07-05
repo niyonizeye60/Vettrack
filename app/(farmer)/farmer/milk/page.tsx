@@ -528,8 +528,8 @@ export default function MilkProductionPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Milk Production</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Record and track daily milk production</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('farmer.milk')}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t('farmer.milkProductionDesc')}</p>
       </div>
 
       {/* Summary Cards */}
@@ -537,27 +537,27 @@ export default function MilkProductionPage() {
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Total Produced</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.totalProduced')}</p>
               <Droplets className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-gray-900 mt-2">{totalLiters.toFixed(1)}L</h3>
-            <p className="text-xs text-gray-400 mt-1">All time</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.allTime')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Home Consumed</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.homeConsumed')}</p>
               <Milk className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-orange-600 mt-2">{totalConsumed.toFixed(1)}L</h3>
-            <p className="text-xs text-gray-400 mt-1">Not sold</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.notSold')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Sold</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.sold')}</p>
               <DollarSign className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-green-600 mt-2">{totalSold.toFixed(1)}L</h3>
@@ -567,20 +567,20 @@ export default function MilkProductionPage() {
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Avg / Day</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.avgPerDay')}</p>
               <TrendingUp className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-blue-600 mt-2">{avgPerDay}L</h3>
-            <p className="text-xs text-gray-400 mt-1">Daily average</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.dailyAverage')}</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="record">
         <TabsList className="grid grid-cols-3 w-full max-w-md">
-          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> Record</TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> History</TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> Reports</TabsTrigger>
+          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> {t('farmer.tabRecord')}</TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> {t('farmer.tabHistory')}</TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> {t('farmer.tabReports')}</TabsTrigger>
         </TabsList>
 
         {/* RECORD TAB */}
@@ -589,17 +589,17 @@ export default function MilkProductionPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-green-500 rounded-full" />
-                {editRecord ? "Edit Milk Record" : "New Milk Record"}
+                {editRecord ? t('farmer.editMilkRecord') : t('farmer.newMilkRecord')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Cow */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Cow *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.cow')} *</label>
                   <Select value={cowId} onValueChange={setCowId}>
                     <SelectTrigger className={errors.cowId ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select cow..." />
+                      <SelectValue placeholder={t('farmer.cow')} />
                     </SelectTrigger>
                     <SelectContent>
                       {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
@@ -610,13 +610,13 @@ export default function MilkProductionPage() {
 
                 {/* Session */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Session *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.session')} *</label>
                   <Select value={session} onValueChange={setSession}>
                     <SelectTrigger className={errors.session ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select session..." />
+                      <SelectValue placeholder={t('farmer.session')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {SESSIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {SESSIONS.map(s => <SelectItem key={s} value={s}>{s === 'Morning' ? t('farmer.morning') : t('farmer.evening')}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {errors.session && <p className="text-xs text-red-500">{errors.session}</p>}
@@ -624,14 +624,14 @@ export default function MilkProductionPage() {
 
                 {/* Liters */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Milk Quantity (Liters) *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.milkQuantityLiters')} *</label>
                   <Input type="number" min="0" step="0.1" placeholder="e.g. 12.5" value={liters} onChange={e => setLiters(e.target.value)} className={errors.liters ? "border-red-500" : ""} />
                   {errors.liters && <p className="text-xs text-red-500">{errors.liters}</p>}
                 </div>
 
                 {/* Home Consumption */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Home Consumption (Liters) <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.homeConsumptionLiters')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" step="0.1" placeholder="e.g. 2" value={homeConsumption} onChange={e => setHomeConsumption(e.target.value)} />
                   {liters && homeConsumption && (
                     <p className="text-xs text-green-600">Sold: {Math.max(0, Number(liters) - Number(homeConsumption)).toFixed(1)}L</p>
@@ -640,19 +640,19 @@ export default function MilkProductionPage() {
 
                 {/* Price per liter */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Price per Liter (RWF) <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.pricePerLiter')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" placeholder="e.g. 500" value={pricePerLiter} onChange={e => setPricePerLiter(e.target.value)} />
                 </div>
 
                 {/* Total amount */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Total Amount (RWF) <span className="text-gray-400 text-xs">auto-calculated</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.totalAmount')} <span className="text-gray-400 text-xs">{t('farmer.autoCalculated')}</span></label>
                   <Input type="number" min="0" placeholder="Auto-calculated" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} className="bg-green-50" />
                 </div>
 
                 {/* Insurance ID */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Insurance ID <span className="text-gray-400 text-xs">auto-detected</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
                     value={insuranceId || (cowId ? "No insurance registered" : "Select a cow first")}
@@ -662,7 +662,7 @@ export default function MilkProductionPage() {
 
                 {/* Ear Tag ID */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Ear Tag ID <span className="text-gray-400 text-xs">auto-detected</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
                     value={earTagId || (cowId ? "No ear tag registered" : "Select a cow first")}
@@ -672,51 +672,51 @@ export default function MilkProductionPage() {
 
                 {/* Date */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Date *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.date')} *</label>
                   <Input type="date" value={date} onChange={e => setDate(e.target.value)} className={errors.date ? "border-red-500" : ""} />
                   {errors.date && <p className="text-xs text-red-500">{errors.date}</p>}
                 </div>
 
                 {/* Time */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Time <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.time')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="time" value={time} onChange={e => setTime(e.target.value)} />
                 </div>
 
                 {/* Water Intake */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Water Intake (Liters) <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.waterIntake')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" step="0.5" placeholder="e.g. 40" value={waterLiters} onChange={e => setWaterLiters(e.target.value)} />
                 </div>
 
                 {/* Food Type */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Food Type <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.foodType')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input placeholder="e.g. Hay, Silage, Grass, Concentrate" value={foodType} onChange={e => setFoodType(e.target.value)} />
                 </div>
 
                 {/* Food Eaten (KGs) */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Food Eaten (KGs) <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.foodEaten')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" step="0.1" placeholder="e.g. 15" value={foodKg} onChange={e => setFoodKg(e.target.value)} />
                 </div>
 
                 {/* Food Cost */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Food Cost (RWF) <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.foodCost')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" step="0.01" placeholder="e.g. 3000" value={foodCost} onChange={e => setFoodCost(e.target.value)} />
                 </div>
 
                 {/* Notes */}
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Notes <span className="text-gray-400 text-xs">optional</span></label>
-                  <Input placeholder="Any observations..." value={notes} onChange={e => setNotes(e.target.value)} />
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                  <Input placeholder={t('farmer.anyObservations')} value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
-                  {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
+                  {saving ? t('farmer.savingRecord') : editRecord ? t('farmer.updateRecord') : t('farmer.saveRecord')}
                 </Button>
                 {editRecord && (
                   <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>
@@ -732,24 +732,24 @@ export default function MilkProductionPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                Milk History
+                {t('farmer.milkHistory')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Filters */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-gray-50 rounded-xl">
                 <Select value={filterCow || "all"} onValueChange={v => setFilterCow(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="All Cows" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('farmer.allCows')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Cows</SelectItem>
+                    <SelectItem value="all">{t('farmer.allCows')}</SelectItem>
                     {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterSession || "all"} onValueChange={v => setFilterSession(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="All Sessions" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('farmer.allSessions')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Sessions</SelectItem>
-                    {SESSIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    <SelectItem value="all">{t('farmer.allSessions')}</SelectItem>
+                    {SESSIONS.map(s => <SelectItem key={s} value={s}>{s === 'Morning' ? t('farmer.morning') : t('farmer.evening')}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Input type="month" value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setFilterStart(""); setFilterEnd("") }} />
@@ -757,7 +757,7 @@ export default function MilkProductionPage() {
                 <Input type="date" value={filterEnd} onChange={e => { setFilterEnd(e.target.value); setFilterMonth("") }} placeholder="End date" />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-3 lg:col-span-5">
                   <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""} found</p>
-                  <Button variant="outline" onClick={clearFilters} className="rounded-lg ml-auto">Clear Filters</Button>
+                  <Button variant="outline" onClick={clearFilters} className="rounded-lg ml-auto">{t('farmer.clearFilters')}</Button>
                 </div>
               </div>
 
@@ -766,24 +766,24 @@ export default function MilkProductionPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Cow</TableHead>
-                      <TableHead>Session</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Home Use</TableHead>
-                      <TableHead>Home Use Value (RWF)</TableHead>
-                      <TableHead>Sold</TableHead>
-                      <TableHead>Price/L</TableHead>
-                      <TableHead>Revenue (RWF)</TableHead>
-                      <TableHead>Food (KG)</TableHead>
-                      <TableHead>Food Cost (RWF)</TableHead>
-                      <TableHead>Notes</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('farmer.date')}</TableHead>
+                      <TableHead>{t('farmer.cow')}</TableHead>
+                      <TableHead>{t('farmer.session')}</TableHead>
+                      <TableHead>{t('farmer.total')}</TableHead>
+                      <TableHead>{t('farmer.homeUse')}</TableHead>
+                      <TableHead>{t('farmer.homeUseValue')}</TableHead>
+                      <TableHead>{t('farmer.sold')}</TableHead>
+                      <TableHead>{t('farmer.pricePerL')}</TableHead>
+                      <TableHead>{t('farmer.revenue')}</TableHead>
+                      <TableHead>{t('farmer.foodEaten')}</TableHead>
+                      <TableHead>{t('farmer.foodCost')}</TableHead>
+                      <TableHead>{t('farmer.notes')}</TableHead>
+                      <TableHead>{t('farmer.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRecords.length === 0 ? (
-                      <TableRow><TableCell colSpan={13} className="text-center py-8 text-gray-400">No records found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={13} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
                     ) : filteredRecords.map(r => {
                       const sold = r.soldLiters ?? Math.max(0, r.liters - (r.homeConsumption || 0))
                       return (
@@ -792,7 +792,7 @@ export default function MilkProductionPage() {
                           <TableCell className="font-medium">{r.cowName}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={r.session === "Morning" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-700 border-indigo-200"}>
-                              {r.session}
+                              {r.session === 'Morning' ? t('farmer.morning') : t('farmer.evening')}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-semibold text-green-700">{r.liters}L</TableCell>
@@ -841,7 +841,7 @@ export default function MilkProductionPage() {
                 className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <Download className="h-4 w-4" />
-                Export Report
+                {t('farmer.exportReport')}
               </Button>
             </div>
             {/* Per Cow Summary */}
@@ -849,7 +849,7 @@ export default function MilkProductionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                  Production per Cow
+                  {t('farmer.productionPerCow')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -857,16 +857,16 @@ export default function MilkProductionPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Cow</TableHead>
-                        <TableHead>Total (L)</TableHead>
-                        <TableHead>Consumed (L)</TableHead>
-                        <TableHead>Sold (L)</TableHead>
-                        <TableHead>Revenue (RWF)</TableHead>
+                        <TableHead>{t('farmer.cow')}</TableHead>
+                        <TableHead>{t('farmer.total')} (L)</TableHead>
+                        <TableHead>{t('farmer.consumed')} (L)</TableHead>
+                        <TableHead>{t('farmer.sold')} (L)</TableHead>
+                        <TableHead>{t('farmer.revenue')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {cowData.length === 0 ? (
-                        <TableRow><TableCell colSpan={3} className="text-center py-6 text-gray-400">No data</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={3} className="text-center py-6 text-gray-400">{t('farmer.noDataAvailable')}</TableCell></TableRow>
                       ) : cowData.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">{c.name}</TableCell>
@@ -887,7 +887,7 @@ export default function MilkProductionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                  Water Intake &amp; Food Type per Cow
+                  {t('farmer.nutritionPerCow')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -895,16 +895,16 @@ export default function MilkProductionPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Cow</TableHead>
-                        <TableHead>Total Water Intake (L)</TableHead>
-                        <TableHead>Food Types Used</TableHead>
-                        <TableHead>Food Eaten (KG)</TableHead>
-                        <TableHead>Food Cost (RWF)</TableHead>
+                        <TableHead>{t('farmer.cow')}</TableHead>
+                        <TableHead>{t('farmer.totalWaterIntake')}</TableHead>
+                        <TableHead>{t('farmer.foodTypesUsed')}</TableHead>
+                        <TableHead>{t('farmer.foodEaten')}</TableHead>
+                        <TableHead>{t('farmer.foodCost')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {cowData.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-6 text-gray-400">No data</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-6 text-gray-400">{t('farmer.noDataAvailable')}</TableCell></TableRow>
                       ) : cowData.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">{c.name}</TableCell>
@@ -925,12 +925,12 @@ export default function MilkProductionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  Daily Production (Last 14 Days)
+                  {t('farmer.dailyProductionTrend')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {dailyData.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">No data available</div>
+                  <div className="text-center py-8 text-gray-400">{t('farmer.noDataAvailable')}</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={dailyData}>
@@ -950,12 +950,12 @@ export default function MilkProductionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                  Monthly Production Trend
+                  {t('farmer.monthlyProductionTrend')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {monthlyData.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">No data available</div>
+                  <div className="text-center py-8 text-gray-400">{t('farmer.noDataAvailable')}</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={monthlyData}>
@@ -977,7 +977,7 @@ export default function MilkProductionPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                    Production by Cow
+                    {t('farmer.productionByCow')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1003,47 +1003,47 @@ export default function MilkProductionPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-green-600" />
-              Export Milk Production Report
+              {t('farmer.exportMilkReport')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Animal</label>
+              <label className="text-sm font-medium text-gray-700">{t('farmer.animal')}</label>
               <Select value={exportCow} onValueChange={setExportCow}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Animals</SelectItem>
+                  <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
                   {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Report Type</label>
+              <label className="text-sm font-medium text-gray-700">{t('farmer.reportType')}</label>
               <Select value={exportType} onValueChange={v => setExportType(v as "daily" | "monthly" | "total")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Daily Report</SelectItem>
-                  <SelectItem value="monthly">Monthly Report</SelectItem>
-                  <SelectItem value="total">Total Production</SelectItem>
+                  <SelectItem value="daily">{t('farmer.dailyReport')}</SelectItem>
+                  <SelectItem value="monthly">{t('farmer.monthlyReport')}</SelectItem>
+                  <SelectItem value="total">{t('farmer.totalProduction')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {exportType === "daily" && (
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Select Date</label>
+                <label className="text-sm font-medium text-gray-700">{t('farmer.selectDate')}</label>
                 <Input type="date" value={exportDate} onChange={e => setExportDate(e.target.value)} />
               </div>
             )}
 
             {exportType === "monthly" && (
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Select Month</label>
+                <label className="text-sm font-medium text-gray-700">{t('farmer.selectMonth')}</label>
                 <Input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)} />
               </div>
             )}
@@ -1056,7 +1056,7 @@ export default function MilkProductionPage() {
                 const previewRev = preview.reduce((s, r) => s + (r.totalAmount || 0), 0)
                 return (
                   <div className="text-sm space-y-1">
-                    <p className="font-medium text-green-700">Preview</p>
+                    <p className="font-medium text-green-700">{t('farmer.preview')}</p>
                     <p className="text-gray-600">{preview.length} records &bull; {previewLiters.toFixed(1)}L &bull; RWF {previewRev.toLocaleString()}</p>
                   </div>
                 )
@@ -1064,14 +1064,14 @@ export default function MilkProductionPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">Cancel</Button>
+              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
               <Button
                 onClick={exportToExcel}
                 disabled={exporting || getExportRecords().length === 0}
                 className="rounded-lg bg-green-600 hover:bg-green-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
-                {exporting ? 'Exporting...' : 'Excel'}
+                {exporting ? t('farmer.exporting') : t('farmer.exportExcel')}
               </Button>
               <Button
                 onClick={exportToPDF}
@@ -1079,7 +1079,7 @@ export default function MilkProductionPage() {
                 className="col-span-2 bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <FileText className="h-4 w-4" />
-                {exporting ? "Exporting..." : "Export PDF"}
+                {exporting ? t('farmer.exporting') : t('farmer.exportPDF')}
               </Button>
             </div>
           </div>
@@ -1092,7 +1092,7 @@ export default function MilkProductionPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-green-600" />
-              Milk Record Details
+              {t('farmer.milkRecordDetails')}
             </DialogTitle>
           </DialogHeader>
 
@@ -1144,10 +1144,10 @@ export default function MilkProductionPage() {
               <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto pr-2">
 
                 {/* ANIMAL */}
-                <Section title="Animal Information">
-                  <Row label="Animal" value={detailRecord.cowName} />
+                <Section title={t('farmer.animalInformation')}>
+                  <Row label={t('farmer.animal')} value={detailRecord.cowName} />
                   <Row
-                    label="Ear Tag ID"
+                    label={t('farmer.earTagId')}
                     value={
                       animal?.earTagId || (
                         <span className="text-gray-400 italic">Not registered</span>
@@ -1155,7 +1155,7 @@ export default function MilkProductionPage() {
                     }
                   />
                   <Row
-                    label="Insurance ID"
+                    label={t('farmer.insuranceId')}
                     value={
                       animal?.insuranceId || (
                         <span className="text-gray-400 italic">Not registered</span>
@@ -1165,14 +1165,14 @@ export default function MilkProductionPage() {
                 </Section>
 
                 {/* PRODUCTION */}
-                <Section title="Milk Production">
-                  <Row label="Date" value={detailRecord.date} />
+                <Section title={t('farmer.milkProduction')}>
+                  <Row label={t('farmer.date')} value={detailRecord.date} />
                   <Row
-                    label="Time"
+                    label={t('farmer.time')}
                     value={detailRecord.time || <span className="text-gray-400">—</span>}
                   />
                   <Row
-                    label="Session"
+                    label={t('farmer.session')}
                     value={
                       <Badge
                         variant="outline"
@@ -1182,17 +1182,17 @@ export default function MilkProductionPage() {
                             : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                         }
                       >
-                        {detailRecord.session}
+                        {detailRecord.session === 'Morning' ? t('farmer.morning') : t('farmer.evening')}
                       </Badge>
                     }
                   />
                   <Row
-                    label="Total Milk (L)"
+                    label={t('farmer.totalMilk')}
                     value={`${detailRecord.liters} L`}
                     color="text-green-700 font-semibold"
                   />
                   <Row
-                    label="Home Consumed (L)"
+                    label={t('farmer.homeConsumedL')}
                     value={
                       detailRecord.homeConsumption
                         ? `${detailRecord.homeConsumption} L`
@@ -1201,7 +1201,7 @@ export default function MilkProductionPage() {
                     color="text-orange-600"
                   />
                   <Row
-                    label="Sold (L)"
+                    label={t('farmer.soldL')}
                     value={
                       sold > 0 ? `${sold.toFixed(1)} L` : <span className="text-gray-400">—</span>
                     }
@@ -1210,9 +1210,9 @@ export default function MilkProductionPage() {
                 </Section>
 
                 {/* FINANCE */}
-                <Section title="Financial Summary">
+                <Section title={t('farmer.financialSummary')}>
                   <Row
-                    label="Price per Liter (RWF)"
+                    label={t('farmer.pricePerLiterRWF')}
                     value={
                       detailRecord.pricePerLiter
                         ? `RWF ${detailRecord.pricePerLiter}`
@@ -1220,14 +1220,14 @@ export default function MilkProductionPage() {
                     }
                   />
                   <Row
-                    label="Consumed Value (RWF)"
+                    label={t('farmer.consumedValue')}
                     value={
                       consumedValue ? `RWF ${consumedValue}` : <span className="text-gray-400">—</span>
                     }
                     color="text-orange-700"
                   />
                   <Row
-                    label="Total Revenue (RWF)"
+                    label={t('farmer.totalRevenue')}
                     value={
                       detailRecord.totalAmount
                         ? `RWF ${detailRecord.totalAmount.toLocaleString()}`
@@ -1238,9 +1238,9 @@ export default function MilkProductionPage() {
                 </Section>
 
                 {/* FEED */}
-                <Section title="Feed & Notes">
+                <Section title={t('farmer.feedAndNotes')}>
                   <Row
-                    label="Water Intake (L)"
+                    label={t('farmer.waterIntakeL')}
                     value={
                       detailRecord.waterLiters
                         ? `${detailRecord.waterLiters} L`
@@ -1249,11 +1249,11 @@ export default function MilkProductionPage() {
                     color="text-sky-600"
                   />
                   <Row
-                    label="Food Type"
+                    label={t('farmer.foodType')}
                     value={detailRecord.foodType || <span className="text-gray-400">—</span>}
                   />
                   <Row
-                    label="Food Eaten (KGs)"
+                    label={t('farmer.foodEatenKg')}
                     value={
                       detailRecord.foodKg
                         ? `${detailRecord.foodKg} kg`
@@ -1261,7 +1261,7 @@ export default function MilkProductionPage() {
                     }
                   />
                   <Row
-                    label="Food Cost (RWF)"
+                    label={t('farmer.foodCost')}
                     value={
                       detailRecord.foodCost
                         ? `RWF ${detailRecord.foodCost.toLocaleString()}`
@@ -1270,7 +1270,7 @@ export default function MilkProductionPage() {
                     color="text-orange-700"
                   />
                   <Row
-                    label="Notes"
+                    label={t('farmer.notes')}
                     value={detailRecord.notes || <span className="text-gray-400">—</span>}
                   />
                 </Section>
@@ -1285,13 +1285,13 @@ export default function MilkProductionPage() {
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Milk Record</AlertDialogTitle>
+            <AlertDialogTitle>{t('farmer.deleteMilkRecord')}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this milk record? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId && handleDelete(deleteId)}
               className="bg-red-600 hover:bg-red-700 text-white"

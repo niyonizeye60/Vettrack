@@ -387,8 +387,8 @@ export default function WasteManagementPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Waste Management</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Track and manage farm waste disposal</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('farmer.waste')}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t('farmer.wasteDesc')}</p>
       </div>
 
       {/* Summary Cards */}
@@ -396,27 +396,27 @@ export default function WasteManagementPage() {
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Total Quantity</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.totalQuantity')}</p>
               <Weight className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-gray-900 mt-2">{totalQuantity.toFixed(1)}</h3>
-            <p className="text-xs text-gray-400 mt-1">All time</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.allTime')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Home Used</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.homeUsed')}</p>
               <Trash2 className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-orange-600 mt-2">{totalConsumed.toFixed(1)}</h3>
-            <p className="text-xs text-gray-400 mt-1">Not sold</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.notSold')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Sold</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.sold')}</p>
               <BarChart3 className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-green-600 mt-2">{totalSold.toFixed(1)}</h3>
@@ -426,20 +426,20 @@ export default function WasteManagementPage() {
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Waste Types</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.wasteTypesLabel')}</p>
               <Trash2 className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-blue-600 mt-2">{totalByType.length}</h3>
-            <p className="text-xs text-gray-400 mt-1">Distinct types</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.distinctTypes')}</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="record">
         <TabsList className="grid grid-cols-3 w-full max-w-md">
-          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> Record</TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> History</TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> Reports</TabsTrigger>
+          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> {t('farmer.tabRecord')}</TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> {t('farmer.tabHistory')}</TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> {t('farmer.tabReports')}</TabsTrigger>
         </TabsList>
 
         {/* RECORD TAB */}
@@ -448,16 +448,16 @@ export default function WasteManagementPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-green-500 rounded-full" />
-                {editRecord ? "Edit Waste Record" : "New Waste Record"}
+                {editRecord ? t('farmer.editWasteRecord') : t('farmer.newWasteRecord')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Animal (optional) */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Animal <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.animal')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Select value={animalId || "none"} onValueChange={v => setAnimalId(v === "none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="Select animal..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('farmer.selectAnimal')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">All / General</SelectItem>
                       {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
@@ -467,7 +467,7 @@ export default function WasteManagementPage() {
 
                 {/* Insurance ID */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Insurance ID <span className="text-gray-400 text-xs">auto-detected</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
                     value={insuranceId || (animalId ? "No insurance registered" : "Select an animal first")}
@@ -477,7 +477,7 @@ export default function WasteManagementPage() {
 
                 {/* Waste Type */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Waste Type *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.wasteType')} *</label>
                   <button
                     type="button"
                     onClick={() => setWasteTypeOpen(o => !o)}
@@ -513,17 +513,17 @@ export default function WasteManagementPage() {
 
                 {/* Quantity */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Quantity *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.quantity')} *</label>
                   <Input type="number" min="0" step="0.1" placeholder="e.g. 50" value={quantity} onChange={e => setQuantity(e.target.value)} className={errors.quantity ? "border-red-500" : ""} />
                   {errors.quantity && <p className="text-xs text-red-500">{errors.quantity}</p>}
                 </div>
 
                 {/* Unit */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Unit *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.unit')} *</label>
                   <Select value={unit} onValueChange={setUnit}>
                     <SelectTrigger className={errors.unit ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select unit..." />
+                      <SelectValue placeholder={t('farmer.unit')} />
                     </SelectTrigger>
                     <SelectContent>
                       {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
@@ -534,7 +534,7 @@ export default function WasteManagementPage() {
 
                 {/* Home Consumption */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Home Use <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.homeUse')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" step="0.1" placeholder="e.g. 10" value={homeConsumption} onChange={e => setHomeConsumption(e.target.value)} />
                   {quantity && homeConsumption && (
                     <p className="text-xs text-green-600">Sold: {Math.max(0, Number(quantity) - Number(homeConsumption)).toFixed(1)}</p>
@@ -543,21 +543,21 @@ export default function WasteManagementPage() {
 
                 {/* Price per unit */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Price per Unit (RWF) <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.pricePerUnit')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" placeholder="e.g. 200" value={pricePerUnit} onChange={e => setPricePerUnit(e.target.value)} />
                 </div>
 
                 {/* Total amount */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Total Amount (RWF) <span className="text-gray-400 text-xs">auto-calculated</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.totalAmount')} <span className="text-gray-400 text-xs">{t('farmer.autoCalculated')}</span></label>
                   <Input type="number" min="0" placeholder="Auto-calculated" value={totalAmount} onChange={e => setTotalAmount(e.target.value)} className="bg-green-50" />
                 </div>
 
                 {/* Disposal Method */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Disposal Method <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.disposalMethod')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Select value={disposalMethod || "none"} onValueChange={v => setDisposalMethod(v === "none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="Select method..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('farmer.disposalMethod')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">— Not specified —</SelectItem>
                       {DISPOSAL_METHODS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
@@ -567,23 +567,23 @@ export default function WasteManagementPage() {
 
                 {/* Date */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Date *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.date')} *</label>
                   <Input type="date" value={date} onChange={e => setDate(e.target.value)} className={errors.date ? "border-red-500" : ""} />
                   {errors.date && <p className="text-xs text-red-500">{errors.date}</p>}
                 </div>
 
                 {/* Notes */}
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Notes <span className="text-gray-400 text-xs">optional</span></label>
-                  <Input placeholder="Any observations..." value={notes} onChange={e => setNotes(e.target.value)} />
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                  <Input placeholder={t('farmer.anyObservations')} value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
-                  {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
+                  {saving ? t('farmer.savingRecord') : editRecord ? t('farmer.updateRecord') : t('farmer.saveRecord')}
                 </Button>
-                {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>}
+                {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">{t('farmer.cancel')}</Button>}
               </div>
             </CardContent>
           </Card>
@@ -595,16 +595,16 @@ export default function WasteManagementPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                Waste History
+                {t('farmer.wasteHistory')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Filters */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl">
                 <Select value={filterType || "all"} onValueChange={v => setFilterType(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('farmer.allTypes')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="all">{t('farmer.allTypes')}</SelectItem>
                     {WASTE_TYPES.map(w => <SelectItem key={w} value={w}>{w}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -619,9 +619,9 @@ export default function WasteManagementPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Waste Type</TableHead>
-                      <TableHead>Animal</TableHead>
+                      <TableHead>{t('farmer.date')}</TableHead>
+                      <TableHead>{t('farmer.wasteTypesLabel')}</TableHead>
+                      <TableHead>{t('farmer.animal')}</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Home Use</TableHead>
                       <TableHead>Sold</TableHead>
@@ -629,12 +629,12 @@ export default function WasteManagementPage() {
                       <TableHead>Revenue (RWF)</TableHead>
                       <TableHead>Disposal</TableHead>
                       <TableHead>Notes</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('farmer.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRecords.length === 0 ? (
-                      <TableRow><TableCell colSpan={11} className="text-center py-8 text-gray-400">No records found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={11} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
                     ) : filteredRecords.map(r => (
                       <TableRow key={r._id}>
                         <TableCell className="text-sm">{r.date}</TableCell>
@@ -682,19 +682,19 @@ export default function WasteManagementPage() {
                 className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <Download className="h-4 w-4" />
-                Export Report
+                {t('farmer.exportReport')}
               </Button>
             </div>
             <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                  Waste by Type
+                  {t('farmer.wasteByType')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {totalByType.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">No data available</div>
+                  <div className="text-center py-8 text-gray-400">{t('farmer.noWasteData')}</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={totalByType}>
@@ -713,7 +713,7 @@ export default function WasteManagementPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                  Summary by Type
+                  {t('farmer.summaryByType')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -721,14 +721,14 @@ export default function WasteManagementPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Waste Type</TableHead>
-                        <TableHead>Total Quantity</TableHead>
-                        <TableHead>Records</TableHead>
+                        <TableHead>{t('farmer.wasteTypesLabel')}</TableHead>
+                        <TableHead>{t('farmer.totalQuantity')}</TableHead>
+                        <TableHead>{t('farmer.totalRecords')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {totalByType.length === 0 ? (
-                        <TableRow><TableCell colSpan={3} className="text-center py-6 text-gray-400">No data</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={3} className="text-center py-6 text-gray-400">{t('farmer.noWasteData')}</TableCell></TableRow>
                       ) : totalByType.map((row, i) => (
                         <TableRow key={i}>
                           <TableCell>
@@ -756,13 +756,13 @@ export default function WasteManagementPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-green-600" />
-              Export Waste Management Report
+              {t('farmer.exportWasteReport')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="p-3 bg-green-50 rounded-xl border border-green-100">
               <div className="text-sm space-y-1">
-                <p className="font-medium text-green-700">Preview</p>
+                <p className="font-medium text-green-700">{t('farmer.preview')}</p>
                 <p className="text-gray-600">
                   {filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""} &bull; {totalQuantity.toFixed(1)} total quantity &bull; {totalByType.length} waste type{totalByType.length !== 1 ? "s" : ""}
                 </p>
@@ -770,14 +770,14 @@ export default function WasteManagementPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 pt-1">
-              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">Cancel</Button>
+              <Button variant="outline" onClick={() => setExportOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
               <Button
                 onClick={exportToExcel}
                 disabled={exporting || filteredRecords.length === 0}
                 className="rounded-lg bg-green-600 hover:bg-green-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
-                {exporting ? "Exporting..." : "Excel"}
+                {exporting ? t('farmer.exporting') : t('farmer.exportExcel')}
               </Button>
               <Button
                 onClick={exportToPDF}
@@ -785,7 +785,7 @@ export default function WasteManagementPage() {
                 className="col-span-2 bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <FileText className="h-4 w-4" />
-                {exporting ? "Exporting..." : "Export PDF"}
+                {exporting ? t('farmer.exporting') : t('farmer.exportPDF')}
               </Button>
             </div>
           </div>
@@ -798,11 +798,11 @@ export default function WasteManagementPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Waste Record</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this record? This action cannot be undone.
+              {t('farmer.deleteRecordConfirm')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-red-600 hover:bg-red-700 text-white">
               Delete
             </AlertDialogAction>

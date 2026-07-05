@@ -702,8 +702,8 @@ export default function InseminationPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Insemination</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Track artificial insemination records</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('farmer.insemination')}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t('farmer.inseminationDesc')}</p>
       </div>
 
       {/* Summary Cards */}
@@ -711,50 +711,50 @@ export default function InseminationPage() {
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Total Records</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.totalRecords')}</p>
               <Syringe className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-gray-900 mt-2">{records.length}</h3>
-            <p className="text-xs text-gray-400 mt-1">All time</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.allTime')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Total Cost (RWF)</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.totalCostRWF')}</p>
               <FlaskConical className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-orange-600 mt-2">{totalCost.toLocaleString()}</h3>
-            <p className="text-xs text-gray-400 mt-1">Cumulative spend</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.cumulativeSpend')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Expected Births</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.expectedBirths')}</p>
               <Baby className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-green-600 mt-2">{upcoming}</h3>
-            <p className="text-xs text-gray-400 mt-1">Upcoming</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.upcoming')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">Calf(s) Born</p>
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.calvesBorn')}</p>
               <Baby className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-blue-600 mt-2">{totalBabies}</h3>
-            <p className="text-xs text-gray-400 mt-1">Confirmed births</p>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.confirmedBirths')}</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-3 w-full max-w-md">
-          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> Record</TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> History</TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> Reports</TabsTrigger>
+          <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> {t('farmer.tabRecord')}</TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> {t('farmer.tabHistory')}</TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-1"><BarChart3 className="h-4 w-4" /> {t('farmer.tabReports')}</TabsTrigger>
         </TabsList>
 
         {/* RECORD TAB */}
@@ -763,7 +763,7 @@ export default function InseminationPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-green-500 rounded-full" />
-                {editRecord ? "Edit Insemination Record" : "New Insemination Record"}
+                {editRecord ? t('farmer.editInseminationRecord') : t('farmer.newInseminationRecord')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -779,7 +779,7 @@ export default function InseminationPage() {
 
                 {/* Animal — only non-pregnant females */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Animal *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.animal')} *</label>
                   <Select value={animalId} onValueChange={handleAnimalChange} disabled={availableAnimals.length === 0}>
                     <SelectTrigger className={errors.animalId ? "border-red-500" : ""}>
                       <SelectValue placeholder={
@@ -797,20 +797,20 @@ export default function InseminationPage() {
                   {availableAnimals.length === 0
                     ? (
                       femaleAnimals.length === 0
-                        ? <p className="text-xs text-red-500">Please register animals first</p>
-                        : <p className="text-xs text-amber-600">All animals are pregnant</p>
+                        ? <p className="text-xs text-red-500">{t('farmer.noAnimalsRegistered')}</p>
+                        : <p className="text-xs text-amber-600">{t('farmer.allAnimalsPregnant')}</p>
                     )
                     : pregnantAnimalIds.size > 0 && <p className="text-xs text-amber-600">{pregnantAnimalIds.size} animal(s) hidden — currently pregnant</p>
                   }
                   {animalId && !animals.find(a => a._id === animalId)?.gender && (
-                    <p className="text-xs text-amber-600">Gender not defined — you will be prompted to fix this before saving</p>
+                    <p className="text-xs text-amber-600">{t('farmer.genderNotDefined')}</p>
                   )}
                   {errors.animalId && <p className="text-xs text-red-500">{errors.animalId}</p>}
                 </div>
 
                 {/* Insurance ID */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Insurance ID <span className="text-gray-400 text-xs">auto-detected</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
                     value={insuranceId || (animalId ? "No insurance registered" : "Select an animal first")}
@@ -820,7 +820,7 @@ export default function InseminationPage() {
 
                 {/* Ear Tag ID */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Ear Tag ID <span className="text-gray-400 text-xs">auto-detected</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
                     value={earTagId || (animalId ? "No ear tag registered" : "Select an animal first")}
@@ -830,7 +830,7 @@ export default function InseminationPage() {
 
                 {/* Semen Types */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Types of Semen *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.typesOfSemen')} *</label>
                   <button
                     type="button"
                     onClick={() => setSemenTypeOpen(o => !o)}
@@ -838,7 +838,7 @@ export default function InseminationPage() {
                   >
                     <span className="flex flex-wrap gap-1 flex-1 min-w-0">
                       {semenTypes.length === 0
-                        ? <span className="text-gray-400">Select semen type(s)...</span>
+                        ? <span className="text-gray-400">{t('farmer.selectSemenTypes')}</span>
                         : semenTypes.map(t => (
                           <span key={t} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs border bg-green-50 text-green-700 border-green-200">{t}</span>
                         ))
@@ -866,25 +866,25 @@ export default function InseminationPage() {
 
                 {/* Semen Price */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Price of Semen <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.priceOfSemen')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" step="0.01" placeholder="e.g. 5000" value={semenPrice} onChange={e => setSemenPrice(e.target.value)} />
                 </div>
 
                 {/* Vet Price */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Vet Price <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.vetPrice')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" step="0.01" placeholder="e.g. 3000" value={vetPrice} onChange={e => setVetPrice(e.target.value)} />
                 </div>
 
                 {/* Time of Injection */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Time of Injection <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.timeOfInjection')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="time" value={injectionTime} onChange={e => setInjectionTime(e.target.value)} />
                 </div>
 
                 {/* Date */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Date *</label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.date')} *</label>
                   <Input type="date" value={date} onChange={e => handleDateChange(e.target.value)} className={errors.date ? "border-red-500" : ""} />
                   {errors.date && <p className="text-xs text-red-500">{errors.date}</p>}
                 </div>
@@ -892,7 +892,7 @@ export default function InseminationPage() {
                 {/* Expected Birth Date */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-700">Expected Birth Date <span className="text-gray-400 text-xs">optional</span></label>
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.expectedBirthDate')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                     {birthCountdown !== null && (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${birthCountdown > 0
                         ? "bg-green-50 text-green-700"
@@ -915,13 +915,13 @@ export default function InseminationPage() {
 
                 {/* Babies Delivered */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Babies Delivered <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.babiesDelivered')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="number" min="0" placeholder="e.g. 1" value={deliveredBabies} onChange={e => setDeliveredBabies(e.target.value)} />
                 </div>
 
                 {/* Vet Name */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">Name of the Vet <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.nameOfVet')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Select
                     value={vetName || "none"}
                     onValueChange={v => {
@@ -933,9 +933,9 @@ export default function InseminationPage() {
                       }
                     }}
                   >
-                    <SelectTrigger><SelectValue placeholder="Select vet..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('farmer.veterinarian')} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">— Not specified —</SelectItem>
+                      <SelectItem value="none">{t('farmer.selectVet')}</SelectItem>
                       {vets.map(d => (
                         <SelectItem key={d._id} value={d.name}>
                           {d.name}{d.specialization ? ` — ${d.specialization}` : ""}
@@ -947,20 +947,20 @@ export default function InseminationPage() {
 
                 {/* Vet Origin */}
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Vet Origin / Organization <span className="text-gray-400 text-xs">optional</span></label>
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.vetOrigin')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input placeholder="e.g. RAB, MINAGRI, Private Clinic" value={vetOrigin} onChange={e => setVetOrigin(e.target.value)} />
                 </div>
 
                 {/* Notes */}
                 <div className="space-y-1 md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">Notes <span className="text-gray-400 text-xs">optional</span></label>
-                  <Input placeholder="Any observations..." value={notes} onChange={e => setNotes(e.target.value)} />
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                  <Input placeholder={t('farmer.anyObservations')} value={notes} onChange={e => setNotes(e.target.value)} />
                 </div>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <Button onClick={handleSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
-                  {saving ? "Saving..." : editRecord ? "Update Record" : "Save Record"}
+                  {saving ? t('farmer.savingRecord') : editRecord ? t('farmer.updateRecord') : t('farmer.saveRecord')}
                 </Button>
                 {editRecord && <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>}
               </div>
@@ -974,15 +974,15 @@ export default function InseminationPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                Insemination History
+                {t('farmer.inseminationHistory')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl">
                 <Select value={filterAnimal || "all"} onValueChange={v => setFilterAnimal(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="All Animals" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('farmer.allAnimals')} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Animals</SelectItem>
+                    <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
                     {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -997,22 +997,22 @@ export default function InseminationPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Animal</TableHead>
-                      <TableHead>Semen Types</TableHead>
-                      <TableHead>Semen Price</TableHead>
-                      <TableHead>Vet Price</TableHead>
-                      <TableHead>Injection Time</TableHead>
-                      <TableHead>Expected Birth / Outcome</TableHead>
-                      <TableHead>Babies</TableHead>
-                      <TableHead>Vet</TableHead>
-                      <TableHead>Organization</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t('farmer.date')}</TableHead>
+                      <TableHead>{t('farmer.animal')}</TableHead>
+                      <TableHead>{t('farmer.semenTypes')}</TableHead>
+                      <TableHead>{t('farmer.semenPrice')}</TableHead>
+                      <TableHead>{t('farmer.vetPrice')}</TableHead>
+                      <TableHead>{t('farmer.injectionTime')}</TableHead>
+                      <TableHead>{t('farmer.expectedBirthOutcome')}</TableHead>
+                      <TableHead>{t('farmer.babies')}</TableHead>
+                      <TableHead>{t('farmer.veterinarian')}</TableHead>
+                      <TableHead>{t('farmer.organization')}</TableHead>
+                      <TableHead>{t('farmer.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRecords.length === 0 ? (
-                      <TableRow><TableCell colSpan={11} className="text-center py-8 text-gray-400">No records found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={11} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
                     ) : filteredRecords.map(r => (
                       <TableRow key={r._id}>
                         <TableCell className="text-sm">{r.date}</TableCell>
@@ -1085,7 +1085,7 @@ export default function InseminationPage() {
                 className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <Download className="h-4 w-4" />
-                Export Report
+                {t("farmer.exportReport")}
               </Button>
             </div>
 
@@ -1102,17 +1102,17 @@ export default function InseminationPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Animal</TableHead>
-                        <TableHead>Inseminations</TableHead>
-                        <TableHead>Failed Attempts</TableHead>
-                        <TableHead>Calf(s) Born</TableHead>
-                        <TableHead>Total Cost (RWF)</TableHead>
-                        <TableHead>Last Date</TableHead>
+                        <TableHead>{t('farmer.animal')}</TableHead>
+                        <TableHead>{t('farmer.inseminations')}</TableHead>
+                        <TableHead>{t('farmer.failedAttempts')}</TableHead>
+                        <TableHead>{t('farmer.calvesBorn')}</TableHead>
+                        <TableHead>{t('farmer.totalCostRWF')}</TableHead>
+                        <TableHead>{t('farmer.lastDate')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {cowSummary.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-gray-400">No data</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-gray-400">{t('farmer.noDataAvailable')}</TableCell></TableRow>
                       ) : cowSummary.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">{c.name}</TableCell>
@@ -1184,18 +1184,18 @@ export default function InseminationPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-green-600" />
-              Export Insemination Report
+              {t('farmer.exportInseminationReport')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">Animal</label>
+              <label className="text-sm font-medium text-gray-700">{t('farmer.animal')}</label>
               <Select value={exportAnimalFilter || "all"} onValueChange={v => setExportAnimalFilter(v === "all" ? "" : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All Animals" />
+                  <SelectValue placeholder={t('farmer.allAnimals')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Animals</SelectItem>
+                  <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
                   {femaleAnimals.map(a => (
                     <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>
                   ))}
@@ -1219,7 +1219,7 @@ export default function InseminationPage() {
                 className="rounded-lg bg-green-600 hover:bg-green-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
-                {exporting ? "Exporting..." : "Excel"}
+                {exporting ? t('farmer.exporting') : t('farmer.exportExcel')}
               </Button>
               <Button
                 onClick={exportToPDF}
@@ -1227,7 +1227,7 @@ export default function InseminationPage() {
                 className="col-span-2 bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <FileText className="h-4 w-4" />
-                {exporting ? "Exporting..." : "Export PDF"}
+                {exporting ? t('farmer.exporting') : t('farmer.exportPDF')}
               </Button>
             </div>
           </div>
@@ -1238,14 +1238,14 @@ export default function InseminationPage() {
       <AlertDialog open={!!reinseminateConfirm} onOpenChange={open => !open && setReinseminateConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Re-insemination</AlertDialogTitle>
+            <AlertDialogTitle>{t('farmer.confirmReinsemination')}</AlertDialogTitle>
             <AlertDialogDescription>
               This will mark the attempt on <strong>{reinseminateConfirm?.date}</strong> for{" "}
               <strong>{reinseminateConfirm?.animalName || "this animal"}</strong> as <strong>Not Pregnant</strong> (kept in History) and open a new insemination record for the same animal. Do you want to continue?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setReinseminateConfirm(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setReinseminateConfirm(null)}>{t('farmer.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (reinseminateConfirm) handleReinseminate(reinseminateConfirm)
@@ -1263,7 +1263,7 @@ export default function InseminationPage() {
       <AlertDialog open={!!genderAlertAnimal} onOpenChange={open => !open && setGenderAlertAnimal(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Gender Not Defined</AlertDialogTitle>
+            <AlertDialogTitle>{t('farmer.genderNotDefined')}</AlertDialogTitle>
             <AlertDialogDescription>
               The animal <strong>{genderAlertAnimal?.name}</strong> does not have a gender defined. Please go to the Animals page and set its gender to <strong>Female</strong> before recording an insemination.
             </AlertDialogDescription>
@@ -1280,13 +1280,13 @@ export default function InseminationPage() {
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Insemination Record</AlertDialogTitle>
+            <AlertDialogTitle>{t('farmer.deleteInseminationRecord')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this record? This action cannot be undone.
+              {t('farmer.deleteRecordConfirm')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-red-600 hover:bg-red-700 text-white">
               Delete
             </AlertDialogAction>
