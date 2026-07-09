@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,7 +12,10 @@ import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { updateConsultationStatus } from "@/lib/actions"
+import { getRecentMessagesData } from "@/lib/actions/veterinary-dashboard"
 import AnnouncementsBanner from "@/components/ui/announcements-banner"
+
+const RECENT_MESSAGES_POLL_MS = 4000
 
 interface VeterinaryDashboardClientProps {
   currentUser: any
@@ -30,14 +33,27 @@ export default function VeterinaryDashboardClient({
   pendingConsultations,
   acceptedConsultations,
   completedCases,
-  unreadMessages,
-  recentMessages,
+  unreadMessages: initialUnreadMessages,
+  recentMessages: initialRecentMessages,
 }: VeterinaryDashboardClientProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
 
   const [pending, setPending] = useState(pendingConsultations.slice(0, 5))
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [unreadMessages, setUnreadMessages] = useState(initialUnreadMessages)
+  const [recentMessages, setRecentMessages] = useState(initialRecentMessages)
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const data = await getRecentMessagesData()
+        setUnreadMessages(data.unreadMessages)
+        setRecentMessages(data.recentMessages)
+      } catch { /* ignore, retry on next tick */ }
+    }, RECENT_MESSAGES_POLL_MS)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleQuickAction = async (id: string, action: "accept" | "reject") => {
     setLoadingId(id)
@@ -238,34 +254,31 @@ export default function VeterinaryDashboardClient({
               {recentMessages.length > 0 ? (
                 <div className="space-y-2">
                   {recentMessages.map((message) => (
-                    <div
+                    <Link
                       key={message.id}
-                      className={`flex items-start gap-3 p-3 rounded-lg transition-colors duration-150 ${
-                        message.unread ? "bg-green-50/60 hover:bg-green-50" : "hover:bg-gray-50"
-                      }`}
+                      href={`/veterinary/messages?conversationId=${message.conversationId}`}
+                      className="flex items-start gap-3 p-3 rounded-lg transition-colors duration-150 bg-green-50/60 hover:bg-green-50"
                     >
                       <div className="relative flex-shrink-0">
                         <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
                           <span className="text-xs font-bold text-green-700">{message.initials}</span>
                         </div>
-                        {message.unread && (
-                          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-orange-500 rounded-full border border-white" />
-                        )}
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-orange-500 rounded-full border border-white" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className={`text-sm truncate ${message.unread ? "font-semibold text-gray-900" : "font-medium text-gray-700"}`}>
+                          <p className="text-sm truncate font-semibold text-gray-900">
                             {message.senderName}
                           </p>
                           <span className="text-xs text-gray-400 flex-shrink-0">
                             {new Date(message.createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className={`text-xs mt-0.5 truncate ${message.unread ? "text-gray-700" : "text-gray-400"}`}>
+                        <p className="text-xs mt-0.5 truncate text-gray-700">
                           {message.content}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (

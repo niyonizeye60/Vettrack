@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { MessagesPanel } from "@/components/dashboard/messages-panel"
 import { useLanguage } from "@/contexts/LanguageContext"
 
@@ -13,7 +14,9 @@ export default function MessagesPageClient() {
         <p className="text-sm text-gray-500 mt-0.5">{t('vet.communicateFarmers')}</p>
       </div>
       <div className="flex-1 min-h-0">
-        <MessagesPanel variant="vet" />
+        <Suspense fallback={null}>
+          <MessagesPanel variant="vet" />
+        </Suspense>
       </div>
     </div>
   )

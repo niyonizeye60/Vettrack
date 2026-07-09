@@ -1,11 +1,12 @@
 "use client"
 
+import { Suspense } from "react"
 import { MessagesPanel } from "@/components/dashboard/messages-panel"
 import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function MessagesPage() {
   const { t } = useLanguage()
-  
+
   return (
     <div className="flex flex-col h-full gap-4">
       <div className="flex-shrink-0">
@@ -16,7 +17,9 @@ export default function MessagesPage() {
       </div>
 
       <div className="flex-1 min-h-0">
-        <MessagesPanel />
+        <Suspense fallback={null}>
+          <MessagesPanel />
+        </Suspense>
       </div>
     </div>
   )

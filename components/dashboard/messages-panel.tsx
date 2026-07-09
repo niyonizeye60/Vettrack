@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -180,9 +181,17 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   const hoverHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId) || null
+  const searchParams = useSearchParams()
 
   useEffect(() => { fetchConversations(); fetchAvailableUsers() }, [])
   useEffect(() => { fetchConversations() }, [showArchived])
+
+  // Deep-link support: /messages?conversationId=... (used by dashboard "recent
+  // messages" links and chat notifications) opens straight into that thread.
+  useEffect(() => {
+    const conversationId = searchParams.get('conversationId')
+    if (conversationId) setSelectedConversationId(conversationId)
+  }, [searchParams])
 
   useEffect(() => {
     setMessageSelectMode(false)
