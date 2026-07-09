@@ -121,9 +121,12 @@ export async function getConversationMessagesForModeration(conversationId: strin
     .sort({ createdAt: 1 })
     .toArray()
 
-  const senderIds = Array.from(new Set(messages.map((m) => m.senderId.toString())))
+  const idsForNames = Array.from(new Set([
+    ...messages.map((m) => m.senderId.toString()),
+    ...messages.filter((m) => m.deletedBy).map((m) => m.deletedBy.toString()),
+  ]))
   const users = await db.collection("users").find(
-    { _id: { $in: senderIds.map((id) => new ObjectId(id)) } },
+    { _id: { $in: idsForNames.map((id) => new ObjectId(id)) } },
     { projection: { name: 1 } }
   ).toArray()
   const nameById = new Map(users.map((u) => [u._id.toString(), u.name as string]))
@@ -135,8 +138,86 @@ export async function getConversationMessagesForModeration(conversationId: strin
     content: decryptText(m.content),
     createdAt: m.createdAt,
     editedAt: m.editedAt || null,
-    deletedFor: (m.deletedFor || []) as string[],
+    deletedAt: m.deletedAt || null,
+    deletedByName: m.deletedBy ? nameById.get(m.deletedBy.toString()) || "Unknown" : null,
   }))
+}
+
+export async function restoreModerationMessage(messageId: string) {
+  const currentUser = await requireSuperAdmin()
+  const client = await clientPromise
+  const db = client.db("ntdm_animal_hospital")
+
+  await db.collection("messages").updateOne(
+    { _id: new ObjectId(messageId) },
+    { $set: { deletedAt: null, deletedBy: null } }
+  )
+
+  await logUserActivity({
+    userId: currentUser._id.toString(),
+    action: "chat.message.restored",
+    details: messageId,
+  })
+
+  revalidatePath("/superadmin/moderation")
+  return { success: true }
+}
+
+export async function permanentlyDeleteModerationMessage(messageId: string) {
+  const currentUser = await requireSuperAdmin()
+  const client = await clientPromise
+  const db = client.db("ntdm_animal_hospital")
+
+  await db.collection("messages").deleteOne({ _id: new ObjectId(messageId) })
+
+  await logUserActivity({
+    userId: currentUser._id.toString(),
+    action: "chat.message.permanentlyDeleted",
+    details: messageId,
+  })
+
+  revalidatePath("/superadmin/moderation")
+  return { success: true }
+}
+
+export async function restoreAllDeletedMessages(conversationId: string) {
+  const currentUser = await requireSuperAdmin()
+  const client = await clientPromise
+  const db = client.db("ntdm_animal_hospital")
+
+  const result = await db.collection("messages").updateMany(
+    { conversationId: new ObjectId(conversationId), deletedAt: { $ne: null } },
+    { $set: { deletedAt: null, deletedBy: null } }
+  )
+
+  await logUserActivity({
+    userId: currentUser._id.toString(),
+    action: "chat.message.restoredAll",
+    details: conversationId,
+  })
+
+  revalidatePath("/superadmin/moderation")
+  return { success: true, count: result.modifiedCount }
+}
+
+export async function permanentlyDeleteAllDeletedMessages(conversationId: string) {
+  const currentUser = await requireSuperAdmin()
+  const client = await clientPromise
+  const db = client.db("ntdm_animal_hospital")
+
+  const result = await db.collection("messages").deleteMany({
+    conversationId: new ObjectId(conversationId),
+    deletedAt: { $ne: null },
+  })
+
+  await logUserActivity({
+    userId: currentUser._id.toString(),
+    action: "chat.message.permanentlyDeletedAll",
+    details: conversationId,
+  })
+
+  revalidatePath("/superadmin/moderation")
+  return { success: true, count: result.deletedCount }
 }
 
 export async function resolveChatReport(reportId: string, resolutionNote: string) {

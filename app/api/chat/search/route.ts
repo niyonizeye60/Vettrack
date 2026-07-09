@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const messages = await db.collection("messages").find({
       conversationId: { $in: conversationIds },
-      deletedFor: { $nin: [currentUser._id] }
+      deletedAt: null
     }).sort({ createdAt: -1 }).toArray()
 
     const results: Array<{ messageId: string; conversationId: string; content: string; createdAt: Date; otherUserName: string }> = []

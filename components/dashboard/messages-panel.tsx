@@ -34,6 +34,7 @@ type Conversation = {
   }
   lastMessage?: {
     content: string
+    isDeleted?: boolean
     createdAt: string
   }
   unreadCount: number
@@ -47,6 +48,7 @@ type Message = {
   content: string
   senderId: string
   isMe: boolean
+  isDeleted?: boolean
   createdAt: string
   readAt: string | null
   editedAt: string | null
@@ -74,6 +76,7 @@ const CONVERSATIONS_POLL_MS = 3000
 const TYPING_THROTTLE_MS = 2000
 const SEARCH_DEBOUNCE_MS = 300
 const EDIT_WINDOW_MS = 15 * 60 * 1000
+const MESSAGE_HOVER_ACTIONS_MS = 3000
 
 function canEditMessage(message: Message): boolean {
   return Date.now() - new Date(message.createdAt).getTime() <= EDIT_WINDOW_MS
@@ -154,6 +157,7 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingContent, setEditingContent] = useState("")
   const [deleteMessageId, setDeleteMessageId] = useState<string | null>(null)
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
 
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [reportReason, setReportReason] = useState("")
@@ -164,10 +168,16 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false)
   const [removing, setRemoving] = useState(false)
 
+  const [messageSelectMode, setMessageSelectMode] = useState(false)
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastTypingSentAtRef = useRef(0)
   const conversationListRef = useRef<HTMLDivElement>(null)
   const userScrolledRef = useRef(false)
+  const hoverHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId) || null
 
@@ -175,6 +185,8 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   useEffect(() => { fetchConversations() }, [showArchived])
 
   useEffect(() => {
+    setMessageSelectMode(false)
+    setSelectedMessageIds([])
     if (selectedConversationId) {
       setMessages([])
       setMessagesLoading(true)
@@ -295,6 +307,14 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
     }
   }
 
+  const handleMessageMouseEnter = (messageId: string) => {
+    if (hoverHideTimeoutRef.current) clearTimeout(hoverHideTimeoutRef.current)
+    setHoveredMessageId(messageId)
+    hoverHideTimeoutRef.current = setTimeout(() => setHoveredMessageId(null), MESSAGE_HOVER_ACTIONS_MS)
+  }
+
+  useEffect(() => () => { if (hoverHideTimeoutRef.current) clearTimeout(hoverHideTimeoutRef.current) }, [])
+
   const startEditingMessage = (message: Message) => {
     if (!canEditMessage(message)) { setActionError(t('farmer.editWindowExpired')); return }
     setEditingMessageId(message.id); setEditingContent(message.content)
@@ -319,9 +339,35 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
     const messageId = deleteMessageId; setDeleteMessageId(null)
     try {
       const res = await fetch(`/api/chat/messages?messageId=${messageId}`, { method: 'DELETE' })
-      if (res.ok) { setMessages(prev => prev.filter(m => m.id !== messageId)); fetchConversations() }
+      if (res.ok) {
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: "", isDeleted: true } : m))
+        fetchConversations()
+      }
       else setActionError(t('farmer.messageDeleteFailed'))
     } catch { setActionError(t('farmer.messageDeleteFailed')) }
+  }
+
+  const enterMessageSelectMode = () => { cancelEditingMessage(); setMessageSelectMode(true) }
+  const exitMessageSelectMode = () => { setMessageSelectMode(false); setSelectedMessageIds([]) }
+  const toggleMessageSelected = (id: string) =>
+    setSelectedMessageIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+
+  const confirmBulkDeleteMessages = async () => {
+    if (selectedMessageIds.length === 0) return
+    setBulkDeleting(true)
+    try {
+      const ids = selectedMessageIds
+      const results = await Promise.all(
+        ids.map(id => fetch(`/api/chat/messages?messageId=${id}`, { method: 'DELETE' }))
+      )
+      const deletedIds = ids.filter((_, i) => results[i].ok)
+      if (deletedIds.length > 0) {
+        setMessages(prev => prev.map(m => deletedIds.includes(m.id) ? { ...m, content: "", isDeleted: true } : m))
+        fetchConversations()
+      }
+      if (deletedIds.length < ids.length) toast({ title: t('farmer.actionFailed'), variant: "destructive" })
+    } catch { toast({ title: t('farmer.actionFailed'), variant: "destructive" }) }
+    finally { setBulkDeleting(false); setBulkDeleteConfirmOpen(false); exitMessageSelectMode() }
   }
 
   const handleArchiveToggle = async (conversation: Conversation) => {
@@ -632,7 +678,9 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
                         </div>
                       </div>
                       <p className={`text-xs mt-0.5 truncate ${conv.unreadCount > 0 ? "text-gray-700 font-medium" : "text-gray-400"}`}>
-                        {conv.lastMessage?.content || t('farmer.noMessagesYet')}
+                        {conv.lastMessage
+                          ? (conv.lastMessage.isDeleted ? t('farmer.messageDeleted') : conv.lastMessage.content)
+                          : t('farmer.noMessagesYet')}
                       </p>
                     </div>
                   </div>
@@ -648,56 +696,79 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
             <>
               {/* Chat header */}
               <div className="p-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <Button variant="ghost" size="icon" className="md:hidden -ml-1"
-                    onClick={() => setSelectedConversationId(null)}>
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <ConvAvatar conv={selectedConversation} />
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-sm text-gray-900 truncate">{selectedConversation.otherUser.name}</h3>
-                    <p className="text-xs truncate">
-                      {isTyping
-                        ? <span className={th.typingText}>{t('farmer.typing')}</span>
-                        : isOtherOnline
-                          ? <span className="text-green-600">{t('farmer.online')}</span>
-                          : <span className="text-gray-400">
-                              {selectedConversation.otherUser.role === 'doctor' ? t('farmer.veterinarian') : t('farmer.farmer')}
-                            </span>}
-                    </p>
-                  </div>
-                </div>
+                {messageSelectMode ? (
+                  <>
+                    <span className="text-sm font-medium text-gray-700">
+                      {selectedMessageIds.length > 0
+                        ? `${selectedMessageIds.length} ${t('farmer.selected')}`
+                        : t('farmer.selectMessages')}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button size="icon" variant="destructive" disabled={selectedMessageIds.length === 0}
+                        title={t('farmer.deleteSelectedMessages')} onClick={() => setBulkDeleteConfirmOpen(true)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={exitMessageSelectMode}>{t('common.cancel')}</Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Button variant="ghost" size="icon" className="md:hidden -ml-1"
+                        onClick={() => setSelectedConversationId(null)}>
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
+                      <ConvAvatar conv={selectedConversation} />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm text-gray-900 truncate">{selectedConversation.otherUser.name}</h3>
+                        <p className="text-xs truncate">
+                          {isTyping
+                            ? <span className={th.typingText}>{t('farmer.typing')}</span>
+                            : isOtherOnline
+                              ? <span className="text-green-600">{t('farmer.online')}</span>
+                              : <span className="text-gray-400">
+                                  {selectedConversation.otherUser.role === 'doctor' ? t('farmer.veterinarian') : t('farmer.farmer')}
+                                </span>}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-1">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setSelectedConversationId(null)}>
-                        <X className="mr-2 h-4 w-4" />{t('farmer.closeChat')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleArchiveToggle(selectedConversation)}>
-                        {selectedConversation.isArchived
-                          ? <><ArchiveRestore className="mr-2 h-4 w-4" />{t('farmer.unarchiveConversation')}</>
-                          : <><Archive className="mr-2 h-4 w-4" />{t('farmer.archiveConversation')}</>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleBlockToggle(selectedConversation)}>
-                        <Ban className="mr-2 h-4 w-4" />
-                        {selectedConversation.isBlocked ? t('farmer.unblockUser') : t('farmer.blockUser')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setReportDialogOpen(true)} className="text-red-600 focus:text-red-600">
-                        <Flag className="mr-2 h-4 w-4" />{t('farmer.reportUser')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button variant="ghost" size="icon" className="hidden md:inline-flex"
-                    title={t('farmer.closeChat')} onClick={() => setSelectedConversationId(null)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+                    <div className="flex items-center gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setSelectedConversationId(null)}>
+                            <X className="mr-2 h-4 w-4" />{t('farmer.closeChat')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={enterMessageSelectMode}
+                            disabled={!messages.some(m => m.isMe && !m.isDeleted)}>
+                            <CheckSquare className="mr-2 h-4 w-4" />{t('farmer.selectMessages')}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleArchiveToggle(selectedConversation)}>
+                            {selectedConversation.isArchived
+                              ? <><ArchiveRestore className="mr-2 h-4 w-4" />{t('farmer.unarchiveConversation')}</>
+                              : <><Archive className="mr-2 h-4 w-4" />{t('farmer.archiveConversation')}</>}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleBlockToggle(selectedConversation)}>
+                            <Ban className="mr-2 h-4 w-4" />
+                            {selectedConversation.isBlocked ? t('farmer.unblockUser') : t('farmer.blockUser')}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setReportDialogOpen(true)} className="text-red-600 focus:text-red-600">
+                            <Flag className="mr-2 h-4 w-4" />{t('farmer.reportUser')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button variant="ghost" size="icon" className="hidden md:inline-flex"
+                        title={t('farmer.closeChat')} onClick={() => setSelectedConversationId(null)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Message thread */}
@@ -723,14 +794,29 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
                     )
                   }
                   const msg = item.message
+                  const selectable = messageSelectMode && msg.isMe && !msg.isDeleted
+                  const isSelected = selectedMessageIds.includes(msg.id)
                   return (
-                    <div key={item.key} className={`group flex ${msg.isMe ? "justify-end" : "justify-start"}`}>
-                      <div className={`relative max-w-[78%] px-3 py-2 rounded-2xl ${
-                        msg.isMe
-                          ? `${th.sentBubble} rounded-br-sm`
-                          : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                    <div key={item.key} className={`flex items-center gap-2 ${msg.isMe ? "justify-end" : "justify-start"} ${messageSelectMode && !selectable ? "opacity-50" : ""}`}
+                      onMouseEnter={() => !messageSelectMode && handleMessageMouseEnter(msg.id)}
+                      onClick={() => selectable && toggleMessageSelected(msg.id)}>
+                      {selectable && (
+                        isSelected
+                          ? <CheckSquare className={`h-4 w-4 flex-shrink-0 ${th.selectIcon}`} />
+                          : <Square className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                      )}
+                      <div className={`relative max-w-[78%] px-3 py-2 rounded-2xl ${selectable ? "cursor-pointer" : ""} ${
+                        isSelected ? "ring-2 ring-offset-1 ring-primary" : ""
+                      } ${
+                        msg.isDeleted
+                          ? "bg-gray-50 text-gray-400 border border-gray-100 rounded-bl-sm"
+                          : msg.isMe
+                            ? `${th.sentBubble} rounded-br-sm`
+                            : "bg-gray-100 text-gray-800 rounded-bl-sm"
                       }`}>
-                        {editingMessageId === msg.id ? (
+                        {msg.isDeleted ? (
+                          <p className="text-sm italic">{t('farmer.messageDeleted')}</p>
+                        ) : editingMessageId === msg.id ? (
                           <div className="space-y-2 min-w-[200px]">
                             <Textarea value={editingContent} onChange={e => setEditingContent(e.target.value)}
                               className="text-sm text-gray-900 bg-white" rows={2} autoFocus />
@@ -745,8 +831,8 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
                           </div>
                         ) : (
                           <>
-                            {msg.isMe && (
-                              <div className="absolute -top-7 right-0 hidden group-hover:flex bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                            {msg.isMe && !messageSelectMode && hoveredMessageId === msg.id && (
+                              <div className="absolute -top-7 right-0 flex bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                                 {canEditMessage(msg) && (
                                   <Button size="icon" variant="ghost" className="h-6 w-6 rounded-none text-gray-600"
                                     title={t('common.edit')} onClick={() => startEditingMessage(msg)}>
@@ -823,6 +909,24 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteMessage} className="bg-red-600 hover:bg-red-700 text-white">
               {t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteConfirmOpen} onOpenChange={open => !bulkDeleting && setBulkDeleteConfirmOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('common.delete')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('farmer.deleteMessagesConfirm').replace('{count}', String(selectedMessageIds.length))}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBulkDeleteMessages} disabled={bulkDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white">
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

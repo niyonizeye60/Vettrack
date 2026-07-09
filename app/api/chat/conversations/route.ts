@@ -58,19 +58,18 @@ export async function GET(request: NextRequest) {
           { projection: { name: 1, role: 1, image: 1 } }
         )
 
-        // Get last message - exclude any this user has soft-deleted for themselves,
-        // so the preview falls back to the next most recent remaining message.
         const lastMessage = await db.collection("messages").findOne(
-          { conversationId: conv._id, deletedFor: { $nin: [currentUser._id] } },
+          { conversationId: conv._id },
           { sort: { createdAt: -1 } }
         )
 
-        // Count unread messages
+        // Count unread messages - deleted messages have no content to surface,
+        // so they shouldn't inflate the unread badge.
         const unreadCount = await db.collection("messages").countDocuments({
           conversationId: conv._id,
           senderId: { $ne: new ObjectId(currentUser._id) },
           readAt: null,
-          deletedFor: { $nin: [currentUser._id] }
+          deletedAt: null
         })
 
         const otherPresence = otherParticipantId
@@ -90,7 +89,8 @@ export async function GET(request: NextRequest) {
             isOnline
           },
           lastMessage: lastMessage ? {
-            content: decryptText(lastMessage.content),
+            content: lastMessage.deletedAt ? "" : decryptText(lastMessage.content),
+            isDeleted: !!lastMessage.deletedAt,
             createdAt: lastMessage.createdAt
           } : null,
           unreadCount,

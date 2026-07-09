@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Flag, MessageSquare, Search, ShieldAlert, Ban, CheckCircle2, XCircle, Eye } from "lucide-react"
+import { Flag, MessageSquare, Search, ShieldAlert, Ban, CheckCircle2, XCircle, Eye, RotateCcw, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   getChatReports,
@@ -34,6 +34,10 @@ import {
   resolveChatReport,
   dismissChatReport,
   suspendReportedUser,
+  restoreModerationMessage,
+  permanentlyDeleteModerationMessage,
+  restoreAllDeletedMessages,
+  permanentlyDeleteAllDeletedMessages,
 } from "@/lib/actions/chat-moderation"
 
 interface ChatReport {
@@ -65,7 +69,8 @@ interface ModerationMessage {
   content: string
   createdAt: string | Date
   editedAt: string | Date | null
-  deletedFor: string[]
+  deletedAt: string | Date | null
+  deletedByName: string | null
 }
 
 interface ChatModerationProps {
@@ -87,6 +92,11 @@ export default function ChatModeration({ initialReports, initialConversations }:
   const [resolutionNote, setResolutionNote] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [suspendUserId, setSuspendUserId] = useState<string | null>(null)
+  const [restoringMessageId, setRestoringMessageId] = useState<string | null>(null)
+  const [permanentDeleteMessageId, setPermanentDeleteMessageId] = useState<string | null>(null)
+  const [restoringAll, setRestoringAll] = useState(false)
+  const [permanentDeleteAllOpen, setPermanentDeleteAllOpen] = useState(false)
+  const [permanentDeletingAll, setPermanentDeletingAll] = useState(false)
 
   const loadAll = async () => {
     try {
@@ -154,6 +164,67 @@ export default function ChatModeration({ initialReports, initialConversations }:
     } catch (error) {
       console.error("Error suspending user:", error)
       toast({ title: "Failed to suspend user", variant: "destructive" })
+    }
+  }
+
+  const handleRestoreMessage = async (messageId: string) => {
+    setRestoringMessageId(messageId)
+    try {
+      await restoreModerationMessage(messageId)
+      toast({ title: "Message restored" })
+      if (viewConversationId) await openConversation(viewConversationId)
+    } catch (error) {
+      console.error("Error restoring message:", error)
+      toast({ title: "Failed to restore message", variant: "destructive" })
+    } finally {
+      setRestoringMessageId(null)
+    }
+  }
+
+  const handlePermanentlyDeleteMessage = async () => {
+    if (!permanentDeleteMessageId) return
+    const messageId = permanentDeleteMessageId
+    setPermanentDeleteMessageId(null)
+    try {
+      await permanentlyDeleteModerationMessage(messageId)
+      toast({ title: "Message permanently deleted" })
+      setViewMessages((prev) => prev.filter((m) => m.id !== messageId))
+      await loadAll()
+    } catch (error) {
+      console.error("Error permanently deleting message:", error)
+      toast({ title: "Failed to delete message", variant: "destructive" })
+    }
+  }
+
+  const handleRestoreAllMessages = async () => {
+    if (!viewConversationId) return
+    setRestoringAll(true)
+    try {
+      await restoreAllDeletedMessages(viewConversationId)
+      toast({ title: "All deleted messages restored" })
+      await openConversation(viewConversationId)
+    } catch (error) {
+      console.error("Error restoring all messages:", error)
+      toast({ title: "Failed to restore messages", variant: "destructive" })
+    } finally {
+      setRestoringAll(false)
+    }
+  }
+
+  const handlePermanentlyDeleteAllMessages = async () => {
+    if (!viewConversationId) return
+    setPermanentDeletingAll(true)
+    try {
+      await permanentlyDeleteAllDeletedMessages(viewConversationId)
+      toast({ title: "All deleted messages permanently removed" })
+      setViewMessages((prev) => prev.filter((m) => !m.deletedAt))
+      await loadAll()
+    } catch (error) {
+      console.error("Error permanently deleting all messages:", error)
+      toast({ title: "Failed to delete messages", variant: "destructive" })
+    } finally {
+      setPermanentDeletingAll(false)
+      setPermanentDeleteAllOpen(false)
     }
   }
 
@@ -338,6 +409,29 @@ export default function ChatModeration({ initialReports, initialConversations }:
             <DialogTitle>Conversation</DialogTitle>
             <DialogDescription>Decrypted message history for moderation review</DialogDescription>
           </DialogHeader>
+          {viewMessages.some((m) => m.deletedAt) && (
+            <div className="flex gap-2 pb-2 border-b border-gray-100">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                disabled={restoringAll}
+                onClick={handleRestoreAllMessages}
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                {restoringAll ? "Restoring..." : "Restore all deleted"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => setPermanentDeleteAllOpen(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete all permanently
+              </Button>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto space-y-3 py-2">
             {loadingMessages ? (
               <div className="text-center text-gray-400 py-8">Loading...</div>
@@ -350,8 +444,36 @@ export default function ChatModeration({ initialReports, initialConversations }:
                     <span className="font-medium">{m.senderName}</span>
                     <span className="text-xs text-gray-400">{new Date(m.createdAt).toLocaleString()}</span>
                     {m.editedAt && <span className="text-xs text-gray-400">(edited)</span>}
+                    {m.deletedAt && (
+                      <Badge variant="outline" className="text-red-600 border-red-200">
+                        Deleted{m.deletedByName ? ` by ${m.deletedByName}` : ""}
+                      </Badge>
+                    )}
                   </div>
-                  <p className="text-gray-700">{m.content}</p>
+                  <p className={m.deletedAt ? "text-gray-400 italic" : "text-gray-700"}>{m.content}</p>
+                  {m.deletedAt && (
+                    <div className="flex gap-2 mt-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs text-emerald-700 hover:bg-emerald-50"
+                        disabled={restoringMessageId === m.id}
+                        onClick={() => handleRestoreMessage(m.id)}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        {restoringMessageId === m.id ? "Restoring..." : "Restore"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs text-red-600 hover:bg-red-50"
+                        onClick={() => setPermanentDeleteMessageId(m.id)}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete permanently
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -381,6 +503,44 @@ export default function ChatModeration({ initialReports, initialConversations }:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Permanent delete confirm */}
+      <AlertDialog open={!!permanentDeleteMessageId} onOpenChange={(open) => !open && setPermanentDeleteMessageId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete this message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the message from the database entirely. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePermanentlyDeleteMessage} className="bg-red-600 hover:bg-red-700 text-white">
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Permanent delete all confirm */}
+      <AlertDialog open={permanentDeleteAllOpen} onOpenChange={(open) => !permanentDeletingAll && setPermanentDeleteAllOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete all deleted messages?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes every message already marked as deleted in this conversation from the database entirely.
+              Messages that were never deleted are not affected. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={permanentDeletingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handlePermanentlyDeleteAllMessages} disabled={permanentDeletingAll}
+              className="bg-red-600 hover:bg-red-700 text-white">
+              {permanentDeletingAll ? "Deleting..." : "Delete all permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Suspend confirm */}
       <AlertDialog open={!!suspendUserId} onOpenChange={(open) => !open && setSuspendUserId(null)}>

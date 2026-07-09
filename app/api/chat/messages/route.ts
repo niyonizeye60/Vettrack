@@ -50,10 +50,8 @@ export async function GET(request: NextRequest) {
       .find((id) => id.toString() !== currentUser._id)
       ?.toString()
 
-    // Get messages, excluding any this user has soft-deleted for themselves
     const messages = await db.collection("messages").find({
-      conversationId: new ObjectId(conversationId),
-      deletedFor: { $nin: [currentUser._id] }
+      conversationId: new ObjectId(conversationId)
     }).sort({ createdAt: 1 }).toArray()
 
     // Mark messages as read
@@ -90,6 +88,7 @@ export async function GET(request: NextRequest) {
 
     const formattedMessages = messages.map(msg => {
       const isMe = msg.senderId.toString() === currentUser._id
+      const isDeleted = !!msg.deletedAt
       let status: "sent" | "delivered" | "read" = "sent"
       if (isMe) {
         if (msg.readAt) {
@@ -100,9 +99,10 @@ export async function GET(request: NextRequest) {
       }
       return {
         id: msg._id.toString(),
-        content: decryptText(msg.content),
+        content: isDeleted ? "" : decryptText(msg.content),
         senderId: msg.senderId.toString(),
         isMe,
+        isDeleted,
         createdAt: msg.createdAt,
         readAt: msg.readAt || (!isMe ? readNow : null),
         editedAt: msg.editedAt || null,
@@ -166,7 +166,8 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       readAt: null,
       editedAt: null,
-      deletedFor: [] as string[]
+      deletedAt: null,
+      deletedBy: null as string | null
     }
 
     const result = await db.collection("messages").insertOne(newMessage)
@@ -302,22 +303,16 @@ export async function DELETE(request: NextRequest) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
+    // Only the sender can delete their own message, and it's deleted for
+    // everyone in the conversation (not just the caller).
     const message = await db.collection("messages").findOne({ _id: new ObjectId(messageId) })
-    if (!message) {
-      return NextResponse.json({ error: "Message not found" }, { status: 404 })
-    }
-
-    const conversation = await db.collection("conversations").findOne({
-      _id: message.conversationId,
-      participants: new ObjectId(currentUser._id)
-    })
-    if (!conversation) {
+    if (!message || message.senderId.toString() !== currentUser._id) {
       return NextResponse.json({ error: "Message not found" }, { status: 404 })
     }
 
     await db.collection("messages").updateOne(
       { _id: new ObjectId(messageId) },
-      { $addToSet: { deletedFor: currentUser._id } }
+      { $set: { deletedAt: new Date(), deletedBy: currentUser._id } }
     )
 
     logUserActivity({
