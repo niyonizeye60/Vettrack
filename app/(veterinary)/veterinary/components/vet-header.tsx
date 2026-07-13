@@ -2,7 +2,7 @@
 
 import { logoutUser, getCurrentUser } from "@/lib/actions/auth"
 import { useRouter } from "next/navigation"
-import { Bell, Menu, User, LogOut, Settings, Stethoscope, RefreshCw } from "lucide-react"
+import { Bell, Menu, User, LogOut, Settings, Stethoscope, RefreshCw, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -42,6 +42,7 @@ export default function VetHeader() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [notificationCount, setNotificationCount] = useState(0)
   const [notificationOpen, setNotificationOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   useEffect(() => {
     async function fetchUser() {
@@ -119,11 +120,13 @@ export default function VetHeader() {
   }
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
     try {
       await logoutUser()
       router.push("/login")
     } catch (error) {
       console.error("Logout error:", error)
+      setIsLoggingOut(false)
     }
   }
 
@@ -268,9 +271,18 @@ export default function VetHeader() {
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>{t("vet.logout")}</span>
+              <DropdownMenuItem
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                onSelect={(e) => isLoggingOut && e.preventDefault()}
+                className="text-red-600 focus:text-red-600"
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="mr-2 h-4 w-4" />
+                )}
+                <span>{isLoggingOut ? t('auth.loggingOut') : t("vet.logout")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

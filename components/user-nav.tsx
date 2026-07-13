@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getCurrentUser, logoutUser } from "@/lib/actions/auth"
+import { Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -19,6 +20,7 @@ import Link from "next/link"
 export function UserNav() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -36,11 +38,13 @@ export function UserNav() {
   }, [])
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
     try {
       await logoutUser()
       router.push("/login")
     } catch (error) {
       console.error("Logout error:", error)
+      setIsLoggingOut(false)
     }
   }
 
@@ -109,8 +113,13 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
-          Log out
+        <DropdownMenuItem
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          onSelect={(e) => isLoggingOut && e.preventDefault()}
+        >
+          {isLoggingOut && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoggingOut ? "Logging out..." : "Log out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

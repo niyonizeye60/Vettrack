@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Bell, Menu, Settings, LogOut, User, AlertCircle, CheckCircle, Clock, UserX, UserPlus, Calendar, Timer, TrendingDown, BarChart3, Target, FileText, Database, Shield } from "lucide-react"
+import { Bell, Menu, Settings, LogOut, User, AlertCircle, CheckCircle, Clock, UserX, UserPlus, Calendar, Timer, TrendingDown, BarChart3, Target, FileText, Database, Shield, Loader2 } from "lucide-react"
 import { logoutUser } from "@/lib/actions/auth"
 import { useRouter } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -27,6 +27,7 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notificationOpen, setNotificationOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
   const { t } = useLanguage()
 
@@ -169,11 +170,13 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
   }
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
     try {
       await logoutUser()
       router.push("/login")
     } catch (error) {
       console.error("Logout error:", error)
+      setIsLoggingOut(false)
     }
   }
 
@@ -314,9 +317,18 @@ export default function AdminHeader({ onMenuClick }: AdminHeaderProps) {
                 {t('admin.settings')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                {t('admin.logout')}
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                onSelect={(e) => isLoggingOut && e.preventDefault()}
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="mr-2 h-4 w-4" />
+                )}
+                {isLoggingOut ? t('auth.loggingOut') : t('admin.logout')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -29,7 +29,8 @@ import {
   Activity,
   AlertTriangle,
   Info,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from "lucide-react"
 import { logoutUser } from "@/lib/actions/auth"
 import { useRouter } from "next/navigation"
@@ -55,6 +56,7 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
 
   const [isOnline, setIsOnline] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -137,11 +139,13 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
   }
 
   const handleLogout = async () => {
+    setIsLoggingOut(true)
     try {
       await logoutUser()
       router.push("/login")
     } catch (error) {
       console.error("Logout failed:", error)
+      setIsLoggingOut(false)
     }
   }
 
@@ -332,9 +336,18 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
                 </DropdownMenuItem>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                {t('superadmin.logout') || 'Logout'}
+              <DropdownMenuItem
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                onSelect={(e) => isLoggingOut && e.preventDefault()}
+                className="text-red-600"
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="mr-2 h-4 w-4" />
+                )}
+                {isLoggingOut ? t('auth.loggingOut') : (t('superadmin.logout') || 'Logout')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
