@@ -80,7 +80,7 @@ const translations = {
     // Home Page
     'home.hero.titleStart': 'Track, Consult, and',
     'home.hero.titleEnd': 'Care for Your Animals',
-    'home.hero.subtitle': 'Innovative solutions for livestock and pet owners. Advanced tracking, expert consultations, and comprehensive care - all in one place',
+    'home.hero.subtitle': 'Innovative solutions for livestock and pet owners. Advanced tracking, expert consultations,farm management and comprehensive care - all in one place',
     'home.hero.cta': 'Explore Our Services',
     'home.hero.bookConsultation': 'Book a Consultation',
     'home.hero.trusted': 'Trusted by 5,000+ animal owners across Rwanda',
@@ -112,7 +112,7 @@ const translations = {
     'home.cta.button': 'Book Consultation',
     // Portal Section
     'home.portal.title': 'Customer Portal',
-    'home.portal.subtitle': 'Our comprehensive customer portal gives you complete control over your animals\' health and management. Track, consult, and care for your animals effortlessly',
+    'home.portal.subtitle': 'Our comprehensive customer portal gives you complete control over your animals\' health and management. Track, consult, Manage and care for your animals effortlessly',
     'home.portal.management.title': 'Animal Management',
     'home.portal.management.desc': 'Register and track all your animals in one place with detailed health records and location data',
     'home.portal.consultations.title': 'Veterinary Consultations',
