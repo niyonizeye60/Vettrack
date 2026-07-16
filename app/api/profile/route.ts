@@ -7,6 +7,18 @@ import { hashPassword } from "@/lib/password"
 
 const ALLOWED_FIELDS = ["name", "email", "phone", "password", "licenseNumber", "specialization", "bio"] as const
 
+export async function GET() {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ success: false }, { status: 401 })
+    }
+    return NextResponse.json({ success: true, image: currentUser.image ?? null })
+  } catch (error) {
+    return NextResponse.json({ success: false }, { status: 500 })
+  }
+}
+
 async function updateProfile(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
