@@ -78,9 +78,9 @@ const translations = {
     'common.optional': 'Optional',
     
     // Home Page
-    'home.hero.titleStart': 'Track, Consult, and',
+    'home.hero.titleStart': 'Track, Consult, Manage and',
     'home.hero.titleEnd': 'Care for Your Animals',
-    'home.hero.subtitle': 'Innovative solutions for livestock and pet owners. Advanced tracking, expert consultations,farm management and comprehensive care - all in one place',
+    'home.hero.subtitle': 'Innovative solutions for livestock and pet owners. Advanced tracking, expert consultations, farm management and comprehensive care - all in one place',
     'home.hero.cta': 'Explore Our Services',
     'home.hero.bookConsultation': 'Book a Consultation',
     'home.hero.trusted': 'Trusted by 5,000+ animal owners across Rwanda',
