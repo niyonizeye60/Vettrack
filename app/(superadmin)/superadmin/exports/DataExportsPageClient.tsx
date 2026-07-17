@@ -293,11 +293,12 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-4 sm:p-6 min-h-full">
+      <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">{t('superadmin.dataExports') || 'Data Exports'}</h1>
-        <p className="text-gray-600">{t('superadmin.exportSystemData') || 'Export system data in various formats'}</p>
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.dataExports') || 'Data Exports'}</h1>
+        <p className="text-gray-500 mt-1 text-sm">{t('superadmin.exportSystemData') || 'Export system data in various formats'}</p>
       </div>
 
       <Tabs defaultValue="manual" className="space-y-6">
@@ -711,6 +712,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   )
 }

@@ -295,11 +295,12 @@ export default function NotificationsPageClient({
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-4 sm:p-6 min-h-full">
+      <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{t('superadmin.notificationManagement') || 'Notification Management'}</h1>
-          <p className="text-gray-600">{t('superadmin.manageNotificationTemplates') || 'Manage notification templates and send bulk notifications'}</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.notificationManagement') || 'Notification Management'}</h1>
+          <p className="text-gray-500 mt-1 text-sm">{t('superadmin.manageNotificationTemplates') || 'Manage notification templates and send bulk notifications'}</p>
         </div>
         <div className="flex space-x-2">
           <Dialog open={isCreateTemplateOpen} onOpenChange={setIsCreateTemplateOpen}>
@@ -851,6 +852,7 @@ export default function NotificationsPageClient({
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   )
 }

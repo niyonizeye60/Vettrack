@@ -3,23 +3,33 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { 
-  Users, 
-  FileText, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Users,
+  FileText,
+  Clock,
   AlertCircle,
-  TrendingUp,
   Activity,
   Server,
-  Mail,
   Database,
   Shield,
+  ShieldAlert,
   Settings,
   ArrowUpRight,
-  MoreVertical
+  MoreVertical,
+  RefreshCw,
+  Download,
+  Mail,
+  Wifi
 } from "lucide-react"
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useRouter } from "next/navigation"
 
@@ -34,8 +44,10 @@ interface SuperAdminDashboardClientProps {
       superadmin?: number
     }
     consultationStats: {
+      pending?: number
       accepted?: number
       rejected?: number
+      completed?: number
     }
   }
   recentActivities: Array<{
@@ -44,153 +56,378 @@ interface SuperAdminDashboardClientProps {
     message: string
     time: string
   }>
+  systemHealth: {
+    database: { status: string; size?: number; collections?: number; indexes?: number }
+    security: { status: string; failedLogins?: number; activeSessions?: number }
+    performance: { status: string; uptime?: string; errors24h?: number }
+    overall: { status: string }
+  }
+  openReportsCount: number
+  subscriberStats: {
+    total: number
+    active: number
+  }
+  onlineUsers: {
+    total: number
+    byRole: {
+      farmer?: number
+      doctor?: number
+      admin?: number
+      superadmin?: number
+    }
+  }
+  registrationTrend: Array<{
+    date: string
+    farmer: number
+    doctor: number
+    admin: number
+    superadmin: number
+    total: number
+  }>
+  activitySnapshot: {
+    activeToday: number
+    activeThisWeek: number
+    activeThisMonth: number
+    dormant: number
+    totalUsers: number
+  }
+  loginActivityTrend: {
+    series: Array<{ date: string; activeUsers: number }>
+    trackingSince: Date | string | null
+  }
 }
 
-export default function SuperAdminDashboardClient({ stats, recentActivities }: SuperAdminDashboardClientProps) {
+export default function SuperAdminDashboardClient({
+  stats,
+  recentActivities,
+  systemHealth,
+  openReportsCount,
+  subscriberStats,
+  onlineUsers,
+  registrationTrend,
+  activitySnapshot,
+  loginActivityTrend
+}: SuperAdminDashboardClientProps) {
   const { t } = useLanguage()
+
+  const healthBadge = (status: string) => {
+    switch (status) {
+      case 'healthy': return { label: t('superadmin.online') || 'Online', dot: 'bg-green-500', badge: 'bg-green-100 text-green-800' }
+      case 'warning': return { label: t('superadmin.warning') || 'Warning', dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-800' }
+      default: return { label: t('superadmin.error') || 'Error', dot: 'bg-red-500', badge: 'bg-red-100 text-red-800' }
+    }
+  }
   const router = useRouter()
+
+  const registrationChartData = registrationTrend.map(day => ({
+    ...day,
+    label: new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  }))
+
+  const activitySnapshotData = [
+    { name: t('superadmin.activeToday') || 'Active Today', value: activitySnapshot.activeToday, color: '#10B981' },
+    { name: t('superadmin.activeThisWeek') || 'Active This Week', value: activitySnapshot.activeThisWeek, color: '#3B82F6' },
+    { name: t('superadmin.activeThisMonth') || 'Active This Month', value: activitySnapshot.activeThisMonth, color: '#F59E0B' },
+    { name: t('superadmin.dormant') || 'Dormant', value: activitySnapshot.dormant, color: '#9CA3AF' },
+  ].filter(item => item.value > 0)
+
+  const loginTrendChartData = loginActivityTrend.series.map(day => ({
+    ...day,
+    label: new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  }))
+  const trackingSinceDate = loginActivityTrend.trackingSince ? new Date(loginActivityTrend.trackingSince) : null
 
   // Helper function to get icon and color based on activity type
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'user': return { icon: Users, color: 'text-blue-600' }
       case 'consultation': return { icon: FileText, color: 'text-orange-600' }
-      case 'system': return { icon: Database, color: 'text-purple-600' }
+      case 'report': return { icon: ShieldAlert, color: 'text-red-600' }
+      case 'subscriber': return { icon: Mail, color: 'text-purple-600' }
+      case 'login': return { icon: Wifi, color: 'text-teal-600' }
+      case 'admin': return { icon: Shield, color: 'text-indigo-600' }
+      case 'system': return { icon: Database, color: 'text-gray-600' }
       default: return { icon: AlertCircle, color: 'text-gray-600' }
     }
   }
 
   // Format activities with icons and colors
-  const formattedActivities = recentActivities.length > 0 ? recentActivities.map(activity => {
+  const formattedActivities = recentActivities.map(activity => {
     const { icon, color } = getActivityIcon(activity.type)
     return {
       ...activity,
       icon,
       color
     }
-  }) : [
-    {
-      id: 'fallback-1',
-      type: 'system',
-      message: t('superadmin.systemUpdate') || 'System running smoothly',
-      time: '1 hour ago',
-      icon: CheckCircle,
-      color: 'text-green-600'
-    }
-  ]
+  })
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 min-h-full">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
-                {t('superadmin.dashboard') || 'Super Admin Dashboard'}
-              </h1>
-              <p className="text-gray-600 mt-2 text-base">
-                {t('superadmin.manageUsersConsultations') || 'Manage users, consultations, and system settings'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                {t('superadmin.systemHealthy') || 'System Healthy'}
-              </Badge>
-              <Button variant="outline" size="sm" className="gap-2">
-                <MoreVertical className="h-4 w-4" />
-                {t('superadmin.actions') || 'Actions'}
-              </Button>
-            </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
+              {t('superadmin.dashboard') || 'Super Admin Dashboard'}
+            </h1>
+            <p className="text-gray-500 mt-1 text-sm">
+              {t('superadmin.manageUsersConsultations') || 'Manage users, consultations, and system settings'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge
+              variant="outline"
+              className={
+                systemHealth.overall.status === 'healthy'
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : systemHealth.overall.status === 'warning'
+                  ? 'bg-orange-50 text-orange-700 border-orange-200'
+                  : 'bg-red-50 text-red-700 border-red-200'
+              }
+            >
+              <div className={`w-2 h-2 rounded-full mr-2 ${
+                systemHealth.overall.status === 'healthy' ? 'bg-green-500' : systemHealth.overall.status === 'warning' ? 'bg-orange-500' : 'bg-red-500'
+              }`}></div>
+              {systemHealth.overall.status === 'healthy'
+                ? (t('superadmin.systemHealthy') || 'System Healthy')
+                : systemHealth.overall.status === 'warning'
+                ? (t('superadmin.systemWarning') || 'System Warning')
+                : (t('superadmin.systemError') || 'System Error')}
+            </Badge>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MoreVertical className="h-4 w-4" />
+                  {t('superadmin.actions') || 'Actions'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => router.refresh()}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {t('superadmin.refreshData') || 'Refresh Data'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-normal text-gray-400">
+                  {t('superadmin.needsAttention') || 'Needs Attention'}
+                </DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => router.push('/superadmin/consultations')}>
+                  <Clock className="mr-2 h-4 w-4 text-amber-600" />
+                  {t('superadmin.pendingConsultations') || 'Pending Consultations'}
+                  {(stats.consultationStats.pending || 0) > 0 && (
+                    <Badge variant="secondary" className="ml-auto bg-amber-100 text-amber-800">
+                      {stats.consultationStats.pending}
+                    </Badge>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/superadmin/moderation')}>
+                  <ShieldAlert className="mr-2 h-4 w-4 text-red-600" />
+                  {t('superadmin.openChatReports') || 'Open Chat Reports'}
+                  {openReportsCount > 0 && (
+                    <Badge variant="secondary" className="ml-auto bg-red-100 text-red-800">
+                      {openReportsCount}
+                    </Badge>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push('/superadmin/exports')}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {t('superadmin.dataExports') || 'Data Exports'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/superadmin/settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  {t('superadmin.settings') || 'Settings'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
-          <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50 hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-900">{t('superadmin.totalUsers')}</CardTitle>
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <Users className="h-4 w-4 text-white" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('superadmin.totalUsers')}</p>
+                <Users className="h-5 w-5 text-gray-400 flex-shrink-0" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-900 mb-1">
-                {stats.totalUsers.toLocaleString()}
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-blue-700">
-                  {t('superadmin.farmers')}: {stats.userStats.farmer || 0} | {t('superadmin.doctors')}: {stats.userStats.doctor || 0} | {t('superadmin.admin')}: {stats.userStats.admin || 0} | {t('superadmin.superadmins')}: {stats.userStats.superadmin || 0}
-                </span>
-                <TrendingUp className="h-3 w-3 text-blue-600" />
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{stats.totalUsers.toLocaleString()}</h3>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-2 text-xs text-gray-400">
+                <span className="truncate">{t('superadmin.farmers')}: <span className="text-gray-600 font-medium">{stats.userStats.farmer || 0}</span></span>
+                <span className="truncate">{t('superadmin.doctors')}: <span className="text-gray-600 font-medium">{stats.userStats.doctor || 0}</span></span>
+                <span className="truncate">{t('superadmin.admin')}: <span className="text-gray-600 font-medium">{stats.userStats.admin || 0}</span></span>
+                <span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}: <span className="text-gray-600 font-medium">{stats.userStats.superadmin || 0}</span></span>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100/50 hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-purple-900">{t('superadmin.totalConsultations')}</CardTitle>
-              <div className="p-2 bg-purple-500 rounded-lg">
-                <FileText className="h-4 w-4 text-white" />
+          <Card
+            className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200 cursor-pointer"
+            onClick={() => router.push('/superadmin/users')}
+          >
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('superadmin.onlineNow') || 'Online Now'}</p>
+                <Wifi className="h-5 w-5 text-gray-400 flex-shrink-0" />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-purple-900 mb-1">
-                {stats.totalConsultations.toLocaleString()}
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-purple-700">{t('superadmin.allTimeConsultations') || 'All time consultations'}</span>
-                <ArrowUpRight className="h-3 w-3 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50 hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-emerald-900">{t('superadmin.approved')}</CardTitle>
-              <div className="p-2 bg-emerald-500 rounded-lg">
-                <CheckCircle className="h-4 w-4 text-white" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-emerald-900 mb-1">
-                {(stats.consultationStats.accepted || 0).toLocaleString()}
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-emerald-700">{t('superadmin.approvedConsultations') || 'Approved consultations'}</span>
-                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5">
-                  +12%
-                </Badge>
+              <h3 className="text-3xl font-bold text-emerald-600 mt-2">{onlineUsers.total.toLocaleString()}</h3>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-2 text-xs text-gray-400">
+                <span className="truncate">{t('superadmin.farmers')}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.farmer || 0}</span></span>
+                <span className="truncate">{t('superadmin.doctors')}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.doctor || 0}</span></span>
+                <span className="truncate">{t('superadmin.admin')}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.admin || 0}</span></span>
+                <span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.superadmin || 0}</span></span>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden border-0 shadow-sm bg-gradient-to-br from-red-50 to-red-100/50 hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-red-900">{t('superadmin.rejected')}</CardTitle>
-              <div className="p-2 bg-red-500 rounded-lg">
-                <XCircle className="h-4 w-4 text-white" />
+          <Card
+            className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200 cursor-pointer"
+            onClick={() => router.push('/superadmin/moderation')}
+          >
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('superadmin.openChatReports') || 'Open Reports'}</p>
+                <ShieldAlert className="h-5 w-5 text-gray-400 flex-shrink-0" />
               </div>
+              <h3 className="text-3xl font-bold text-red-600 mt-2">{openReportsCount.toLocaleString()}</h3>
+              <p className="text-xs text-gray-400 mt-1">{t('superadmin.chatModeration') || 'Chat Moderation'}</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200 cursor-pointer"
+            onClick={() => router.push('/superadmin/subscribers')}
+          >
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('superadmin.newsletterSubscribers') || 'Newsletter Subscribers'}</p>
+                <Mail className="h-5 w-5 text-gray-400 flex-shrink-0" />
+              </div>
+              <h3 className="text-3xl font-bold text-purple-600 mt-2">{subscriberStats.total.toLocaleString()}</h3>
+              <p className="text-xs text-gray-400 mt-1">{subscriberStats.active.toLocaleString()} {t('superadmin.activeSubscribers') || 'active'}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* New User Registrations */}
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold">{t('superadmin.newUserRegistrations') || 'New User Registrations'}</CardTitle>
+                <CardDescription>{t('superadmin.last30Days') || 'Last 30 days'}</CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                onClick={() => router.push('/superadmin/users')}
+              >
+                {t('superadmin.viewAll') || 'View All'}
+                <ArrowUpRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={registrationChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={{ stroke: "#d1d5db" }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11 }} axisLine={{ stroke: "#d1d5db" }} allowDecimals={false} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="farmer" name={t('superadmin.farmers') || 'Farmers'} stackId="reg" fill="#10B981" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="doctor" name={t('superadmin.doctors') || 'Doctors'} stackId="reg" fill="#3B82F6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="admin" name={t('superadmin.admin') || 'Admin'} stackId="reg" fill="#F59E0B" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="superadmin" name={t('superadmin.superAdmin') || 'Super Admin'} stackId="reg" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* User Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold">{t('superadmin.activitySnapshot') || 'Activity Snapshot'}</CardTitle>
+              <CardDescription>{t('superadmin.basedOnLastLogin') || 'Based on last login'}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-red-900 mb-1">
-                {(stats.consultationStats.rejected || 0).toLocaleString()}
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-red-700">{t('superadmin.rejectedConsultations') || 'Rejected consultations'}</span>
-                <Badge variant="secondary" className="bg-red-100 text-red-800 text-xs px-2 py-0.5">
-                  -3%
-                </Badge>
-              </div>
+            <CardContent className="pt-0">
+              {activitySnapshotData.length > 0 ? (
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <div className="w-full sm:w-1/2">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={activitySnapshotData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={78}
+                          paddingAngle={2}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                        >
+                          {activitySnapshotData.map((entry, index) => (
+                            <Cell key={index} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 w-full space-y-3">
+                    {activitySnapshotData.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                          <span className="text-sm text-gray-600">{item.name}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900">{item.value.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-900">{t('superadmin.totalUsers')}</span>
+                      <span className="text-sm font-bold text-gray-900">{activitySnapshot.totalUsers.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-40 text-sm text-gray-400">
+                  {t('superadmin.noDataAvailable') || 'No data available'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold">{t('superadmin.dailyActiveUsers') || 'Daily Active Users'}</CardTitle>
+              <CardDescription>
+                {trackingSinceDate
+                  ? `${t('superadmin.trackingSince') || 'Tracking since'} ${trackingSinceDate.toLocaleDateString()}`
+                  : (t('superadmin.trackingJustStarted') || 'Login tracking just started - data will build up over the coming days')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={loginTrendChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={{ stroke: "#d1d5db" }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={{ stroke: "#d1d5db" }} allowDecimals={false} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="activeUsers" name={t('superadmin.activeUsers') || 'Active Users'} stroke="#3B82F6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Recent Activity */}
-          <Card className="xl:col-span-2 border-0 shadow-sm hover:shadow-md transition-all duration-200">
+          <Card className="xl:col-span-2 border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -204,28 +441,37 @@ export default function SuperAdminDashboardClient({ stats, recentActivities }: S
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="space-y-4">
-                {formattedActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start space-x-4 p-3 rounded-lg hover:bg-gray-50/80 transition-colors duration-150">
-                    <div className={`p-2 rounded-lg bg-gray-100 ${activity.color}`}>
-                      <activity.icon className="h-4 w-4" />
+              {formattedActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {formattedActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-start space-x-4 p-3 rounded-lg hover:bg-gray-50/80 transition-colors duration-150">
+                      <div className={`p-2 rounded-lg bg-gray-100 ${activity.color}`}>
+                        <activity.icon className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 leading-5">
+                          {activity.message}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {activity.time}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 leading-5">
-                        {activity.message}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {activity.time}
-                      </p>
-                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <div className="p-3 rounded-full bg-gray-100 mb-3">
+                    <Activity className="h-5 w-5 text-gray-400" />
                   </div>
-                ))}
-              </div>
+                  <p className="text-sm text-gray-500">{t('superadmin.noDataAvailable') || 'No data available'}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* System Health */}
-          <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-200">
+          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -236,75 +482,70 @@ export default function SuperAdminDashboardClient({ stats, recentActivities }: S
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-green-50/50">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-white rounded-lg shadow-sm">
-                      <Database className="h-4 w-4 text-green-600" />
+                      <Database className="h-4 w-4 text-gray-600" />
                     </div>
                     <div>
                       <span className="text-sm font-medium text-gray-900">{t('superadmin.database') || 'Database'}</span>
-                      <p className="text-xs text-gray-500">{t('superadmin.primaryBackup') || 'Primary & Backup'}</p>
+                      <p className="text-xs text-gray-500">
+                        {typeof systemHealth.database.size === 'number'
+                          ? `${systemHealth.database.size}MB · ${systemHealth.database.collections} collections`
+                          : (t('superadmin.primaryBackup') || 'Primary & Backup')}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                      {t('superadmin.online') || 'Online'}
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${healthBadge(systemHealth.database.status).dot}`}></div>
+                    <Badge variant="secondary" className={`${healthBadge(systemHealth.database.status).badge} text-xs`}>
+                      {healthBadge(systemHealth.database.status).label}
                     </Badge>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-green-50/50">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-white rounded-lg shadow-sm">
-                      <Shield className="h-4 w-4 text-green-600" />
+                      <Shield className="h-4 w-4 text-gray-600" />
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-900">{t('superadmin.authentication') || 'Authentication'}</span>
-                      <p className="text-xs text-gray-500">{t('superadmin.authServer') || 'Auth Server'}</p>
+                      <span className="text-sm font-medium text-gray-900">{t('superadmin.security') || 'Security'}</span>
+                      <p className="text-xs text-gray-500">
+                        {typeof systemHealth.security.failedLogins === 'number'
+                          ? `${systemHealth.security.failedLogins} ${t('superadmin.failedLogins24h') || 'failed logins (24h)'} · ${systemHealth.security.activeSessions} ${t('superadmin.activeSessions') || 'active sessions'}`
+                          : (t('superadmin.authServer') || 'Auth Server')}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                      {t('superadmin.online') || 'Online'}
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${healthBadge(systemHealth.security.status).dot}`}></div>
+                    <Badge variant="secondary" className={`${healthBadge(systemHealth.security.status).badge} text-xs`}>
+                      {healthBadge(systemHealth.security.status).label}
                     </Badge>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 rounded-lg bg-green-50/50">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-white rounded-lg shadow-sm">
-                      <Mail className="h-4 w-4 text-green-600" />
+                      <Server className="h-4 w-4 text-gray-600" />
                     </div>
                     <div>
-                      <span className="text-sm font-medium text-gray-900">{t('superadmin.emailService') || 'Email Service'}</span>
-                      <p className="text-xs text-gray-500">{t('superadmin.smtpGateway') || 'SMTP Gateway'}</p>
+                      <span className="text-sm font-medium text-gray-900">{t('superadmin.performance') || 'Performance'}</span>
+                      <p className="text-xs text-gray-500">
+                        {systemHealth.performance.uptime
+                          ? `${t('superadmin.uptime') || 'Uptime'}: ${systemHealth.performance.uptime} · ${systemHealth.performance.errors24h ?? 0} ${t('superadmin.errors24h') || 'errors (24h)'}`
+                          : (t('superadmin.serverPerformance') || 'Server Performance')}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-                      {t('superadmin.online') || 'Online'}
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${healthBadge(systemHealth.performance.status).dot}`}></div>
+                    <Badge variant="secondary" className={`${healthBadge(systemHealth.performance.status).badge} text-xs`}>
+                      {healthBadge(systemHealth.performance.status).label}
                     </Badge>
-                  </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Server className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-900">{t('superadmin.serverPerformance') || 'Server Performance'}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <span className="text-gray-600">{t('superadmin.cpuUsage') || 'CPU Usage'}</span>
-                      <div className="font-medium text-blue-900">23%</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">{t('superadmin.memory') || 'Memory'}</span>
-                      <div className="font-medium text-blue-900">67%</div>
-                    </div>
                   </div>
                 </div>
               </div>

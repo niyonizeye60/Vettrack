@@ -38,7 +38,7 @@ export default function SuperAdminNotificationsManagePage() {
     async function init() {
       const userData = await getCurrentUser()
       setUser(userData)
-      if (userData?._id) await fetchAll(userData._id)
+      if (userData?._id) await fetchAll(String(userData._id))
       setLoading(false)
     }
     init()
@@ -99,19 +99,18 @@ export default function SuperAdminNotificationsManagePage() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-10 h-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+      <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
     </div>
   )
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 min-h-full">
+      <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl">
-          <Bell className="h-6 w-6 text-white" />
-        </div>
+        <Bell className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 flex-shrink-0" />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications Management</h1>
-          <p className="text-sm text-gray-500">View, restore, or permanently delete all notifications</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Notifications Management</h1>
+          <p className="text-gray-500 mt-1 text-sm">View, restore, or permanently delete all notifications</p>
         </div>
       </div>
 
@@ -121,7 +120,7 @@ export default function SuperAdminNotificationsManagePage() {
           <Card
             key={f}
             onClick={() => setFilter(f)}
-            className={`cursor-pointer border-2 transition-all ${filter === f ? "border-emerald-500 bg-emerald-50" : "border-transparent"}`}
+            className={`cursor-pointer border transition-all ${filter === f ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}
           >
             <CardContent className="p-4">
               <p className="text-xs text-gray-500 uppercase font-medium capitalize">{f}</p>
@@ -131,7 +130,7 @@ export default function SuperAdminNotificationsManagePage() {
         ))}
       </div>
 
-      <Card className="border-0 shadow-xl bg-white/90">
+      <Card className="border border-gray-200 shadow-sm bg-white">
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -203,11 +202,11 @@ export default function SuperAdminNotificationsManagePage() {
                           {(isDeleted || isExpired) && (
                             <Button
                               size="sm" variant="ghost"
-                              className="h-8 w-8 p-0 hover:bg-emerald-50"
+                              className="h-8 w-8 p-0 hover:bg-blue-50"
                               title="Restore"
                               onClick={() => setRestoreId(n._id)}
                             >
-                              <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
+                              <RotateCcw className="h-3.5 w-3.5 text-blue-600" />
                             </Button>
                           )}
                           <Button
@@ -263,13 +262,14 @@ export default function SuperAdminNotificationsManagePage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => restoreId && user?._id && handleRestore(restoreId, user._id)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Restore
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   )
 }

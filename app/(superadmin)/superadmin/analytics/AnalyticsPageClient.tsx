@@ -1,59 +1,55 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
-import { 
-  Users, 
-  FileText, 
-  TrendingUp, 
-  Activity, 
-  Database, 
-  Shield, 
+import {
+  Users,
+  FileText,
+  TrendingUp,
   AlertTriangle,
-  CheckCircle,
   RefreshCw
 } from "lucide-react"
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 interface AnalyticsPageClientProps {
-  analyticsData: any
-  systemHealth: any
+  analyticsData: {
+    users: {
+      total: number
+      newLast30Days: number
+      growthRate: string
+    }
+    consultations: {
+      total: number
+      last30Days: number
+      completionRate: string
+      statusBreakdown: {
+        pending: number
+        accepted: number
+        rejected: number
+        completed: number
+      }
+    }
+    consultationTrend: Array<{ date: string; count: number }>
+    popularServices: Array<{ _id: string; count: number }>
+  } | null
 }
 
-export default function AnalyticsPageClient({ analyticsData, systemHealth }: AnalyticsPageClientProps) {
+export default function AnalyticsPageClient({ analyticsData }: AnalyticsPageClientProps) {
   const { t } = useLanguage()
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    // Refresh page data
     window.location.reload()
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'healthy': return 'text-green-600 bg-green-50 border-green-200'
-      case 'warning': return 'text-orange-600 bg-orange-50 border-orange-200'
-      case 'error': return 'text-red-600 bg-red-50 border-red-200'
-      default: return 'text-gray-600 bg-gray-50 border-gray-200'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'healthy': return <CheckCircle className="w-4 h-4" />
-      case 'warning': return <AlertTriangle className="w-4 h-4" />
-      case 'error': return <AlertTriangle className="w-4 h-4" />
-      default: return <Activity className="w-4 h-4" />
-    }
-  }
-
-  if (!analyticsData || !systemHealth) {
+  if (!analyticsData) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center py-12">
+      <div className="p-4 sm:p-6 min-h-full">
+        <div className="max-w-7xl mx-auto text-center py-12">
           <AlertTriangle className="w-12 h-12 mx-auto text-red-500 mb-4" />
           <h2 className="text-xl font-semibold mb-2">{t('superadmin.failedToLoadAnalytics') || 'Failed to Load Analytics'}</h2>
           <p className="text-gray-600 mb-4">{t('superadmin.unableToFetchAnalyticsData') || 'Unable to fetch analytics data'}</p>
@@ -66,229 +62,175 @@ export default function AnalyticsPageClient({ analyticsData, systemHealth }: Ana
     )
   }
 
+  const consultationTrendData = analyticsData.consultationTrend.map(day => ({
+    ...day,
+    label: new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  }))
+
+  const statusBreakdownData = [
+    { name: t('superadmin.pending') || 'Pending', value: analyticsData.consultations.statusBreakdown.pending, color: '#F59E0B' },
+    { name: t('superadmin.accepted') || 'Accepted', value: analyticsData.consultations.statusBreakdown.accepted, color: '#3B82F6' },
+    { name: t('superadmin.completed') || 'Completed', value: analyticsData.consultations.statusBreakdown.completed, color: '#10B981' },
+    { name: t('superadmin.rejected') || 'Rejected', value: analyticsData.consultations.statusBreakdown.rejected, color: '#EF4444' },
+  ].filter(item => item.value > 0)
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">{t('superadmin.analytics') || 'Analytics'}</h1>
-          <p className="text-gray-600">{t('superadmin.systemAnalytics') || 'System performance and user analytics'}</p>
-        </div>
-        <Button onClick={handleRefresh} disabled={isRefreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          {t('superadmin.refresh') || 'Refresh'}
-        </Button>
-      </div>
-
-      {/* System Health Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Database className="w-4 h-4 mr-2" />
-              {t('superadmin.database') || 'Database'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`flex items-center space-x-2 p-2 rounded-lg border ${getStatusColor(systemHealth.database.status)}`}>
-              {getStatusIcon(systemHealth.database.status)}
-              <span className="text-sm font-medium capitalize">{systemHealth.database.status}</span>
-            </div>
-            {systemHealth.database.size && (
-              <p className="text-xs text-gray-500 mt-2">{systemHealth.database.size}MB</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Shield className="w-4 h-4 mr-2" />
-              {t('superadmin.security') || 'Security'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`flex items-center space-x-2 p-2 rounded-lg border ${getStatusColor(systemHealth.security.status)}`}>
-              {getStatusIcon(systemHealth.security.status)}
-              <span className="text-sm font-medium capitalize">{systemHealth.security.status}</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">{systemHealth.security.failedLogins} {t('superadmin.failedLogins24h') || 'failed logins (24h)'}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Activity className="w-4 h-4 mr-2" />
-              {t('superadmin.performance') || 'Performance'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`flex items-center space-x-2 p-2 rounded-lg border ${getStatusColor(systemHealth.performance.status)}`}>
-              {getStatusIcon(systemHealth.performance.status)}
-              <span className="text-sm font-medium capitalize">{systemHealth.performance.status}</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">{t('superadmin.uptime') || 'Uptime'}: {systemHealth.performance.uptime}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t('superadmin.overallStatus') || 'Overall Status'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`flex items-center space-x-2 p-2 rounded-lg border ${getStatusColor(systemHealth.overall.status)}`}>
-              {getStatusIcon(systemHealth.overall.status)}
-              <span className="text-sm font-medium capitalize">{systemHealth.overall.status}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">{t('superadmin.totalUsers') || 'Total Users'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <Users className="w-5 h-5 text-blue-600" />
-              <span className="text-2xl font-bold">{analyticsData.users.total}</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              +{analyticsData.users.newLast30Days} {t('superadmin.thisMonth') || 'this month'} ({analyticsData.users.growthRate}%)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">{t('superadmin.activeUsers') || 'Active Users'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <Activity className="w-5 h-5 text-green-600" />
-              <span className="text-2xl font-bold">{analyticsData.users.active}</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">{t('superadmin.currentlyOnline') || 'Currently online'}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">{t('superadmin.totalConsultations') || 'Total Consultations'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-purple-600" />
-              <span className="text-2xl font-bold">{analyticsData.consultations.total}</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              +{analyticsData.consultations.last30Days} {t('superadmin.thisMonth') || 'this month'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">{t('superadmin.completionRate') || 'Completion Rate'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-orange-600" />
-              <span className="text-2xl font-bold">{analyticsData.consultations.completionRate}%</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {analyticsData.consultations.pending} {t('superadmin.pending') || 'pending'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts and Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Role Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('superadmin.userDistributionByRole') || 'User Distribution by Role'}</CardTitle>
-            <CardDescription>{t('superadmin.breakdownUsersByRoles') || 'Breakdown of users by their roles'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {analyticsData.distribution.userRoles.map((role: any) => (
-                <div key={role._id} className="flex items-center justify-between">
-                  <span className="text-sm font-medium capitalize">{role._id}</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-20 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full" 
-                        style={{ width: `${(role.count / analyticsData.users.total) * 100}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm text-gray-600">{role.count}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Popular Services */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('superadmin.popularServices') || 'Popular Services'}</CardTitle>
-            <CardDescription>{t('superadmin.mostRequestedConsultationServices') || 'Most requested consultation services'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {analyticsData.distribution.popularServices.map((service: any, index: number) => (
-                <div key={service._id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="outline" className="text-xs">#{index + 1}</Badge>
-                    <span className="text-sm font-medium">{service._id}</span>
-                  </div>
-                  <span className="text-sm text-gray-600">{service.count} {t('superadmin.requests') || 'requests'}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Trends */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('superadmin.activityTrendsLast7Days') || 'Activity Trends (Last 7 Days)'}</CardTitle>
-          <CardDescription>{t('superadmin.userRegistrationsConsultationRequests') || 'User registrations and consultation requests'}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium mb-3">{t('superadmin.userRegistrations') || 'User Registrations'}</h4>
-              <div className="space-y-2">
-                {analyticsData.trends.registrations.map((trend: any) => (
-                  <div key={trend._id} className="flex justify-between text-sm">
-                    <span>{new Date(trend._id).toLocaleDateString()}</span>
-                    <span className="font-medium">{trend.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h4 className="font-medium mb-3">{t('superadmin.consultationRequests') || 'Consultation Requests'}</h4>
-              <div className="space-y-2">
-                {analyticsData.trends.consultations.map((trend: any) => (
-                  <div key={trend._id} className="flex justify-between text-sm">
-                    <span>{new Date(trend._id).toLocaleDateString()}</span>
-                    <span className="font-medium">{trend.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+    <div className="p-4 sm:p-6 min-h-full">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.analytics') || 'Analytics'}</h1>
+            <p className="text-gray-500 mt-1 text-sm">{t('superadmin.systemAnalytics') || 'System performance and user analytics'}</p>
           </div>
-        </CardContent>
-      </Card>
+          <Button onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {t('superadmin.refresh') || 'Refresh'}
+          </Button>
+        </div>
+
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('superadmin.totalUsers') || 'Total Users'}</p>
+                <Users className="h-5 w-5 text-gray-400 flex-shrink-0" />
+              </div>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{analyticsData.users.total.toLocaleString()}</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                +{analyticsData.users.newLast30Days} {t('superadmin.thisMonth') || 'this month'} ({analyticsData.users.growthRate}%)
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('superadmin.totalConsultations') || 'Total Consultations'}</p>
+                <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
+              </div>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{analyticsData.consultations.total.toLocaleString()}</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                +{analyticsData.consultations.last30Days} {t('superadmin.thisMonth') || 'this month'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('superadmin.completionRate') || 'Completion Rate'}</p>
+                <TrendingUp className="h-5 w-5 text-gray-400 flex-shrink-0" />
+              </div>
+              <h3 className="text-3xl font-bold text-gray-900 mt-2">{analyticsData.consultations.completionRate}%</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {analyticsData.consultations.statusBreakdown.completed} {t('superadmin.completed') || 'completed'} · {analyticsData.consultations.statusBreakdown.pending} {t('superadmin.pending') || 'pending'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Consultation Volume */}
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold">{t('superadmin.consultationVolume') || 'Consultation Volume'}</CardTitle>
+            <CardDescription>{t('superadmin.last30Days') || 'Last 30 days'}</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={consultationTrendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={{ stroke: "#d1d5db" }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11 }} axisLine={{ stroke: "#d1d5db" }} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" name={t('superadmin.totalConsultations') || 'Consultations'} fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Status Breakdown + Popular Services */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader>
+              <CardTitle>{t('superadmin.consultationStatusBreakdown') || 'Consultation Status'}</CardTitle>
+              <CardDescription>{t('superadmin.currentConsultationsByStatus') || 'Current consultations by status'}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {statusBreakdownData.length > 0 ? (
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <div className="w-full sm:w-1/2">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={statusBreakdownData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={78}
+                          paddingAngle={2}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                        >
+                          {statusBreakdownData.map((entry, index) => (
+                            <Cell key={index} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 w-full space-y-3">
+                    {statusBreakdownData.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                          <span className="text-sm text-gray-600">{item.name}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-900">{item.value.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-40 text-sm text-gray-400">
+                  {t('superadmin.noDataAvailable') || 'No data available'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Popular Services */}
+          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader>
+              <CardTitle>{t('superadmin.popularServices') || 'Popular Services'}</CardTitle>
+              <CardDescription>{t('superadmin.mostRequestedConsultationServices') || 'Most requested consultation services'}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {analyticsData.popularServices.length > 0 ? (
+                <div className="space-y-3">
+                  {analyticsData.popularServices.map((service, index) => (
+                    <div key={service._id} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="text-xs">#{index + 1}</Badge>
+                        <span className="text-sm font-medium">{service._id}</span>
+                      </div>
+                      <span className="text-sm text-gray-600">{service.count} {t('superadmin.requests') || 'requests'}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-40 text-sm text-gray-400">
+                  {t('superadmin.noDataAvailable') || 'No data available'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

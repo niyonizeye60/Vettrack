@@ -4,6 +4,18 @@ import clientPromise from "../db"
 import { revalidatePath } from "next/cache"
 import { ObjectId } from "mongodb"
 import { hashPassword } from "../password"
+import { getCurrentUser } from "./auth"
+
+// Every exported function in this file is a Next.js server action with its own
+// network-invocable endpoint, independent of which page renders it - so each one
+// needs its own auth check rather than relying on the (superadmin) layout's redirect.
+async function requireSuperAdmin() {
+  const user = await getCurrentUser()
+  if (!user || user.role !== "superadmin") {
+    throw new Error("Unauthorized")
+  }
+  return user
+}
 
 interface SystemSettingsDoc {
   _id: string
@@ -36,6 +48,7 @@ interface SystemSettingsDoc {
 // Get all users for super admin management
 export async function getAllUsers() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -74,13 +87,19 @@ export async function getAllUsers() {
 // Update user status (suspend/activate)
 export async function updateUserStatus(userId: string, status: "active" | "suspended" | "inactive") {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
+    const targetUser = await db.collection("users").findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { name: 1 } }
+    )
+
     const result = await db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
-      { 
-        $set: { 
+      {
+        $set: {
           status,
           updatedAt: new Date()
         }
@@ -88,6 +107,10 @@ export async function updateUserStatus(userId: string, status: "active" | "suspe
     )
 
     if (result.modifiedCount > 0) {
+      await logAdminAction(
+        status === "suspended" ? "admin.user.suspended" : status === "active" ? "admin.user.activated" : "admin.user.deactivated",
+        targetUser?.name || userId
+      )
       revalidatePath("/superadmin/users")
       return { success: true, message: `User ${status} successfully` }
     }
@@ -102,20 +125,22 @@ export async function updateUserStatus(userId: string, status: "active" | "suspe
 // Bulk User Operations
 export async function bulkUpdateUserStatus(userIds: string[], status: "active" | "suspended" | "inactive") {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     const objectIds = userIds.map(id => new ObjectId(id))
     const result = await db.collection("users").updateMany(
       { _id: { $in: objectIds } },
-      { 
-        $set: { 
+      {
+        $set: {
           status,
           updatedAt: new Date()
         }
       }
     )
 
+    await logAdminAction("admin.user.bulkStatusChanged", `${result.modifiedCount} users set to ${status}`)
     revalidatePath("/superadmin/users")
     return { success: true, message: `${result.modifiedCount} users updated successfully`, count: result.modifiedCount }
   } catch (error) {
@@ -126,6 +151,7 @@ export async function bulkUpdateUserStatus(userIds: string[], status: "active" |
 
 export async function bulkDeleteUsers(userIds: string[]) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -134,6 +160,7 @@ export async function bulkDeleteUsers(userIds: string[]) {
       { _id: { $in: objectIds } }
     )
 
+    await logAdminAction("admin.user.bulkDeleted", `${result.deletedCount} users`)
     revalidatePath("/superadmin/users")
     return { success: true, message: `${result.deletedCount} users deleted successfully`, count: result.deletedCount }
   } catch (error) {
@@ -146,13 +173,17 @@ export async function exportUsers(filters?: {
   role?: string
   status?: string
   dateRange?: { start: Date, end: Date }
-}) {
+}): Promise<
+  | { success: true; data: Record<string, string>[]; count: number }
+  | { success: false; message: string }
+> {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     let query: any = {}
-    
+
     if (filters?.role && filters.role !== 'all') {
       query.role = filters.role
     }
@@ -186,6 +217,7 @@ export async function exportUsers(filters?: {
       lastLoginAt: user.lastLoginAt?.toISOString() || ''
     }))
 
+    await logAdminAction("admin.export.users", `${csvData.length} records`)
     return { success: true, data: csvData, count: csvData.length }
   } catch (error) {
     console.error("Error exporting users:", error)
@@ -195,6 +227,7 @@ export async function exportUsers(filters?: {
 
 export async function importUsers(userData: any[]) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -229,6 +262,7 @@ export async function importUsers(userData: any[]) {
 
 export async function getUserActivityLogs(userId?: string, limit: number = 100) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -286,6 +320,22 @@ export async function logUserActivity(data: {
   }
 }
 
+// Records an admin/superadmin-initiated action against the currently authenticated actor,
+// so it can surface in the recent activity feed and system log exports.
+async function logAdminAction(action: string, details?: string) {
+  try {
+    const actor = await getCurrentUser()
+    if (!actor) return
+    await logUserActivity({
+      userId: actor._id.toString(),
+      action,
+      details: details || '',
+    })
+  } catch (error) {
+    console.error("Error logging admin action:", error)
+  }
+}
+
 // Advanced Data Export Capabilities
 export async function exportConsultations(filters?: {
   status?: string
@@ -294,11 +344,12 @@ export async function exportConsultations(filters?: {
   farmerId?: string
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     let query: any = {}
-    
+
     if (filters?.status && filters.status !== 'all') {
       query.status = filters.status
     }
@@ -349,6 +400,8 @@ export async function exportConsultations(filters?: {
       updatedAt: consultation.updatedAt?.toISOString() || ''
     }))
 
+    await logAdminAction("admin.export.consultations", `${csvData.length} records`)
+
     return { success: true, data: csvData, count: csvData.length }
   } catch (error) {
     console.error("Error exporting consultations:", error)
@@ -362,11 +415,12 @@ export async function exportSystemLogs(filters?: {
   userId?: string
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     let query: any = {}
-    
+
     if (filters?.dateRange) {
       query.createdAt = {
         $gte: filters.dateRange.start,
@@ -419,6 +473,7 @@ export async function exportSystemLogs(filters?: {
       }))
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
+    await logAdminAction("admin.export.systemLogs", `${allLogs.length} records`)
     return { success: true, data: allLogs, count: allLogs.length }
   } catch (error) {
     console.error("Error exporting system logs:", error)
@@ -428,6 +483,7 @@ export async function exportSystemLogs(filters?: {
 
 export async function exportSystemReport() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -476,6 +532,7 @@ export async function exportSystemReport() {
       recentActivity: recentActivity.slice(0, 10)
     }
 
+    await logAdminAction("admin.export.systemReport")
     return { success: true, data: reportData }
   } catch (error) {
     console.error("Error generating system report:", error)
@@ -490,6 +547,7 @@ export async function scheduleDataExport(data: {
   email?: string
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -527,6 +585,7 @@ function getNextRunDate(frequency: string): Date {
 // Update user information
 export async function updateUser(userId: string, formData: FormData) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -577,6 +636,7 @@ export async function updateUser(userId: string, formData: FormData) {
 // Update user password
 export async function updateUserPassword(userId: string, newPassword: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -605,14 +665,21 @@ export async function updateUserPassword(userId: string, newPassword: string) {
 // Delete user
 export async function deleteUser(userId: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
+
+    const targetUser = await db.collection("users").findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { name: 1 } }
+    )
 
     const result = await db.collection("users").deleteOne(
       { _id: new ObjectId(userId) }
     )
 
     if (result.deletedCount > 0) {
+      await logAdminAction("admin.user.deleted", targetUser?.name || userId)
       revalidatePath("/superadmin/users")
       return { success: true, message: "User deleted successfully" }
     }
@@ -632,6 +699,7 @@ function safeObjectId(id: any): ObjectId | null {
 // Get all consultations for super admin review
 export async function getAllConsultations() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -689,26 +757,62 @@ export async function getAllConsultations() {
 // Get recent activities for dashboard
 export async function getRecentActivities() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-    // Get recent users (last 24 hours)
-    const recentUsers = await db.collection("users")
-      .find({ createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } })
-      .sort({ createdAt: -1 })
-      .limit(2)
-      .toArray()
+    const [recentUsers, recentConsultations, recentReports, recentSubscribers, loginBuckets, adminActionLogs] = await Promise.all([
+      db.collection("users")
+        .find({ createdAt: { $gte: since } })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .toArray(),
+      db.collection("consultations")
+        .find({ createdAt: { $gte: since } })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .toArray(),
+      db.collection("chat_reports")
+        .find({ createdAt: { $gte: since } })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .toArray(),
+      db.collection("newsletter_subscribers")
+        .find({ subscribedAt: { $gte: since } })
+        .sort({ subscribedAt: -1 })
+        .limit(5)
+        .toArray(),
+      db.collection("login_events").aggregate([
+        { $match: { createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d-%H", date: "$createdAt" } },
+            users: { $addToSet: "$userId" },
+            latest: { $max: "$createdAt" }
+          }
+        },
+        { $sort: { latest: -1 } },
+        { $limit: 5 }
+      ]).toArray(),
+      db.collection("user_activity_logs")
+        .find({ createdAt: { $gte: since }, action: { $regex: /^(admin|chat)\./ } })
+        .sort({ createdAt: -1 })
+        .limit(6)
+        .toArray()
+    ])
 
-    // Get recent consultations (last 24 hours)
-    const recentConsultations = await db.collection("consultations")
-      .find({ createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } })
-      .sort({ createdAt: -1 })
-      .limit(2)
-      .toArray()
+    const actorIds = [...new Set(adminActionLogs.map(log => log.userId?.toString()).filter(Boolean))]
+    const actors = actorIds.length > 0
+      ? await db.collection("users").find(
+          { _id: { $in: actorIds.map(id => new ObjectId(id)) } },
+          { projection: { name: 1 } }
+        ).toArray()
+      : []
+    const actorNameById = new Map(actors.map(actor => [actor._id.toString(), actor.name]))
 
     const activities: { id: string; type: string; message: string; time: string; createdAt: Date }[] = []
 
-    // Add user activities
     recentUsers.forEach(user => {
       activities.push({
         id: `user-${user._id}`,
@@ -719,7 +823,6 @@ export async function getRecentActivities() {
       })
     })
 
-    // Add consultation activities
     recentConsultations.forEach(consultation => {
       activities.push({
         id: `consultation-${consultation._id}`,
@@ -730,10 +833,54 @@ export async function getRecentActivities() {
       })
     })
 
-    // Sort by creation time and return top 4
+    recentReports.forEach(report => {
+      activities.push({
+        id: `report-${report._id}`,
+        type: 'report',
+        message: `New chat report filed: ${report.reason}`,
+        time: getTimeAgo(report.createdAt),
+        createdAt: report.createdAt
+      })
+    })
+
+    recentSubscribers.forEach(subscriber => {
+      activities.push({
+        id: `subscriber-${subscriber._id}`,
+        type: 'subscriber',
+        message: `New newsletter subscriber: ${subscriber.email}`,
+        time: getTimeAgo(subscriber.subscribedAt),
+        createdAt: subscriber.subscribedAt
+      })
+    })
+
+    loginBuckets.forEach(bucket => {
+      const count = bucket.users.length
+      activities.push({
+        id: `login-${bucket._id}`,
+        type: 'login',
+        message: count === 1 ? '1 user logged in' : `${count} users logged in`,
+        time: getTimeAgo(bucket.latest),
+        createdAt: bucket.latest
+      })
+    })
+
+    adminActionLogs.forEach(log => {
+      const actorName = actorNameById.get(log.userId?.toString()) || 'An admin'
+      const description = describeAdminAction(log.action, log.details)
+      if (!description) return
+      activities.push({
+        id: `admin-${log._id}`,
+        type: 'admin',
+        message: `${actorName} ${description}`,
+        time: getTimeAgo(log.createdAt),
+        createdAt: log.createdAt
+      })
+    })
+
+    // Sort by creation time and return the most recent 8 across all sources
     return activities
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 4)
+      .slice(0, 8)
 
   } catch (error) {
     console.error("Error fetching recent activities:", error)
@@ -756,69 +903,88 @@ function getTimeAgo(date: Date): string {
   return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
 }
 
-// Get analytics data for dashboard
+// Turns a user_activity_logs entry into a human-readable second-person-omitted
+// activity description, e.g. "suspended user: Jane Doe". Returns null for
+// actions not meant to appear in the recent activity feed.
+function describeAdminAction(action: string, details?: string): string | null {
+  switch (action) {
+    case 'admin.user.suspended': return `suspended user: ${details}`
+    case 'admin.user.activated': return `reactivated user: ${details}`
+    case 'admin.user.deactivated': return `deactivated user: ${details}`
+    case 'admin.user.bulkStatusChanged': return details || 'updated multiple user accounts'
+    case 'admin.user.bulkDeleted': return `deleted ${details}`
+    case 'admin.user.deleted': return `deleted user: ${details}`
+    case 'admin.vet.approved': return `approved veterinarian: ${details}`
+    case 'admin.vet.rejected': return `rejected veterinarian application: ${details}`
+    case 'admin.export.users': return `exported user data (${details})`
+    case 'admin.export.consultations': return `exported consultation data (${details})`
+    case 'admin.export.systemLogs': return `exported system logs (${details})`
+    case 'admin.export.systemReport': return 'generated a system report'
+    case 'chat.report.resolved': return 'resolved a chat report'
+    case 'chat.report.dismissed': return 'dismissed a chat report'
+    case 'chat.user.suspended': return 'suspended a reported user'
+    case 'chat.message.permanentlyDeleted': return 'permanently deleted a chat message'
+    case 'chat.message.permanentlyDeletedAll': return 'permanently deleted all flagged messages in a conversation'
+    case 'chat.message.restored': return 'restored a deleted chat message'
+    case 'chat.message.restoredAll': return 'restored all deleted messages in a conversation'
+    default: return null
+  }
+}
+
+// Get analytics data for the analytics page. System health, user role distribution,
+// online-user counts, and registration trends already live on the main dashboard -
+// this focuses on data the dashboard doesn't cover: growth rates, consultation
+// volume/status, and service popularity.
 export async function getAnalyticsData() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     const now = new Date()
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
-    // User analytics
-    const [totalUsers, newUsersLast30Days, newUsersLast7Days, activeUsers] = await Promise.all([
+    const [totalUsers, newUsersLast30Days] = await Promise.all([
       db.collection("users").countDocuments(),
-      db.collection("users").countDocuments({ createdAt: { $gte: last30Days } }),
-      db.collection("users").countDocuments({ createdAt: { $gte: last7Days } }),
-      db.collection("sessions").countDocuments({ expiresAt: { $gt: now } })
+      db.collection("users").countDocuments({ createdAt: { $gte: last30Days } })
     ])
 
-    // Consultation analytics
-    const [totalConsultations, consultationsLast30Days, pendingConsultations, completedConsultations] = await Promise.all([
+    const [totalConsultations, consultationsLast30Days, statusRows] = await Promise.all([
       db.collection("consultations").countDocuments(),
       db.collection("consultations").countDocuments({ createdAt: { $gte: last30Days } }),
-      db.collection("consultations").countDocuments({ status: "pending" }),
-      db.collection("consultations").countDocuments({ status: "completed" })
+      db.collection("consultations").aggregate([
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+      ]).toArray()
     ])
 
-    // User registration trends (last 7 days)
-    const registrationTrends = await db.collection("users").aggregate([
-      { $match: { createdAt: { $gte: last7Days } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
+    const statusBreakdown = statusRows.reduce((acc, row) => {
+      acc[row._id] = row.count
+      return acc
+    }, {} as Record<string, number>)
+    const completedConsultations = statusBreakdown.completed || 0
+
+    // Consultation volume trend (last 30 days, zero-filled so the chart doesn't skip empty days)
+    const trendStart = new Date(last30Days)
+    trendStart.setHours(0, 0, 0, 0)
+    const consultationTrendRows = await db.collection("consultations").aggregate([
+      { $match: { createdAt: { $gte: trendStart } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
     ]).toArray()
 
-    // Consultation trends (last 7 days)
-    const consultationTrends = await db.collection("consultations").aggregate([
-      { $match: { createdAt: { $gte: last7Days } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]).toArray()
-
-    // User role distribution
-    const userRoleDistribution = await db.collection("users").aggregate([
-      {
-        $group: {
-          _id: "$role",
-          count: { $sum: 1 }
-        }
-      }
-    ]).toArray()
+    const consultationTrend: { date: string; count: number }[] = []
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(trendStart)
+      d.setDate(d.getDate() + i)
+      consultationTrend.push({ date: d.toISOString().slice(0, 10), count: 0 })
+    }
+    const trendByDate = new Map(consultationTrend.map(entry => [entry.date, entry]))
+    for (const row of consultationTrendRows) {
+      const entry = trendByDate.get(row._id)
+      if (entry) entry.count = row.count
+    }
 
     // Popular services
-    const popularServices = await db.collection("consultations").aggregate([
+    const popularServiceRows = await db.collection("consultations").aggregate([
       {
         $group: {
           _id: "$service",
@@ -828,30 +994,30 @@ export async function getAnalyticsData() {
       { $sort: { count: -1 } },
       { $limit: 5 }
     ]).toArray()
+    const popularServices = popularServiceRows.map(row => ({
+      _id: String(row._id),
+      count: row.count as number
+    }))
 
     return {
       users: {
         total: totalUsers,
         newLast30Days: newUsersLast30Days,
-        newLast7Days: newUsersLast7Days,
-        active: activeUsers,
-        growthRate: totalUsers > 0 ? ((newUsersLast30Days / totalUsers) * 100).toFixed(1) : 0
+        growthRate: totalUsers > 0 ? ((newUsersLast30Days / totalUsers) * 100).toFixed(1) : "0"
       },
       consultations: {
         total: totalConsultations,
         last30Days: consultationsLast30Days,
-        pending: pendingConsultations,
-        completed: completedConsultations,
-        completionRate: totalConsultations > 0 ? ((completedConsultations / totalConsultations) * 100).toFixed(1) : 0
+        completionRate: totalConsultations > 0 ? ((completedConsultations / totalConsultations) * 100).toFixed(1) : "0",
+        statusBreakdown: {
+          pending: statusBreakdown.pending || 0,
+          accepted: statusBreakdown.accepted || 0,
+          rejected: statusBreakdown.rejected || 0,
+          completed: completedConsultations
+        }
       },
-      trends: {
-        registrations: registrationTrends,
-        consultations: consultationTrends
-      },
-      distribution: {
-        userRoles: userRoleDistribution,
-        popularServices: popularServices
-      }
+      consultationTrend,
+      popularServices
     }
   } catch (error) {
     console.error("Error fetching analytics data:", error)
@@ -862,6 +1028,7 @@ export async function getAnalyticsData() {
 // Get system health metrics
 export async function getSystemHealth() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -948,6 +1115,7 @@ export async function logSystemError(error: {
 // Content Management Functions
 export async function getSystemAnnouncements() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -981,6 +1149,7 @@ export async function createAnnouncement(data: {
   sendEmail?: boolean
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1071,6 +1240,7 @@ export async function updateAnnouncement(id: string, data: {
   active: boolean
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1094,6 +1264,7 @@ export async function updateAnnouncement(id: string, data: {
 
 export async function deleteAnnouncement(id: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1109,6 +1280,7 @@ export async function deleteAnnouncement(id: string) {
 // Generate automatic notifications based on system events
 export async function generateSystemNotifications() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1196,6 +1368,7 @@ export async function generateSystemNotifications() {
 // Get system settings
 export async function getSystemSettings() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1245,6 +1418,7 @@ export async function getSystemSettings() {
 // Update system settings
 export async function updateSystemSettings(settings: any) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1269,6 +1443,7 @@ export async function updateSystemSettings(settings: any) {
 // Database maintenance actions
 export async function performDatabaseAction(action: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1303,6 +1478,7 @@ export async function performDatabaseAction(action: string) {
 // Get system statistics
 export async function getSystemStats() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1351,9 +1527,191 @@ export async function getSystemStats() {
   }
 }
 
+// Get newsletter subscriber counts
+export async function getNewsletterSubscriberStats() {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const [total, active] = await Promise.all([
+      db.collection("newsletter_subscribers").countDocuments({}),
+      db.collection("newsletter_subscribers").countDocuments({ status: "active" })
+    ])
+
+    return { total, active }
+  } catch (error) {
+    console.error("Error fetching newsletter subscriber stats:", error)
+    return { total: 0, active: 0 }
+  }
+}
+
+// Get currently logged-in (active session) users, broken down by role
+export async function getOnlineUsersByRole() {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    // Collapse to distinct users first (a user can hold multiple active sessions),
+    // then count distinct users per role
+    const roleStats = await db.collection("sessions").aggregate([
+      { $match: { expiresAt: { $gt: new Date() } } },
+      { $group: { _id: "$userId", role: { $first: "$role" } } },
+      { $group: { _id: "$role", count: { $sum: 1 } } }
+    ]).toArray()
+
+    return {
+      total: roleStats.reduce((sum, stat) => sum + stat.count, 0),
+      byRole: roleStats.reduce((acc, stat) => {
+        acc[stat._id] = stat.count
+        return acc
+      }, {} as Record<string, number>)
+    }
+  } catch (error) {
+    console.error("Error fetching online users by role:", error)
+    return { total: 0, byRole: {} }
+  }
+}
+
+// Get daily new-user registration counts for the last N days, broken down by role
+export async function getUserRegistrationTrend(days = 30) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const start = new Date()
+    start.setDate(start.getDate() - (days - 1))
+    start.setHours(0, 0, 0, 0)
+
+    const rows = await db.collection("users").aggregate([
+      { $match: { createdAt: { $gte: start } } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            role: "$role"
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]).toArray()
+
+    // Build a zero-filled day-by-day series so the chart doesn't skip empty days
+    const byDate: Record<string, { date: string; farmer: number; doctor: number; admin: number; superadmin: number; total: number }> = {}
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start)
+      d.setDate(d.getDate() + i)
+      const key = d.toISOString().slice(0, 10)
+      byDate[key] = { date: key, farmer: 0, doctor: 0, admin: 0, superadmin: 0, total: 0 }
+    }
+
+    for (const row of rows) {
+      const key = row._id.date
+      const role = row._id.role as "farmer" | "doctor" | "admin" | "superadmin"
+      if (byDate[key] && role in byDate[key]) {
+        byDate[key][role] += row.count
+        byDate[key].total += row.count
+      }
+    }
+
+    return Object.values(byDate)
+  } catch (error) {
+    console.error("Error fetching user registration trend:", error)
+    return []
+  }
+}
+
+// Snapshot of how recently users last logged in
+export async function getUserActivitySnapshot() {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    const [activeToday, activeThisWeek, activeThisMonth, totalUsers] = await Promise.all([
+      db.collection("users").countDocuments({ lastLoginAt: { $gte: startOfToday } }),
+      db.collection("users").countDocuments({ lastLoginAt: { $gte: last7Days } }),
+      db.collection("users").countDocuments({ lastLoginAt: { $gte: last30Days } }),
+      db.collection("users").countDocuments({})
+    ])
+
+    return {
+      activeToday,
+      // "this week" bucket excludes anyone already counted in "today", so the buckets are non-overlapping
+      activeThisWeek: activeThisWeek - activeToday,
+      activeThisMonth: activeThisMonth - activeThisWeek,
+      dormant: totalUsers - activeThisMonth,
+      totalUsers
+    }
+  } catch (error) {
+    console.error("Error fetching user activity snapshot:", error)
+    return { activeToday: 0, activeThisWeek: 0, activeThisMonth: 0, dormant: 0, totalUsers: 0 }
+  }
+}
+
+// Get daily active-user counts for the last N days, from the login_events log.
+// login_events only started being recorded recently, so early days in the range will read as 0.
+export async function getLoginActivityTrend(days = 30) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const start = new Date()
+    start.setDate(start.getDate() - (days - 1))
+    start.setHours(0, 0, 0, 0)
+
+    const rows = await db.collection("login_events").aggregate([
+      { $match: { createdAt: { $gte: start } } },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            userId: "$userId"
+          }
+        }
+      },
+      {
+        $group: {
+          _id: "$_id.date",
+          activeUsers: { $sum: 1 }
+        }
+      }
+    ]).toArray()
+
+    const byDate: Record<string, number> = {}
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start)
+      d.setDate(d.getDate() + i)
+      byDate[d.toISOString().slice(0, 10)] = 0
+    }
+    for (const row of rows) {
+      if (row._id in byDate) byDate[row._id] = row.activeUsers
+    }
+
+    const earliestTrackedAt = await db.collection("login_events").find({}).sort({ createdAt: 1 }).limit(1).toArray()
+
+    return {
+      series: Object.entries(byDate).map(([date, activeUsers]) => ({ date, activeUsers })),
+      trackingSince: earliestTrackedAt[0]?.createdAt ?? null
+    }
+  } catch (error) {
+    console.error("Error fetching login activity trend:", error)
+    return { series: [], trackingSince: null }
+  }
+}
+
 // Get user profile by ID
 export async function getUserProfile(userId: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1389,6 +1747,7 @@ export async function updateUserProfile(userId: string, profileData: {
   location: string
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1417,6 +1776,7 @@ export async function updateUserProfile(userId: string, profileData: {
 // Get notifications for super admin
 export async function getNotifications(userId: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1452,6 +1812,7 @@ export async function getNotifications(userId: string) {
 // Mark notification as read
 export async function markNotificationRead(notificationId: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1470,6 +1831,7 @@ export async function markNotificationRead(notificationId: string) {
 // Mark all notifications as read for a user
 export async function markAllNotificationsRead(userId: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1502,6 +1864,7 @@ export async function createSystemNotification(data: {
   actionUrl?: string
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1525,6 +1888,7 @@ export async function createSystemNotification(data: {
 // Advanced Notification System
 export async function getNotificationTemplates() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1560,6 +1924,7 @@ export async function createNotificationTemplate(data: {
   active: boolean
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1579,6 +1944,7 @@ export async function createNotificationTemplate(data: {
 
 export async function sendBulkNotification(templateId: string, targetUsers: string[]) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1618,6 +1984,7 @@ export async function scheduleNotification(data: {
   recurring?: "daily" | "weekly" | "monthly"
 }) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1637,6 +2004,7 @@ export async function scheduleNotification(data: {
 
 export async function getScheduledNotifications() {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -1662,6 +2030,7 @@ export async function getScheduledNotifications() {
 
 export async function deleteNotificationTemplate(templateId: string) {
   try {
+    await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 

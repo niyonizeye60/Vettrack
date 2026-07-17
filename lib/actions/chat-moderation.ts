@@ -66,6 +66,13 @@ export async function getChatReports() {
   })
 }
 
+export async function getOpenChatReportsCount() {
+  await requireSuperAdmin()
+  const client = await clientPromise
+  const db = client.db("ntdm_animal_hospital")
+  return db.collection("chat_reports").countDocuments({ status: "open" })
+}
+
 export async function getAllConversationsForModeration() {
   await requireSuperAdmin()
   const client = await clientPromise
