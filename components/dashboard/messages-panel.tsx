@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   Send, Plus, Loader2, Search, Archive, ArchiveRestore, MoreVertical,
   Pencil, Trash2, Check, CheckCheck, Ban, Flag, ArrowLeft, X, CheckSquare, Square,
-  User, MessageSquare,
+  User, MessageSquare, Eye, Mail, Phone, MapPin, Award, Clock,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import {
@@ -62,6 +62,12 @@ type User = {
   role: string
   specialization?: string
   location?: string
+  image?: string | null
+  email?: string
+  phone?: string
+  licenseNumber?: string
+  bio?: string
+  availability?: { days?: string[]; hours?: { start?: string; end?: string } }
 }
 
 type SearchResult = {
@@ -144,6 +150,7 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [showNewChat, setShowNewChat] = useState(false)
+  const [viewingProfile, setViewingProfile] = useState<User | null>(null)
   const [actionError, setActionError] = useState("")
   const [loadError, setLoadError] = useState(false)
   const [showArchived, setShowArchived] = useState(false)
@@ -282,7 +289,7 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
       })
       const data = await res.json()
       if (res.ok) {
-        setShowNewChat(false); setShowArchived(false)
+        setShowNewChat(false); setViewingProfile(null); setShowArchived(false)
         await fetchConversations()
         setSelectedConversationId(data.conversationId)
       } else { setActionError(t('farmer.failedToStartConversation')) }
@@ -579,41 +586,137 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
                   onClick={() => { setShowArchived(prev => !prev); setSelectedConversationId(null) }}>
                   <Archive className="h-4 w-4" />
                 </Button>
-                <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
+                <Dialog open={showNewChat} onOpenChange={(open) => { setShowNewChat(open); if (!open) setViewingProfile(null) }}>
                   <DialogTrigger asChild>
                     <Button size="icon" className={th.newChatBtn} title={t('farmer.startNewConversation')}>
                       <Plus className="h-4 w-4" />
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{t('farmer.startNewConversation')}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {availableUsers.map(user => (
-                        <div key={user.id}
-                          className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={() => startNewConversation(user.id)}>
-                          {th.convAvatar === "vet" ? (
-                            <div className="bg-amber-100 p-2 rounded-lg flex-shrink-0">
-                              <User className="h-4 w-4 text-amber-600" />
-                            </div>
-                          ) : (
-                            <Avatar className="h-9 w-9 flex-shrink-0">
-                              <AvatarFallback className={th.avatarFallback}>
-                                {user.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
+                    {viewingProfile ? (
+                      <>
+                        <DialogHeader>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" className="-ml-2 h-7 w-7"
+                              onClick={() => setViewingProfile(null)}>
+                              <ArrowLeft className="h-4 w-4" />
+                            </Button>
+                            <DialogTitle>{t('farmer.vetProfile')}</DialogTitle>
+                          </div>
+                        </DialogHeader>
+
+                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                          <div className="flex items-center gap-4">
+                            <Avatar className="h-16 w-16 flex-shrink-0">
+                              <AvatarImage src={viewingProfile.image ?? undefined} alt={viewingProfile.name} />
+                              <AvatarFallback className={`text-lg ${th.avatarFallback}`}>
+                                {viewingProfile.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
                               </AvatarFallback>
                             </Avatar>
-                          )}
-                          <div>
-                            <p className="font-medium text-sm text-gray-800">{user.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {user.role === 'doctor' ? (user.specialization ? `Dr. · ${user.specialization}` : 'Veterinarian') : (user.location ?? 'Farmer')}
-                            </p>
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-base text-gray-900 truncate">
+                                {viewingProfile.role === 'doctor' ? `Dr. ${viewingProfile.name}` : viewingProfile.name}
+                              </h3>
+                              {viewingProfile.specialization && (
+                                <Badge variant="secondary" className="mt-1">{viewingProfile.specialization}</Badge>
+                              )}
+                            </div>
                           </div>
+
+                          <div className="space-y-2 text-sm">
+                            {viewingProfile.email && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <Mail className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                <span className="truncate">{viewingProfile.email}</span>
+                              </div>
+                            )}
+                            {viewingProfile.phone && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <Phone className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                <span>{viewingProfile.phone}</span>
+                              </div>
+                            )}
+                            {viewingProfile.location && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                <span>{viewingProfile.location}</span>
+                              </div>
+                            )}
+                            {viewingProfile.licenseNumber && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <Award className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                <span>{t('farmer.licenseNumber')}: {viewingProfile.licenseNumber}</span>
+                              </div>
+                            )}
+                            {viewingProfile.availability?.hours?.start && (
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <Clock className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                                <span>
+                                  {viewingProfile.availability.days?.length ? `${viewingProfile.availability.days.join(', ')} · ` : ''}
+                                  {viewingProfile.availability.hours.start} - {viewingProfile.availability.hours.end}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {viewingProfile.bio && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{t('farmer.about')}</h4>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{viewingProfile.bio}</p>
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
+
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setViewingProfile(null)}>{t('common.close')}</Button>
+                          <Button className={th.newChatBtn} onClick={() => startNewConversation(viewingProfile.id)}>
+                            <Send className="h-4 w-4 mr-2" />{t('farmer.sendMessage')}
+                          </Button>
+                        </DialogFooter>
+                      </>
+                    ) : (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle>{t('farmer.startNewConversation')}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {availableUsers.map(user => (
+                            <div key={user.id}
+                              className="flex items-center gap-2 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                              <button type="button" className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                                onClick={() => setViewingProfile(user)}>
+                                {th.convAvatar === "vet" && !user.image ? (
+                                  <div className="bg-amber-100 p-2 rounded-lg flex-shrink-0">
+                                    <User className="h-4 w-4 text-amber-600" />
+                                  </div>
+                                ) : (
+                                  <Avatar className="h-9 w-9 flex-shrink-0">
+                                    <AvatarImage src={user.image ?? undefined} alt={user.name} />
+                                    <AvatarFallback className={th.avatarFallback}>
+                                      {user.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm text-gray-800 truncate">{user.name}</p>
+                                  <p className="text-xs text-gray-500 truncate">
+                                    {user.role === 'doctor' ? (user.specialization ? `Dr. · ${user.specialization}` : 'Veterinarian') : (user.location ?? 'Farmer')}
+                                  </p>
+                                </div>
+                              </button>
+                              <Button size="icon" variant="ghost" className="flex-shrink-0" title={t('farmer.viewProfile')}
+                                onClick={() => setViewingProfile(user)}>
+                                <Eye className="h-4 w-4 text-gray-500" />
+                              </Button>
+                              <Button size="icon" className={`flex-shrink-0 ${th.newChatBtn}`} title={t('farmer.sendMessage')}
+                                onClick={() => startNewConversation(user.id)}>
+                                <Send className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>

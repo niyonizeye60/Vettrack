@@ -104,7 +104,7 @@ export default function MessagesInbox({ userId }: MessagesInboxProps) {
         <CardTitle>Messages</CardTitle>
       </CardHeader>
       <CardContent>
-        <MessagesPanel userId={userId} />
+        <MessagesPanel />
       </CardContent>
     </Card>
   )

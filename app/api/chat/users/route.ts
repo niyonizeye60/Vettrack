@@ -29,17 +29,29 @@ export async function GET() {
           role: 1,
           specialization: 1,
           district: 1,
-          sector: 1
+          sector: 1,
+          image: 1,
+          email: 1,
+          phone: 1,
+          licenseNumber: 1,
+          bio: 1,
+          availability: 1
         }
       }
     ).toArray()
-    
+
     const formattedUsers = users.map(user => ({
       id: user._id.toString(),
       name: user.name,
       role: user.role,
       specialization: user.specialization,
-      location: user.district && user.sector ? `${user.district}, ${user.sector}` : null
+      location: user.district && user.sector ? `${user.district}, ${user.sector}` : null,
+      image: user.image ?? null,
+      email: user.email,
+      phone: user.phone,
+      licenseNumber: user.licenseNumber,
+      bio: user.bio,
+      availability: user.availability
     }))
     
     return NextResponse.json({ users: formattedUsers })

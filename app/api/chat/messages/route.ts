@@ -4,6 +4,7 @@ import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
 import { encryptText, decryptText } from "@/lib/crypto"
+import { sendNewMessageAlertEmail } from "@/lib/email"
 import { ObjectId } from "mongodb"
 
 const ONLINE_THRESHOLD_MS = 60 * 1000
@@ -158,6 +159,11 @@ export async function POST(request: NextRequest) {
 
     const trimmedContent = content.trim()
 
+    // conversations POST sets expiresAt only on a brand-new, still-empty conversation
+    // (see conversations/route.ts) and it's $unset the moment a first message lands
+    // below - so its presence here means this is that first message.
+    const isFirstMessage = !!conversation.expiresAt
+
     // Create message
     const newMessage = {
       conversationId: new ObjectId(conversationId),
@@ -207,6 +213,23 @@ export async function POST(request: NextRequest) {
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         createdAt: new Date()
       }).catch((err) => console.error("Error inserting chat notification:", err))
+
+      if (isFirstMessage) {
+        db.collection("users")
+          .findOne({ _id: new ObjectId(otherParticipantId) }, { projection: { name: 1, email: 1 } })
+          .then((recipient) => {
+            if (recipient?.email) {
+              return sendNewMessageAlertEmail(
+                recipient.email,
+                recipient.name,
+                currentUser.name,
+                trimmedContent.slice(0, 200),
+                `${process.env.NEXT_PUBLIC_APP_URL || "https://www.vettrack.rw"}/${dashboardSegment}/messages?conversationId=${conversationId}`
+              )
+            }
+          })
+          .catch((err) => console.error("Error sending new message alert email:", err))
+      }
     }
 
     return NextResponse.json({

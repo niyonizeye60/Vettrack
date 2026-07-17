@@ -75,8 +75,9 @@ export default function FarmerNotificationsPage() {
         const userData = await getCurrentUser()
         setUser(userData)
         if (userData?._id) {
-          await fetchNotifications(userData._id)
-          const interval = setInterval(() => fetchNotifications(userData._id), 10000)
+          const userId = String(userData._id)
+          await fetchNotifications(userId)
+          const interval = setInterval(() => fetchNotifications(userId), 10000)
           return () => clearInterval(interval)
         }
       } catch (e) {

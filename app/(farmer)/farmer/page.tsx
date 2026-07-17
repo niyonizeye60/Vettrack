@@ -28,8 +28,8 @@ export default async function FarmerDashboard() {
   const consultations = await getConsultations(undefined, userId)
 
   return (
-    <FarmerDashboardContent 
-      currentUser={currentUser}
+    <FarmerDashboardContent
+      currentUser={{ _id: userId, name: currentUser.name, role: currentUser.role }}
       animals={animals}
       consultations={consultations}
     />

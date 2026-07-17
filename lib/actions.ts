@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import clientPromise from "./db"
 import { getCurrentUser } from "./auth"
 import { ObjectId } from "mongodb"
+import { sendConsultationRequestEmail } from "./email"
 
 // Animal-related actions
 export async function registerAnimal(formData: FormData, ownerId: string) {
@@ -207,6 +208,31 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
     await db.collection("consultations").insertOne(consultation)
     revalidatePath("/dashboard/consultations")
     revalidatePath("/farmer/consultations") // Also revalidate the farmer path
+
+    // Notify the selected vet by email. Wrapped separately so a failed email
+    // never fails the booking itself.
+    try {
+      const doctorId = consultation.doctor as string | null
+      if (doctorId) {
+        const doctor = await db.collection("users").findOne({ _id: new ObjectId(doctorId) })
+        if (doctor?.email) {
+          await sendConsultationRequestEmail(doctor.email, doctor.name, {
+            fullName:    consultation.fullName,
+            phoneNumber: consultation.phoneNumber,
+            service:     consultation.service,
+            type:        consultation.type,
+            date:        consultation.date,
+            time:        consultation.time,
+            animalName:  consultation.animalName,
+            animalType:  consultation.animalType,
+            animalBreed: consultation.animalBreed,
+          })
+        }
+      }
+    } catch (emailError) {
+      console.error("Error sending consultation request email:", emailError)
+    }
+
     return { success: true }
   } catch (error) {
     console.error("Error booking consultation:", error)
