@@ -200,13 +200,17 @@ export default function DrugDetailPage() {
             </div>
 
             <div className="space-y-3">
-              <Button className="w-full" size="lg">
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                Order Now
+              <Button className="w-full" size="lg" asChild>
+                <a href="tel:+250780721800">
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  Order Now
+                </a>
               </Button>
-              <Button variant="outline" className="w-full" size="lg">
-                <Phone className="h-5 w-5 mr-2" />
-                Consult Veterinarian
+              <Button variant="outline" className="w-full" size="lg" asChild>
+                <Link href="/booking">
+                  <Phone className="h-5 w-5 mr-2" />
+                  Consult Veterinarian
+                </Link>
               </Button>
             </div>
           </div>

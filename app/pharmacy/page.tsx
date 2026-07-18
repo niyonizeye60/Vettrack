@@ -360,13 +360,17 @@ export default function PharmacyPage() {
                     </Button>
                   </Link>
                   <div className="flex gap-2">
-                    <Button className="flex-1">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      {t('common.orderNow')}
+                    <Button className="flex-1" asChild>
+                      <a href="tel:+250780721800">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        {t('common.orderNow')}
+                      </a>
                     </Button>
-                    <Button variant="outline">
-                      <Phone className="h-4 w-4 mr-2" />
-                      Consult
+                    <Button variant="outline" asChild>
+                      <Link href="/booking">
+                        <Phone className="h-4 w-4 mr-2" />
+                        Consult
+                      </Link>
                     </Button>
                   </div>
                 </div>

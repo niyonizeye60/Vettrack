@@ -381,13 +381,17 @@ export default function FeedsPage() {
                     </Button>
                   </Link>
                   <div className="flex gap-2">
-                    <Button className="flex-1">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      {t('common.orderNow')}
+                    <Button className="flex-1" asChild>
+                      <a href="tel:+250780721800">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        {t('common.orderNow')}
+                      </a>
                     </Button>
-                    <Button variant="outline">
-                      <Truck className="h-4 w-4 mr-2" />
-                      {t('common.delivery')}
+                    <Button variant="outline" asChild>
+                      <a href={`mailto:info@vettrack.rw?subject=${encodeURIComponent(`Delivery request: ${feed.name}`)}`}>
+                        <Truck className="h-4 w-4 mr-2" />
+                        {t('common.delivery')}
+                      </a>
                     </Button>
                   </div>
                 </div>

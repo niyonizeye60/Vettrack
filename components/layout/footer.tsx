@@ -113,7 +113,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard" className="text-gray-400 hover:text-primary transition-colors">
+                <Link href="/login" className="text-gray-400 hover:text-primary transition-colors">
                   {t('Customer Portal')}
                 </Link>
               </li>
@@ -237,6 +237,15 @@ export default function Footer() {
             <span className="inline-block">{t('footer.serving')}</span>
             <span className="mx-2">|</span>
             <span className="inline-block">{t('footer.tagline')}</span>
+          </p>
+          <p className="mt-2">
+            <Link href="/terms" className="hover:text-primary transition-colors">
+              Terms of Service
+            </Link>
+            <span className="mx-2">|</span>
+            <Link href="/privacy" className="hover:text-primary transition-colors">
+              Privacy Policy
+            </Link>
           </p>
         </div>
       </div>

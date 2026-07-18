@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -30,6 +30,7 @@ export default function RegisterForm() {
   const [district, setDistrict] = useState("")
   const [sector, setSector] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [passwordError, setPasswordError] = useState("")
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
@@ -50,8 +51,14 @@ export default function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setPasswordError("")
+
+    if (!agreedToTerms) {
+      setPasswordError("You must agree to the Terms of Service and Privacy Policy to register")
+      return
+    }
+
+    setIsLoading(true)
 
     // Validate passwords first
     if (!validatePasswords()) {
@@ -292,7 +299,12 @@ export default function RegisterForm() {
           )}
 
           <div className="flex items-center space-x-2">
-            <Checkbox id="terms" required />
+            <Checkbox
+              id="terms"
+              checked={agreedToTerms}
+              onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+              required
+            />
             <label
               htmlFor="terms"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -308,7 +320,7 @@ export default function RegisterForm() {
             </label>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || !agreedToTerms}>
             {isLoading ? t('auth.creatingAccount') : t('auth.createAccount')}
           </Button>
         </form>
@@ -322,24 +334,6 @@ export default function RegisterForm() {
           </p>
         </div>
       </CardContent>
-      <CardFooter className="flex flex-col">
-        <div className="relative w-full">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-gray-300" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-500">{t('auth.orContinueWith')}</span>
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          <Button variant="outline" type="button">
-            Google
-          </Button>
-          <Button variant="outline" type="button">
-            {t('auth.phoneNumber')}
-          </Button>
-        </div>
-      </CardFooter>
     </Card>
   )
 }

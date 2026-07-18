@@ -291,12 +291,6 @@ const services = {
         "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=500&h=350&fit=crop&crop=focalpoint&auto=format&q=80",
     },
   ],
-Ai: [
-
-  "Coming Soon"
-   
-],
-
 }
 
 export default function ServicesTabs() {
@@ -455,6 +449,19 @@ export default function ServicesTabs() {
             {services.government.map((service) => (
               <ServiceCard key={service.id} service={service} />
             ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="Ai" className="mt-0">
+          <div className="flex flex-col items-center justify-center text-center py-16">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-6">
+              <Brain className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold mb-3">AI Disease Prediction</h3>
+            <p className="text-gray-600 max-w-md">
+              We're building AI-powered disease prediction for livestock and pets. This feature is coming soon —
+              check back or contact us to be notified when it launches.
+            </p>
           </div>
         </TabsContent>
       </Tabs>

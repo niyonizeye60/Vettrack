@@ -76,7 +76,13 @@ export default function Header() {
               </Link>
             ))}
             <div className="flex space-x-2 ml-4">
-              <LanguageSwitcher />
+              <LanguageSwitcher
+                className={
+                  forceBlackNav || isScrolled
+                    ? "text-black hover:text-black hover:bg-primary/10"
+                    : "text-white hover:text-white hover:bg-white/10"
+                }
+              />
               <Button asChild variant="outline" className="rounded-full">
                 <Link href="/login">{t('nav.login')}</Link>
               </Button>
@@ -114,7 +120,7 @@ export default function Header() {
               </Link>
             ))}
             <div className="flex justify-center mb-4">
-              <LanguageSwitcher />
+              <LanguageSwitcher className="text-black hover:text-black" />
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
               <Button asChild variant="outline" className="w-full">

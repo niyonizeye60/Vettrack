@@ -101,12 +101,6 @@ export default function BlogList() {
           </Card>
         ))}
       </div>
-
-      <div className="flex justify-center">
-        <Button variant="outline" size="lg">
-          Load More Articles
-        </Button>
-      </div>
     </div>
   )
 }

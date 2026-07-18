@@ -2054,7 +2054,7 @@ const translations = {
     'Customer Portal': 'Urubuga rw\'Abakiriya',
     
     // Blog
-    'blog.subtitle': 'Ubumenyi bw\'inzobere, randevu, n\'amakuru yerekeye ubuzima bw\'amatungo, gukurikirana, no kwita ku nyamaswa biva ku baganga bacu b\'amatungo',
+    'blog.subtitle': 'Ubumenyi bw\'inzobere, randevu, n\'amakuru yerekeye ubuzima bw\'amatungo, gukurikirana, no kwita ku matungo biva ku baganga bacu b\'amatungo',
     
     // Booking
     'booking.title': 'Teganya Randevu Yawe',

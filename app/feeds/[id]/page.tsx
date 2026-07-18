@@ -230,13 +230,17 @@ export default function FeedDetailPage() {
             </div>
 
             <div className="space-y-3">
-              <Button className="w-full" size="lg">
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                {t('common.orderNow')}
+              <Button className="w-full" size="lg" asChild>
+                <a href="tel:+250780721800">
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  {t('common.orderNow')}
+                </a>
               </Button>
-              <Button variant="outline" className="w-full" size="lg">
-                <Truck className="h-5 w-5 mr-2" />
-                {t('common.requestDelivery')}
+              <Button variant="outline" className="w-full" size="lg" asChild>
+                <a href={`mailto:info@vettrack.rw?subject=${encodeURIComponent(`Delivery request: ${feed.name}`)}`}>
+                  <Truck className="h-5 w-5 mr-2" />
+                  {t('common.requestDelivery')}
+                </a>
               </Button>
             </div>
           </div>
