@@ -525,8 +525,36 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   // ─── Loading / error states ───────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="h-full min-h-0 flex flex-col gap-3">
+        <div className="flex flex-col md:flex-row gap-4 flex-1 min-h-0">
+          <Card className={`flex-1 min-h-0 overflow-hidden flex flex-col ${th.card} animate-pulse`}>
+            <div className="p-3 border-b border-gray-100 flex-shrink-0">
+              <div className="h-9 bg-gray-200 rounded-md" />
+            </div>
+            <div className="flex-1 overflow-hidden p-2 space-y-1">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="flex items-center gap-3 p-2">
+                  <div className="h-10 w-10 rounded-full bg-gray-200 flex-shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-3.5 bg-gray-200 rounded w-1/2" />
+                    <div className="h-3 bg-gray-200 rounded w-3/4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className={`hidden md:flex flex-[2] min-h-0 flex-col ${th.card} animate-pulse`}>
+            <div className="p-3 border-b border-gray-100 flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-gray-200" />
+              <div className="h-3.5 bg-gray-200 rounded w-32" />
+            </div>
+            <div className="flex-1 p-4 space-y-3">
+              <div className="h-10 bg-gray-200 rounded-2xl w-1/2" />
+              <div className="h-10 bg-gray-200 rounded-2xl w-2/3 ml-auto" />
+              <div className="h-10 bg-gray-200 rounded-2xl w-1/3" />
+            </div>
+          </Card>
+        </div>
       </div>
     )
   }
@@ -890,8 +918,11 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
                   userScrolledRef.current = t.scrollHeight - t.scrollTop - t.clientHeight >= 100
                 }}>
                 {messagesLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                  <div className="space-y-3 animate-pulse">
+                    <div className="h-10 bg-gray-200 rounded-2xl w-1/2" />
+                    <div className="h-10 bg-gray-200 rounded-2xl w-2/3 ml-auto" />
+                    <div className="h-10 bg-gray-200 rounded-2xl w-1/3" />
+                    <div className="h-10 bg-gray-200 rounded-2xl w-1/2 ml-auto" />
                   </div>
                 ) : messageItems.length === 0 ? (
                   <div className="text-center text-gray-400 text-sm py-8">{t('farmer.noMessagesStart')}</div>
