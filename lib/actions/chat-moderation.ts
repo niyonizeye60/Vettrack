@@ -67,10 +67,15 @@ export async function getChatReports() {
 }
 
 export async function getOpenChatReportsCount() {
-  await requireSuperAdmin()
-  const client = await clientPromise
-  const db = client.db("ntdm_animal_hospital")
-  return db.collection("chat_reports").countDocuments({ status: "open" })
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+    return await db.collection("chat_reports").countDocuments({ status: "open" })
+  } catch (error) {
+    console.error("Error fetching open chat reports count:", error)
+    return 0
+  }
 }
 
 export async function getAllConversationsForModeration() {
