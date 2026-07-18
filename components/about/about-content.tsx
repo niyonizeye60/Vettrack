@@ -10,15 +10,27 @@ export default function AboutContent() {
   
   return (
     <>
-      <div className="bg-gradient-to-r from-primary to-primary/80 py-20 mb-12">
-        <div className="container-custom">
-          <h1 className="heading-xl text-white text-center mb-4">{t('about.title')}</h1>
-          <p className="text-xl text-white/90 text-center max-w-2xl mx-auto">
-            {t('about.subtitle')}
-          </p>
+      <section className="relative pt-32 pb-8">
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="https://img.magnific.com/premium-photo/cow-farm_173387-3519.jpg?semt=ais_hybrid&w=740&q=80"
+            alt="Cattle grazing on a farm"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-black/50"></div>
         </div>
-      </div>
-      <div className="container-custom mb-20">
+        <div className="container-custom relative z-10">
+          <div className="max-w-2xl text-white">
+            <h1 className="heading-xl text-blue-600 mb-4">{t('about.title')}</h1>
+            <p className="text-xl text-white/90">
+              {t('about.subtitle')}
+            </p>
+          </div>
+        </div>
+      </section>
+      <div className="container-custom pt-16 mb-20">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
           <div>
             <h2 className="heading-lg mb-6">{t('about.history')}</h2>
