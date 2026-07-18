@@ -5,7 +5,8 @@ import clientPromise from "@/lib/db"
 import { sendTemperatureAlertEmail } from "@/lib/email"
 
 const FEVER_THRESHOLD_CELSIUS = 40
-const ALERT_COOLDOWN_MS = 30 * 60 * 1000 // Avoid re-emailing every 30s poll while the fever persists
+const LOW_TEMP_THRESHOLD_CELSIUS = 36.5
+const ALERT_COOLDOWN_MS = 30 * 60 * 1000 // Avoid re-emailing every 30s poll while the condition persists
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,18 +45,19 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
 
-    // Check the latest reading for a fever and email the farmer if it crosses the threshold.
+    // Check the latest reading for a fever or hypothermia and email the farmer if it crosses either threshold.
     try {
       const feeds = Array.isArray(data?.feeds) ? data.feeds : []
       const latestFeed = [...feeds].reverse().find((feed: any) => feed.field4 != null)
       const latestTemperature = latestFeed ? Number.parseFloat(latestFeed.field4) : NaN
 
       if (!Number.isNaN(latestTemperature) && user.email) {
-        const lastAlertedAt = config.lastTempAlertAt ? new Date(config.lastTempAlertAt).getTime() : 0
+        const lastFeverAlertedAt = config.lastTempAlertAt ? new Date(config.lastTempAlertAt).getTime() : 0
+        const lastLowAlertedAt = config.lastLowTempAlertAt ? new Date(config.lastLowTempAlertAt).getTime() : 0
 
         if (latestTemperature >= FEVER_THRESHOLD_CELSIUS) {
-          if (Date.now() - lastAlertedAt > ALERT_COOLDOWN_MS) {
-            await sendTemperatureAlertEmail(user.email, user.name, latestTemperature, latestFeed.created_at)
+          if (Date.now() - lastFeverAlertedAt > ALERT_COOLDOWN_MS) {
+            await sendTemperatureAlertEmail(user.email, user.name, latestTemperature, latestFeed.created_at, "high")
             await db.collection("trackingConfigs").updateOne(
               { userId: user._id, role: user.role },
               { $set: { lastTempAlertAt: new Date() } }
@@ -66,6 +68,22 @@ export async function GET(request: NextRequest) {
           await db.collection("trackingConfigs").updateOne(
             { userId: user._id, role: user.role },
             { $unset: { lastTempAlertAt: "" } }
+          )
+        }
+
+        if (latestTemperature < LOW_TEMP_THRESHOLD_CELSIUS) {
+          if (Date.now() - lastLowAlertedAt > ALERT_COOLDOWN_MS) {
+            await sendTemperatureAlertEmail(user.email, user.name, latestTemperature, latestFeed.created_at, "low")
+            await db.collection("trackingConfigs").updateOne(
+              { userId: user._id, role: user.role },
+              { $set: { lastLowTempAlertAt: new Date() } }
+            )
+          }
+        } else if (config.lastLowTempAlertAt) {
+          // Temperature is back to normal; clear the cooldown so the next low reading alerts immediately.
+          await db.collection("trackingConfigs").updateOne(
+            { userId: user._id, role: user.role },
+            { $unset: { lastLowTempAlertAt: "" } }
           )
         }
       }
