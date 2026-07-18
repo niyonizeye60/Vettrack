@@ -92,7 +92,7 @@ export default function TestimonialsSection() {
                     <div className="flex flex-col md:flex-row md:items-center mb-6">
                       <div className="relative w-16 h-16 rounded-full overflow-hidden mb-4 md:mb-0 md:mr-4">
                         <Image
-                          src={testimonial.image || "/placeholder.svg"}
+                          src="/placeholder.svg"
                           alt={testimonial.name}
                           fill
                           className="object-cover"

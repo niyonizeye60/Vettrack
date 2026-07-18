@@ -4,6 +4,12 @@ import Script from "next/script"
 import { usePathname } from "next/navigation"
 import { useEffect } from "react"
 
+declare global {
+  interface Window {
+    gtag?: (...args: any[]) => void
+  }
+}
+
 export default function GoogleAnalytics() {
   const pathname = usePathname()
 
