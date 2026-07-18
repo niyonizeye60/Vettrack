@@ -693,8 +693,22 @@ export default function InseminationPage() {
   }
 
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-10 h-10 border-4 border-green-200 border-t-green-600 rounded-full animate-spin" />
+    <div className="space-y-6 animate-pulse">
+      <div>
+        <div className="h-7 bg-gray-200 rounded w-40" />
+        <div className="h-4 bg-gray-200 rounded w-64 mt-2" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 space-y-3">
+            <div className="h-4 bg-gray-200 rounded w-20" />
+            <div className="h-8 bg-gray-200 rounded w-16" />
+            <div className="h-3 bg-gray-200 rounded w-24" />
+          </div>
+        ))}
+      </div>
+      <div className="h-10 bg-gray-200 rounded w-full max-w-md" />
+      <div className="h-64 bg-gray-200 rounded-xl" />
     </div>
   )
 

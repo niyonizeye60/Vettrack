@@ -610,11 +610,23 @@ export default function PetTrackingPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="text-center">
-              <div className="w-10 h-10 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600 font-medium">{t('farmer.loadingSensorData')}</p>
+          <div className="space-y-8 animate-pulse">
+            <div className="border border-gray-200 shadow-sm rounded-lg p-6">
+              <div className="h-4 bg-gray-200 rounded w-40 mb-4" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-gray-200 rounded-lg" />)}
+              </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="border border-gray-200 shadow-sm rounded-lg p-6 space-y-4">
+                  <div className="h-10 w-10 bg-gray-200 rounded-xl" />
+                  <div className="h-3 bg-gray-200 rounded w-24" />
+                  <div className="h-7 bg-gray-200 rounded w-16" />
+                </div>
+              ))}
+            </div>
+            <div className="h-72 bg-gray-200 rounded-lg" />
           </div>
         ) : data.length === 0 ? (
           <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center">
