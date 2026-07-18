@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Check } from "lucide-react"
+import { Check, AlertCircle } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { sendContactEmail } from "@/lib/actions/send-contact-email"
 
 export default function ContactForm() {
   const [name, setName] = useState("")
@@ -17,26 +18,32 @@ export default function ContactForm() {
   const [message, setMessage] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [error, setError] = useState("")
   const { t } = useLanguage()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError("")
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      const result = await sendContactEmail({ name, email, phone, message })
+
+      if (!result.success) {
+        setError(result.message)
+        return
+      }
+
       setIsSuccess(true)
-
-      // Reset form after 3 seconds
-      setTimeout(() => {
-        setIsSuccess(false)
-        setName("")
-        setEmail("")
-        setPhone("")
-        setMessage("")
-      }, 3000)
-    }, 1500)
+      setName("")
+      setEmail("")
+      setPhone("")
+      setMessage("")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send message")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -62,6 +69,13 @@ export default function ContactForm() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div>
             <Label htmlFor="name">{t('common.name')}</Label>
             <Input
