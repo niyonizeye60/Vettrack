@@ -44,7 +44,10 @@ export async function sendMissedMessageDigests() {
   for (const userId of userIds) {
     const presence = presenceById.get(userId)
     const lastActiveAt: Date | null = presence?.lastActiveAt ? new Date(presence.lastActiveAt) : null
-    const isCurrentlyOnline = !!lastActiveAt && Date.now() - lastActiveAt.getTime() < OFFLINE_THRESHOLD_MS
+    // Explicit isOnline: false (logout/idle-timeout/tab-close) always wins over
+    // a stale-but-recent heartbeat timestamp - see lib/presence.ts.
+    const isCurrentlyOnline = presence?.isOnline !== false &&
+      !!lastActiveAt && Date.now() - lastActiveAt.getTime() < OFFLINE_THRESHOLD_MS
     if (isCurrentlyOnline) continue
 
     const lastDigestSentAt: Date | null = presence?.lastDigestSentAt ? new Date(presence.lastDigestSentAt) : null

@@ -5,9 +5,9 @@ import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
 import { encryptText, decryptText } from "@/lib/crypto"
 import { sendNewMessageAlertEmail } from "@/lib/email"
+import { isPresenceOnline } from "@/lib/presence"
 import { ObjectId } from "mongodb"
 
-const ONLINE_THRESHOLD_MS = 60 * 1000
 const EDIT_WINDOW_MS = 15 * 60 * 1000
 
 function isBlockedPair(conversation: any, idA: string, idB: string): boolean {
@@ -71,9 +71,7 @@ export async function GET(request: NextRequest) {
       ? await db.collection("presence").findOne({ _id: new ObjectId(otherParticipantId) } as any)
       : null
     const otherLastActiveAt: Date | null = otherPresence?.lastActiveAt || null
-    const otherIsOnline = otherLastActiveAt
-      ? Date.now() - new Date(otherLastActiveAt).getTime() < ONLINE_THRESHOLD_MS
-      : false
+    const otherIsOnline = isPresenceOnline(otherPresence as any)
 
     // Typing indicator from the other participant
     const now = new Date()
@@ -159,11 +157,6 @@ export async function POST(request: NextRequest) {
 
     const trimmedContent = content.trim()
 
-    // conversations POST sets expiresAt only on a brand-new, still-empty conversation
-    // (see conversations/route.ts) and it's $unset the moment a first message lands
-    // below - so its presence here means this is that first message.
-    const isFirstMessage = !!conversation.expiresAt
-
     // Create message
     const newMessage = {
       conversationId: new ObjectId(conversationId),
@@ -214,22 +207,41 @@ export async function POST(request: NextRequest) {
         createdAt: new Date()
       }).catch((err) => console.error("Error inserting chat notification:", err))
 
-      if (isFirstMessage) {
-        db.collection("users")
-          .findOne({ _id: new ObjectId(otherParticipantId) }, { projection: { name: 1, email: 1 } })
-          .then((recipient) => {
-            if (recipient?.email) {
-              return sendNewMessageAlertEmail(
-                recipient.email,
-                recipient.name,
-                currentUser.name,
-                trimmedContent.slice(0, 200),
-                `${process.env.NEXT_PUBLIC_APP_URL || "https://www.vettrack.rw"}/${dashboardSegment}/messages?conversationId=${conversationId}`
-              )
-            }
-          })
-          .catch((err) => console.error("Error sending new message alert email:", err))
-      }
+      // Only email the recipient if they're offline right now - an online
+      // recipient already sees the message live in the chat UI, so an email
+      // would just be noise. This chain is fire-and-forget (not awaited) so it
+      // never delays the message-send response above.
+      const otherParticipantObjectId = new ObjectId(otherParticipantId)
+      db.collection("presence").findOne({ _id: otherParticipantObjectId } as any)
+        .then(async (presence) => {
+          if (isPresenceOnline(presence as any)) return
+
+          const recipient = await db.collection("users").findOne(
+            { _id: otherParticipantObjectId },
+            { projection: { name: 1, email: 1 } }
+          )
+          if (!recipient?.email) return
+
+          const emailResult = await sendNewMessageAlertEmail(
+            recipient.email,
+            recipient.name,
+            currentUser.name,
+            trimmedContent.slice(0, 200),
+            `${process.env.NEXT_PUBLIC_APP_URL || "https://www.vettrack.rw"}/${dashboardSegment}/messages?conversationId=${conversationId}`
+          )
+
+          // Stamp the same dedup field the daily missed-message digest cron
+          // relies on (lib/actions/chat-digest.ts) so it doesn't re-email the
+          // recipient later about a notification we already alerted them to.
+          if (emailResult.success) {
+            await db.collection("presence").updateOne(
+              { _id: otherParticipantObjectId } as any,
+              { $set: { lastDigestSentAt: new Date() } },
+              { upsert: true }
+            )
+          }
+        })
+        .catch((err) => console.error("Error sending offline chat alert email:", err))
     }
 
     return NextResponse.json({

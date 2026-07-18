@@ -151,6 +151,21 @@ export async function loginUser(formData: FormData) {
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // 1 week
     })
 
+    // Append-only login event log, used for daily-active-user trend reporting
+    await db.collection("login_events").insertOne({
+      userId: user._id,
+      role: user.role,
+      createdAt: new Date(),
+    })
+
+    // Mark the user online immediately so presence checks don't have to wait
+    // for their first heartbeat ping to land.
+    await db.collection("presence").updateOne(
+      { _id: user._id },
+      { $set: { lastActiveAt: new Date(), lastActiveRole: user.role, isOnline: true } },
+      { upsert: true }
+    )
+
     // Return success with redirect path instead of using redirect directly
     return {
       success: true,
@@ -180,8 +195,20 @@ export async function logoutUser() {
     const sessionId = cookieStore.get("session")?.value
 
     if (sessionId) {
+      // Look up the session before deleting it so we know who to mark offline -
+      // covers manual logout, idle auto-logout, and the shared /api/logout route.
+      const session = await db.collection("sessions").findOne({ sessionId })
+
       // Delete the session from database
       await db.collection("sessions").deleteOne({ sessionId })
+
+      if (session?.userId) {
+        await db.collection("presence").updateOne(
+          { _id: session.userId },
+          { $set: { isOnline: false } },
+          { upsert: true }
+        ).catch((err) => console.error("Error marking presence offline on logout:", err))
+      }
     }
 
     // Delete the session cookie

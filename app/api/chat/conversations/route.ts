@@ -4,9 +4,8 @@ import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
 import { decryptText } from "@/lib/crypto"
+import { isPresenceOnline } from "@/lib/presence"
 import { ObjectId } from "mongodb"
-
-const ONLINE_THRESHOLD_MS = 60 * 1000
 
 function isBlockedPair(conversation: any, idA: string, idB: string): boolean {
   const blockedBy = conversation.blockedBy || []
@@ -75,9 +74,7 @@ export async function GET(request: NextRequest) {
         const otherPresence = otherParticipantId
           ? await db.collection("presence").findOne({ _id: otherParticipantId } as any)
           : null
-        const isOnline = otherPresence?.lastActiveAt
-          ? Date.now() - new Date(otherPresence.lastActiveAt).getTime() < ONLINE_THRESHOLD_MS
-          : false
+        const isOnline = isPresenceOnline(otherPresence as any)
 
         return {
           id: conv._id.toString(),

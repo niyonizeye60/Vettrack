@@ -4,6 +4,9 @@ import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { ObjectId } from "mongodb"
 
+// Hit via navigator.sendBeacon on tab close/refresh (see PresenceHeartbeat) so
+// presence flips to offline immediately instead of waiting up to
+// ONLINE_THRESHOLD_MS for the heartbeat to go stale.
 export async function POST() {
   try {
     const currentUser = await getCurrentUser()
@@ -16,13 +19,13 @@ export async function POST() {
 
     await db.collection("presence").updateOne(
       { _id: new ObjectId(currentUser._id) } as any,
-      { $set: { lastActiveAt: new Date(), lastActiveRole: currentUser.role, isOnline: true } },
+      { $set: { isOnline: false } },
       { upsert: true }
     )
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error recording presence:", error)
-    return NextResponse.json({ error: "Failed to record presence" }, { status: 500 })
+    console.error("Error marking presence offline:", error)
+    return NextResponse.json({ error: "Failed to mark offline" }, { status: 500 })
   }
 }

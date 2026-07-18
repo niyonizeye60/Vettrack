@@ -4,8 +4,13 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertModal } from "@/components/ui/AlertModal"
 
-const SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes
-const WARNING_TIME = 5 * 60 * 1000 // 5 minutes before timeout
+// Auto-logout after 5 minutes with zero interaction (no mouse movement, key
+// presses, clicks, scrolling, or touch) - see handleActivity/events below for
+// what counts as "interaction". A short warning appears near the end of the
+// window rather than firing silently, so an idle-but-present user has a
+// chance to stay logged in.
+const SESSION_TIMEOUT = 5 * 60 * 1000 // 5 minutes
+const WARNING_TIME = 30 * 1000 // warn 30s before the 5-minute cutoff
 
 export function useSessionTimeout() {
   const router = useRouter()
