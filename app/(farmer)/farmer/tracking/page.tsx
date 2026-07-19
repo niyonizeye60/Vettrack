@@ -288,10 +288,6 @@ export default function PetTrackingPage() {
       const jsPDF = (await import('jspdf')).default
       const doc = new jsPDF()
 
-      // Header background
-      doc.setFillColor(22, 163, 74) // green-600
-      doc.rect(32, 5, 210, 30, 'F')
-
       // Logo (if available)
       try {
         const logoImg = new Image()
@@ -307,14 +303,19 @@ export default function PetTrackingPage() {
       }
 
       // Header text
-      doc.setTextColor(255, 255, 255) // white
+      doc.setTextColor(17, 24, 39) // gray-900
       doc.setFontSize(18)
       doc.setFont('helvetica', 'bold')
       doc.text(t('farmer.animalHealthMonitoringReport'), 52, 20)
 
+      doc.setTextColor(75, 85, 99) // gray-600
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
       doc.text('Vettrack', 52, 28)
+
+      // Divider under header
+      doc.setDrawColor(226, 232, 240)
+      doc.line(15, 38, 195, 38)
 
       // Reset text color for body
       doc.setTextColor(55, 65, 81) // gray-700
@@ -343,6 +344,15 @@ export default function PetTrackingPage() {
       doc.text(`${t('farmer.latest')} ${t('farmer.temperature')}: ${latestTemperature || 'N/A'}°C`, 20, 140)
       doc.text(`${t('farmer.locationCoverage')}: ${locationPercentage}%`, 20, 150)
 
+      // Reserve space for the footer so it never gets clipped by a
+      // printer's non-printable bottom margin (most printers can't
+      // print all the way to the physical edge of the page).
+      const pageHeight = doc.internal.pageSize.height
+      const footerHeight = 25
+      const footerBottomMargin = 12
+      const footerTop = pageHeight - footerHeight - footerBottomMargin
+      const maxContentY = footerTop - 8
+
       // Recent Readings section
       doc.setTextColor(22, 163, 74) // green-600
       doc.setFontSize(13)
@@ -355,7 +365,7 @@ export default function PetTrackingPage() {
 
       let yPos = 185
       data.slice(-15).forEach((item, index) => {
-        if (yPos > 280) {
+        if (yPos > maxContentY) {
           doc.addPage()
           yPos = 20
         }
@@ -372,10 +382,10 @@ export default function PetTrackingPage() {
         yPos += 8
       })
 
-      // Footer
-      const pageHeight = doc.internal.pageSize.height
+      // Footer — kept footerBottomMargin (12mm) clear of the physical
+      // page edge so printers with a non-printable border don't clip it
       doc.setFillColor(248, 250, 252) // slate-50
-      doc.rect(0, pageHeight - 25, 210, 25, 'F')
+      doc.rect(0, footerTop, 210, footerHeight, 'F')
 
       const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -388,7 +398,7 @@ export default function PetTrackingPage() {
       const emailInfo = `Email: info@vettrack.rw`
       const phoneInfo = `Phone:+250 78 072 1800 `
 
-      const baseY = pageHeight - 22;
+      const baseY = footerTop + 8;
       const lineHeight = 5;
       const centerX = pageWidth / 2;
 

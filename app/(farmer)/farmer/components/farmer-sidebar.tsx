@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Stethoscope, Settings, MessageSquare, Bell, Menu,
-  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart
+  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -31,6 +31,7 @@ export default function FarmerSidebar() {
   const navItems = [
     { href: "/farmer",               label: t("farmer.dashboard"),    icon: <Home         className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/animals",       label: t("farmer.animals"),      icon: <Users        className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/calves",        label: t("farmer.calves"),       icon: <Baby         className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/milk",          label: t("farmer.milk"),         icon: <Milk         className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/consultations", label: t("farmer.consultations"),icon: <Stethoscope  className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/tracking",      label: t("farmer.tracking"),     icon: <Activity     className="h-4 w-4 sm:h-5 sm:w-5" /> },

@@ -207,18 +207,19 @@ export default function WasteManagementPage() {
       const doc = new jsPDF({ orientation: 'landscape' })
 
       // Header
-      doc.setFillColor(22, 163, 74)
-      doc.rect(0, 0, 297, 38, 'F')
       try {
-        const logoImg = new Image(); logoImg.crossOrigin = 'anonymous'; logoImg.src = '/logo/NTDM.png'
+        const logoImg = new Image(); logoImg.crossOrigin = 'anonymous'; logoImg.src = '/logo/Vet print.png'
         await new Promise((res, rej) => { logoImg.onload = res; logoImg.onerror = rej })
-        doc.addImage(logoImg, 'PNG', 15, 7, 22, 22)
+        doc.addImage(logoImg, 'PNG', 15, 7, 35, 24)
       } catch { }
-      doc.setTextColor(255, 255, 255)
+      doc.setTextColor(17, 24, 39)
       doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-      doc.text(t('farmer.wasteManagementReportTitle'), 45, 18)
+      doc.text(t('farmer.wasteManagementReportTitle'), 55, 18)
+      doc.setTextColor(75, 85, 99)
       doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-      doc.text('NTDM Animal Hospital', 45, 27)
+      doc.text('NTDM Animal Hospital', 55, 27)
+      doc.setDrawColor(226, 232, 240)
+      doc.line(0, 38, 297, 38)
 
       // Meta
       doc.setTextColor(55, 65, 81); doc.setFontSize(10)

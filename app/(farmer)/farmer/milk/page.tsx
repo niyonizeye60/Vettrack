@@ -217,26 +217,27 @@ export default function MilkProductionPage() {
       const totalRev = exportRecords.reduce((s, r) => s + (r.totalAmount || 0), 0)
       const reportLabel = exportType === "daily" ? `Daily Report — ${exportDate}` : exportType === "monthly" ? `Monthly Report — ${exportMonth}` : "Total Production Report"
 
-      // Header
-      doc.setFillColor(22, 163, 74)
-      doc.rect(0, 0, pageWidth0, 38, 'F')
-
       // Logo
       try {
         const logoImg = new Image()
         logoImg.crossOrigin = 'anonymous'
-        logoImg.src = '/logo/NTDM.png'
+        logoImg.src = '/logo/Vet print.png'
         await new Promise((resolve, reject) => { logoImg.onload = resolve; logoImg.onerror = reject })
-        doc.addImage(logoImg, 'PNG', 15, 7, 22, 22)
+        doc.addImage(logoImg, 'PNG', 15, 7, 35, 24)
       } catch { }
 
-      doc.setTextColor(255, 255, 255)
+      doc.setTextColor(17, 24, 39)
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
-      doc.text(t('farmer.milkProductionReportTitle'), 45, 18)
+      doc.text(t('farmer.milkProductionReportTitle'), 55, 18)
+      doc.setTextColor(75, 85, 99)
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text('NTDM Animal Hospital', 45, 27)
+      doc.text('NTDM Animal Hospital', 55, 27)
+
+      // Divider under header
+      doc.setDrawColor(226, 232, 240)
+      doc.line(0, 38, pageWidth0, 38)
 
       // Meta
       doc.setTextColor(55, 65, 81)
