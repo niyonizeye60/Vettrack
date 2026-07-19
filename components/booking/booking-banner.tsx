@@ -21,7 +21,7 @@ export default function BookingBanner() {
 
       <div className="container-custom relative z-10">
         <div className="max-w-2xl text-white">
-          <h1 className="heading-xl mb-4">{t('booking.title')}</h1>
+          <h1 className="heading-xl mb-4 text-blue-600">{t('booking.title')}</h1>
           <p className="text-lg md:text-xl text-white/90">
             {t('booking.subtitle')}
           </p>
