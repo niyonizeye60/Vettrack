@@ -153,7 +153,7 @@ export default function FarmerHeader() {
 
   if (loading) {
     return (
-      <header className="sticky top-0 z-50 h-14 sm:h-16 bg-white border-b border-gray-200 shadow-sm">
+      <header className="sticky top-0 z-50 h-14 sm:h-16 bg-white border-b border-gray-200 shadow-sm print:hidden">
         <div className="flex h-full items-center justify-between px-3 sm:px-6">
           <div className="flex items-center space-x-3">
             <div className="w-7 h-7 bg-gray-200 rounded animate-pulse" />
@@ -166,7 +166,7 @@ export default function FarmerHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-50 h-14 sm:h-16 bg-white border-b border-gray-200 shadow-sm">
+    <header className="sticky top-0 z-50 h-14 sm:h-16 bg-white border-b border-gray-200 shadow-sm print:hidden">
       <PresenceHeartbeat />
       <div className="flex h-full items-center justify-between px-3 sm:px-6">
 

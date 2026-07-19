@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,7 +10,7 @@ import AnnouncementsBanner from "@/components/ui/announcements-banner"
 
 import {
   PlusCircle, Calendar, FileText, Activity,
-  MilkIcon as Cow, CheckCircle, XCircle, AlertCircle, ArrowRight,
+  MilkIcon as Cow, CheckCircle, XCircle, AlertCircle, ArrowRight, FileBarChart,
 } from "lucide-react"
 
 interface FarmerDashboardContentProps {
@@ -18,12 +19,36 @@ interface FarmerDashboardContentProps {
   consultations: any[]
 }
 
+interface PnlSnapshot { income: number; expense: number; net: number }
+
 export default function FarmerDashboardContent({
   currentUser,
   animals,
   consultations,
 }: FarmerDashboardContentProps) {
   const { t } = useLanguage()
+  const [pnl, setPnl] = useState<PnlSnapshot | null>(null)
+  const [pnlLoading, setPnlLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchPnl() {
+      try {
+        const now = new Date()
+        const pad = (n: number) => String(n).padStart(2, "0")
+        const start = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+        const end = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`
+        const res = await fetch(`/api/reports/general?farmerId=${currentUser._id}&startDate=${start}&endDate=${end}`)
+        const data = await res.json()
+        if (!data.error) setPnl({ income: data.income.total, expense: data.expenses.total, net: data.netResult })
+      } catch {
+        setPnl(null)
+      } finally {
+        setPnlLoading(false)
+      }
+    }
+    fetchPnl()
+  }, [currentUser._id])
 
   const totalAnimals = animals.length
   const pendingRequests = consultations.filter((c) => c.status === "pending")
@@ -112,6 +137,43 @@ export default function FarmerDashboardContent({
             </CardContent>
           </Card>
         </div>
+
+        {/* Net Profit/Loss widget */}
+        {pnlLoading ? (
+          <div className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-40" />
+            <div className="h-8 bg-gray-200 rounded w-32 mt-3" />
+            <div className="h-2 bg-gray-200 rounded w-full mt-4" />
+          </div>
+        ) : pnl && (
+          <Card className={`border shadow-sm ${pnl.net > 0 ? "border-green-200 bg-green-50" : pnl.net < 0 ? "border-red-200 bg-red-50" : "border-gray-200 bg-gray-50"}`}>
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">{t("farmer.thisMonthResult")}</p>
+                  <h3 className={`text-2xl sm:text-3xl font-bold mt-1 ${pnl.net > 0 ? "text-green-700" : pnl.net < 0 ? "text-red-700" : "text-gray-700"}`}>
+                    {pnl.net < 0 ? `(RWF ${Math.abs(Math.round(pnl.net)).toLocaleString()})` : `RWF ${Math.round(pnl.net).toLocaleString()}`}
+                  </h3>
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="flex-1 h-2 rounded-full bg-white overflow-hidden min-w-[80px] max-w-[160px]">
+                      <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(100, (pnl.income / Math.max(pnl.income, pnl.expense, 1)) * 100)}%` }} />
+                    </div>
+                    <div className="flex-1 h-2 rounded-full bg-white overflow-hidden min-w-[80px] max-w-[160px]">
+                      <div className="h-full bg-red-500 rounded-full" style={{ width: `${Math.min(100, (pnl.expense / Math.max(pnl.income, pnl.expense, 1)) * 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+                <Button asChild variant="outline" className="rounded-lg gap-2 border-gray-200 hover:border-green-600 hover:text-green-700 flex-shrink-0">
+                  <Link href="/farmer/reports">
+                    <FileBarChart className="h-4 w-4" />
+                    {t("farmer.viewFullReport")}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quick actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
