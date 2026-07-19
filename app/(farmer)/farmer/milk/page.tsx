@@ -24,16 +24,18 @@ interface MilkRecord {
   session: string; date: string; time: string | null; notes: string | null
   waterLiters: number | null; foodType: string | null
   foodKg: number | null; foodCost: number | null
+  saltKg: number | null; saltCost: number | null
 }
 
 const SESSIONS = ["Morning", "Evening"]
+const MILK_PRODUCING_TYPES = ["cow", "goat", "sheep"]
 const today = new Date().toISOString().split("T")[0]
 
 export default function MilkProductionPage() {
   const { t } = useLanguage()
   const [user, setUser] = useState<any>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
-  const femaleAnimals = animals.filter(a => !a.gender || a.gender === "female")
+  const milkableAnimals = animals.filter(a => MILK_PRODUCING_TYPES.includes((a.type || "").toLowerCase()) && (!a.gender || a.gender === "female"))
   const [records, setRecords] = useState<MilkRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -56,6 +58,8 @@ export default function MilkProductionPage() {
   const [foodType, setFoodType] = useState("")
   const [foodKg, setFoodKg] = useState("")
   const [foodCost, setFoodCost] = useState("")
+  const [saltKg, setSaltKg] = useState("")
+  const [saltCost, setSaltCost] = useState("")
   const [notes, setNotes] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -129,7 +133,7 @@ export default function MilkProductionPage() {
   const resetForm = () => {
     setCowId(""); setLiters(""); setHomeConsumption(""); setPricePerLiter(""); setTotalAmount("")
     setInsuranceId(""); setEarTagId("")
-    setSession(""); setDate(today); setTime(""); setWaterLiters(""); setFoodType(""); setFoodKg(""); setFoodCost(""); setNotes("")
+    setSession(""); setDate(today); setTime(""); setWaterLiters(""); setFoodType(""); setFoodKg(""); setFoodCost(""); setSaltKg(""); setSaltCost(""); setNotes("")
     setErrors({}); setEditRecord(null)
   }
 
@@ -138,10 +142,10 @@ export default function MilkProductionPage() {
     setSaving(true)
     const cow = animals.find(a => a._id === cowId)
     const soldLiters = Math.max(0, Number(liters) - Number(homeConsumption || 0))
-    const body = { farmerId: user._id.toString(), cowId, cowName: cow?.name, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, notes }
+    const body = { farmerId: user._id.toString(), cowId, cowName: cow?.name, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }
 
     if (editRecord) {
-      await fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, notes }) })
+      await fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }) })
     } else {
       await fetch("/api/milk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     }
@@ -164,6 +168,8 @@ export default function MilkProductionPage() {
     setFoodType(r.foodType || "")
     setFoodKg(r.foodKg ? String(r.foodKg) : "")
     setFoodCost(r.foodCost ? String(r.foodCost) : "")
+    setSaltKg(r.saltKg ? String(r.saltKg) : "")
+    setSaltCost(r.saltCost ? String(r.saltCost) : "")
     setNotes(r.notes || "")
   }
 
@@ -261,21 +267,23 @@ export default function MilkProductionPage() {
 
       const cols = {
         date: { x: 15, width: 18 },
-        animal: { x: 33, width: 24 },
-        earTag: { x: 57, width: 20 },
-        insurance: { x: 77, width: 24 },
-        session: { x: 101, width: 16 },
-        liters: { x: 117, width: 14 },
-        price: { x: 131, width: 18 },
-        consumed: { x: 149, width: 16 },
-        consumedVal: { x: 165, width: 20 },
-        total: { x: 185, width: 20 },
-        water: { x: 205, width: 16 },
-        foodType: { x: 221, width: 24 },
-        foodKg: { x: 245, width: 16 },
-        foodCost: { x: 261, width: 21 }
+        animal: { x: 33, width: 22 },
+        earTag: { x: 55, width: 18 },
+        insurance: { x: 73, width: 18 },
+        session: { x: 91, width: 16 },
+        liters: { x: 107, width: 14 },
+        price: { x: 121, width: 16 },
+        consumed: { x: 137, width: 16 },
+        consumedVal: { x: 153, width: 16 },
+        total: { x: 169, width: 16 },
+        water: { x: 185, width: 16 },
+        foodType: { x: 201, width: 18 },
+        foodKg: { x: 219, width: 16 },
+        foodCost: { x: 235, width: 17 },
+        salt: { x: 252, width: 14 },
+        saltCost: { x: 266, width: 16 }
       }
-      const colBoundaries = [33, 57, 77, 101, 117, 131, 149, 165, 185, 205, 221, 245, 261]
+      const colBoundaries = [33, 55, 73, 91, 107, 121, 137, 153, 169, 185, 201, 219, 235, 252, 266]
 
       const drawTableHeader = () => {
         doc.setFillColor(22, 163, 74)
@@ -297,6 +305,8 @@ export default function MilkProductionPage() {
         doc.text("Food Type", cols.foodType.x, y)
         doc.text("Food(KG)", cols.foodKg.x, y)
         doc.text("Food Cost", cols.foodCost.x, y)
+        doc.text("Salt(KG)", cols.salt.x, y)
+        doc.text("Salt Cost", cols.saltCost.x, y)
         doc.setFont("helvetica", "normal")
       }
 
@@ -381,6 +391,8 @@ export default function MilkProductionPage() {
         )
         doc.text(r.foodKg ? `${r.foodKg}kg` : "-", cols.foodKg.x, y)
         doc.text(r.foodCost ? `${r.foodCost.toLocaleString()}` : "-", cols.foodCost.x, y)
+        doc.text(r.saltKg ? `${r.saltKg}kg` : "-", cols.salt.x, y)
+        doc.text(r.saltCost ? `${r.saltCost.toLocaleString()}` : "-", cols.saltCost.x, y)
         y += rowHeight
       })
 
@@ -461,11 +473,13 @@ export default function MilkProductionPage() {
         'Food Type': r.foodType || '-',
         'Food Eaten (KG)': r.foodKg ?? '-',
         'Food Cost (RWF)': r.foodCost ?? '-',
+        'Salt Consumed (KG)': r.saltKg ?? '-',
+        'Salt Cost (RWF)': r.saltCost ?? '-',
         Notes: r.notes || '-',
       }))
 
       const ws = XLSX.utils.json_to_sheet(data)
-      ws['!cols'] = [14, 10, 18, 18, 20, 12, 14, 14, 22, 12, 22, 22, 16, 20, 16, 18, 30].map(w => ({ wch: w }))
+      ws['!cols'] = [14, 10, 18, 18, 20, 12, 14, 14, 22, 12, 22, 22, 16, 20, 16, 18, 18, 16, 30].map(w => ({ wch: w }))
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Milk Production')
       XLSX.writeFile(wb, `milk-report-${cowName.replace(/\s+/g, '-')}-${exportType}-${today}.xlsx`)
@@ -494,9 +508,9 @@ export default function MilkProductionPage() {
   }, [filteredRecords])
 
   const cowData = useMemo(() => {
-    const map: Record<string, { name: string; liters: number; consumed: number; sold: number; revenue: number; water: number; foodTypes: Set<string>; foodKg: number; foodCost: number }> = {}
+    const map: Record<string, { name: string; liters: number; consumed: number; sold: number; revenue: number; water: number; foodTypes: Set<string>; foodKg: number; foodCost: number; saltKg: number; saltCost: number }> = {}
     filteredRecords.forEach(r => {
-      if (!map[r.cowId]) map[r.cowId] = { name: r.cowName, liters: 0, consumed: 0, sold: 0, revenue: 0, water: 0, foodTypes: new Set(), foodKg: 0, foodCost: 0 }
+      if (!map[r.cowId]) map[r.cowId] = { name: r.cowName, liters: 0, consumed: 0, sold: 0, revenue: 0, water: 0, foodTypes: new Set(), foodKg: 0, foodCost: 0, saltKg: 0, saltCost: 0 }
       map[r.cowId].liters += r.liters
       map[r.cowId].consumed += r.homeConsumption || 0
       map[r.cowId].sold += r.soldLiters ?? Math.max(0, r.liters - (r.homeConsumption || 0))
@@ -504,6 +518,8 @@ export default function MilkProductionPage() {
       map[r.cowId].water += r.waterLiters || 0
       map[r.cowId].foodKg += r.foodKg || 0
       map[r.cowId].foodCost += r.foodCost || 0
+      map[r.cowId].saltKg += r.saltKg || 0
+      map[r.cowId].saltCost += r.saltCost || 0
       if (r.foodType) r.foodType.split(',').map(f => f.trim()).filter(Boolean).forEach(f => map[r.cowId].foodTypes.add(f))
     })
     return Object.values(map).map(c => ({ ...c, foodTypes: Array.from(c.foodTypes).join(', ') || '—' }))
@@ -616,7 +632,7 @@ export default function MilkProductionPage() {
                       <SelectValue placeholder={t('farmer.cow')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
+                      {milkableAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {errors.cowId && <p className="text-xs text-red-500">{errors.cowId}</p>}
@@ -721,6 +737,18 @@ export default function MilkProductionPage() {
                   <Input type="number" min="0" step="0.01" placeholder="e.g. 3000" value={foodCost} onChange={e => setFoodCost(e.target.value)} />
                 </div>
 
+                {/* Salt Consumed */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.saltConsumed')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                  <Input type="number" min="0" step="0.1" placeholder="e.g. 0.5" value={saltKg} onChange={e => setSaltKg(e.target.value)} />
+                </div>
+
+                {/* Salt Cost */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.saltCost')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                  <Input type="number" min="0" step="0.01" placeholder="e.g. 500" value={saltCost} onChange={e => setSaltCost(e.target.value)} />
+                </div>
+
                 {/* Notes */}
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
@@ -756,7 +784,7 @@ export default function MilkProductionPage() {
                   <SelectTrigger><SelectValue placeholder={t('farmer.allCows')} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t('farmer.allCows')}</SelectItem>
-                    {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
+                    {milkableAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterSession || "all"} onValueChange={v => setFilterSession(v === "all" ? "" : v)}>
@@ -791,13 +819,15 @@ export default function MilkProductionPage() {
                       <TableHead>{t('farmer.revenue')}</TableHead>
                       <TableHead>{t('farmer.foodEaten')}</TableHead>
                       <TableHead>{t('farmer.foodCost')}</TableHead>
+                      <TableHead>{t('farmer.saltConsumed')}</TableHead>
+                      <TableHead>{t('farmer.saltCost')}</TableHead>
                       <TableHead>{t('farmer.notes')}</TableHead>
                       <TableHead>{t('farmer.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredRecords.length === 0 ? (
-                      <TableRow><TableCell colSpan={13} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={15} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
                     ) : filteredRecords.map(r => {
                       const sold = r.soldLiters ?? Math.max(0, r.liters - (r.homeConsumption || 0))
                       return (
@@ -821,6 +851,8 @@ export default function MilkProductionPage() {
                           <TableCell>{r.totalAmount ? r.totalAmount.toLocaleString() : "—"}</TableCell>
                           <TableCell className="text-gray-700">{r.foodKg ? `${r.foodKg} kg` : "—"}</TableCell>
                           <TableCell className="text-orange-700 font-medium">{r.foodCost ? `RWF ${r.foodCost.toLocaleString()}` : "—"}</TableCell>
+                          <TableCell className="text-gray-700">{r.saltKg ? `${r.saltKg} kg` : "—"}</TableCell>
+                          <TableCell className="text-orange-700 font-medium">{r.saltCost ? `RWF ${r.saltCost.toLocaleString()}` : "—"}</TableCell>
                           <TableCell className="text-sm text-gray-500 max-w-[120px] truncate">{r.notes || "—"}</TableCell>
                           <TableCell>
                             <div className="flex gap-1">
@@ -914,11 +946,13 @@ export default function MilkProductionPage() {
                         <TableHead>{t('farmer.foodTypesUsed')}</TableHead>
                         <TableHead>{t('farmer.foodEaten')}</TableHead>
                         <TableHead>{t('farmer.foodCost')}</TableHead>
+                        <TableHead>{t('farmer.totalSaltConsumed')}</TableHead>
+                        <TableHead>{t('farmer.totalSaltCost')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {cowData.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-6 text-gray-400">{t('farmer.noDataAvailable')}</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center py-6 text-gray-400">{t('farmer.noDataAvailable')}</TableCell></TableRow>
                       ) : cowData.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">{c.name}</TableCell>
@@ -926,6 +960,8 @@ export default function MilkProductionPage() {
                           <TableCell className="text-gray-700">{c.foodTypes !== '—' ? c.foodTypes : <span className="text-gray-400">Not recorded</span>}</TableCell>
                           <TableCell className="text-gray-700">{c.foodKg > 0 ? `${c.foodKg.toFixed(1)} kg` : <span className="text-gray-400">Not recorded</span>}</TableCell>
                           <TableCell className="text-orange-700 font-medium">{c.foodCost > 0 ? `RWF ${c.foodCost.toLocaleString()}` : <span className="text-gray-400">Not recorded</span>}</TableCell>
+                          <TableCell className="text-gray-700">{c.saltKg > 0 ? `${c.saltKg.toFixed(1)} kg` : <span className="text-gray-400">Not recorded</span>}</TableCell>
+                          <TableCell className="text-orange-700 font-medium">{c.saltCost > 0 ? `RWF ${c.saltCost.toLocaleString()}` : <span className="text-gray-400">Not recorded</span>}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1029,7 +1065,7 @@ export default function MilkProductionPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
-                  {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
+                  {milkableAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -1279,6 +1315,23 @@ export default function MilkProductionPage() {
                     value={
                       detailRecord.foodCost
                         ? `RWF ${detailRecord.foodCost.toLocaleString()}`
+                        : <span className="text-gray-400">—</span>
+                    }
+                    color="text-orange-700"
+                  />
+                  <Row
+                    label={t('farmer.saltConsumed')}
+                    value={
+                      detailRecord.saltKg
+                        ? `${detailRecord.saltKg} kg`
+                        : <span className="text-gray-400">—</span>
+                    }
+                  />
+                  <Row
+                    label={t('farmer.saltCost')}
+                    value={
+                      detailRecord.saltCost
+                        ? `RWF ${detailRecord.saltCost.toLocaleString()}`
                         : <span className="text-gray-400">—</span>
                     }
                     color="text-orange-700"

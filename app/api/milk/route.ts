@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, cowId, cowName, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, notes } = body
+    const { farmerId, cowId, cowName, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes } = body
 
     if (!farmerId || !cowId || !liters || !session || !date)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -86,6 +86,8 @@ export async function POST(req: NextRequest) {
       foodType: foodType || null,
       foodKg: foodKg ? Number(foodKg) : null,
       foodCost: foodCost ? Number(foodCost) : null,
+      saltKg: saltKg ? Number(saltKg) : null,
+      saltCost: saltCost ? Number(saltCost) : null,
       notes: notes || null,
       createdAt: new Date(),
     }
@@ -105,7 +107,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, notes } = body
+    const { id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes } = body
     if (!id) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
 
     const client = await clientPromise
@@ -121,7 +123,7 @@ export async function PUT(req: NextRequest) {
 
     await db.collection("milk_records").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { liters: Number(liters), homeConsumption: homeConsumption ? Number(homeConsumption) : null, soldLiters: soldLiters != null ? Number(soldLiters) : null, pricePerLiter: pricePerLiter ? Number(pricePerLiter) : null, totalAmount: totalAmount ? Number(totalAmount) : null, session, date, time, waterLiters: waterLiters ? Number(waterLiters) : null, foodType: foodType || null, foodKg: foodKg ? Number(foodKg) : null, foodCost: foodCost ? Number(foodCost) : null, notes, updatedAt: new Date() } }
+      { $set: { liters: Number(liters), homeConsumption: homeConsumption ? Number(homeConsumption) : null, soldLiters: soldLiters != null ? Number(soldLiters) : null, pricePerLiter: pricePerLiter ? Number(pricePerLiter) : null, totalAmount: totalAmount ? Number(totalAmount) : null, session, date, time, waterLiters: waterLiters ? Number(waterLiters) : null, foodType: foodType || null, foodKg: foodKg ? Number(foodKg) : null, foodCost: foodCost ? Number(foodCost) : null, saltKg: saltKg ? Number(saltKg) : null, saltCost: saltCost ? Number(saltCost) : null, notes, updatedAt: new Date() } }
     )
     return NextResponse.json({ success: true })
   } catch (error) {
