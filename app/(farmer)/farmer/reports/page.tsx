@@ -291,7 +291,7 @@ export default function GeneralReportPage() {
           <Button onClick={exportToExcel} disabled={exporting || !report} variant="outline" className="rounded-lg gap-2">
             <Download className="h-4 w-4" /> {t('farmer.exportExcel')}
           </Button>
-          <Button onClick={exportToPDF} disabled={exporting || !report} className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2">
+          <Button onClick={exportToPDF} disabled={exporting || !report} variant="outline" className="bg-green-600 hover:bg-green-700 text-white hover:text-white border-green-600 rounded-lg gap-2">
             <FileText className="h-4 w-4" /> {t('farmer.exportPDF')}
           </Button>
         </div>
@@ -305,9 +305,9 @@ export default function GeneralReportPage() {
               <Button
                 key={p}
                 size="sm"
-                variant={preset === p ? "default" : "outline"}
+                variant="outline"
                 onClick={() => handlePresetChange(p)}
-                className={preset === p ? "bg-green-600 hover:bg-green-700 text-white rounded-lg" : "rounded-lg"}
+                className={preset === p ? "bg-green-600 hover:bg-green-700 text-white hover:text-white border-green-600 rounded-lg" : "rounded-lg"}
               >
                 {t(`farmer.${p}`)}
               </Button>
@@ -317,7 +317,7 @@ export default function GeneralReportPage() {
                 <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-auto" />
                 <span className="text-gray-400 text-sm">{t('farmer.to')}</span>
                 <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-auto" />
-                <Button size="sm" onClick={handleGenerateCustom} disabled={!customStart || !customEnd} className="bg-green-600 hover:bg-green-700 text-white rounded-lg">
+                <Button size="sm" variant="outline" onClick={handleGenerateCustom} disabled={!customStart || !customEnd} className="bg-green-600 hover:bg-green-700 text-white hover:text-white border-green-600 rounded-lg">
                   {t('farmer.generateReport')}
                 </Button>
               </div>
