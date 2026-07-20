@@ -15,36 +15,31 @@ const options = {
   retryReads: true,
 }
 
-let client: MongoClient
 let clientPromise: Promise<MongoClient>
 
-if (process.env.NODE_ENV === "development") {
+// Cached on `global` in every environment, not just development. In dev this
+// survives HMR module reloads; in production (Vercel serverless) it's what
+// makes a warm function container reuse its existing MongoDB connection
+// instead of re-running this module's top-level code and paying a fresh
+// TLS+auth handshake to Atlas on every invocation that lands on that
+// container. Skipping this in production (the previous behavior) meant cold
+// - and often even warm - invocations could each open their own connection,
+// which is exactly the multi-second, refresh-doesn't-help latency this was
+// causing on the conversations list.
+const globalWithMongo = global as typeof globalThis & {
+  _mongoClientPromise?: Promise<MongoClient>
+}
 
-  // is preserved across module reloads caused by HMR (Hot Module Replacement).
-  const globalWithMongo = global as typeof globalThis & {
-    _mongoClientPromise?: Promise<MongoClient>
-  }
-
-  if (!globalWithMongo._mongoClientPromise) {
-    try {
-      client = new MongoClient(MONGODB_URI, options)
-      globalWithMongo._mongoClientPromise = client.connect()
-    } catch (error) {
-      console.error('MongoDB connection error:', error)
-      throw new Error('Failed to connect to MongoDB')
-    }
-  }
-  clientPromise = globalWithMongo._mongoClientPromise
-} else {
-  // In production mode, it's best to not use a global variable.
+if (!globalWithMongo._mongoClientPromise) {
   try {
-    client = new MongoClient(MONGODB_URI, options)
-    clientPromise = client.connect()
+    const client = new MongoClient(MONGODB_URI, options)
+    globalWithMongo._mongoClientPromise = client.connect()
   } catch (error) {
     console.error('MongoDB connection error:', error)
     throw new Error('Failed to connect to MongoDB')
   }
 }
+clientPromise = globalWithMongo._mongoClientPromise
 
 // Add a function to test the connection
 export async function testConnection() {
