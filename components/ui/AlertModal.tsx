@@ -9,9 +9,10 @@ interface AlertModalProps {
   title: string
   message: string
   type?: "warning" | "error" | "info"
+  confirmLabel?: string
 }
 
-export function AlertModal({ isOpen, onClose, title, message, type = "warning" }: AlertModalProps) {
+export function AlertModal({ isOpen, onClose, title, message, type = "warning", confirmLabel = "OK" }: AlertModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden"
@@ -72,7 +73,7 @@ export function AlertModal({ isOpen, onClose, title, message, type = "warning" }
             onClick={onClose}
             className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium"
           >
-            OK
+            {confirmLabel}
           </button>
         </div>
       </div>
