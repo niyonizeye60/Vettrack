@@ -187,15 +187,25 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   const userScrolledRef = useRef(false)
   const hoverHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Bumped on every fetchMessages/fetchConversations call (and whenever the
-  // open chat is closed). Each in-flight request captures the value at the
-  // moment it was sent; when it resolves, it only applies its data if it's
-  // still the most recent one issued. Network responses can arrive out of
-  // order (especially under production latency/jitter), so without this a
-  // slow response for a conversation the user already navigated away from
-  // can land after the fresh one and silently overwrite it.
-  const messagesRequestIdRef = useRef(0)
-  const conversationsRequestIdRef = useRef(0)
+  // Live mirrors of the two pieces of state that define "which data is
+  // currently wanted": the open conversation, and the archived filter. A
+  // fetch captures the context it was issued for and, when it resolves,
+  // only applies its data if that context is still current. This discards
+  // responses that arrived after the user genuinely moved on (switched
+  // conversation, closed the chat, or flipped the archived filter) - which
+  // is what fixes the switch-flicker - WITHOUT discarding a response merely
+  // because a newer poll for the SAME context was fired in the meantime.
+  // The latter distinction matters: fetchConversations polls every 3s and
+  // fetchMessages every 1.2s, so keying on plain recency (a monotonic
+  // counter) meant that whenever a response took longer than the poll
+  // interval - exactly what happens against a cold serverless DB
+  // connection - each poll superseded the previous in-flight request before
+  // it could resolve, and the list/thread never populated until latency
+  // dropped below the interval.
+  const selectedConversationIdRef = useRef<string | null>(null)
+  const showArchivedRef = useRef(showArchived)
+  useEffect(() => { selectedConversationIdRef.current = selectedConversationId }, [selectedConversationId])
+  useEffect(() => { showArchivedRef.current = showArchived }, [showArchived])
 
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId) || null
   const searchParams = useSearchParams()
@@ -222,11 +232,10 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
       setMessagesLoading(true)
       fetchMessages(selectedConversationId).finally(() => setMessagesLoading(false))
     } else {
-      // No new fetch is being issued, so nothing below will invalidate a
-      // request still in flight for the conversation that was just closed -
-      // bump the token ourselves so its response gets ignored instead of
+      // selectedConversationIdRef is now null (synced above), so any
+      // fetchMessages still in flight for the conversation that was just
+      // closed will see the mismatch and drop its response instead of
       // reopening the chat it belonged to.
-      messagesRequestIdRef.current++
       setMessages([])
       setOtherUserPresence(null)
       setTypingUsers([])
@@ -268,26 +277,30 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
 
   // ─── API calls ────────────────────────────────────────────────────────────
   const fetchConversations = async () => {
-    const requestId = ++conversationsRequestIdRef.current
+    const requestedArchived = showArchived
     try {
       const res = await fetch(`/api/chat/conversations?includeArchived=${showArchived}`)
       const data = await res.json()
-      if (requestId !== conversationsRequestIdRef.current) return []
+      // Only drop this response if the archived filter has since flipped -
+      // in which case it's for the wrong list. A newer poll for the same
+      // filter must still be allowed to apply (see the ref comment above).
+      if (requestedArchived !== showArchivedRef.current) return []
       if (res.ok) { setConversations(data.conversations); setLoadError(false); return data.conversations as Conversation[] }
     } catch { if (loading) setLoadError(true) } finally { setLoading(false) }
     return []
   }
 
   const fetchMessages = async (conversationId: string) => {
-    const requestId = ++messagesRequestIdRef.current
     try {
       const res = await fetch(`/api/chat/messages?conversationId=${conversationId}`)
       const data = await res.json()
-      // A newer request (switching conversations, the next poll tick, or
-      // closing the chat) was issued after this one - even if this response
-      // happens to arrive last, it's stale and must not overwrite what's
-      // currently selected.
-      if (requestId !== messagesRequestIdRef.current) return
+      // Only drop this response if the user has since switched to a
+      // different conversation or closed the chat - i.e. it's for a thread
+      // that's no longer open. A newer poll for the SAME conversation must
+      // still apply, otherwise under high latency each 1.2s poll would
+      // supersede the previous in-flight request and the thread would never
+      // render.
+      if (conversationId !== selectedConversationIdRef.current) return
       if (res.ok) {
         setMessages(data.messages)
         setOtherUserPresence(data.otherUserPresence)
