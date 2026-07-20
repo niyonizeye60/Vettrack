@@ -200,7 +200,11 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId) || null
   const searchParams = useSearchParams()
 
-  useEffect(() => { fetchConversations(); fetchAvailableUsers() }, [])
+  useEffect(() => { fetchAvailableUsers() }, [])
+  // Covers both the initial load and refetching when the archived filter
+  // changes - `showArchived`'s default value on mount means this alone
+  // already fires the first fetch, so a separate mount-only effect calling
+  // fetchConversations() would just double the initial request.
   useEffect(() => { fetchConversations() }, [showArchived])
 
   // Deep-link support: /messages?conversationId=... (used by dashboard "recent

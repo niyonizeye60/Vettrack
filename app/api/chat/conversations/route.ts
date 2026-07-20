@@ -52,28 +52,32 @@ export async function GET(request: NextRequest) {
           (id: ObjectId) => id.toString() !== currentUser._id
         )
 
-        const otherUser = await db.collection("users").findOne(
-          { _id: otherParticipantId },
-          { projection: { name: 1, role: 1, image: 1 } }
-        )
-
-        const lastMessage = await db.collection("messages").findOne(
-          { conversationId: conv._id },
-          { sort: { createdAt: -1 } }
-        )
-
-        // Count unread messages - deleted messages have no content to surface,
-        // so they shouldn't inflate the unread badge.
-        const unreadCount = await db.collection("messages").countDocuments({
-          conversationId: conv._id,
-          senderId: { $ne: new ObjectId(currentUser._id) },
-          readAt: null,
-          deletedAt: null
-        })
-
-        const otherPresence = otherParticipantId
-          ? await db.collection("presence").findOne({ _id: otherParticipantId } as any)
-          : null
+        // These four lookups are independent of each other, so run them
+        // concurrently instead of paying four sequential round-trips per
+        // conversation (conversations already run concurrently with each
+        // other via the outer Promise.all - this parallelizes within each
+        // one too).
+        const [otherUser, lastMessage, unreadCount, otherPresence] = await Promise.all([
+          db.collection("users").findOne(
+            { _id: otherParticipantId },
+            { projection: { name: 1, role: 1, image: 1 } }
+          ),
+          db.collection("messages").findOne(
+            { conversationId: conv._id },
+            { sort: { createdAt: -1 } }
+          ),
+          // Count unread messages - deleted messages have no content to
+          // surface, so they shouldn't inflate the unread badge.
+          db.collection("messages").countDocuments({
+            conversationId: conv._id,
+            senderId: { $ne: new ObjectId(currentUser._id) },
+            readAt: null,
+            deletedAt: null
+          }),
+          otherParticipantId
+            ? db.collection("presence").findOne({ _id: otherParticipantId } as any)
+            : Promise.resolve(null)
+        ])
         const isOnline = isPresenceOnline(otherPresence as any)
 
         return {
