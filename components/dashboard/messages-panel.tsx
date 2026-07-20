@@ -187,6 +187,16 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
   const userScrolledRef = useRef(false)
   const hoverHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Bumped on every fetchMessages/fetchConversations call (and whenever the
+  // open chat is closed). Each in-flight request captures the value at the
+  // moment it was sent; when it resolves, it only applies its data if it's
+  // still the most recent one issued. Network responses can arrive out of
+  // order (especially under production latency/jitter), so without this a
+  // slow response for a conversation the user already navigated away from
+  // can land after the fresh one and silently overwrite it.
+  const messagesRequestIdRef = useRef(0)
+  const conversationsRequestIdRef = useRef(0)
+
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId) || null
   const searchParams = useSearchParams()
 
@@ -208,6 +218,11 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
       setMessagesLoading(true)
       fetchMessages(selectedConversationId).finally(() => setMessagesLoading(false))
     } else {
+      // No new fetch is being issued, so nothing below will invalidate a
+      // request still in flight for the conversation that was just closed -
+      // bump the token ourselves so its response gets ignored instead of
+      // reopening the chat it belonged to.
+      messagesRequestIdRef.current++
       setMessages([])
       setOtherUserPresence(null)
       setTypingUsers([])
@@ -249,18 +264,26 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
 
   // ─── API calls ────────────────────────────────────────────────────────────
   const fetchConversations = async () => {
+    const requestId = ++conversationsRequestIdRef.current
     try {
       const res = await fetch(`/api/chat/conversations?includeArchived=${showArchived}`)
       const data = await res.json()
+      if (requestId !== conversationsRequestIdRef.current) return []
       if (res.ok) { setConversations(data.conversations); setLoadError(false); return data.conversations as Conversation[] }
     } catch { if (loading) setLoadError(true) } finally { setLoading(false) }
     return []
   }
 
   const fetchMessages = async (conversationId: string) => {
+    const requestId = ++messagesRequestIdRef.current
     try {
       const res = await fetch(`/api/chat/messages?conversationId=${conversationId}`)
       const data = await res.json()
+      // A newer request (switching conversations, the next poll tick, or
+      // closing the chat) was issued after this one - even if this response
+      // happens to arrive last, it's stale and must not overwrite what's
+      // currently selected.
+      if (requestId !== messagesRequestIdRef.current) return
       if (res.ok) {
         setMessages(data.messages)
         setOtherUserPresence(data.otherUserPresence)
