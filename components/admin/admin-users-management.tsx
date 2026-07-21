@@ -178,52 +178,52 @@ export default function AdminUsersManagement() {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold">{users.length}</div>
-            <p className="text-sm text-muted-foreground">{t('admin.totalUsers')}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <p className="text-sm text-gray-500 font-medium">{t('admin.totalUsers')}</p>
+            <h3 className="text-2xl font-bold text-gray-900 mt-2">{users.length}</h3>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold text-green-600">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <p className="text-sm text-gray-500 font-medium">{t('admin.activeUsers')}</p>
+            <h3 className="text-2xl font-bold text-green-600 mt-2">
               {users.filter(u => u.status === 'active').length}
-            </div>
-            <p className="text-sm text-muted-foreground">{t('admin.activeUsers')}</p>
+            </h3>
           </CardContent>
         </Card>
-        <Card className={users.some(u => u.status === 'pending_verification') ? "border-yellow-300" : ""}>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold text-yellow-600">
+        <Card className={`border shadow-sm bg-white hover:shadow-md transition-shadow duration-200 ${users.some(u => u.status === 'pending_verification') ? "border-yellow-300" : "border-gray-200"}`}>
+          <CardContent className="p-4 sm:p-5">
+            <p className="text-sm text-gray-500 font-medium">{t('admin.pendingVerification')}</p>
+            <h3 className="text-2xl font-bold text-yellow-600 mt-2">
               {users.filter(u => u.status === 'pending_verification').length}
-            </div>
-            <p className="text-sm text-muted-foreground">{t('admin.pendingVerification')}</p>
+            </h3>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold text-blue-600">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <p className="text-sm text-gray-500 font-medium">{t('admin.doctors')}</p>
+            <h3 className="text-2xl font-bold text-blue-600 mt-2">
               {users.filter(u => u.role === 'doctor').length}
-            </div>
-            <p className="text-sm text-muted-foreground">{t('admin.doctors')}</p>
+            </h3>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold text-orange-600">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <p className="text-sm text-gray-500 font-medium">{t('admin.farmers')}</p>
+            <h3 className="text-2xl font-bold text-orange-600 mt-2">
               {users.filter(u => u.role === 'farmer').length}
-            </div>
-            <p className="text-sm text-muted-foreground">{t('admin.farmers')}</p>
+            </h3>
           </CardContent>
         </Card>
       </div>
 
       {/* Search and Filters */}
-      <Card>
-        <CardHeader>
+      <Card className="border border-gray-200 shadow-sm">
+        <CardHeader className="pb-4 border-b border-gray-100">
           <div className="flex justify-between items-center">
-            <CardTitle>{t('admin.regionalUsers')}</CardTitle>
+            <CardTitle className="text-base font-semibold text-gray-900">{t('admin.regionalUsers')}</CardTitle>
             <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               {t('admin.addUser')}
@@ -268,7 +268,7 @@ export default function AdminUsersManagement() {
       </Card>
 
       {/* Users Table */}
-      <Card>
+      <Card className="border border-gray-200 shadow-sm">
         <CardContent className="p-0">
           {error && (
             <Alert className="mb-4">
@@ -289,17 +289,17 @@ export default function AdminUsersManagement() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>{t('admin.user')}</TableHead>
-                  <TableHead>{t('admin.role')}</TableHead>
-                  <TableHead>{t('admin.status')}</TableHead>
-                  <TableHead>{t('admin.locationSpecialization')}</TableHead>
-                  <TableHead className="text-right">{t('admin.actions')}</TableHead>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="font-semibold text-gray-600">{t('admin.user')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.role')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.status')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.locationSpecialization')}</TableHead>
+                  <TableHead className="text-right font-semibold text-gray-600">{t('admin.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsers.map((user) => (
-                  <TableRow key={user._id}>
+                  <TableRow key={user._id} className="hover:bg-gray-50/80 transition-colors duration-150">
                     <TableCell>
                       <div>
                         <div className="font-medium">{user.name}</div>
@@ -538,7 +538,7 @@ export default function AdminUsersManagement() {
               >
                 {t('admin.cancel')}
               </Button>
-              <Button type="submit" disabled={creating} className="bg-blue-600 hover:bg-blue-700">
+              <Button type="submit" disabled={creating}>
                 {creating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

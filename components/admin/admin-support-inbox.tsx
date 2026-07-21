@@ -80,18 +80,18 @@ export default function AdminSupportInbox() {
   return (
     <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="border border-gray-200 shadow-sm rounded-lg p-4">
-          <div className="text-2xl font-bold text-blue-600">{openCount}</div>
-          <p className="text-sm text-gray-500">{t("admin.openTickets")}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+        <div className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200 rounded-lg p-4 sm:p-5">
+          <p className="text-sm text-gray-500 font-medium">{t("admin.openTickets")}</p>
+          <h3 className="text-2xl font-bold text-blue-600 mt-2">{openCount}</h3>
         </div>
-        <div className="border border-gray-200 shadow-sm rounded-lg p-4">
-          <div className="text-2xl font-bold text-orange-600">{unassignedCount}</div>
-          <p className="text-sm text-gray-500">{t("support.unassignedTickets")}</p>
+        <div className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200 rounded-lg p-4 sm:p-5">
+          <p className="text-sm text-gray-500 font-medium">{t("support.unassignedTickets")}</p>
+          <h3 className="text-2xl font-bold text-orange-600 mt-2">{unassignedCount}</h3>
         </div>
-        <div className="border border-gray-200 shadow-sm rounded-lg p-4">
-          <div className="text-2xl font-bold text-green-600">{tickets.filter((tk) => tk.status === "resolved").length}</div>
-          <p className="text-sm text-gray-500">{t("admin.resolved")}</p>
+        <div className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200 rounded-lg p-4 sm:p-5">
+          <p className="text-sm text-gray-500 font-medium">{t("admin.resolved")}</p>
+          <h3 className="text-2xl font-bold text-green-600 mt-2">{tickets.filter((tk) => tk.status === "resolved").length}</h3>
         </div>
       </div>
 

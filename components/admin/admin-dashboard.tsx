@@ -3,10 +3,26 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, FileText, Calendar, MessageSquare, TrendingUp, AlertCircle, Plus, ArrowRight, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Users, FileText, Calendar, MessageSquare, TrendingUp, AlertCircle, Plus, ArrowRight, Loader2, Mail, Phone, MapPin, BadgeCheck } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AnnouncementsBanner from "@/components/ui/announcements-banner"
+
+type UserDetail = {
+  _id: string
+  name: string
+  email: string
+  phone?: string
+  role: "farmer" | "doctor"
+  status: string
+  district?: string
+  sector?: string
+  licenseNumber?: string
+  specialization?: string
+  createdAt: string
+}
 
 type DashboardData = {
   stats: {
@@ -38,9 +54,49 @@ export default function AdminDashboard() {
   const [error, setError] = useState("")
   const { t } = useLanguage()
 
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null)
+  const [viewingUser, setViewingUser] = useState<UserDetail | null>(null)
+  const [userDetailLoading, setUserDetailLoading] = useState(false)
+  const [userDetailError, setUserDetailError] = useState("")
+
   useEffect(() => {
     fetchDashboardData()
   }, [])
+
+  useEffect(() => {
+    if (!viewingUserId) return
+    setUserDetailLoading(true)
+    setUserDetailError("")
+    setViewingUser(null)
+    fetch(`/api/admin-users/${viewingUserId}`)
+      .then((res) => res.json().then((json) => ({ ok: res.ok, json })))
+      .then(({ ok, json }) => {
+        if (ok) setViewingUser(json.user)
+        else setUserDetailError(json.error || t('admin.failedToFetchData'))
+      })
+      .catch(() => setUserDetailError(t('admin.failedToFetchData')))
+      .finally(() => setUserDetailLoading(false))
+  }, [viewingUserId, t])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active": return "bg-green-100 text-green-800"
+      case "suspended": return "bg-red-100 text-red-800"
+      case "pending_verification": return "bg-yellow-100 text-yellow-800"
+      case "rejected": return "bg-gray-200 text-gray-700"
+      default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "active": return t('admin.active')
+      case "suspended": return t('admin.suspended')
+      case "pending_verification": return t('admin.pendingVerification')
+      case "rejected": return t('admin.rejected')
+      default: return status
+    }
+  }
 
   const fetchDashboardData = async () => {
     try {
@@ -78,83 +134,82 @@ export default function AdminDashboard() {
       </div>
     )
   }
+  const today = new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+
   return (
     <div className="space-y-6">
       {/* System Announcements */}
       <AnnouncementsBanner />
-      
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
-        <div className="flex flex-col md:flex-row md:items-center justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">{t('admin.welcomeBack')}</h1>
-            <p className="text-blue-100">{t('admin.happeningToday')}</p>
-          </div>
-          <div className="mt-4 md:mt-0">
-            <Button variant="secondary" asChild>
-              <Link href="/admin/users">
-                <Plus className="h-4 w-4 mr-2" />
-                {t('admin.addNewUser')}
-              </Link>
-            </Button>
-          </div>
+
+      {/* Greeting */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('admin.welcomeBack')}</h1>
+          <p className="text-green-600 font-medium text-sm mt-1">{t('admin.happeningToday')}</p>
+          <p className="text-gray-400 text-xs mt-0.5">{today}</p>
         </div>
+        <Button asChild>
+          <Link href="/admin/users">
+            <Plus className="h-4 w-4 mr-2" />
+            {t('admin.addNewUser')}
+          </Link>
+        </Button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin.regionalUsers')}</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.stats.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">+{data.stats.growthPercentage}% {t('admin.fromLastMonth')}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.regionalUsers')}</p>
+              <Users className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-gray-900 mt-2">{data.stats.totalUsers}</h3>
+            <p className="text-xs text-gray-400 mt-1">+{data.stats.growthPercentage}% {t('admin.fromLastMonth')}</p>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin.activeUsers')}</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.stats.activeUsers}</div>
-            <p className="text-xs text-muted-foreground">{data.stats.totalUsers - data.stats.activeUsers} {t('admin.inactive')}</p>
+
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.activeUsers')}</p>
+              <Calendar className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-green-600 mt-2">{data.stats.activeUsers}</h3>
+            <p className="text-xs text-gray-400 mt-1">{data.stats.totalUsers - data.stats.activeUsers} {t('admin.inactive')}</p>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin.supportTickets')}</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.stats.supportTickets}</div>
-            <p className="text-xs text-muted-foreground">{t('admin.allResolved')}</p>
+
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.supportTickets')}</p>
+              <MessageSquare className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-orange-600 mt-2">{data.stats.supportTickets}</h3>
+            <p className="text-xs text-gray-400 mt-1">{t('admin.allResolved')}</p>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin.newRegistrations')}</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.recentAlerts.length}</div>
-            <p className="text-xs text-muted-foreground">{t('admin.last24Hours')}</p>
+
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.newRegistrations')}</p>
+              <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-blue-600 mt-2">{data.recentAlerts.length}</h3>
+            <p className="text-xs text-gray-400 mt-1">{t('admin.last24Hours')}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Quick Actions & Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className="lg:col-span-2 border border-gray-200 shadow-sm">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center">
-                <AlertCircle className="mr-2 h-5 w-5 text-orange-500" />
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                <AlertCircle className="h-4 w-4 text-orange-500" />
                 {t('admin.recentAlerts')}
               </CardTitle>
               <Button variant="ghost" size="sm" asChild>
@@ -174,10 +229,13 @@ export default function AdminDashboard() {
                       <p className="font-medium text-sm text-blue-800">{alert.title}</p>
                       <p className="text-xs text-blue-600 mt-1">{alert.description}</p>
                     </div>
-                    <Button size="sm" variant="outline" className="text-blue-600 border-blue-200" asChild>
-                      <Link href="/admin/users">
-                        {t('admin.view')}
-                      </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-blue-600 border-blue-200"
+                      onClick={() => setViewingUserId(alert.id)}
+                    >
+                      {t('admin.view')}
                     </Button>
                   </div>
                 ))
@@ -190,10 +248,10 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <TrendingUp className="mr-2 h-5 w-5 text-green-500" />
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <TrendingUp className="h-4 w-4 text-green-600" />
               {t('admin.performance')}
             </CardTitle>
           </CardHeader>
@@ -238,12 +296,12 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
           <CardContent className="p-6">
             <Link href="/admin/users" className="block">
               <div className="flex items-center justify-between">
                 <div>
-                  <Users className="h-8 w-8 text-blue-600 mb-2" />
+                  <Users className="h-8 w-8 text-green-600 mb-2" />
                   <h3 className="font-medium text-gray-900">{t('admin.manageUsers')}</h3>
                   <p className="text-sm text-gray-500">{t('admin.addEditSuspendUsers')}</p>
                 </div>
@@ -253,7 +311,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
           <CardContent className="p-6">
             <Link href="/admin/appointments" className="block">
               <div className="flex items-center justify-between">
@@ -268,7 +326,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
           <CardContent className="p-6">
             <Link href="/admin/support" className="block">
               <div className="flex items-center justify-between">
@@ -283,7 +341,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
         
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
           <CardContent className="p-6">
             <Link href="/admin/content" className="block">
               <div className="flex items-center justify-between">
@@ -298,6 +356,91 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* User Detail Dialog */}
+      <Dialog open={!!viewingUserId} onOpenChange={(open) => !open && setViewingUserId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('admin.userDetails')}</DialogTitle>
+          </DialogHeader>
+          {userDetailLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : userDetailError ? (
+            <p className="text-sm text-red-600 py-6 text-center">{userDetailError}</p>
+          ) : viewingUser ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">{viewingUser.name}</p>
+                  <p className="text-sm text-gray-500 capitalize">{viewingUser.role === 'doctor' ? t('admin.doctor') : t('admin.farmer')}</p>
+                </div>
+                <Badge className={getStatusColor(viewingUser.status)}>
+                  {getStatusLabel(viewingUser.status)}
+                </Badge>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Mail className="h-4 w-4 text-gray-400" />
+                  {viewingUser.email}
+                </div>
+                {viewingUser.phone && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Phone className="h-4 w-4 text-gray-400" />
+                    {viewingUser.phone}
+                  </div>
+                )}
+                {viewingUser.role === 'doctor' && viewingUser.specialization && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <BadgeCheck className="h-4 w-4 text-gray-400" />
+                    {viewingUser.specialization}
+                  </div>
+                )}
+              </div>
+
+              {(viewingUser.district || viewingUser.sector) && (
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                  <div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                      {t('admin.district')}
+                    </p>
+                    <p className="text-sm font-medium text-gray-900">{viewingUser.district || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">{t('admin.sector')}</p>
+                    <p className="text-sm font-medium text-gray-900">{viewingUser.sector || '-'}</p>
+                  </div>
+                </div>
+              )}
+
+              {viewingUser.role === 'doctor' && viewingUser.licenseNumber && (
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                  <div>
+                    <p className="text-xs text-gray-500">{t('admin.licenseNumber')}</p>
+                    <p className="text-sm font-medium text-gray-900">{viewingUser.licenseNumber}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-xs text-gray-500">{t('admin.registeredOn')}</p>
+                <p className="text-sm font-medium text-gray-900">{new Date(viewingUser.createdAt).toLocaleString()}</p>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingUserId(null)}>{t('common.close')}</Button>
+            <Button asChild>
+              <Link href="/admin/users" onClick={() => setViewingUserId(null)}>
+                {t('admin.manageInUsers')}
+              </Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

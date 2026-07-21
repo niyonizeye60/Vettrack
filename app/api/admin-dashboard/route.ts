@@ -43,14 +43,37 @@ export async function GET() {
       createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
     }).sort({ createdAt: -1 }).limit(5).toArray()
 
+    const [consultations, openTickets, totalTickets, contentItems] = await Promise.all([
+      db.collection("consultations").find({}, { projection: { status: 1, createdAt: 1, updatedAt: 1 } }).toArray(),
+      db.collection("supportTickets").countDocuments({ status: { $ne: "resolved" } }),
+      db.collection("supportTickets").countDocuments({}),
+      db.collection("services").countDocuments({}),
+    ])
+
+    const consultationsTotal = consultations.length
+    const consultationsCompleted = consultations.filter((c) => (c.status || "").toLowerCase() === "completed").length
+    const resolutionRate = consultationsTotal > 0 ? Math.round((consultationsCompleted / consultationsTotal) * 100) : 0
+
+    // "Resolved" here means the vet actually acted on it (not left pending) - used for the average response time below.
+    const respondedConsultations = consultations.filter((c) => (c.status || "").toLowerCase() !== "pending" && c.updatedAt)
+    const avgResponseMinutes = respondedConsultations.length > 0
+      ? respondedConsultations.reduce((sum, c) => sum + (new Date(c.updatedAt).getTime() - new Date(c.createdAt).getTime()), 0)
+        / respondedConsultations.length / 60000
+      : 0
+
+    // No survey/rating system exists yet, so this is approximated from the
+    // one real satisfaction proxy on hand: how much of the support queue is
+    // actually getting resolved rather than piling up unanswered.
+    const ticketResolutionRate = totalTickets > 0 ? Math.round(((totalTickets - openTickets) / totalTickets) * 100) : 100
+
     const dashboardData = {
       stats: {
         totalUsers,
         activeUsers,
         growthPercentage,
-        consultations: 0, // Placeholder - would need consultations collection
-        supportTickets: 0, // Placeholder - would need support tickets collection
-        contentItems: 0 // Placeholder - would need content collection
+        consultations: consultationsTotal,
+        supportTickets: openTickets,
+        contentItems
       },
       recentAlerts: recentUsers.map(user => ({
         id: user._id.toString(),
@@ -61,9 +84,9 @@ export async function GET() {
         createdAt: user.createdAt
       })),
       performance: {
-        userSatisfaction: 94,
-        responseTime: "2.3 min",
-        resolutionRate: 87
+        userSatisfaction: ticketResolutionRate,
+        responseTime: avgResponseMinutes > 0 ? `${avgResponseMinutes.toFixed(1)} min` : "N/A",
+        resolutionRate
       }
     }
 

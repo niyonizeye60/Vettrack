@@ -8,11 +8,16 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Plus, Edit, Trash2, Eye, Calendar, DollarSign, Pill, Wheat } from "lucide-react"
+import { FileText, Plus, Edit, Trash2, Eye, Calendar, DollarSign, Pill, Wheat, Search, MapPin, Tag } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import AdminProductCard from "@/components/admin/admin-product-card"
 
 interface Service {
   id: string
@@ -120,6 +125,12 @@ export default function AdminContentManagement() {
     description: '',
     image: ''
   })
+  const [salesSearch, setSalesSearch] = useState('')
+  const [drugsSearch, setDrugsSearch] = useState('')
+  const [feedsSearch, setFeedsSearch] = useState('')
+  const [deleteServiceTarget, setDeleteServiceTarget] = useState<Service | null>(null)
+  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<Category | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     fetchServices()
@@ -206,6 +217,17 @@ export default function AdminContentManagement() {
     }
   }
 
+  const confirmDeleteCategory = async () => {
+    if (!deleteCategoryTarget) return
+    setIsDeleting(true)
+    try {
+      await handleDeleteCategory(deleteCategoryTarget)
+    } finally {
+      setIsDeleting(false)
+      setDeleteCategoryTarget(null)
+    }
+  }
+
   const openEditCategoryDialog = (category: Category) => {
     setCurrentCategoryEdit(category)
     setCategoryFormData({
@@ -278,6 +300,17 @@ export default function AdminContentManagement() {
     }
   }
 
+  const confirmDeleteService = async () => {
+    if (!deleteServiceTarget) return
+    setIsDeleting(true)
+    try {
+      await handleDeleteService(deleteServiceTarget)
+    } finally {
+      setIsDeleting(false)
+      setDeleteServiceTarget(null)
+    }
+  }
+
   const openEditDialog = (service: Service) => {
     setCurrentService(service)
     setFormData({
@@ -347,10 +380,10 @@ export default function AdminContentManagement() {
         </TabsList>
 
         <TabsContent value="blog" className="space-y-4">
-          <Card>
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>{t('content.blogPosts')}</CardTitle>
+                <CardTitle className="text-base font-semibold text-gray-900">{t('content.blogPosts')}</CardTitle>
                 <Button onClick={() => setIsCreatePostOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   {t('content.newPost')}
@@ -360,7 +393,7 @@ export default function AdminContentManagement() {
             <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead>{t('content.title')}</TableHead>
                     <TableHead>{t('content.status')}</TableHead>
                     <TableHead>{t('content.views')}</TableHead>
@@ -401,11 +434,11 @@ export default function AdminContentManagement() {
         </TabsContent>
 
         <TabsContent value="sales" className="space-y-4">
-          <Card>
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <DollarSign className="h-4 w-4 text-green-600" />
                   {t('content.animalSalesCategories')}
                 </CardTitle>
                 <Button onClick={() => { setCurrentCategory('sales'); setIsCreateCategoryOpen(true) }}>
@@ -417,7 +450,7 @@ export default function AdminContentManagement() {
             <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead>{t('content.categoryName')}</TableHead>
                     <TableHead>{t('content.description')}</TableHead>
                     <TableHead>{t('content.itemsCount')}</TableHead>
@@ -438,7 +471,7 @@ export default function AdminContentManagement() {
                           <Button variant="ghost" size="sm" onClick={() => openEditCategoryDialog(category)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category)}>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteCategoryTarget(category)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -450,54 +483,64 @@ export default function AdminContentManagement() {
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('content.animals')}</CardTitle>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <CardTitle className="text-base font-semibold text-gray-900">{t('content.animals')}</CardTitle>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder={t('content.searchItems')}
+                    value={salesSearch}
+                    onChange={(e) => setSalesSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('content.animalName')}</TableHead>
-                    <TableHead>{t('content.category')}</TableHead>
-                    <TableHead>{t('content.price')}</TableHead>
-                    <TableHead>{t('content.duration')}</TableHead>
-                    <TableHead>{t('content.description')}</TableHead>
-                    <TableHead className="text-right">{t('content.actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {services.sales?.map((service) => (
-                    <TableRow key={service.id}>
-                      <TableCell className="font-medium">{service.name}</TableCell>
-                      <TableCell>{getCategoryName(service.categoryId, 'sales')}</TableCell>
-                      <TableCell>RWF {service.price.toLocaleString()}</TableCell>
-                      <TableCell>{service.duration}</TableCell>
-                      <TableCell className="max-w-xs truncate">{service.description}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(service)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteService(service)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {services.sales?.filter((s) => s.name.toLowerCase().includes(salesSearch.toLowerCase())).length ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {services.sales
+                    .filter((s) => s.name.toLowerCase().includes(salesSearch.toLowerCase()))
+                    .map((service) => (
+                      <AdminProductCard
+                        key={service.id}
+                        image={service.image}
+                        name={service.name}
+                        categoryName={getCategoryName(service.categoryId, 'sales')}
+                        price={service.price}
+                        unit={service.duration}
+                        description={service.description}
+                        details={[
+                          ...(service.animalType || service.breed
+                            ? [{ icon: Tag, text: [service.animalType, service.breed].filter(Boolean).join(' · ') }]
+                            : []),
+                          ...(service.age || service.sex
+                            ? [{ icon: Calendar, text: [service.age, service.sex].filter(Boolean).join(' · ') }]
+                            : []),
+                          ...(service.district
+                            ? [{ icon: MapPin, text: [service.district, service.sector].filter(Boolean).join(', ') }]
+                            : []),
+                        ]}
+                        onEdit={() => openEditDialog(service)}
+                        onDelete={() => setDeleteServiceTarget(service)}
+                      />
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-sm text-gray-500">{t('content.noItemsFound')}</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="drugs" className="space-y-4">
-          <Card>
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center gap-2">
-                  <Pill className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <Pill className="h-4 w-4 text-green-600" />
                   {t('content.pharmacyCategories')}
                 </CardTitle>
                 <Button onClick={() => { setCurrentCategory('drugs'); setIsCreateCategoryOpen(true) }}>
@@ -509,7 +552,7 @@ export default function AdminContentManagement() {
             <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead>Category Name</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Items Count</TableHead>
@@ -530,7 +573,7 @@ export default function AdminContentManagement() {
                           <Button variant="ghost" size="sm" onClick={() => openEditCategoryDialog(category)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category)}>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteCategoryTarget(category)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -542,54 +585,59 @@ export default function AdminContentManagement() {
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('content.drugs')}</CardTitle>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <CardTitle className="text-base font-semibold text-gray-900">{t('content.drugs')}</CardTitle>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder={t('content.searchItems')}
+                    value={drugsSearch}
+                    onChange={(e) => setDrugsSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('content.drugName')}</TableHead>
-                    <TableHead>{t('content.category')}</TableHead>
-                    <TableHead>{t('content.price')}</TableHead>
-                    <TableHead>{t('content.package')}</TableHead>
-                    <TableHead>{t('content.description')}</TableHead>
-                    <TableHead className="text-right">{t('content.actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {services.drugs?.map((service) => (
-                    <TableRow key={service.id}>
-                      <TableCell className="font-medium">{service.name}</TableCell>
-                      <TableCell>{getCategoryName(service.categoryId, 'drugs')}</TableCell>
-                      <TableCell>RWF {service.price.toLocaleString()}</TableCell>
-                      <TableCell>{service.duration}</TableCell>
-                      <TableCell className="max-w-xs truncate">{service.description}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(service)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteService(service)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {services.drugs?.filter((s) => s.name.toLowerCase().includes(drugsSearch.toLowerCase())).length ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {services.drugs
+                    .filter((s) => s.name.toLowerCase().includes(drugsSearch.toLowerCase()))
+                    .map((service) => (
+                      <AdminProductCard
+                        key={service.id}
+                        image={service.image}
+                        name={service.name}
+                        categoryName={getCategoryName(service.categoryId, 'drugs')}
+                        price={service.price}
+                        unit={service.duration}
+                        description={service.description}
+                        details={[
+                          ...(service.drugType ? [{ icon: Pill, text: service.drugType }] : []),
+                          ...(service.district
+                            ? [{ icon: MapPin, text: [service.district, service.sector].filter(Boolean).join(', ') }]
+                            : []),
+                        ]}
+                        onEdit={() => openEditDialog(service)}
+                        onDelete={() => setDeleteServiceTarget(service)}
+                      />
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-sm text-gray-500">{t('content.noItemsFound')}</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="feeds" className="space-y-4">
-          <Card>
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="flex items-center gap-2">
-                  <Wheat className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <Wheat className="h-4 w-4 text-green-600" />
                   {t('content.feedCategories')}
                 </CardTitle>
                 <Button onClick={() => { setCurrentCategory('feeds'); setIsCreateCategoryOpen(true) }}>
@@ -601,7 +649,7 @@ export default function AdminContentManagement() {
             <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead>Category Name</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Items Count</TableHead>
@@ -622,7 +670,7 @@ export default function AdminContentManagement() {
                           <Button variant="ghost" size="sm" onClick={() => openEditCategoryDialog(category)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category)}>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteCategoryTarget(category)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -634,52 +682,60 @@ export default function AdminContentManagement() {
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('content.feeds')}</CardTitle>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <CardTitle className="text-base font-semibold text-gray-900">{t('content.feeds')}</CardTitle>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder={t('content.searchItems')}
+                    value={feedsSearch}
+                    onChange={(e) => setFeedsSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('content.feedName')}</TableHead>
-                    <TableHead>{t('content.category')}</TableHead>
-                    <TableHead>{t('content.price')}</TableHead>
-                    <TableHead>{t('content.package')}</TableHead>
-                    <TableHead>{t('content.description')}</TableHead>
-                    <TableHead className="text-right">{t('content.actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {services.feeds?.map((service) => (
-                    <TableRow key={service.id}>
-                      <TableCell className="font-medium">{service.name}</TableCell>
-                      <TableCell>{getCategoryName(service.categoryId, 'feeds')}</TableCell>
-                      <TableCell>RWF {service.price.toLocaleString()}</TableCell>
-                      <TableCell>{service.duration}</TableCell>
-                      <TableCell className="max-w-xs truncate">{service.description}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(service)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteService(service)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              {services.feeds?.filter((s) => s.name.toLowerCase().includes(feedsSearch.toLowerCase())).length ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {services.feeds
+                    .filter((s) => s.name.toLowerCase().includes(feedsSearch.toLowerCase()))
+                    .map((service) => (
+                      <AdminProductCard
+                        key={service.id}
+                        image={service.image}
+                        name={service.name}
+                        categoryName={getCategoryName(service.categoryId, 'feeds')}
+                        price={service.price}
+                        unit={service.duration}
+                        description={service.description}
+                        details={[
+                          ...(service.feedType || service.quality
+                            ? [{ icon: Wheat, text: [service.feedType, service.quality].filter(Boolean).join(' · ') }]
+                            : []),
+                          ...(service.targetAnimal ? [{ icon: Tag, text: service.targetAnimal }] : []),
+                          ...(service.district
+                            ? [{ icon: MapPin, text: [service.district, service.sector].filter(Boolean).join(', ') }]
+                            : []),
+                        ]}
+                        onEdit={() => openEditDialog(service)}
+                        onDelete={() => setDeleteServiceTarget(service)}
+                      />
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-sm text-gray-500">{t('content.noItemsFound')}</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="announcements" className="space-y-4">
-          <Card>
+          <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
-              <CardTitle>{t('content.systemAnnouncements')}</CardTitle>
+              <CardTitle className="text-base font-semibold text-gray-900">{t('content.systemAnnouncements')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center py-8 text-gray-500">
@@ -1232,6 +1288,50 @@ export default function AdminContentManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Item Confirmation */}
+      <AlertDialog open={!!deleteServiceTarget} onOpenChange={(open) => !open && setDeleteServiceTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('content.deleteItemConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('content.deleteItemConfirmDesc').replace('{name}', deleteServiceTarget?.name || '')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteService}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? t('common.loading') : t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Category Confirmation */}
+      <AlertDialog open={!!deleteCategoryTarget} onOpenChange={(open) => !open && setDeleteCategoryTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('content.deleteCategoryConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('content.deleteCategoryConfirmDesc').replace('{name}', deleteCategoryTarget?.name || '')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteCategory}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? t('common.loading') : t('common.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

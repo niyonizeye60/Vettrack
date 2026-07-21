@@ -6,6 +6,35 @@ import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
 import { ObjectId } from "mongodb"
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser || currentUser.role !== "admin" || !ObjectId.isValid(params.id)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    // Admin can only look up farmers and doctors, not other admins/superadmins
+    const user = await db.collection("users").findOne({
+      _id: new ObjectId(params.id),
+      role: { $in: ["farmer", "doctor"] },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    const { password, ...userWithoutPassword } = user
+    return NextResponse.json({ user: { ...userWithoutPassword, _id: user._id.toString() } })
+  } catch (error) {
+    console.error("Error fetching user:", error)
+    return NextResponse.json({ error: "Failed to fetch user" }, { status: 500 })
+  }
+}
+
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const currentUser = await getCurrentUser()
