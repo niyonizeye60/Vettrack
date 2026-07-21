@@ -442,7 +442,7 @@ export default function VeterinaryTrackingPage() {
 
   const exportToExcel = async () => {
     try {
-      const XLSX = (await import('xlsx')).default
+      const XLSX = await import('xlsx')
 
       // Patient + animal info sheet
       const animalInfo = {
