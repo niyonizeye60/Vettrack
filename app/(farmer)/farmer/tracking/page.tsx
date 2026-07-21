@@ -453,7 +453,7 @@ export default function PetTrackingPage() {
 
   const exportToExcel = async () => {
     try {
-      const XLSX = (await import('xlsx')).default
+      const XLSX = await import('xlsx')
 
       // Animal info sheet
       const animalInfo = {
