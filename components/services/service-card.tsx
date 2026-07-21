@@ -1,7 +1,10 @@
+"use client"
+
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Clock} from "lucide-react"
+import { Clock } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface ServiceProps {
   service: {
@@ -11,7 +14,6 @@ interface ServiceProps {
     price: number | string
     duration: string
     image: string
-    category?: string
     link?: string
   }
 }
@@ -19,17 +21,14 @@ interface ServiceProps {
 function getServiceLink(service: ServiceProps['service']) {
   // Check for external link (RVSMS)
   if (service.link) return service.link
-  
-  // Check if service has category (dynamic services)
-  if (service.category === 'sales') return `/animal-sales?category=${service.id}`
-  if (service.category === 'drugs') return `/pharmacy?category=${service.id}`
-  if (service.category === 'feeds') return `/feeds?category=${service.id}`
-  
-  // For static services, use booking page
+
+  // Static services go to the booking page
   return `/booking?service=${encodeURIComponent(service.name)}`
 }
 
 export default function ServiceCard({ service }: ServiceProps) {
+  const { t } = useLanguage()
+
   return (
     <div className="salon-card overflow-hidden shadow-salon hover:shadow-salon-hover transition-all group">
       <div className="relative h-48">
@@ -48,7 +47,6 @@ export default function ServiceCard({ service }: ServiceProps) {
 
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center text-primary font-semibold">
-            
             <span>{typeof service.price === "number" ? `RWF ${service.price.toLocaleString()}` : service.price}</span>
           </div>
 
@@ -63,7 +61,7 @@ export default function ServiceCard({ service }: ServiceProps) {
           className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded-full shadow-md"
         >
           <Link href={getServiceLink(service)} target={service.link ? "_blank" : "_self"}>
-            {service.name === "Access RVSMS" ? "Access RVSMS" : "Order Now"}
+            {service.link ? t('common.accessPortal') : t('common.bookNow')}
           </Link>
         </Button>
       </div>

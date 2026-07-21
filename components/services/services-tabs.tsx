@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ServiceCard from "@/components/services/service-card"
+import CategoryCard from "@/components/services/category-card"
 import { Activity, Video, ShieldAlert, ShoppingBag, Pill, Wheat, FileText, MapPin, Stethoscope, Shield, DollarSign, Brain } from "lucide-react"
 
 // Service data
@@ -399,15 +400,14 @@ export default function ServicesTabs() {
         <TabsContent value="sales" className="mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {categories.sales.map((category) => (
-              <ServiceCard key={category.id} service={{
-                id: category.id,
-                name: category.name,
-                description: category.description,
-                price: 'View Items',
-                duration: '',
-                image: category.image,
-                category: 'sales'
-              }} />
+              <CategoryCard
+                key={category.id}
+                id={category.id}
+                name={category.name}
+                description={category.description}
+                image={category.image}
+                href={`/animal-sales?category=${category.id}`}
+              />
             ))}
           </div>
         </TabsContent>
@@ -415,15 +415,14 @@ export default function ServicesTabs() {
         <TabsContent value="drugs" className="mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {categories.drugs.map((category) => (
-              <ServiceCard key={category.id} service={{
-                id: category.id,
-                name: category.name,
-                description: category.description,
-                price: 'View Items',
-                duration: '',
-                image: category.image,
-                category: 'drugs'
-              }} />
+              <CategoryCard
+                key={category.id}
+                id={category.id}
+                name={category.name}
+                description={category.description}
+                image={category.image}
+                href={`/pharmacy?category=${category.id}`}
+              />
             ))}
           </div>
         </TabsContent>
@@ -431,15 +430,14 @@ export default function ServicesTabs() {
         <TabsContent value="feeds" className="mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {categories.feeds.map((category) => (
-              <ServiceCard key={category.id} service={{
-                id: category.id,
-                name: category.name,
-                description: category.description,
-                price: 'View Items',
-                duration: '',
-                image: category.image,
-                category: 'feeds'
-              }} />
+              <CategoryCard
+                key={category.id}
+                id={category.id}
+                name={category.name}
+                description={category.description}
+                image={category.image}
+                href={`/feeds?category=${category.id}`}
+              />
             ))}
           </div>
         </TabsContent>

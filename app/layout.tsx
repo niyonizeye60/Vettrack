@@ -6,6 +6,7 @@ import "./globals.css"
 import GoogleAnalytics from "@/components/analytics/google-analytics"
 import BodyWrapper from "@/components/layout/body-wrapper"
 import { LanguageProvider } from "@/contexts/LanguageContext"
+import { CartProvider } from "@/contexts/CartContext"
 import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({
@@ -44,7 +45,9 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans`}>
         <GoogleAnalytics />
         <LanguageProvider>
-          <BodyWrapper>{children}</BodyWrapper>
+          <CartProvider>
+            <BodyWrapper>{children}</BodyWrapper>
+          </CartProvider>
         </LanguageProvider>
         <Toaster />
       </body>

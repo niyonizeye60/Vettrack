@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react"
 import Image from "next/image"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { useLanguage } from "@/contexts/LanguageContext"
+import CartDrawer from "@/components/cart/cart-drawer"
 
 // Navigation items will be translated dynamically
 
@@ -75,8 +76,15 @@ export default function Header() {
                 {item.name}
               </Link>
             ))}
-            <div className="flex space-x-2 ml-4">
+            <div className="flex items-center space-x-2 ml-4">
               <LanguageSwitcher
+                className={
+                  forceBlackNav || isScrolled
+                    ? "text-black hover:text-black hover:bg-primary/10"
+                    : "text-white hover:text-white hover:bg-white/10"
+                }
+              />
+              <CartDrawer
                 className={
                   forceBlackNav || isScrolled
                     ? "text-black hover:text-black hover:bg-primary/10"
@@ -92,14 +100,17 @@ export default function Header() {
             </div>
           </nav>
 
-          <Button
-            size="icon"
-            className="lg:hidden bg-primary text-white hover:bg-primary/90"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </Button>
+          <div className="flex items-center gap-2 lg:hidden">
+            <CartDrawer className={forceBlackNav ? "text-black" : isScrolled ? "text-black" : "text-white"} />
+            <Button
+              size="icon"
+              className="bg-primary text-white hover:bg-primary/90"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </Button>
+          </div>
         </div>
 
         {/* Mobile menu */}

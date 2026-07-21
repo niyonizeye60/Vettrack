@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@aws-sdk/credential-providers": "latest",
+    "@d-merci/intouchpay-client": "^0.1.5",
     "@hookform/resolvers": "^3.9.1",
     "@mongodb-js/zstd": "latest",
     "@prisma/client": "^6.18.0",
@@ -63,6 +64,7 @@
     "next-auth": "^4.24.11",
     "next-themes": "^0.4.4",
     "nodemailer": "^6.10.1",
+    "pesakit": "^2.0.5",
     "prisma": "^6.18.0",
     "react": "^18.3.0",
     "react-day-picker": "8.10.1",
