@@ -21,7 +21,7 @@ type User = {
   email: string
   phone: string
   role: "farmer" | "doctor"
-  status: "active" | "suspended"
+  status: "active" | "suspended" | "pending_verification" | "rejected"
   district?: string
   sector?: string
   licenseNumber?: string
@@ -87,7 +87,7 @@ export default function AdminUsersManagement() {
     return matchesSearch && matchesRole && matchesStatus
   })
 
-  const handleStatusChange = async (userId: string, action: "suspend" | "activate") => {
+  const handleStatusChange = async (userId: string, action: "suspend" | "activate" | "approve" | "reject") => {
     try {
       const response = await fetch(`/api/admin-users/${userId}`, {
         method: 'PUT',
@@ -151,7 +151,19 @@ export default function AdminUsersManagement() {
     switch (status) {
       case "active": return "bg-green-100 text-green-800"
       case "suspended": return "bg-red-100 text-red-800"
+      case "pending_verification": return "bg-yellow-100 text-yellow-800"
+      case "rejected": return "bg-gray-200 text-gray-700"
       default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "active": return t('admin.active')
+      case "suspended": return t('admin.suspended')
+      case "pending_verification": return t('admin.pendingVerification')
+      case "rejected": return t('admin.rejected')
+      default: return status
     }
   }
 
@@ -166,7 +178,7 @@ export default function AdminUsersManagement() {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="text-2xl font-bold">{users.length}</div>
@@ -179,6 +191,14 @@ export default function AdminUsersManagement() {
               {users.filter(u => u.status === 'active').length}
             </div>
             <p className="text-sm text-muted-foreground">{t('admin.activeUsers')}</p>
+          </CardContent>
+        </Card>
+        <Card className={users.some(u => u.status === 'pending_verification') ? "border-yellow-300" : ""}>
+          <CardContent className="p-6">
+            <div className="text-2xl font-bold text-yellow-600">
+              {users.filter(u => u.status === 'pending_verification').length}
+            </div>
+            <p className="text-sm text-muted-foreground">{t('admin.pendingVerification')}</p>
           </CardContent>
         </Card>
         <Card>
@@ -238,7 +258,9 @@ export default function AdminUsersManagement() {
               <SelectContent>
                 <SelectItem value="all">{t('admin.allStatus')}</SelectItem>
                 <SelectItem value="active">{t('admin.active')}</SelectItem>
+                <SelectItem value="pending_verification">{t('admin.pendingVerification')}</SelectItem>
                 <SelectItem value="suspended">{t('admin.suspended')}</SelectItem>
+                <SelectItem value="rejected">{t('admin.rejected')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -292,7 +314,7 @@ export default function AdminUsersManagement() {
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(user.status)}>
-                        {user.status === 'active' ? t('admin.active') : t('admin.suspended')}
+                        {getStatusLabel(user.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -306,7 +328,18 @@ export default function AdminUsersManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {user.status === "active" ? (
+                          {user.status === "pending_verification" ? (
+                            <>
+                              <DropdownMenuItem onClick={() => handleStatusChange(user._id, "approve")}>
+                                <UserCheck className="mr-2 h-4 w-4" />
+                                {t('admin.approve')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatusChange(user._id, "reject")}>
+                                <UserX className="mr-2 h-4 w-4" />
+                                {t('admin.reject')}
+                              </DropdownMenuItem>
+                            </>
+                          ) : user.status === "active" ? (
                             <DropdownMenuItem onClick={() => handleStatusChange(user._id, "suspend")}>
                               <UserX className="mr-2 h-4 w-4" />
                               {t('admin.suspend')}
@@ -476,6 +509,11 @@ export default function AdminUsersManagement() {
                     />
                   </div>
                 </div>
+                <Alert className="bg-yellow-50 border-yellow-200">
+                  <AlertDescription className="text-yellow-800 text-sm">
+                    {t('admin.verifyVetAccount')}
+                  </AlertDescription>
+                </Alert>
               </div>
             )}
             

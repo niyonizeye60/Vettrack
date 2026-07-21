@@ -27,6 +27,9 @@ export async function registerUser(formData: FormData) {
 
     // Add role-specific data
     if (role === "doctor") {
+      // Vet accounts require Extension Officer verification (license check)
+      // before they can log in - see loginUser's status check below.
+      userData.status = "pending_verification"
       Object.assign(userData, {
         licenseNumber: formData.get("licenseNumber"),
         specialization: formData.get("specialization"),
@@ -124,6 +127,14 @@ export async function loginUser(formData: FormData) {
 
     if (user.status === "inactive") {
       return { success: false, message: "Your account is inactive. Please contact the administrator for assistance." }
+    }
+
+    if (user.status === "pending_verification") {
+      return { success: false, message: "Your veterinarian account is pending verification by an Extension Officer. You'll be notified once it's approved." }
+    }
+
+    if (user.status === "rejected") {
+      return { success: false, message: "Your veterinarian account application was not approved. Please contact the administrator for details." }
     }
 
     // Set a session cookie
