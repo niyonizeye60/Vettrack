@@ -213,7 +213,21 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
     // never fails the booking itself.
     try {
       const doctorId = consultation.doctor as string | null
-      if (doctorId) {
+      if (doctorId && ObjectId.isValid(doctorId)) {
+        // In-app notification so the vet's bell reflects the new request.
+        await db.collection("notifications").insertOne({
+          title: "New consultation request",
+          message: `${consultation.fullName} requested a consultation${consultation.animalName ? ` for ${consultation.animalName}` : ""}.`,
+          type: "consultation",
+          priority: "normal",
+          read: false,
+          deletedBy: [],
+          userId: new ObjectId(doctorId),
+          actionUrl: "/veterinary/consultations",
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          createdAt: new Date(),
+        }).catch((err) => console.error("Error inserting consultation notification:", err))
+
         const doctor = await db.collection("users").findOne({ _id: new ObjectId(doctorId) })
         if (doctor?.email) {
           await sendConsultationRequestEmail(doctor.email, doctor.name, {
@@ -273,6 +287,30 @@ export async function updateConsultationStatus(id: string, status: string, feedb
       { _id: objectId },
       { $set: updateData }
     );
+
+    // Notify the farmer in-app that the vet responded. The vet already sees the
+    // change live; the farmer otherwise has no signal, so this closes the loop.
+    try {
+      const consultation = await db.collection("consultations").findOne({ _id: objectId });
+      const farmerId = consultation?.farmerId as string | undefined;
+      if (farmerId && ObjectId.isValid(farmerId)) {
+        const animalSuffix = consultation?.animalName ? ` for ${consultation.animalName}` : "";
+        await db.collection("notifications").insertOne({
+          title: `Consultation ${status}`,
+          message: `Your consultation${animalSuffix} was marked ${status}${feedback ? ": " + feedback.slice(0, 80) : "."}`,
+          type: "consultation",
+          priority: "normal",
+          read: false,
+          deletedBy: [],
+          userId: new ObjectId(farmerId),
+          actionUrl: `/farmer/consultations/${id}`,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          createdAt: new Date(),
+        });
+      }
+    } catch (notifyError) {
+      console.error("Error notifying farmer of consultation update:", notifyError);
+    }
 
     // Revalidate paths
     revalidatePath("/veterinary/consultations");
@@ -436,8 +474,14 @@ export async function getConsultations(doctorId?: string, farmerId?: string) {
       status: c.status.toLowerCase(),
       createdAt: c.createdAt.toISOString(),
       doctor: doctorMap.get(c.doctor) || c.doctor || "Unassigned",
+      doctorId: c.doctor ? c.doctor.toString() : null,
+      doctorName: doctorMap.get(c.doctor) || null,
       farmerId: c.farmerId || null,
       feedback: c.feedback || null,
+      animalId: c.animalId || null,
+      animalName: c.animalName || null,
+      animalType: c.animalType || null,
+      animalBreed: c.animalBreed || null,
     }))
   } catch (error) {
     console.error("Error fetching consultations:", error)
@@ -484,6 +528,19 @@ export async function getConsultationById(id: string, farmerId?: string) {
       return null;
     }
 
+    // Normalize the doctor reference: `doctor` is stored as the raw id, but every
+    // consumer wants the display name. Resolve it here so this returns the same
+    // shape as getConsultations (doctor = name, plus an explicit doctorId).
+    const doctorId = consultation.doctor ? consultation.doctor.toString() : null;
+    let doctorName: string | null = null;
+    if (doctorId && ObjectId.isValid(doctorId)) {
+      const doctor = await db.collection("users").findOne(
+        { _id: new ObjectId(doctorId), role: "doctor" },
+        { projection: { name: 1 } }
+      );
+      doctorName = doctor?.name ?? null;
+    }
+
     return {
       _id: consultation._id.toString(),
       fullName: consultation.fullName,
@@ -494,9 +551,15 @@ export async function getConsultationById(id: string, farmerId?: string) {
       type: consultation.type,
       status: consultation.status.toLowerCase(),
       createdAt: consultation.createdAt.toISOString(),
-      doctor: consultation.doctor,
+      doctor: doctorName || doctorId || "Unassigned",
+      doctorId,
+      doctorName,
       farmerId: consultation.farmerId || null,
-      feedback: consultation.feedback || null
+      feedback: consultation.feedback || null,
+      animalId: consultation.animalId || null,
+      animalName: consultation.animalName || null,
+      animalType: consultation.animalType || null,
+      animalBreed: consultation.animalBreed || null
     };
   } catch (error) {
     console.error("Error fetching consultation:", error);

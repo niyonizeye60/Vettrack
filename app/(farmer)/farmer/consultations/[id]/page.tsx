@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/auth";
-import { getConsultationById, getDoctorsList } from "@/lib/actions";
+import { getConsultationById } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import ConsultationDetailContent from "./components/consultation-detail-content";
 
@@ -28,15 +28,8 @@ export default async function ConsultationDetailPage({ params }: PageProps) {
     notFound();
   }
   
-  // Get doctor info if available
-  let doctorName = "Unknown Doctor";
-  if (consultation.doctor) {
-    const doctors = await getDoctorsList();
-    const doctor = doctors.find(d => d._id === consultation.doctor);
-    if (doctor) {
-      doctorName = doctor.name;
-    }
-  }
+  // Doctor name is resolved server-side by getConsultationById.
+  const doctorName = consultation.doctorName || "Unknown Doctor";
 
   return (
     <ConsultationDetailContent

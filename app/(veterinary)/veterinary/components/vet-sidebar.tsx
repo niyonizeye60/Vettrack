@@ -7,6 +7,7 @@ import {
   Stethoscope,
   Calendar,
   Users,
+  Activity,
   MessageSquare,
   Bell,
   Menu,
@@ -40,6 +41,7 @@ export default function VetSidebar() {
     { href: "/veterinary/consultations", label: t("vet.consultations"), icon: <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/appointments", label: t("vet.appointments"), icon: <Calendar className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/patients", label: t("vet.patients"), icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/veterinary/tracking", label: t("vet.tracking"), icon: <Activity className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/messages", label: t("vet.messages"), icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/notifications", label: t("vet.notifications"), icon: <Bell className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ];

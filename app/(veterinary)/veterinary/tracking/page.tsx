@@ -1,546 +1,974 @@
-"use client";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  Legend,
-  PieChart,
-  Pie,
-  Cell
-} from "recharts";
-import { useEffect, useState } from "react";
-import { Activity, MapPin, Heart, RefreshCw, Search, PlusCircle } from "lucide-react";
+"use client"
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart } from "recharts"
+import { useEffect, useState, useCallback } from "react"
+import { Activity, MapPin, Heart, RefreshCw, Thermometer, Database, Users, Download, FileText, FileSpreadsheet } from "lucide-react"
+import { DistributionChart } from "@/components/distribution-chart"
+import { RwandaMap } from "@/components/rwanda-map"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useLanguage } from "@/contexts/LanguageContext"
+import { getCurrentUser as getAuthUser } from "@/lib/auth"
 
-// Define our data types
+// Field mapping matches the farmer tracking channel: field1 = BPM,
+// field2/field3 = lat/lng, field4 = temperature.
+type Channel = {
+  id: number
+  name: string
+  latitude: string
+  longitude: string
+  field1: string
+  field2: string
+  field3: string
+  field4: string
+  created_at: string
+  updated_at: string
+  last_entry_id: number
+}
+
 type Feed = {
-  created_at: string;
-  entry_id: number;
-  field1: string;
-  field2: string | null;
-  field3: string | null;
-};
+  created_at: string
+  entry_id: number
+  field1: string
+  field2: string | null
+  field3: string | null
+  field4: string | null
+}
+
+type ApiResponse = {
+  channel: Channel
+  feeds: Feed[]
+}
 
 type FormattedData = {
-  created_at: string;
-  timestamp: string;
-  bpm: number;
-  latitude: number | null;
-  longitude: number | null;
-  hasLocation: boolean;
-};
+  created_at: string
+  timestamp: string
+  bpm: number
+  latitude: number | null
+  longitude: number | null
+  temperature: number | null
+  hasLocation: boolean
+  hasTemperature: boolean
+}
 
-type Animal = {
-  id: string;
-  name: string;
-  species: string;
-  deviceId: string;
-};
+type Patient = {
+  id: string
+  name: string
+  phone: string
+  hasTracking: boolean
+}
 
-export default function Page() {
-  const [data, setData] = useState<FormattedData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
-  const [refreshing, setRefreshing] = useState(false);
-  const [deviceId, setDeviceId] = useState<string>("2688413");
-  const [apiKey, setApiKey] = useState<string>("WCY7XQTJZVB21DHQ");
-  const [results, setResults] = useState<number>(10);
-  const [animals, setAnimals] = useState<Animal[]>([
-    { id: "1", name: "Max", species: "Dog", deviceId: "2688413" },
-    { id: "2", name: "Bella", species: "Cat", deviceId: "2688414" }
-  ]);
-  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(animals[0]);
-  const [showAddAnimal, setShowAddAnimal] = useState(false);
-  const [newAnimal, setNewAnimal] = useState<Partial<Animal>>({ name: "", species: "", deviceId: "" });
+export default function VeterinaryTrackingPage() {
+  const { t } = useLanguage()
 
-  const fetchSensorData = async () => {
-    setRefreshing(true);
-    try {
-      const res = await fetch(
-        `https://api.thingspeak.com/channels/${deviceId}/feeds.json?api_key=${apiKey}&results=${results}`
-      );
-      const json = await res.json();
-      
-      // Format the data
-      const formatted = json.feeds.map((feed: Feed) => {
-        const date = new Date(feed.created_at);
-        return {
-          created_at: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          timestamp: date.toISOString(),
-          bpm: parseFloat(feed.field1) || 0,
-          latitude: feed.field2 ? parseFloat(feed.field2) : null,
-          longitude: feed.field3 ? parseFloat(feed.field3) : null,
-          hasLocation: !!feed.field2 && !!feed.field3
-        };
-      });
-      
-      // Sort by date
-      formatted.sort((a: FormattedData, b: FormattedData) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      
-      setData(formatted);
-      setLastUpdated(new Date().toLocaleString());
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [patientsLoading, setPatientsLoading] = useState(true)
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("")
 
+  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null)
+  const [data, setData] = useState<FormattedData[]>([])
+  const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<string>("")
+  const [results, setResults] = useState<number>(20)
+  const [notConfigured, setNotConfigured] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ name: string; email?: string } | null>(null)
+
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId) ?? null
+
+  // Load the vet's patients (farmers they have consultations with) on mount.
   useEffect(() => {
-    fetchSensorData();
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchSensorData();
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [deviceId, apiKey, results]);
-
-  const handleAnimalSelect = (animal: Animal) => {
-    setSelectedAnimal(animal);
-    setDeviceId(animal.deviceId);
-  };
-
-  const handleAddAnimal = () => {
-    if (newAnimal.name && newAnimal.species && newAnimal.deviceId) {
-      const animal: Animal = {
-        id: Date.now().toString(),
-        name: newAnimal.name,
-        species: newAnimal.species,
-        deviceId: newAnimal.deviceId
-      };
-      setAnimals([...animals, animal]);
-      setNewAnimal({ name: "", species: "", deviceId: "" });
-      setShowAddAnimal(false);
+    async function fetchPatients() {
+      setPatientsLoading(true)
+      try {
+        const res = await fetch("/api/veterinary/patients")
+        const json = await res.json()
+        const list: Patient[] = json.patients ?? []
+        setPatients(list)
+        // Prefer a patient who actually has tracking configured.
+        const firstTrackable = list.find((p: Patient) => p.hasTracking) ?? list[0]
+        if (firstTrackable) setSelectedPatientId(firstTrackable.id)
+      } catch (err) {
+        console.error("Failed to load patients:", err)
+      } finally {
+        setPatientsLoading(false)
+      }
     }
-  };
 
-  // Calculate some stats
-  const averageBpm = data.length > 0 
-    ? Math.round(data.reduce((sum: number, item: FormattedData) => sum + item.bpm, 0) / data.length) 
-    : 0;
-  
-  const latestBpm = data.length > 0 ? data[data.length - 1].bpm : 0;
-  
-  // Location data stats
-  const locationDataPoints = data.filter((item: FormattedData) => item.hasLocation).length;
-  const totalDataPoints = data.length;
-  const locationPercentage = totalDataPoints > 0 ? Math.round((locationDataPoints / totalDataPoints) * 100) : 0;
+    async function fetchUser() {
+      try {
+        const userData = await getAuthUser()
+        if (userData) {
+          setCurrentUser({ name: userData.name, email: userData.email })
+        }
+      } catch (err) {
+        console.error("Failed to fetch user data:", err)
+      }
+    }
 
-  // BPM status determination
+    fetchPatients()
+    fetchUser()
+  }, [])
+
+  // Load Leaflet CSS dynamically (same as the farmer tracking page — RwandaMap
+  // relies on this being present rather than injecting it itself).
+  useEffect(() => {
+    const link = document.createElement("link")
+    link.rel = "stylesheet"
+    link.href = "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    link.integrity = "sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+    link.crossOrigin = ""
+    document.head.appendChild(link)
+
+    return () => {
+      document.head.removeChild(link)
+    }
+  }, [])
+
+  const fetchSensorData = useCallback(async () => {
+    if (!selectedPatientId) return
+    setRefreshing(true)
+    try {
+      const res = await fetch(`/api/veterinary/patient-tracking?farmerId=${selectedPatientId}&results=${results}`)
+      const json = await res.json()
+
+      if (json.configured === false) {
+        setApiResponse(null)
+        setData([])
+        setNotConfigured(true)
+        return
+      }
+
+      if (!res.ok || json.error || !json.feeds || !Array.isArray(json.feeds)) {
+        throw new Error(json.error || `HTTP error! status: ${res.status}`)
+      }
+
+      setNotConfigured(false)
+      setApiResponse(json)
+
+      const formatted = json.feeds.map((feed: Feed) => {
+        const date = new Date(feed.created_at)
+        return {
+          created_at: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: date.toISOString(),
+          bpm: Number.parseFloat(feed.field1) || 0,
+          latitude: feed.field2 ? Number.parseFloat(feed.field2) : null,
+          longitude: feed.field3 ? Number.parseFloat(feed.field3) : null,
+          temperature: feed.field4 ? Number.parseFloat(feed.field4) : null,
+          hasLocation: !!feed.field2 && !!feed.field3,
+          hasTemperature: !!feed.field4,
+        }
+      })
+
+      formatted.sort(
+        (a: FormattedData, b: FormattedData) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      )
+
+      setData(formatted)
+      setLastUpdated(new Date().toLocaleString())
+    } catch (error) {
+      console.error("Error fetching patient tracking data:", error)
+      setApiResponse(null)
+      setData([])
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [selectedPatientId, results])
+
+  // Refetch whenever the selected patient or result count changes, then poll.
+  useEffect(() => {
+    if (!selectedPatientId) return
+    setLoading(true)
+    setData([])
+    setApiResponse(null)
+    setNotConfigured(false)
+    fetchSensorData()
+    const interval = setInterval(fetchSensorData, 30000)
+    return () => clearInterval(interval)
+  }, [selectedPatientId, results, fetchSensorData])
+
+  // Stats
+  const averageBpm =
+    data.length > 0 ? Math.round(data.reduce((sum, item) => sum + item.bpm, 0) / data.length) : 0
+  const latestBpm = data.length > 0 ? data[data.length - 1].bpm : 0
+
+  const temperatureData = data.filter((item) => item.hasTemperature)
+  const averageTemperature =
+    temperatureData.length > 0
+      ? Math.round(
+        (temperatureData.reduce((sum, item) => sum + (item.temperature || 0), 0) / temperatureData.length) * 10,
+      ) / 10
+      : 0
+  const latestTemperature = data.length > 0 ? data[data.length - 1].temperature : null
+
+  const locationDataPoints = data.filter((item) => item.hasLocation).length
+  const totalDataPoints = data.length
+  const locationPercentage = totalDataPoints > 0 ? Math.round((locationDataPoints / totalDataPoints) * 100) : 0
+
   const getBpmStatus = (bpm: number) => {
-    if (bpm === 0) return { label: "No Data", color: "#9CA3AF" };
-    if (bpm < 60) return { label: "Low", color: "#3B82F6" };
-    if (bpm <= 100) return { label: "Normal", color: "#10B981" };
-    if (bpm <= 130) return { label: "Elevated", color: "#F59E0B" };
-    return { label: "High", color: "#EF4444" };
-  };
+    if (bpm === 0) return { label: t("farmer.noData"), color: "#9CA3AF" }
+    if (bpm < 60) return { label: t("farmer.low"), color: "#3B82F6" }
+    if (bpm <= 100) return { label: t("farmer.normal"), color: "#10B981" }
+    if (bpm <= 130) return { label: t("farmer.elevated"), color: "#F59E0B" }
+    return { label: t("farmer.high"), color: "#EF4444" }
+  }
 
-  const bpmStatus = getBpmStatus(latestBpm);
+  const getTemperatureStatus = (temp: number | null) => {
+    if (temp === null) return { label: t("farmer.noData"), color: "#9CA3AF" }
+    if (temp < 36) return { label: t("farmer.low"), color: "#3B82F6" }
+    if (temp <= 39) return { label: t("farmer.normal"), color: "#10B981" }
+    if (temp <= 41) return { label: t("farmer.elevated"), color: "#F59E0B" }
+    return { label: t("farmer.high"), color: "#EF4444" }
+  }
 
-  // Data for pie chart
-  const statusCounts = data.reduce((acc: Record<string, number>, item: FormattedData) => {
-    const status = getBpmStatus(item.bpm).label;
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {});
+  const bpmStatus = getBpmStatus(latestBpm)
+  const temperatureStatus = getTemperatureStatus(latestTemperature)
 
-  const pieData = Object.entries(statusCounts).map(([name, value]: [string, number]) => ({
-    name,
+  const statusCounts = data.reduce((acc: Record<string, number>, item) => {
+    const bpm = item.bpm
+    let statusKey = "High"
+    if (bpm === 0) statusKey = "No Data"
+    else if (bpm < 60) statusKey = "Low"
+    else if (bpm <= 100) statusKey = "Normal"
+    else if (bpm <= 130) statusKey = "Elevated"
+
+    acc[statusKey] = (acc[statusKey] || 0) + 1
+    return acc
+  }, {})
+
+  const getStatusColor = (statusKey: string) => {
+    switch (statusKey) {
+      case "No Data": return "#9CA3AF"
+      case "Low": return "#3B82F6"
+      case "Normal": return "#10B981"
+      case "Elevated": return "#F59E0B"
+      case "High": return "#EF4444"
+      default: return "#9CA3AF"
+    }
+  }
+
+  const getTranslatedStatus = (statusKey: string) => {
+    switch (statusKey) {
+      case "No Data": return t("farmer.noData")
+      case "Low": return t("farmer.low")
+      case "Normal": return t("farmer.normal")
+      case "Elevated": return t("farmer.elevated")
+      case "High": return t("farmer.high")
+      default: return statusKey
+    }
+  }
+
+  const pieData = Object.entries(statusCounts).map(([statusKey, value]) => ({
+    name: getTranslatedStatus(statusKey),
     value,
-    color: getBpmStatus(name === "No Data" ? 0 : name === "Low" ? 50 : name === "Normal" ? 80 : name === "Elevated" ? 120 : 150).color
-  }));
+    color: getStatusColor(statusKey),
+  }))
+
+  const locationPoints = data.filter((item) => item.hasLocation)
+
+  const getFieldLabel = (fieldKey: keyof Channel) => {
+    return apiResponse?.channel[fieldKey] || fieldKey
+  }
+
+  const exportFileSlug = () =>
+    (selectedPatient?.name || "patient").trim().toLowerCase().replace(/\s+/g, "-")
+
+  // Export functions
+  const exportToPDF = async () => {
+    try {
+      const jsPDF = (await import('jspdf')).default
+      const doc = new jsPDF()
+
+      // Logo (if available)
+      try {
+        const logoImg = new Image()
+        logoImg.crossOrigin = 'anonymous'
+        logoImg.src = '/logo/Vet print.png'
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve
+          logoImg.onerror = reject
+        })
+        doc.addImage(logoImg, 'PNG', 15, 8, 35, 24)
+      } catch (error) {
+        console.log('Logo not loaded:', error)
+      }
+
+      // Header text
+      doc.setTextColor(17, 24, 39) // gray-900
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text(t('farmer.animalHealthMonitoringReport'), 52, 20)
+
+      doc.setTextColor(75, 85, 99) // gray-600
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Vettrack', 52, 28)
+
+      // Divider under header
+      doc.setDrawColor(226, 232, 240)
+      doc.line(15, 38, 195, 38)
+
+      // Reset text color for body
+      doc.setTextColor(55, 65, 81) // gray-700
+      doc.setFontSize(11)
+      doc.text(`${t('farmer.animal')}: ${apiResponse?.channel.name || t('farmer.unknown')} — ${t('vet.patient')}: ${selectedPatient?.name || t('farmer.unknown')}`, 20, 55)
+      doc.text(`${t('farmer.generated')}: ${new Date().toLocaleString()}`, 20, 65)
+      doc.text(`${t('farmer.genName')}: ${currentUser?.name || 'Unknown User'}`, 20, 75)
+      doc.text(`${t('farmer.channelId')}: ${apiResponse?.channel.id ?? ''}`, 20, 85)
+
+      // Health Summary section
+      doc.setFillColor(248, 250, 252) // slate-50
+      doc.rect(15, 95, 180, 60, 'F')
+      doc.setDrawColor(226, 232, 240) // slate-200
+      doc.rect(15, 95, 180, 60, 'S')
+
+      doc.setTextColor(22, 163, 74) // green-600
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(t('farmer.healthSummary'), 20, 108)
+
+      doc.setTextColor(55, 65, 81) // gray-700
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`${t('farmer.latest')} ${getFieldLabel('field1')}: ${latestBpm}`, 20, 120)
+      doc.text(`${t('farmer.average')} ${getFieldLabel('field1')}: ${averageBpm}`, 20, 130)
+      doc.text(`${t('farmer.latest')} ${t('farmer.temperature')}: ${latestTemperature || 'N/A'}°C`, 20, 140)
+      doc.text(`${t('farmer.locationCoverage')}: ${locationPercentage}%`, 20, 150)
+
+      // Reserve space for the footer so it never gets clipped by a
+      // printer's non-printable bottom margin (most printers can't
+      // print all the way to the physical edge of the page).
+      const pageHeight = doc.internal.pageSize.height
+      const footerHeight = 25
+      const footerBottomMargin = 12
+      const footerTop = pageHeight - footerHeight - footerBottomMargin
+      const maxContentY = footerTop - 8
+
+      // Recent Readings section
+      doc.setTextColor(22, 163, 74) // green-600
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(t('farmer.recentReadings'), 20, 175)
+
+      doc.setTextColor(55, 65, 81) // gray-700
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+
+      let yPos = 185
+      data.slice(-15).forEach((item) => {
+        if (yPos > maxContentY) {
+          doc.addPage()
+          yPos = 20
+        }
+        const status = getBpmStatus(item.bpm)
+        const statusColor: [number, number, number] = status.color === '#10B981' ? [16, 185, 129] :
+          status.color === '#EF4444' ? [239, 68, 68] :
+            status.color === '#F59E0B' ? [245, 158, 11] :
+              status.color === '#3B82F6' ? [59, 130, 246] : [156, 163, 175]
+
+        doc.setTextColor(...statusColor)
+        doc.text(`● `, 20, yPos)
+        doc.setTextColor(55, 65, 81)
+        doc.text(`${new Date(item.timestamp).toLocaleString()} - BPM: ${item.bpm}, Temp: ${item.temperature || 'N/A'}°C`, 25, yPos)
+        yPos += 8
+      })
+
+      // Footer — kept footerBottomMargin (12mm) clear of the physical
+      // page edge so printers with a non-printable border don't clip it
+      doc.setFillColor(248, 250, 252) // slate-50
+      doc.rect(0, footerTop, 210, footerHeight, 'F')
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      doc.setTextColor(55, 65, 81) // gray-700
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+
+      // Contact info
+      const contactInfo = `Contact Vettrack Support`
+      const emailInfo = `Email: info@vettrack.rw`
+      const phoneInfo = `Phone:+250 78 072 1800 `
+
+      const baseY = footerTop + 8;
+      const lineHeight = 5;
+      const centerX = pageWidth / 2;
+
+      doc.text(contactInfo, centerX, baseY, { align: 'center' });
+      doc.text(emailInfo, centerX, baseY + lineHeight, { align: 'center' });
+      doc.text(phoneInfo, centerX, baseY + lineHeight * 2, { align: 'center' });
+
+      doc.textWithLink(
+        'Website: www.vettrack.rw | Generated by Vettrack System',
+        centerX,
+        baseY + lineHeight * 3,
+        { align: 'center', url: 'https://www.vettrack.rw' }
+      );
+
+      doc.text(
+        `© ${new Date().getFullYear()} Vettrack. All rights reserved.`,
+        centerX,
+        baseY + lineHeight * 4,
+        { align: 'center' }
+      );
+
+      doc.save(`health-report-${exportFileSlug()}-${new Date().toISOString().split('T')[0]}.pdf`)
+    } catch (error) {
+      console.error('PDF export failed:', error)
+    }
+  }
+
+  const exportToCSV = () => {
+    const headers = [t('farmer.timestamp'), 'BPM', t('farmer.temperature'), t('farmer.latitude'), t('farmer.longitude'), t('farmer.status')]
+    const csvData = data.map(item => [
+      new Date(item.timestamp).toLocaleString(),
+      item.bpm,
+      item.temperature || '',
+      item.latitude || '',
+      item.longitude || '',
+      getBpmStatus(item.bpm).label
+    ])
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `health-data-${exportFileSlug()}-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportToExcel = async () => {
+    try {
+      const XLSX = (await import('xlsx')).default
+
+      // Patient + animal info sheet
+      const animalInfo = {
+        [t('farmer.genName')]: currentUser?.name || 'Unknown User',
+        [t('vet.patient')]: selectedPatient?.name || 'Unknown Patient',
+        [t('animal.phone')]: selectedPatient?.phone || '',
+        [t('farmer.animal')]: apiResponse?.channel.name || t('farmer.unknown'),
+        [t('farmer.channelId')]: apiResponse?.channel.id ?? '',
+        [t('farmer.reportDate')]: new Date().toLocaleString(),
+        [`${t('farmer.latest')} BPM`]: latestBpm,
+        [`${t('farmer.average')} BPM`]: averageBpm,
+        [`${t('farmer.latest')} ${t('farmer.temperature')}`]: latestTemperature || 'N/A',
+        [t('farmer.locationCoverage')]: `${locationPercentage}%`,
+        [t('farmer.totalRecords')]: data.length
+      }
+
+      // Health data sheet
+      const healthData = data.map(item => ({
+        [t('farmer.timestamp')]: new Date(item.timestamp).toLocaleString(),
+        'BPM': item.bpm,
+        [`${t('farmer.temperature')} (°C)`]: item.temperature || '',
+        [t('farmer.latitude')]: item.latitude || '',
+        [t('farmer.longitude')]: item.longitude || '',
+        [t('farmer.bpmStatus')]: getBpmStatus(item.bpm).label,
+        [t('farmer.tempStatus')]: getTemperatureStatus(item.temperature).label,
+        [t('farmer.hasLocation')]: item.hasLocation ? t('farmer.yes') : t('farmer.no')
+      }))
+
+      const wb = XLSX.utils.book_new()
+
+      const infoWs = XLSX.utils.json_to_sheet([animalInfo])
+      XLSX.utils.book_append_sheet(wb, infoWs, t('farmer.animalInfo'))
+
+      const dataWs = XLSX.utils.json_to_sheet(healthData)
+      XLSX.utils.book_append_sheet(wb, dataWs, t('farmer.healthData'))
+
+      XLSX.writeFile(wb, `health-report-${exportFileSlug()}-${new Date().toISOString().split('T')[0]}.xlsx`)
+    } catch (error) {
+      console.error('Excel export failed:', error)
+    }
+  }
+
+  const showSkeleton = patientsLoading || (loading && !!selectedPatientId)
 
   return (
-    <div className="bg-gray-50 min-h-screen p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
-          <h1 className="text-3xl font-bold text-gray-800">🐾 Animal Health Monitor</h1>
-          
-          {/* Animal Selector */}
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex">
-              <div className="relative">
-                <select
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  value={selectedAnimal?.id || ""}
-                  onChange={(e) => {
-                    const animal = animals.find(a => a.id === e.target.value);
-                    if (animal) handleAnimalSelect(animal);
-                  }}
-                >
-                  {animals.map((animal) => (
-                    <option key={animal.id} value={animal.id}>
-                      {animal.name} ({animal.species})
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
-                  <svg className="h-4 w-4 fill-current text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                  </svg>
-                </div>
+    <div className="space-y-6">
+      <div className="mx-auto max-w-7xl">
+        {/* Header Section */}
+        <div className="mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="space-y-1">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {apiResponse?.channel.name || t("vet.patientHealthMonitor")}
+                </h1>
+                <p className="text-sm text-gray-500 mt-0.5">{t("farmer.realTimeTracking")}</p>
               </div>
-              <button 
-                className="ml-2 p-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600 transition-colors"
-                onClick={() => setShowAddAnimal(!showAddAnimal)}
-              >
-                <PlusCircle className="w-5 h-5" />
-              </button>
+              {selectedPatient && (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Users className="w-4 h-4" />
+                  <span>
+                    {selectedPatient.name}
+                    {selectedPatient.phone ? ` • ${selectedPatient.phone}` : ""}
+                  </span>
+                </div>
+              )}
+              {apiResponse && (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Database className="w-4 h-4" />
+                  <span>
+                    {t("farmer.channel")} #{apiResponse.channel.id} • {apiResponse.channel.last_entry_id} {t("farmer.totalEntries")}
+                  </span>
+                </div>
+              )}
             </div>
-            
-            <div className="flex items-center text-sm text-gray-500">
-              <span>Last updated: {lastUpdated}</span>
-              <button 
-                className="ml-2 p-2 rounded-full bg-white shadow hover:bg-gray-100 transition-colors"
-                onClick={fetchSensorData}
-                disabled={refreshing}
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-              </button>
+
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">{t("farmer.lastUpdated")}:</span> {lastUpdated}
+              </div>
+              <div className="flex gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                      disabled={data.length === 0}
+                    >
+                      <Download className="w-4 h-4" />
+                      <span className="font-medium">{t("farmer.exportReport")}</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => exportToPDF()}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      {t("farmer.exportAsPDF")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportToCSV()}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      {t("farmer.exportAsCSV")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => exportToExcel()}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      {t("farmer.exportAsExcel")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <button
+                  className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200 print:hidden disabled:opacity-50"
+                  onClick={fetchSensorData}
+                  disabled={refreshing || !selectedPatientId}
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                  <span className="font-medium">{t("farmer.refresh")}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-        
-        {/* Add Animal Form */}
-        {showAddAnimal && (
-          <div className="bg-white rounded-xl p-6 shadow-md border mb-6">
-            <h2 className="text-lg font-semibold mb-4">Add New Animal</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  value={newAnimal.name}
-                  onChange={(e) => setNewAnimal({...newAnimal, name: e.target.value})}
-                  placeholder="Animal name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Species</label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  value={newAnimal.species}
-                  onChange={(e) => setNewAnimal({...newAnimal, species: e.target.value})}
-                  placeholder="Dog, Cat, etc."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Device ID</label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  value={newAnimal.deviceId}
-                  onChange={(e) => setNewAnimal({...newAnimal, deviceId: e.target.value})}
-                  placeholder="ThingSpeak Channel ID"
-                />
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                className="px-4 py-2 bg-gray-200 rounded-lg mr-2 hover:bg-gray-300 transition-colors"
-                onClick={() => setShowAddAnimal(false)}
+
+        {/* Patient Selector Panel */}
+        <div className="border border-gray-200 shadow-sm rounded-lg p-6 mb-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">{t("vet.selectPatient")}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("vet.patient")}</label>
+              <select
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white disabled:bg-gray-50"
+                value={selectedPatientId}
+                onChange={(e) => setSelectedPatientId(e.target.value)}
+                disabled={patientsLoading || patients.length === 0}
               >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-                onClick={handleAddAnimal}
-                disabled={!newAnimal.name || !newAnimal.species || !newAnimal.deviceId}
-              >
-                Add Animal
-              </button>
+                {patientsLoading ? (
+                  <option>…</option>
+                ) : patients.length === 0 ? (
+                  <option value="">—</option>
+                ) : (
+                  patients.map((patient) => (
+                    <option key={patient.id} value={patient.id}>
+                      {patient.name}
+                      {patient.hasTracking ? "" : ` ${t("vet.noTrackerSuffix")}`}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
-          </div>
-        )}
-        
-        {/* API Configuration */}
-        <div className="bg-white rounded-xl p-6 shadow-md border mb-6">
-          <h2 className="text-lg font-semibold mb-4">Data Source Configuration</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Device ID</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("animal.phone")}</label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={deviceId}
-                onChange={(e) => setDeviceId(e.target.value)}
-                placeholder="ThingSpeak Channel ID"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-600 cursor-not-allowed"
+                value={selectedPatient?.phone || "—"}
+                readOnly
+                disabled
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="ThingSpeak API Key"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Results Count</label>
-              <input
-                type="number"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={results}
-                onChange={(e) => setResults(parseInt(e.target.value) || 10)}
-                min="1"
-                max="100"
-              />
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("farmer.resultsCount")}</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                  value={results}
+                  onChange={(e) => setResults(Number.parseInt(e.target.value) || 20)}
+                  min="1"
+                  max="8000"
+                />
+                <button
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  onClick={fetchSensorData}
+                  disabled={!selectedPatientId}
+                >
+                  {t("farmer.fetch")}
+                </button>
+              </div>
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+        </div>
+
+        {showSkeleton ? (
+          <div className="space-y-8 animate-pulse">
+            <div className="border border-gray-200 shadow-sm rounded-lg p-6">
+              <div className="h-4 bg-gray-200 rounded w-40 mb-4" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => <div key={i} className="h-16 bg-gray-200 rounded-lg" />)}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="border border-gray-200 shadow-sm rounded-lg p-6 space-y-4">
+                  <div className="h-10 w-10 bg-gray-200 rounded-xl" />
+                  <div className="h-3 bg-gray-200 rounded w-24" />
+                  <div className="h-7 bg-gray-200 rounded w-16" />
+                </div>
+              ))}
+            </div>
+            <div className="h-72 bg-gray-200 rounded-lg" />
+          </div>
+        ) : patients.length === 0 ? (
+          <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-full bg-green-50">
+              <Users className="w-6 h-6 text-green-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">{t("vet.noTrackablePatientsYet")}</h3>
+            <p className="text-gray-600 mb-6">{t("vet.noTrackablePatientsYetDesc")}</p>
+          </div>
+        ) : notConfigured ? (
+          <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-full bg-green-50">
+              <Database className="w-6 h-6 text-green-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">{t("farmer.noDataAvailable")}</h3>
+            <p className="text-gray-600 mb-6">{t("vet.noTrackerYet")}</p>
             <button
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               onClick={fetchSensorData}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
             >
-              Fetch Data
+              {t("farmer.tryAgain")}
             </button>
           </div>
-        </div>
-        
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-pulse flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full bg-blue-200 mb-2"></div>
-              <div className="text-gray-500">Loading sensor data...</div>
-            </div>
-          </div>
         ) : data.length === 0 ? (
-          <div className="flex justify-center items-center h-64 bg-white rounded-xl shadow-md border">
-            <div className="text-center p-6">
-              <div className="text-gray-400 text-5xl mb-4">📡</div>
-              <h3 className="text-lg font-medium text-gray-700 mb-2">No Data Available</h3>
-              <p className="text-gray-500 mb-4">
-                No sensor data found for the selected device. Please verify the Device ID and API Key.
-              </p>
-              <button
-                onClick={fetchSensorData}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Try Again
-              </button>
+          <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-full bg-green-50">
+              <Database className="w-6 h-6 text-green-600" />
             </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">{t("farmer.noDataAvailable")}</h3>
+            <p className="text-gray-600 mb-6">{t("farmer.noSensorData")}</p>
+            <button
+              onClick={fetchSensorData}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+            >
+              {t("farmer.tryAgain")}
+            </button>
           </div>
         ) : (
-          <>
-            {/* Animal Info Card */}
-            {selectedAnimal && (
-              <div className="bg-white rounded-xl p-6 shadow-md border mb-6">
-                <div className="flex items-center">
-                  <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center text-2xl">
-                    {selectedAnimal.species === "Dog" ? "🐕" : 
-                     selectedAnimal.species === "Cat" ? "🐈" : "🐾"}
+          <div className="space-y-8">
+            {/* Field Information */}
+            {apiResponse && (
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
+                <h2 className="text-base font-semibold text-gray-900 mb-4">{t("farmer.dataFieldsMapping")}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="flex items-center gap-3 p-4 bg-red-50 rounded-lg border border-red-100">
+                    <Heart className="w-6 h-6 text-red-500" />
+                    <div>
+                      <p className="font-semibold text-red-800">{t("farmer.field")} 1</p>
+                      <p className="text-sm text-red-600">{getFieldLabel("field1")}</p>
+                    </div>
                   </div>
-                  <div className="ml-4">
-                    <h2 className="text-2xl font-bold text-gray-800">{selectedAnimal.name}</h2>
-                    <p className="text-gray-500">{selectedAnimal.species} • Device ID: {selectedAnimal.deviceId}</p>
+                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <MapPin className="w-6 h-6 text-blue-500" />
+                    <div>
+                      <p className="font-semibold text-blue-800">{t("farmer.field")} 2</p>
+                      <p className="text-sm text-blue-600">{getFieldLabel("field2")}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
+                    <MapPin className="w-6 h-6 text-green-500" />
+                    <div>
+                      <p className="font-semibold text-green-800">{t("farmer.field")} 3</p>
+                      <p className="text-sm text-green-600">{getFieldLabel("field3")}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-orange-50 rounded-lg border border-orange-100">
+                    <Thermometer className="w-6 h-6 text-orange-500" />
+                    <div>
+                      <p className="font-semibold text-orange-800">{t("farmer.field")} 4</p>
+                      <p className="text-sm text-orange-600">{getFieldLabel("field4")}</p>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
-            
+
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-white rounded-xl p-6 shadow-md border border-l-4 border-l-gray-400">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-red-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-red-50 rounded-xl">
                     <Heart className="w-6 h-6 text-red-500" />
                   </div>
-                  <div className="ml-4">
-                    <h2 className="text-sm font-medium text-gray-500">Latest BPM</h2>
-                    <div className="flex items-baseline">
-                      <p className="text-2xl font-bold">{latestBpm}</p>
-                      <span className={`ml-2 text-sm font-medium px-2 py-0.5 rounded-full ${
-                        bpmStatus.color === "#10B981" ? "bg-green-100 text-green-800" :
-                        bpmStatus.color === "#EF4444" ? "bg-red-100 text-red-800" :
-                        bpmStatus.color === "#F59E0B" ? "bg-yellow-100 text-yellow-800" :
-                        bpmStatus.color === "#3B82F6" ? "bg-blue-100 text-blue-800" :
-                        "bg-gray-100 text-gray-800"
-                      }`}>
-                        {bpmStatus.label}
-                      </span>
-                    </div>
-                  </div>
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full ${bpmStatus.color === "#10B981"
+                      ? "bg-green-100 text-green-800"
+                      : bpmStatus.color === "#EF4444"
+                        ? "bg-red-100 text-red-800"
+                        : bpmStatus.color === "#F59E0B"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : bpmStatus.color === "#3B82F6"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                      }`}
+                  >
+                    {bpmStatus.label}
+                  </span>
                 </div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">{t("farmer.latest")} {getFieldLabel("field1")}</h3>
+                <p className="text-3xl font-bold text-gray-900">{latestBpm}</p>
               </div>
-              
-              <div className="bg-white rounded-xl p-6 shadow-md border">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-purple-50">
+
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-orange-50 rounded-xl">
+                    <Thermometer className="w-6 h-6 text-orange-500" />
+                  </div>
+                  <span
+                    className={`px-3 py-1 text-xs font-semibold rounded-full ${temperatureStatus.color === "#10B981"
+                      ? "bg-green-100 text-green-800"
+                      : temperatureStatus.color === "#EF4444"
+                        ? "bg-red-100 text-red-800"
+                        : temperatureStatus.color === "#F59E0B"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : temperatureStatus.color === "#3B82F6"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                      }`}
+                  >
+                    {temperatureStatus.label}
+                  </span>
+                </div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">{getFieldLabel("field4")}</h3>
+                <p className="text-3xl font-bold text-gray-900">
+                  {latestTemperature !== null ? `${latestTemperature}°C` : "N/A"}
+                </p>
+              </div>
+
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-purple-50 rounded-xl">
                     <Activity className="w-6 h-6 text-purple-500" />
                   </div>
-                  <div className="ml-4">
-                    <h2 className="text-sm font-medium text-gray-500">Average BPM</h2>
-                    <p className="text-2xl font-bold">{averageBpm}</p>
+                </div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">{t("farmer.average")} {getFieldLabel("field1")}</h3>
+                <p className="text-3xl font-bold text-gray-900">{averageBpm}</p>
+              </div>
+
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-sky-50 rounded-xl">
+                    <MapPin className="w-6 h-6 text-sky-500" />
                   </div>
                 </div>
-              </div>
-              
-              <div className="bg-white rounded-xl p-6 shadow-md border">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-full bg-blue-50">
-                    <MapPin className="w-6 h-6 text-blue-500" />
-                  </div>
-                  <div className="ml-4">
-                    <h2 className="text-sm font-medium text-gray-500">Location Data</h2>
-                    <div className="flex items-baseline">
-                      <p className="text-2xl font-bold">{locationPercentage}%</p>
-                      <span className="ml-2 text-sm text-gray-500">
-                        ({locationDataPoints}/{totalDataPoints} points)
-                      </span>
-                    </div>
-                  </div>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">{t("farmer.locationCoverage")}</h3>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-gray-900">{locationPercentage}%</p>
+                  <span className="text-sm text-gray-500">
+                    ({locationDataPoints}/{totalDataPoints})
+                  </span>
                 </div>
               </div>
             </div>
-            
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl p-6 shadow-md border lg:col-span-2">
-                <h2 className="text-lg font-semibold mb-4">Heart Rate Trend</h2>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={data}>
-                    <defs>
-                      <linearGradient id="colorBpm" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
+                <h2 className="text-base font-semibold text-gray-900 mb-4">{t("farmer.healthMetricsTrend")}</h2>
+                <ResponsiveContainer width="100%" height={320}>
+                  <ComposedChart data={data}>
                     <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="created_at" 
-                      tick={{ fontSize: 12 }}
-                      tickMargin={10}
+                    <XAxis dataKey="created_at" tick={{ fontSize: 12 }} tickMargin={10} />
+                    <YAxis
+                      yAxisId="left"
+                      label={{
+                        value: getFieldLabel("field1"),
+                        angle: -90,
+                        position: "insideLeft",
+                        style: { textAnchor: "middle" },
+                      }}
+                      domain={[0, "auto"]}
                     />
-                    <YAxis 
-                      label={{ value: 'BPM', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }}
-                      domain={[0, 'auto']}
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      label={{
+                        value: `${getFieldLabel("field4")} (°C)`,
+                        angle: 90,
+                        position: "insideRight",
+                        style: { textAnchor: "middle" },
+                      }}
+                      domain={[20, 45]}
                     />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #eee' }}
-                      labelStyle={{ fontWeight: 'bold', marginBottom: '5px' }}
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "rgba(255, 255, 255, 0.95)",
+                        borderRadius: "12px",
+                        border: "1px solid #e5e7eb",
+                        backdropFilter: "blur(8px)",
+                      }}
+                      labelStyle={{ fontWeight: "bold", marginBottom: "5px" }}
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="bpm" 
-                      stroke="#8884d8" 
-                      fillOpacity={1} 
-                      fill="url(#colorBpm)" 
-                      name="Heart Rate"
+                    <Legend />
+                    <Area
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="bpm"
+                      stroke="#8b5cf6"
+                      fill="#8b5cf6"
+                      fillOpacity={0.2}
+                      name={`${getFieldLabel("field1")}`}
                     />
-                  </AreaChart>
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="temperature"
+                      stroke="#f59e0b"
+                      strokeWidth={3}
+                      dot={{ fill: "#f59e0b", strokeWidth: 2, r: 4 }}
+                      name={`${getFieldLabel("field4")} (°C)`}
+                    />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
-              
-              <div className="bg-white rounded-xl p-6 shadow-md border">
-                <h2 className="text-lg font-semibold mb-4">BPM Distribution</h2>
-                {pieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [`${value} readings`, 'Count']} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex justify-center items-center h-64 text-gray-400">
-                    No BPM data available
-                  </div>
-                )}
+
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
+                <h2 className="text-base font-semibold text-gray-900 mb-4">{getFieldLabel("field1")} {t("farmer.distribution")}</h2>
+                <DistributionChart pieData={pieData} data={data} />
               </div>
             </div>
-            
-            {/* Location Map Placeholder */}
+
+            {/* Rwanda Map */}
             {locationDataPoints > 0 && (
-              <div className="mt-6 bg-white rounded-xl p-6 shadow-md border">
-                <h2 className="text-lg font-semibold mb-4">Location Data</h2>
-                <div className="bg-gray-100 rounded-lg h-64 flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                    <p className="text-gray-500">Map visualization would appear here</p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      Latest location: {data.filter((d: FormattedData) => d.hasLocation).pop()?.latitude || 0}, 
-                      {data.filter((d: FormattedData) => d.hasLocation).pop()?.longitude || 0}
-                    </p>
-                  </div>
-                </div>
+              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
+                <h2 className="text-base font-semibold text-gray-900 mb-4">
+                  🇷🇼 {apiResponse?.channel.name} {t("farmer.locationTrackingInRwanda")}
+                </h2>
+                <RwandaMap
+                  locationPoints={locationPoints.map((point) => ({
+                    latitude: point.latitude!,
+                    longitude: point.longitude!,
+                    timestamp: point.timestamp,
+                    bpm: point.bpm,
+                    temperature: point.temperature,
+                  }))}
+                  animalName={apiResponse?.channel.name || selectedPatient?.name || "Patient"}
+                />
               </div>
             )}
-            
+
             {/* Data Table */}
-            <div className="mt-6 bg-white rounded-xl p-6 shadow-md border">
-              <h2 className="text-lg font-semibold mb-4">Recent Readings</h2>
+            <div className="border border-gray-200 shadow-sm rounded-lg p-6">
+              <h2 className="text-base font-semibold text-gray-900 mb-4">{t("farmer.recentReadings")}</h2>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">BPM</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">{t("farmer.time")}</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                        {getFieldLabel("field1")}
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                        {getFieldLabel("field4")}
+                      </th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">{t("farmer.status")}</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                        {t("farmer.location")} ({getFieldLabel("field2")}, {getFieldLabel("field3")})
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {data.slice().reverse().slice(0, 5).map((item, index) => {
-                      const status = getBpmStatus(item.bpm);
-                      return (
-                        <tr key={index}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(item.timestamp).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.bpm}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              status.color === "#10B981" ? "bg-green-100 text-green-800" :
-                              status.color === "#EF4444" ? "bg-red-100 text-red-800" :
-                              status.color === "#F59E0B" ? "bg-yellow-100 text-yellow-800" :
-                              status.color === "#3B82F6" ? "bg-blue-100 text-blue-800" :
-                              "bg-gray-100 text-gray-800"
-                            }`}>
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.hasLocation ? (
-                              <span className="text-green-600">Lat: {item.latitude}, Lng: {item.longitude}</span>
-                            ) : (
-                              <span className="text-gray-400">No location data</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                  <tbody className="divide-y divide-gray-100">
+                    {data
+                      .slice()
+                      .reverse()
+                      .slice(0, 15)
+                      .map((item, index) => {
+                        const rowBpmStatus = getBpmStatus(item.bpm)
+                        const rowTempStatus = getTemperatureStatus(item.temperature)
+                        return (
+                          <tr key={index} className="hover:bg-gray-50/50 transition-colors duration-150">
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {new Date(item.timestamp).toLocaleString()}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.bpm}</td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                              {item.temperature !== null ? `${item.temperature}°C` : "N/A"}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col gap-1">
+                                <span
+                                  className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${rowBpmStatus.color === "#10B981"
+                                    ? "bg-green-100 text-green-800"
+                                    : rowBpmStatus.color === "#EF4444"
+                                      ? "bg-red-100 text-red-800"
+                                      : rowBpmStatus.color === "#F59E0B"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : rowBpmStatus.color === "#3B82F6"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : "bg-gray-100 text-gray-800"
+                                    }`}
+                                >
+                                  {getFieldLabel("field1")}: {rowBpmStatus.label}
+                                </span>
+                                {item.hasTemperature && (
+                                  <span
+                                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${rowTempStatus.color === "#10B981"
+                                      ? "bg-green-100 text-green-800"
+                                      : rowTempStatus.color === "#EF4444"
+                                        ? "bg-red-100 text-red-800"
+                                        : rowTempStatus.color === "#F59E0B"
+                                          ? "bg-yellow-100 text-yellow-800"
+                                          : rowTempStatus.color === "#3B82F6"
+                                            ? "bg-blue-100 text-blue-800"
+                                            : "bg-gray-100 text-gray-800"
+                                      }`}
+                                  >
+                                    {getFieldLabel("field4")}: {rowTempStatus.label}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {item.hasLocation ? (
+                                <span className="text-green-600 font-medium">
+                                  {item.latitude?.toFixed(6)}, {item.longitude?.toFixed(6)}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">{t("farmer.noLocationData")}</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                   </tbody>
                 </table>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
-  );
+  )
 }
