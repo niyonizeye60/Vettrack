@@ -3,7 +3,7 @@
 import AdminSupportInbox from "@/components/admin/admin-support-inbox"
 import { useLanguage } from "@/contexts/LanguageContext"
 
-export default function AdminSupportPage() {
+export default function SuperAdminSupportPage() {
   const { t } = useLanguage()
 
   return (

@@ -42,6 +42,32 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Support tickets awaiting an admin reply - unlike the other blocks below,
+    // "read" here comes straight off the ticket (unreadByAdmin), not the
+    // per-admin admin_read_notifications set: once any admin has opened the
+    // ticket it should stop pinging the whole team, since it's a shared queue.
+    const openTickets = await db.collection("supportTickets")
+      .find({ unreadByAdmin: true })
+      .sort({ lastMessageAt: -1 })
+      .limit(20)
+      .toArray()
+
+    for (const ticket of openTickets) {
+      const notificationId = `support_ticket_${ticket._id}`
+      notifications.push({
+        id: notificationId,
+        type: 'support_ticket',
+        title: ticket.assignedTo ? 'Support ticket reply' : 'New support ticket',
+        message: `${ticket.requesterName} (${ticket.requesterRole}): ${ticket.subject}`,
+        time: new Date(ticket.lastMessageAt || ticket.createdAt).toLocaleString(),
+        // Dismissible either by clicking it here (admin_read_notifications,
+        // per-admin) or by actually opening the ticket (clears unreadByAdmin
+        // for the whole team - see the ticket detail route).
+        read: readNotificationIds.has(notificationId),
+        createdAt: ticket.lastMessageAt || ticket.createdAt
+      })
+    }
+
     // New User Registrations (last 24 hours)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const newUsers = await db.collection("users").find({

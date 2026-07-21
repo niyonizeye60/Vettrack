@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Stethoscope, Settings, MessageSquare, Bell, Menu,
-  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby
+  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby, LifeBuoy
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -42,6 +42,7 @@ export default function FarmerSidebar() {
     { href: "/farmer/employees",     label: t("farmer.employees"),    icon: <Wallet       className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/reports",       label: t("farmer.generalReport"),icon: <FileBarChart className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/messages",      label: t("farmer.messages"),     icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/support",       label: t("farmer.support"),      icon: <LifeBuoy      className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ];
 
   const showSidebar = (isMobile && mobileOpen) || !isMobile;

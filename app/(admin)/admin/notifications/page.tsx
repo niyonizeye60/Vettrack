@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Bell, Check, ArrowLeft, AlertCircle, CheckCircle, Clock, UserX, UserPlus, Calendar, Timer, TrendingDown, BarChart3, Target, FileText, Database, Shield, Settings } from "lucide-react"
+import { Bell, Check, ArrowLeft, AlertCircle, CheckCircle, Clock, UserX, UserPlus, Calendar, Timer, TrendingDown, BarChart3, Target, FileText, Database, Shield, Settings, MessageSquare } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
 import Link from "next/link"
@@ -166,6 +166,7 @@ export default function AdminNotificationsPage() {
       case 'maintenance_scheduled': return <Settings className="h-5 w-5 text-gray-500" />
       case 'backup_status': return <Database className="h-5 w-5 text-green-500" />
       case 'compliance_deadline': return <Shield className="h-5 w-5 text-orange-500" />
+      case 'support_ticket': return <MessageSquare className="h-5 w-5 text-blue-500" />
       default: return <CheckCircle className="h-5 w-5 text-blue-500" />
     }
   }

@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Mail,
   Menu,
+  LifeBuoy,
 } from "lucide-react"
 
 export default function SuperAdminSidebar() {
@@ -48,6 +49,7 @@ export default function SuperAdminSidebar() {
     { href: "/superadmin/users", label: t('superadmin.manageUsers'), icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/consultations", label: t('superadmin.reviewConsultations'), icon: <FileText className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/moderation", label: t('superadmin.chatModeration') || 'Chat Moderation', icon: <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/superadmin/support", label: t('superadmin.support') || 'Support', icon: <LifeBuoy className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/subscribers", label: t('superadmin.newsletterSubscribers') || 'Subscribers', icon: <Mail className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/settings", label: t('superadmin.settings'), icon: <Settings className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ]

@@ -11,12 +11,14 @@ export async function middleware(request: NextRequest) {
     "/farmer/consultations",
     "/farmer/messages",
     "/farmer/tracking",
+    "/farmer/support",
 
     "/veterinary",
     "/veterinary/animals",
     "/veterinary/consultations",
     "/veterinary/messages",
     "/veterinary/tracking",
+    "/veterinary/support",
 
     "/superadmin",
     "/superadmin/users",
