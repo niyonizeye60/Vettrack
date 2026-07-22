@@ -29,6 +29,18 @@ interface RealCreatePaymentResult {
   redirectUrl: string
 }
 
+/**
+ * Normalise a Rwandan phone number to international format (+250...).
+ * Accepts 07XXXXXXXX, 2507XXXXXXXX, or +2507XXXXXXXX.
+ */
+function toInternationalPhone(phone: string): string {
+  const cleaned = phone.replace(/\s+/g, "")
+  if (cleaned.startsWith("+250")) return cleaned
+  if (cleaned.startsWith("250")) return `+${cleaned}`
+  if (cleaned.startsWith("0")) return `+250${cleaned.slice(1)}`
+  return phone
+}
+
 function getClient() {
   const consumerKey = process.env.PESAPAL_CONSUMER_KEY
   const consumerSecret = process.env.PESAPAL_CONSUMER_SECRET
@@ -58,7 +70,7 @@ export async function initiatePesapalPayment(order: Order): Promise<RealCreatePa
     callbackUrl: `${baseUrl}/checkout/callback`,
     ipnUrl: `${baseUrl}/api/payments/pesapal/ipn`,
     currency: "RWF",
-    phoneNumber: order.buyer.phone,
+    phoneNumber: toInternationalPhone(order.buyer.phone),
     firstName: order.buyer.name.split(" ")[0],
     lastName: order.buyer.name.split(" ").slice(1).join(" ") || order.buyer.name,
   }

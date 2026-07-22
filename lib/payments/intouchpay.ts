@@ -26,3 +26,16 @@ export async function parseIntouchWebhook(body: unknown) {
   const client = getClient()
   return client.parseWebhook(body as Parameters<typeof client.parseWebhook>[0])
 }
+
+export async function requestIntouchDeposit(
+  amount: number,
+  mobilePhone: string,
+  reason?: string,
+) {
+  const client = getClient()
+  return client.requestDeposit({
+    amount,
+    mobilePhone,
+    reason: reason ?? "Deposit request",
+  })
+}
