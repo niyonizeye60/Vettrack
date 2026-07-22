@@ -29,6 +29,10 @@ interface HeaderUser {
   image?: string
 }
 
+function stripHtml(html: string) {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+}
+
 export default function AdminHeader() {
   const { t } = useLanguage()
   const router = useRouter()
@@ -262,7 +266,7 @@ export default function AdminHeader() {
                           <p className={`text-sm font-medium truncate ${!notification.read ? "text-gray-900" : "text-gray-600"}`}>
                             {notification.title}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notification.message}</p>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{stripHtml(notification.message)}</p>
                           <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
                         </div>
                       </div>
@@ -297,13 +301,17 @@ export default function AdminHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                {t('admin.profile')}
+              <DropdownMenuItem asChild>
+                <Link href="/admin/profile" className="flex items-center">
+                  <User className="mr-2 h-4 w-4" />
+                  {t('admin.profile')}
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                {t('admin.settings')}
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="flex items-center">
+                  <Settings className="mr-2 h-4 w-4" />
+                  {t('admin.settings')}
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

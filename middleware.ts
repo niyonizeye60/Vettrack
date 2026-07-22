@@ -27,9 +27,6 @@ export async function middleware(request: NextRequest) {
     "/superadmin/settings",
 
     "/admin",
-    "/admin/users",
-    "/admin/consultations",
-    "/admin/dashboard",
   ]
 
   // If trying to access a protected route without a session, redirect to login
