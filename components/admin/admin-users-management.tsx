@@ -7,10 +7,12 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, MoreHorizontal, Edit, UserCheck, UserX, Key, Plus, Loader2 } from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Search, MoreHorizontal, Edit, UserCheck, UserX, Key, Eye, Plus, Loader2, PawPrint, Stethoscope, HeartPulse, Users as UsersIcon, MessageSquare } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -30,19 +32,99 @@ type User = {
   lastLoginAt?: string
 }
 
+type Animal = {
+  _id: string
+  name: string
+  type: string
+  breed?: string
+  status: string
+  createdAt?: string
+}
+
+type MedicalRecord = {
+  _id: string
+  animalName?: string
+  diseaseName: string
+  symptoms?: string
+  treatment?: string
+  diagnosedDate?: string
+  resolvedDate?: string
+  status: string
+  notes?: string
+  veterinarianName?: string
+}
+
+type ConsultationRecord = {
+  _id: string
+  fullName?: string
+  service?: string
+  date?: string
+  time?: string
+  type?: string
+  status: string
+  createdAt: string
+  doctor?: string
+  farmerId?: string | null
+  feedback?: string | null
+  animalName?: string | null
+  animalType?: string | null
+}
+
+type Contact = {
+  _id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  specialization?: string | null
+  district?: string | null
+  sector?: string | null
+  consultationCount: number
+  lastConsultationAt?: string | null
+}
+
+type AnimalTreated = {
+  _id: string
+  name?: string
+  type?: string
+  breed?: string
+}
+
+type ChatContact = {
+  _id: string
+  name: string
+  role?: string | null
+  email?: string | null
+  district?: string | null
+  sector?: string | null
+  specialization?: string | null
+  messageCount: number
+  lastMessageAt?: string | null
+}
+
+type UserDetails = {
+  user: User
+  animals?: Animal[]
+  medicalHistory?: MedicalRecord[]
+  consultations: ConsultationRecord[]
+  contacts: Contact[]
+  chatContacts: ChatContact[]
+  animalsTreated?: AnimalTreated[]
+}
+
 export default function AdminUsersManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [roleFilter, setRoleFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const { t } = useLanguage()
-  
+
   // Create user form state
   const [newUser, setNewUser] = useState({
     name: "",
@@ -56,6 +138,25 @@ export default function AdminUsersManagement() {
     specialization: ""
   })
   const [creating, setCreating] = useState(false)
+
+  // Edit user form state
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    district: "",
+    sector: "",
+    licenseNumber: "",
+    specialization: ""
+  })
+  const [updating, setUpdating] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+
+  // View details state
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState("")
+  const [userDetails, setUserDetails] = useState<UserDetails | null>(null)
 
   useEffect(() => {
     fetchUsers()
@@ -105,6 +206,114 @@ export default function AdminUsersManagement() {
       }
     } catch (error) {
       setError(t('admin.failedToUpdateUserStatus'))
+    }
+  }
+
+  const openEditDialog = (user: User) => {
+    setSelectedUser(user)
+    setEditForm({
+      name: user.name,
+      email: user.email,
+      phone: user.phone || "",
+      district: user.district || "",
+      sector: user.sector || "",
+      licenseNumber: user.licenseNumber || "",
+      specialization: user.specialization || ""
+    })
+    setError("")
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedUser) return
+    setUpdating(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/admin-users/${selectedUser._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          selectedUser.role === 'farmer'
+            ? { name: editForm.name, email: editForm.email, phone: editForm.phone, district: editForm.district, sector: editForm.sector }
+            : { name: editForm.name, email: editForm.email, phone: editForm.phone, licenseNumber: editForm.licenseNumber, specialization: editForm.specialization }
+        )
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setSuccess(data.message)
+        setIsEditDialogOpen(false)
+        setSelectedUser(null)
+        fetchUsers()
+      } else {
+        setError(data.error || t('admin.failedToUpdateUser'))
+      }
+    } catch (error) {
+      setError(t('admin.failedToUpdateUser'))
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const openPasswordDialog = (user: User) => {
+    setSelectedUser(user)
+    setNewPassword("")
+    setError("")
+    setIsPasswordDialogOpen(true)
+  }
+
+  const handleResetPassword = async () => {
+    if (!selectedUser || !newPassword.trim()) return
+    setUpdating(true)
+    setError("")
+
+    try {
+      const response = await fetch(`/api/admin-users/${selectedUser._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: "resetPassword", password: newPassword })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setSuccess(data.message)
+        setIsPasswordDialogOpen(false)
+        setSelectedUser(null)
+        setNewPassword("")
+      } else {
+        setError(data.error || t('admin.failedToUpdatePassword'))
+      }
+    } catch (error) {
+      setError(t('admin.failedToUpdatePassword'))
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const openDetails = async (user: User) => {
+    setSelectedUser(user)
+    setIsDetailsOpen(true)
+    setDetailsLoading(true)
+    setDetailsError("")
+    setUserDetails(null)
+
+    try {
+      const response = await fetch(`/api/admin-users/${user._id}/details`)
+      const data = await response.json()
+
+      if (response.ok) {
+        setUserDetails(data)
+      } else {
+        setDetailsError(data.error || t('admin.failedToFetchUserDetails'))
+      }
+    } catch (error) {
+      setDetailsError(t('admin.failedToFetchUserDetails'))
+    } finally {
+      setDetailsLoading(false)
     }
   }
 
@@ -171,6 +380,33 @@ export default function AdminUsersManagement() {
     switch (role) {
       case "doctor": return "bg-green-100 text-green-800"
       case "farmer": return "bg-orange-100 text-orange-800"
+      default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getAnimalStatusColor = (status: string) => {
+    switch ((status || "").toLowerCase()) {
+      case "sick": return "bg-red-100 text-red-800"
+      case "healthy": return "bg-green-100 text-green-800"
+      default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getMedicalStatusColor = (status: string) => {
+    switch ((status || "").toLowerCase()) {
+      case "active": return "bg-red-100 text-red-800"
+      case "under treatment": return "bg-yellow-100 text-yellow-800"
+      case "resolved": return "bg-green-100 text-green-800"
+      default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getConsultationStatusColor = (status: string) => {
+    switch ((status || "").toLowerCase()) {
+      case "pending": return "bg-yellow-100 text-yellow-800"
+      case "accepted": return "bg-blue-100 text-blue-800"
+      case "completed": return "bg-green-100 text-green-800"
+      case "rejected": return "bg-red-100 text-red-800"
       default: return "bg-gray-100 text-gray-800"
     }
   }
@@ -293,7 +529,8 @@ export default function AdminUsersManagement() {
                   <TableHead className="font-semibold text-gray-600">{t('admin.user')}</TableHead>
                   <TableHead className="font-semibold text-gray-600">{t('admin.role')}</TableHead>
                   <TableHead className="font-semibold text-gray-600">{t('admin.status')}</TableHead>
-                  <TableHead className="font-semibold text-gray-600">{t('admin.locationSpecialization')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.location')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.specialization')}</TableHead>
                   <TableHead className="text-right font-semibold text-gray-600">{t('admin.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -318,7 +555,12 @@ export default function AdminUsersManagement() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {user.role === 'farmer' ? `${user.district}, ${user.sector}` : user.specialization}
+                      {user.role === 'farmer'
+                        ? [user.district, user.sector].filter(Boolean).join(", ") || "—"
+                        : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {user.role === 'doctor' ? (user.specialization || "—") : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -328,6 +570,19 @@ export default function AdminUsersManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openDetails(user)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            {t('admin.viewDetails')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            {t('admin.editUser')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openPasswordDialog(user)}>
+                            <Key className="mr-2 h-4 w-4" />
+                            {t('admin.resetPassword')}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           {user.status === "pending_verification" ? (
                             <>
                               <DropdownMenuItem onClick={() => handleStatusChange(user._id, "approve")}>
@@ -357,7 +612,7 @@ export default function AdminUsersManagement() {
                 ))}
                 {filteredUsers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       {t('admin.noUsersFound')}
                     </TableCell>
                   </TableRow>
@@ -367,6 +622,391 @@ export default function AdminUsersManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* View Details Sheet */}
+      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{selectedUser?.name || t('admin.userDetails')}</SheetTitle>
+            <SheetDescription>{selectedUser?.email}</SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6">
+            {detailsLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : detailsError ? (
+              <Alert>
+                <AlertDescription className="text-red-600">{detailsError}</AlertDescription>
+              </Alert>
+            ) : userDetails ? (
+              <div className="space-y-6">
+                {/* Summary badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={getRoleColor(userDetails.user.role)}>
+                    {t(`admin.${userDetails.user.role}`)}
+                  </Badge>
+                  <Badge className={getStatusColor(userDetails.user.status)}>
+                    {getStatusLabel(userDetails.user.status)}
+                  </Badge>
+                  {userDetails.user.phone && (
+                    <span className="text-sm text-gray-500">{userDetails.user.phone}</span>
+                  )}
+                </div>
+
+                <Tabs defaultValue={userDetails.user.role === 'farmer' ? 'animals' : 'patients'}>
+                  <TabsList className="flex-wrap h-auto">
+                    {userDetails.user.role === 'farmer' && (
+                      <>
+                        <TabsTrigger value="animals">
+                          <PawPrint className="h-3.5 w-3.5 mr-1.5" />
+                          {t('admin.animals')} ({userDetails.animals?.length ?? 0})
+                        </TabsTrigger>
+                        <TabsTrigger value="medical">
+                          <HeartPulse className="h-3.5 w-3.5 mr-1.5" />
+                          {t('admin.medicalHistory')} ({userDetails.medicalHistory?.length ?? 0})
+                        </TabsTrigger>
+                      </>
+                    )}
+                    <TabsTrigger value="consultations">
+                      <Stethoscope className="h-3.5 w-3.5 mr-1.5" />
+                      {t('admin.consultations')} ({userDetails.consultations.length})
+                    </TabsTrigger>
+                    {userDetails.user.role === 'doctor' && (
+                      <TabsTrigger value="patients">
+                        <UsersIcon className="h-3.5 w-3.5 mr-1.5" />
+                        {t('admin.patients')} ({userDetails.contacts.length})
+                      </TabsTrigger>
+                    )}
+                    {userDetails.user.role === 'farmer' && (
+                      <TabsTrigger value="contacts">
+                        <UsersIcon className="h-3.5 w-3.5 mr-1.5" />
+                        {t('admin.contacts')} ({userDetails.contacts.length})
+                      </TabsTrigger>
+                    )}
+                    {userDetails.user.role === 'doctor' && (
+                      <TabsTrigger value="animalsTreated">
+                        <PawPrint className="h-3.5 w-3.5 mr-1.5" />
+                        {t('admin.animalsTreated')} ({userDetails.animalsTreated?.length ?? 0})
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger value="chatContacts">
+                      <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                      {t('admin.chatContacts')} ({userDetails.chatContacts.length})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Animals (farmer) */}
+                  {userDetails.user.role === 'farmer' && (
+                    <TabsContent value="animals" className="space-y-3">
+                      {!userDetails.animals || userDetails.animals.length === 0 ? (
+                        <p className="text-sm text-gray-500 py-6 text-center">{t('admin.noAnimalsFound')}</p>
+                      ) : (
+                        userDetails.animals.map((animal) => (
+                          <Card key={animal._id}>
+                            <CardContent className="p-4 flex items-center justify-between">
+                              <div>
+                                <p className="font-medium">{animal.name}</p>
+                                <p className="text-sm text-gray-500">{animal.type}{animal.breed ? ` · ${animal.breed}` : ""}</p>
+                              </div>
+                              <Badge className={getAnimalStatusColor(animal.status)}>{animal.status}</Badge>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </TabsContent>
+                  )}
+
+                  {/* Medical history (farmer) */}
+                  {userDetails.user.role === 'farmer' && (
+                    <TabsContent value="medical" className="space-y-3">
+                      {!userDetails.medicalHistory || userDetails.medicalHistory.length === 0 ? (
+                        <p className="text-sm text-gray-500 py-6 text-center">{t('admin.noMedicalRecords')}</p>
+                      ) : (
+                        userDetails.medicalHistory.map((record) => (
+                          <Card key={record._id}>
+                            <CardContent className="p-4 space-y-2">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="font-medium">{record.diseaseName}</p>
+                                  <p className="text-sm text-gray-500">{record.animalName}</p>
+                                </div>
+                                <Badge className={getMedicalStatusColor(record.status)}>{record.status}</Badge>
+                              </div>
+                              {record.symptoms && (
+                                <p className="text-sm"><span className="text-gray-500">{t('admin.symptoms')}:</span> {record.symptoms}</p>
+                              )}
+                              {record.treatment && (
+                                <p className="text-sm"><span className="text-gray-500">{t('admin.treatment')}:</span> {record.treatment}</p>
+                              )}
+                              <p className="text-xs text-gray-400">
+                                {t('admin.diagnosedDate')}: {record.diagnosedDate}
+                                {record.veterinarianName ? ` · Dr. ${record.veterinarianName}` : ""}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </TabsContent>
+                  )}
+
+                  {/* Consultations (both roles) */}
+                  <TabsContent value="consultations" className="space-y-3">
+                    {userDetails.consultations.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-6 text-center">{t('admin.noConsultationsFound')}</p>
+                    ) : (
+                      userDetails.consultations.map((c) => (
+                        <Card key={c._id}>
+                          <CardContent className="p-4 space-y-1.5">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="font-medium">
+                                  {userDetails.user.role === 'farmer' ? c.doctor : c.fullName}
+                                </p>
+                                <p className="text-sm text-gray-500">{c.service}{c.animalName ? ` · ${c.animalName}` : ""}</p>
+                              </div>
+                              <Badge className={getConsultationStatusColor(c.status)}>{c.status}</Badge>
+                            </div>
+                            {c.feedback && (
+                              <p className="text-sm"><span className="text-gray-500">{t('admin.feedback')}:</span> {c.feedback}</p>
+                            )}
+                            <p className="text-xs text-gray-400">{c.date} {c.time}</p>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </TabsContent>
+
+                  {/* Contacts / Patients (both roles - same shape, different tab key) */}
+                  <TabsContent value={userDetails.user.role === 'farmer' ? 'contacts' : 'patients'} className="space-y-3">
+                    {userDetails.contacts.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-6 text-center">{t('admin.noContactsFound')}</p>
+                    ) : (
+                      userDetails.contacts.map((contact) => (
+                        <Card key={contact._id}>
+                          <CardContent className="p-4 flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{contact.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {contact.specialization || [contact.district, contact.sector].filter(Boolean).join(", ") || contact.email}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium">{contact.consultationCount} {t('admin.consultationCount')}</p>
+                              {contact.lastConsultationAt && (
+                                <p className="text-xs text-gray-400">{new Date(contact.lastConsultationAt).toLocaleDateString()}</p>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </TabsContent>
+
+                  {/* Animals treated (doctor) */}
+                  {userDetails.user.role === 'doctor' && (
+                    <TabsContent value="animalsTreated" className="space-y-3">
+                      {!userDetails.animalsTreated || userDetails.animalsTreated.length === 0 ? (
+                        <p className="text-sm text-gray-500 py-6 text-center">{t('admin.noAnimalsFound')}</p>
+                      ) : (
+                        userDetails.animalsTreated.map((animal) => (
+                          <Card key={animal._id}>
+                            <CardContent className="p-4">
+                              <p className="font-medium">{animal.name}</p>
+                              <p className="text-sm text-gray-500">{animal.type}{animal.breed ? ` · ${animal.breed}` : ""}</p>
+                            </CardContent>
+                          </Card>
+                        ))
+                      )}
+                    </TabsContent>
+                  )}
+
+                  {/* Chat contacts (both roles) - who they've messaged, no message content */}
+                  <TabsContent value="chatContacts" className="space-y-3">
+                    {userDetails.chatContacts.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-6 text-center">{t('admin.noChatContactsFound')}</p>
+                    ) : (
+                      userDetails.chatContacts.map((contact) => (
+                        <Card key={contact._id}>
+                          <CardContent className="p-4 flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{contact.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {contact.role ? t(`admin.${contact.role}`) : ""}
+                                {contact.specialization ? ` · ${contact.specialization}` : ""}
+                                {!contact.specialization && (contact.district || contact.sector)
+                                  ? ` · ${[contact.district, contact.sector].filter(Boolean).join(", ")}`
+                                  : ""}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium">{contact.messageCount} {t('admin.messageCount')}</p>
+                              {contact.lastMessageAt && (
+                                <p className="text-xs text-gray-400">{t('admin.lastMessage')}: {new Date(contact.lastMessageAt).toLocaleDateString()}</p>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('admin.editUser')}</DialogTitle>
+            <DialogDescription>{t('admin.updateUserInfo')}</DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <form onSubmit={handleEditUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">{t('admin.name')}</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">{t('admin.email')}</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">{t('admin.phoneNumber')}</Label>
+                <Input
+                  id="edit-phone"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  required
+                />
+              </div>
+
+              {selectedUser.role === 'farmer' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-district">{t('admin.district')}</Label>
+                    <Input
+                      id="edit-district"
+                      value={editForm.district}
+                      onChange={(e) => setEditForm({ ...editForm, district: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-sector">{t('admin.sector')}</Label>
+                    <Input
+                      id="edit-sector"
+                      value={editForm.sector}
+                      onChange={(e) => setEditForm({ ...editForm, sector: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {selectedUser.role === 'doctor' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-license">{t('admin.licenseNumber')}</Label>
+                    <Input
+                      id="edit-license"
+                      value={editForm.licenseNumber}
+                      onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-specialization">{t('admin.specialization')}</Label>
+                    <Input
+                      id="edit-specialization"
+                      value={editForm.specialization}
+                      onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  {t('admin.cancel')}
+                </Button>
+                <Button type="submit" disabled={updating}>
+                  {updating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      {t('admin.updating')}
+                    </>
+                  ) : (
+                    t('admin.updateUser')
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('admin.resetPassword')}</DialogTitle>
+            <DialogDescription>{t('admin.setNewPassword')}</DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                <strong>{selectedUser.name}</strong> — {selectedUser.email}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">{t('admin.newPassword')}</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder={t('admin.enterNewPassword')}
+                  required
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsPasswordDialogOpen(false)
+                setNewPassword("")
+              }}
+            >
+              {t('admin.cancel')}
+            </Button>
+            <Button onClick={handleResetPassword} disabled={updating || !newPassword.trim()}>
+              {updating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {t('admin.updating')}
+                </>
+              ) : (
+                t('admin.updatePassword')
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create User Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

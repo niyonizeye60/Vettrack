@@ -4,7 +4,13 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
+import { hashPassword } from "@/lib/password"
 import { ObjectId } from "mongodb"
+
+const EDITABLE_FIELDS = ["name", "email", "phone", "district", "sector", "licenseNumber", "specialization"] as const
+// Admin manages farmers and doctors only - every write below is scoped to this filter
+// so a regional admin can never touch another admin/superadmin account.
+const MANAGED_ROLES = { $in: ["farmer", "doctor"] }
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -50,10 +56,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     if (action === "suspend" || action === "activate") {
       const newStatus = action === "suspend" ? "suspended" : "active"
-      const targetUser = await db.collection("users").findOne({ _id: new ObjectId(params.id) }, { projection: { name: 1 } })
+      const targetUser = await db.collection("users").findOne({ _id: new ObjectId(params.id), role: MANAGED_ROLES }, { projection: { name: 1 } })
 
       await db.collection("users").updateOne(
-        { _id: new ObjectId(params.id) },
+        { _id: new ObjectId(params.id), role: MANAGED_ROLES },
         { $set: { status: newStatus, updatedAt: new Date() } }
       )
 
@@ -84,11 +90,55 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ success: true, message: `Veterinarian ${action}d successfully` })
     }
 
-    // Regular update
-    await db.collection("users").updateOne(
-      { _id: new ObjectId(params.id) },
-      { $set: { ...updateData, updatedAt: new Date() } }
+    if (action === "resetPassword") {
+      const { password } = updateData
+      if (!password || typeof password !== "string" || password.length < 6) {
+        return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 })
+      }
+
+      const targetUser = await db.collection("users").findOne({ _id: new ObjectId(params.id), role: MANAGED_ROLES }, { projection: { name: 1 } })
+      if (!targetUser) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 })
+      }
+
+      await db.collection("users").updateOne(
+        { _id: new ObjectId(params.id), role: MANAGED_ROLES },
+        { $set: { password: await hashPassword(password), updatedAt: new Date() } }
+      )
+
+      await logUserActivity({
+        userId: currentUser._id,
+        action: "admin.user.passwordReset",
+        details: targetUser.name,
+      })
+
+      return NextResponse.json({ success: true, message: "Password updated successfully" })
+    }
+
+    // Regular update - only known profile fields, never password (use action: "resetPassword" for that)
+    const fields: Record<string, unknown> = {}
+    for (const field of EDITABLE_FIELDS) {
+      if (updateData[field] !== undefined) fields[field] = updateData[field]
+    }
+
+    if (fields.email) {
+      const existing = await db.collection("users").findOne({
+        email: fields.email,
+        _id: { $ne: new ObjectId(params.id) },
+      })
+      if (existing) {
+        return NextResponse.json({ error: "Email already in use" }, { status: 400 })
+      }
+    }
+
+    const result = await db.collection("users").updateOne(
+      { _id: new ObjectId(params.id), role: MANAGED_ROLES },
+      { $set: { ...fields, updatedAt: new Date() } }
     )
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
 
     return NextResponse.json({ success: true, message: "User updated successfully" })
   } catch (error) {

@@ -914,6 +914,7 @@ function describeAdminAction(action: string, details?: string): string | null {
     case 'admin.user.bulkStatusChanged': return details || 'updated multiple user accounts'
     case 'admin.user.bulkDeleted': return `deleted ${details}`
     case 'admin.user.deleted': return `deleted user: ${details}`
+    case 'admin.user.passwordReset': return `reset password for user: ${details}`
     case 'admin.vet.approved': return `approved veterinarian: ${details}`
     case 'admin.vet.rejected': return `rejected veterinarian application: ${details}`
     case 'admin.export.users': return `exported user data (${details})`
