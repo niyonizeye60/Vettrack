@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar, Clock, User, Phone, Plus, Edit, CheckCircle, XCircle, Loader2, CalendarX, X } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Appointment {
   id: string
@@ -292,9 +293,36 @@ export default function AdminAppointments() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 hover:bg-gray-50">
+                      <TableHead className="font-semibold text-gray-600">{t('appointments.appointment')}</TableHead>
+                      <TableHead className="font-semibold text-gray-600">{t('appointments.doctor')}</TableHead>
+                      <TableHead className="font-semibold text-gray-600">{t('appointments.dateTime')}</TableHead>
+                      <TableHead className="font-semibold text-gray-600">{t('appointments.type')}</TableHead>
+                      <TableHead className="font-semibold text-gray-600">{t('appointments.status')}</TableHead>
+                      <TableHead className="text-right font-semibold text-gray-600">{t('appointments.actions')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-28" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               ) : visibleAppointments.length === 0 ? (
                 <div className="text-center py-16">
                   <CalendarX className="h-10 w-10 text-gray-300 mx-auto mb-3" />
@@ -386,8 +414,31 @@ export default function AdminAppointments() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Card key={i} className="border border-gray-200 shadow-sm">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="w-12 h-12 rounded-full" />
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-28" />
+                              <Skeleton className="h-3 w-20" />
+                              <Skeleton className="h-5 w-16 rounded-full" />
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-right">
+                            <Skeleton className="h-7 w-8 ml-auto" />
+                            <Skeleton className="h-3 w-20" />
+                          </div>
+                        </div>
+                        <div className="mt-4 flex gap-2">
+                          <Skeleton className="h-8 flex-1" />
+                          <Skeleton className="h-8 flex-1" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               ) : doctors.length === 0 ? (
                 <div className="text-center py-16 text-sm text-gray-500">{t('appointments.noDoctorsYet')}</div>

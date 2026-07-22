@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/auth"
-import { LifeBuoy, Loader2 } from "lucide-react"
+import { LifeBuoy } from "lucide-react"
 import TicketThread from "@/components/support/ticket-thread"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface TicketSummary {
   id: string
@@ -125,9 +126,20 @@ export default function AdminSupportInbox() {
 
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="flex items-center justify-center h-32">
-                  <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                </div>
+                <ul>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <li key={i} className="px-4 py-3 border-b border-gray-100">
+                      <div className="flex items-center justify-between gap-2">
+                        <Skeleton className="h-4 w-40" />
+                      </div>
+                      <Skeleton className="h-3 w-32 mt-1.5" />
+                      <div className="flex items-center justify-between mt-1.5">
+                        <Skeleton className="h-4 w-16 rounded-full" />
+                        <Skeleton className="h-3 w-12" />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               ) : tickets.length === 0 ? (
                 <div className="text-center p-6">
                   <LifeBuoy className="h-8 w-8 text-gray-300 mx-auto mb-3" />

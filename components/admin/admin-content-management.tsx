@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Plus, Edit, Trash2, Eye, Calendar, DollarSign, Pill, Wheat, Search, MapPin, Tag } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AdminProductCard from "@/components/admin/admin-product-card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Service {
   id: string
@@ -131,10 +132,10 @@ export default function AdminContentManagement() {
   const [deleteServiceTarget, setDeleteServiceTarget] = useState<Service | null>(null)
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<Category | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [contentLoading, setContentLoading] = useState(true)
 
   useEffect(() => {
-    fetchServices()
-    fetchCategories()
+    Promise.all([fetchServices(), fetchCategories()]).finally(() => setContentLoading(false))
   }, [])
 
   const fetchServices = async () => {
@@ -458,7 +459,16 @@ export default function AdminContentManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categories.sales?.map((category) => (
+                  {contentLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-10" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : categories.sales?.map((category) => (
                     <TableRow key={category.id}>
                       <TableCell className="font-medium">{category.name}</TableCell>
                       <TableCell className="max-w-xs truncate">{category.description}</TableCell>
@@ -499,7 +509,18 @@ export default function AdminContentManagement() {
               </div>
             </CardHeader>
             <CardContent>
-              {services.sales?.filter((s) => s.name.toLowerCase().includes(salesSearch.toLowerCase())).length ? (
+              {contentLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                      <Skeleton className="h-32 w-full rounded" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : services.sales?.filter((s) => s.name.toLowerCase().includes(salesSearch.toLowerCase())).length ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {services.sales
                     .filter((s) => s.name.toLowerCase().includes(salesSearch.toLowerCase()))
@@ -560,7 +581,16 @@ export default function AdminContentManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categories.drugs?.map((category) => (
+                  {contentLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-10" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : categories.drugs?.map((category) => (
                     <TableRow key={category.id}>
                       <TableCell className="font-medium">{category.name}</TableCell>
                       <TableCell className="max-w-xs truncate">{category.description}</TableCell>
@@ -601,7 +631,18 @@ export default function AdminContentManagement() {
               </div>
             </CardHeader>
             <CardContent>
-              {services.drugs?.filter((s) => s.name.toLowerCase().includes(drugsSearch.toLowerCase())).length ? (
+              {contentLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                      <Skeleton className="h-32 w-full rounded" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : services.drugs?.filter((s) => s.name.toLowerCase().includes(drugsSearch.toLowerCase())).length ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {services.drugs
                     .filter((s) => s.name.toLowerCase().includes(drugsSearch.toLowerCase()))
@@ -657,7 +698,16 @@ export default function AdminContentManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categories.feeds?.map((category) => (
+                  {contentLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-10" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : categories.feeds?.map((category) => (
                     <TableRow key={category.id}>
                       <TableCell className="font-medium">{category.name}</TableCell>
                       <TableCell className="max-w-xs truncate">{category.description}</TableCell>
@@ -698,7 +748,18 @@ export default function AdminContentManagement() {
               </div>
             </CardHeader>
             <CardContent>
-              {services.feeds?.filter((s) => s.name.toLowerCase().includes(feedsSearch.toLowerCase())).length ? (
+              {contentLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                      <Skeleton className="h-32 w-full rounded" />
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : services.feeds?.filter((s) => s.name.toLowerCase().includes(feedsSearch.toLowerCase())).length ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {services.feeds
                     .filter((s) => s.name.toLowerCase().includes(feedsSearch.toLowerCase()))

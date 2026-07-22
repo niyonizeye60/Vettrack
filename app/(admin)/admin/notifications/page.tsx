@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Notification {
   _id: string
@@ -203,10 +204,41 @@ export default function AdminNotificationsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="h-24 bg-gray-200 rounded" />
-        {[1, 2, 3].map(i => <div key={i} className="h-20 bg-gray-200 rounded" />)}
+      <div className="space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-64 mt-2" />
+          </div>
+          <Skeleton className="h-8 w-24" />
+        </div>
+
+        <Card className="border border-gray-200 shadow-sm bg-white max-w-xs">
+          <CardContent className="p-4 space-y-2">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-8 w-12" />
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="pb-4 border-b border-gray-100">
+            <Skeleton className="h-5 w-36" />
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-gray-100">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-4 p-4">
+                  <Skeleton className="h-9 w-9 rounded-lg flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-3 w-2/3" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }

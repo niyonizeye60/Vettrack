@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Search, Loader2, TriangleAlert } from "lucide-react"
+import { Search, TriangleAlert } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getDiseaseOversightData } from "@/lib/actions/admin-oversight"
+import { Skeleton } from "@/components/ui/skeleton"
 
 type DiseaseItem = {
   id: string
@@ -139,9 +140,32 @@ export default function AdminDiseases() {
       <Card className="border border-gray-200 shadow-sm">
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 hover:bg-gray-50">
+                  <TableHead className="font-semibold text-gray-600">{t('admin.farmerName')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.location')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.animal')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.diseaseName')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.veterinarian')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.diagnosedDate')}</TableHead>
+                  <TableHead className="font-semibold text-gray-600">{t('admin.status')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : (
             <Table>
               <TableHeader>
