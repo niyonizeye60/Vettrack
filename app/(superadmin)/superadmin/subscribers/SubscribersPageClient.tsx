@@ -64,11 +64,10 @@ export default function SubscribersPageClient({ subscribers: initial }: Props) {
   const activeCount = initial.filter((s) => s.status === "active").length
 
   return (
-    <div className="p-4 sm:p-6 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.newsletterSubscribers')}</h1>
-        <p className="text-gray-500 mt-1 text-sm">{t('superadmin.newsletterSubscribersDesc')}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('superadmin.newsletterSubscribers')}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t('superadmin.newsletterSubscribersDesc')}</p>
       </div>
 
       {/* Stats */}
@@ -172,7 +171,6 @@ export default function SubscribersPageClient({ subscribers: initial }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
     </div>
   )
 }

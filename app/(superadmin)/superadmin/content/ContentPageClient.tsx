@@ -10,10 +10,20 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useToast } from "@/hooks/use-toast"
 import { createAnnouncement, updateAnnouncement, deleteAnnouncement } from "@/lib/actions/superadmin"
 import { Plus, Edit, Trash2, Megaphone, AlertTriangle, Info, Shield } from "lucide-react"
-import { toast } from "sonner"
 
 interface ContentPageClientProps {
   initialAnnouncements: any[]
@@ -21,6 +31,7 @@ interface ContentPageClientProps {
 
 export default function ContentPageClient({ initialAnnouncements }: ContentPageClientProps) {
   const { t } = useLanguage()
+  const { toast } = useToast()
   const [announcements, setAnnouncements] = useState(initialAnnouncements)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] = useState<any>(null)
@@ -57,7 +68,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
 
   const handleCreate = async () => {
     if (!formData.title || !formData.content) {
-      toast.error("Please fill in all required fields")
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
       return
     }
 
@@ -65,16 +76,16 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
     try {
       const result = await createAnnouncement(formData)
       if (result.success) {
-        toast.success("Announcement created successfully")
+        toast({ title: "Success", description: "Announcement created successfully" })
         setIsCreateOpen(false)
         resetForm()
         // Refresh announcements
         window.location.reload()
       } else {
-        toast.error(result.message || "Failed to create announcement")
+        toast({ title: "Error", description: result.message || "Failed to create announcement", variant: "destructive" })
       }
     } catch (error) {
-      toast.error("Failed to create announcement")
+      toast({ title: "Error", description: "Failed to create announcement", variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -82,7 +93,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
 
   const handleUpdate = async () => {
     if (!editingAnnouncement || !formData.title || !formData.content) {
-      toast.error("Please fill in all required fields")
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
       return
     }
 
@@ -90,15 +101,15 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
     try {
       const result = await updateAnnouncement(editingAnnouncement._id, formData)
       if (result.success) {
-        toast.success("Announcement updated successfully")
+        toast({ title: "Success", description: "Announcement updated successfully" })
         setEditingAnnouncement(null)
         resetForm()
         window.location.reload()
       } else {
-        toast.error(result.message || "Failed to update announcement")
+        toast({ title: "Error", description: result.message || "Failed to update announcement", variant: "destructive" })
       }
     } catch (error) {
-      toast.error("Failed to update announcement")
+      toast({ title: "Error", description: "Failed to update announcement", variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -110,13 +121,13 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
     try {
       const result = await deleteAnnouncement(announcementToDelete._id)
       if (result.success) {
-        toast.success("Announcement deleted successfully")
+        toast({ title: "Success", description: "Announcement deleted successfully" })
         setAnnouncements(prev => prev.filter(a => a._id !== announcementToDelete._id))
       } else {
-        toast.error(result.message || "Failed to delete announcement")
+        toast({ title: "Error", description: result.message || "Failed to delete announcement", variant: "destructive" })
       }
     } catch (error) {
-      toast.error("Failed to delete announcement")
+      toast({ title: "Error", description: "Failed to delete announcement", variant: "destructive" })
     } finally {
       setDeleteDialogOpen(false)
       setAnnouncementToDelete(null)
@@ -159,13 +170,12 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
   }
 
   return (
-    <div className="p-4 sm:p-6 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.contentManagement') || 'Content Management'}</h1>
-          <p className="text-gray-500 mt-1 text-sm">{t('superadmin.manageSystemContent') || 'Manage system announcements and content'}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('superadmin.contentManagement') || 'Content Management'}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('superadmin.manageSystemContent') || 'Manage system announcements and content'}</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
@@ -411,25 +421,22 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('superadmin.deleteAnnouncement')}</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('superadmin.deleteAnnouncement')}</AlertDialogTitle>
+            <AlertDialogDescription>
               {t('superadmin.confirmDelete')} "{announcementToDelete?.title}"? {t('superadmin.confirmAction')}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              {t('superadmin.cancel')}
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('superadmin.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
               {t('superadmin.delete')}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      </div>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

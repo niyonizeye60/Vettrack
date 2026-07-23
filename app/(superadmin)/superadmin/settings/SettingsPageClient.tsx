@@ -10,6 +10,16 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Settings,
   Database,
   Mail,
@@ -22,6 +32,7 @@ import {
   X
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useToast } from "@/hooks/use-toast"
 import { updateSystemSettings, performDatabaseAction } from "@/lib/actions/superadmin"
 import { useRouter } from "next/navigation"
 
@@ -31,40 +42,48 @@ interface SettingsPageClientProps {
 
 export default function SettingsPageClient({ settings }: SettingsPageClientProps) {
   const { t } = useLanguage()
+  const { toast } = useToast()
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState(settings || {})
   const [bannerPreview, setBannerPreview] = useState<string | null>(settings?.bannerImage ?? null)
   const [bannerUploading, setBannerUploading] = useState(false)
   const bannerInputRef = useRef<HTMLInputElement>(null)
-  
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
+  const [removeBannerConfirmOpen, setRemoveBannerConfirmOpen] = useState(false)
+
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }))
   }
-  
+
   const handleSaveSettings = async () => {
     setIsSaving(true)
     try {
       const result = await updateSystemSettings(formData)
       if (result.success) {
-        alert('Settings saved successfully!')
+        toast({ title: "Settings saved", description: "Your changes have been saved successfully." })
         router.refresh()
       } else {
-        alert('Failed to save settings: ' + result.message)
+        toast({ title: "Error", description: "Failed to save settings: " + result.message, variant: "destructive" })
       }
     } catch (error) {
-      alert('Error saving settings')
+      toast({ title: "Error", description: "Error saving settings", variant: "destructive" })
     }
     setIsSaving(false)
   }
-  
+
   const handleDatabaseAction = async (action: string) => {
     try {
       const result = await performDatabaseAction(action)
-      alert(result.message)
+      toast({ title: "Success", description: result.message })
     } catch (error) {
-      alert('Error performing action')
+      toast({ title: "Error", description: "Error performing action", variant: "destructive" })
     }
+  }
+
+  const handleRestartServices = () => {
+    setRestartConfirmOpen(false)
+    toast({ title: "Not implemented", description: "System restart would be initiated (not implemented)" })
   }
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,13 +97,13 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
       const data = await res.json()
       if (data.success) {
         setBannerPreview(data.bannerImage)
-        alert("Banner image updated successfully!")
+        toast({ title: "Banner updated", description: "Banner image updated successfully." })
         router.refresh()
       } else {
-        alert("Failed to upload banner: " + (data.message ?? "Unknown error"))
+        toast({ title: "Error", description: "Failed to upload banner: " + (data.message ?? "Unknown error"), variant: "destructive" })
       }
     } catch {
-      alert("Error uploading banner")
+      toast({ title: "Error", description: "Error uploading banner", variant: "destructive" })
     } finally {
       setBannerUploading(false)
       e.target.value = ""
@@ -92,27 +111,27 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
   }
 
   const handleRemoveBanner = async () => {
-    if (!confirm("Remove the current banner image? The profile page will fall back to the default gradient.")) return
+    setRemoveBannerConfirmOpen(false)
     try {
       const res = await fetch("/api/system/banner", { method: "DELETE" })
       const data = await res.json()
       if (data.success) {
         setBannerPreview(null)
+        toast({ title: "Banner removed", description: "The profile page will fall back to the default gradient." })
         router.refresh()
       } else {
-        alert("Failed to remove banner")
+        toast({ title: "Error", description: "Failed to remove banner", variant: "destructive" })
       }
     } catch {
-      alert("Error removing banner")
+      toast({ title: "Error", description: "Error removing banner", variant: "destructive" })
     }
   }
 
   return (
-    <div className="p-4 sm:p-6 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.systemSettings') || 'System Settings'}</h1>
-        <p className="text-gray-500 mt-1 text-sm">{t('superadmin.configureSystemWideSettings') || 'Configure system-wide settings and preferences'}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t('superadmin.systemSettings') || 'System Settings'}</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{t('superadmin.configureSystemWideSettings') || 'Configure system-wide settings and preferences'}</p>
       </div>
 
       <div className="space-y-6">
@@ -431,11 +450,11 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
                 >
                   {t('superadmin.clearCache') || 'Clear Cache'}
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="text-red-600 hover:text-red-700"
-                  onClick={() => confirm('Are you sure? This will restart all services.') && alert('System restart would be initiated (not implemented)')}
+                  onClick={() => setRestartConfirmOpen(true)}
                 >
                   Restart Services
                 </Button>
@@ -561,7 +580,7 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
                   variant="ghost"
                   size="sm"
                   className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                  onClick={handleRemoveBanner}
+                  onClick={() => setRemoveBannerConfirmOpen(true)}
                 >
                   <X className="h-4 w-4 mr-1" />
                   Remove
@@ -595,7 +614,40 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
           </Button>
         </div>
       </div>
-      </div>
+
+      <AlertDialog open={restartConfirmOpen} onOpenChange={setRestartConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restart all services?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will restart all services. Any in-progress requests may be interrupted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestartServices} className="bg-red-600 hover:bg-red-700 text-white">
+              Restart Services
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={removeBannerConfirmOpen} onOpenChange={setRemoveBannerConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove the current banner image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The profile page will fall back to the default gradient.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemoveBanner} className="bg-red-600 hover:bg-red-700 text-white">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

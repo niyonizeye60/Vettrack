@@ -48,16 +48,14 @@ export default function AnalyticsPageClient({ analyticsData }: AnalyticsPageClie
 
   if (!analyticsData) {
     return (
-      <div className="p-4 sm:p-6 min-h-full">
-        <div className="max-w-7xl mx-auto text-center py-12">
-          <AlertTriangle className="w-12 h-12 mx-auto text-red-500 mb-4" />
-          <h2 className="text-xl font-semibold mb-2">{t('superadmin.failedToLoadAnalytics') || 'Failed to Load Analytics'}</h2>
-          <p className="text-gray-600 mb-4">{t('superadmin.unableToFetchAnalyticsData') || 'Unable to fetch analytics data'}</p>
-          <Button onClick={handleRefresh}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Retry
-          </Button>
-        </div>
+      <div className="text-center py-12">
+        <AlertTriangle className="w-12 h-12 mx-auto text-red-500 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">{t('superadmin.failedToLoadAnalytics') || 'Failed to Load Analytics'}</h2>
+        <p className="text-gray-600 mb-4">{t('superadmin.unableToFetchAnalyticsData') || 'Unable to fetch analytics data'}</p>
+        <Button onClick={handleRefresh}>
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Retry
+        </Button>
       </div>
     )
   }
@@ -75,19 +73,18 @@ export default function AnalyticsPageClient({ analyticsData }: AnalyticsPageClie
   ].filter(item => item.value > 0)
 
   return (
-    <div className="p-4 sm:p-6 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.analytics') || 'Analytics'}</h1>
-            <p className="text-gray-500 mt-1 text-sm">{t('superadmin.systemAnalytics') || 'System performance and user analytics'}</p>
-          </div>
-          <Button onClick={handleRefresh} disabled={isRefreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {t('superadmin.refresh') || 'Refresh'}
-          </Button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">{t('superadmin.analytics') || 'Analytics'}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('superadmin.systemAnalytics') || 'System performance and user analytics'}</p>
         </div>
+        <Button onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {t('superadmin.refresh') || 'Refresh'}
+        </Button>
+      </div>
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -230,7 +227,6 @@ export default function AnalyticsPageClient({ analyticsData }: AnalyticsPageClie
             </CardContent>
           </Card>
         </div>
-      </div>
     </div>
   )
 }

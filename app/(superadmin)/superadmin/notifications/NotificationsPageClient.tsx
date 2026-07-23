@@ -10,6 +10,16 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -296,12 +306,11 @@ export default function NotificationsPageClient({
   }
 
   return (
-    <div className="p-4 sm:p-6 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t('superadmin.notificationManagement') || 'Notification Management'}</h1>
-          <p className="text-gray-500 mt-1 text-sm">{t('superadmin.manageNotificationTemplates') || 'Manage notification templates and send bulk notifications'}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('superadmin.notificationManagement') || 'Notification Management'}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t('superadmin.manageNotificationTemplates') || 'Manage notification templates and send bulk notifications'}</p>
         </div>
         <div className="flex space-x-2">
           <Dialog open={isCreateTemplateOpen} onOpenChange={setIsCreateTemplateOpen}>
@@ -576,43 +585,43 @@ export default function NotificationsPageClient({
       </Tabs>
 
       {/* Bulk Action Confirmation Dialog */}
-      <Dialog open={!!bulkAction} onOpenChange={open => !open && setBulkAction(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+      <AlertDialog open={!!bulkAction} onOpenChange={open => !open && setBulkAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
               {bulkAction === 'restore' ? 'Restore Selected Notifications' : 'Delete Selected Notifications'}
-            </DialogTitle>
-            <DialogDescription>
+            </AlertDialogTitle>
+            <AlertDialogDescription>
               {bulkAction === 'restore'
                 ? `This will restore ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} and reset their expiry to 48 hours from now.`
                 : `This will permanently delete ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''}. This cannot be undone.`
               }
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setBulkAction(null)}>Cancel</Button>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             {bulkAction === 'restore' ? (
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleBulkRestore}>Restore</Button>
+              <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleBulkRestore}>Restore</AlertDialogAction>
             ) : (
-              <Button variant="destructive" onClick={handleBulkDelete}>Delete Permanently</Button>
+              <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={handleBulkDelete}>Delete Permanently</AlertDialogAction>
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Permanent Delete Dialog */}
-      <Dialog open={!!permanentDeleteId} onOpenChange={open => !open && setPermanentDeleteId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Permanently Delete Notification</DialogTitle>
-            <DialogDescription>This will permanently delete the notification for all users. This cannot be undone.</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setPermanentDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => permanentDeleteId && handlePermanentDelete(permanentDeleteId)}>Delete Permanently</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AlertDialog open={!!permanentDeleteId} onOpenChange={open => !open && setPermanentDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently Delete Notification</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently delete the notification for all users. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => permanentDeleteId && handlePermanentDelete(permanentDeleteId)} className="bg-red-600 hover:bg-red-700 text-white">Delete Permanently</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Restore Dialog */}
       <Dialog open={!!restoreId} onOpenChange={open => !open && setRestoreId(null)}>
@@ -869,25 +878,22 @@ export default function NotificationsPageClient({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('superadmin.deleteTemplate') || 'Delete Template'}</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !isSubmitting && setDeleteDialogOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('superadmin.deleteTemplate') || 'Delete Template'}</AlertDialogTitle>
+            <AlertDialogDescription>
               {t('superadmin.deleteTemplateConfirm') || 'Are you sure you want to delete this template? This action cannot be undone.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              {t('superadmin.cancel') || 'Cancel'}
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteTemplate} disabled={isSubmitting}>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>{t('superadmin.cancel') || 'Cancel'}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTemplate} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-white">
               {isSubmitting ? (t('superadmin.deleting') || 'Deleting...') : (t('superadmin.delete') || 'Delete')}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      </div>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

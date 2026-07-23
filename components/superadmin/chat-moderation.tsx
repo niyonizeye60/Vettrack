@@ -242,13 +242,12 @@ export default function ChatModeration({ initialReports, initialConversations }:
   })
 
   return (
-    <div className="p-4 sm:p-6 min-h-full">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <ShieldAlert className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 flex-shrink-0" />
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Chat Moderation</h1>
-          <p className="text-gray-500 mt-1 text-sm">Review reports and oversee farmer-vet conversations</p>
+          <h1 className="text-2xl font-bold text-gray-900">Chat Moderation</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Review reports and oversee farmer-vet conversations</p>
         </div>
       </div>
 
@@ -567,7 +566,6 @@ export default function ChatModeration({ initialReports, initialConversations }:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
     </div>
   )
 }

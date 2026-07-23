@@ -21,6 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -54,6 +64,7 @@ import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useToast } from "@/hooks/use-toast"
 
 interface User {
   _id: string
@@ -78,6 +89,7 @@ interface UsersManagementProps {
 
 export default function UsersManagement({ users }: UsersManagementProps) {
   const { t } = useLanguage()
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -120,10 +132,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
     try {
       const result = await updateUserStatus(userId, status)
       if (result.success) {
+        toast({ title: "Status updated", description: `User status changed to ${status}.` })
         router.refresh()
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to update status", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error updating user status:", error)
+      toast({ title: "Error", description: "Failed to update status", variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -136,10 +152,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       if (result.success) {
         setIsDeleteDialogOpen(false)
         setSelectedUser(null)
+        toast({ title: "User deleted", description: "The user has been permanently deleted." })
         router.refresh()
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to delete user", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error deleting user:", error)
+      toast({ title: "Error", description: "Failed to delete user", variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -153,10 +173,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
         setIsPasswordDialogOpen(false)
         setNewPassword("")
         setSelectedUser(null)
+        toast({ title: "Password updated", description: "The user's password has been changed." })
         router.refresh()
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to update password", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error updating password:", error)
+      toast({ title: "Error", description: "Failed to update password", variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -169,10 +193,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       if (result.success) {
         setIsLogoutDialogOpen(false)
         setSelectedUser(null)
+        toast({ title: "User logged out", description: "The user's active sessions have been terminated." })
         router.refresh()
+      } else {
+        toast({ title: "Error", description: result.error || "Failed to log out user", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error logging out user:", error)
+      toast({ title: "Error", description: "Failed to log out user", variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -211,10 +239,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
           district: "",
           sector: ""
         })
+        toast({ title: "User created", description: "The new user account has been created." })
         router.refresh()
+      } else {
+        toast({ title: "Error", description: result.message || "Failed to create user", variant: "destructive" })
       }
     } catch (error) {
       console.error("Error creating user:", error)
+      toast({ title: "Error", description: "Failed to create user", variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -770,14 +802,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       </Dialog>
 
       {/* Delete User Dialog - Responsive */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="w-full max-w-md mx-4">
-          <DialogHeader>
-            <DialogTitle>{t('superadmin.deleteUser')}</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => { if (!isUpdating) { setIsDeleteDialogOpen(open); if (!open) setSelectedUser(null) } }}>
+        <AlertDialogContent className="w-full max-w-md mx-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('superadmin.deleteUser')}</AlertDialogTitle>
+            <AlertDialogDescription>
               {t('superadmin.deleteUserConfirm')}
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           {selectedUser && (
             <div className="py-4 space-y-2">
               <p className="text-sm text-gray-600">
@@ -791,25 +823,18 @@ export default function UsersManagement({ users }: UsersManagementProps) {
               </p>
             </div>
           )}
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteDialogOpen(false)}
-              className="w-full sm:w-auto"
-            >
-              {t('superadmin.cancel')}
-            </Button>
-            <Button
-              variant="destructive"
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>{t('superadmin.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
               onClick={() => selectedUser && handleDeleteUser(selectedUser._id)}
               disabled={isUpdating}
-              className="w-full sm:w-auto"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               {isUpdating ? t('superadmin.deleting') : t('superadmin.deleteUser')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Change Password Dialog - Responsive */}
       <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
@@ -863,14 +888,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       </Dialog>
 
       {/* Force Logout Dialog - Responsive */}
-      <Dialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
-        <DialogContent className="w-full max-w-md mx-4">
-          <DialogHeader>
-            <DialogTitle>{t('superadmin.forceLogoutUser')}</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={isLogoutDialogOpen} onOpenChange={(open) => { if (!isUpdating) { setIsLogoutDialogOpen(open); if (!open) setSelectedUser(null) } }}>
+        <AlertDialogContent className="w-full max-w-md mx-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('superadmin.forceLogoutUser')}</AlertDialogTitle>
+            <AlertDialogDescription>
               {t('superadmin.forceLogoutConfirm')}
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           {selectedUser && (
             <div className="py-4 space-y-3">
               <div className="flex items-center space-x-2 mb-3">
@@ -895,28 +920,18 @@ export default function UsersManagement({ users }: UsersManagementProps) {
               </div>
             </div>
           )}
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsLogoutDialogOpen(false)
-                setSelectedUser(null)
-              }}
-              className="w-full sm:w-auto"
-            >
-              {t('superadmin.cancel')}
-            </Button>
-            <Button
-              variant="destructive"
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>{t('superadmin.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
               onClick={() => selectedUser && handleLogoutUser(selectedUser._id)}
               disabled={isUpdating}
-              className="w-full sm:w-auto"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               {isUpdating ? t('superadmin.loggingOut') : t('superadmin.forceLogout')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Create User Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
