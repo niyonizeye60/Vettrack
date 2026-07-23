@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Settings, Mail, MapPin, Phone, Calendar, Activity,
   Users, ClipboardList, Shield, Award, RefreshCw, UserCheck, Camera
@@ -231,10 +232,58 @@ export default function SuperAdminProfilePage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-5 bg-gray-200 rounded w-40" />
-        <div className="h-6 bg-gray-200 rounded w-28" />
-        <div className="h-56 bg-gray-200 rounded-2xl" />
+      <div className="space-y-6">
+        <Skeleton className="h-4 w-40" />
+        <div>
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </div>
+
+        <Card className="overflow-hidden border border-gray-200">
+          <Skeleton className="h-36 w-full rounded-none" />
+          <CardContent className="pt-0 pb-5 px-6">
+            <div className="flex items-end justify-between -mt-12 mb-4">
+              <Skeleton className="w-24 h-24 rounded-full border-4 border-white" />
+              <Skeleton className="h-8 w-28 mb-1" />
+            </div>
+            <Skeleton className="h-5 w-40 mb-2" />
+            <Skeleton className="h-4 w-24 mb-5" />
+            <div className="flex flex-wrap gap-x-6 gap-y-2 pt-4 border-t border-gray-100">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="border border-gray-200 shadow-sm bg-white">
+              <CardContent className="p-4 sm:p-5 space-y-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8 w-12" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-5 w-32" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     )
   }
@@ -442,14 +491,14 @@ export default function SuperAdminProfilePage() {
           </CardHeader>
           <CardContent>
             {activityLoading ? (
-              <div className="space-y-6 animate-pulse">
+              <div className="space-y-6">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="flex gap-4 items-start">
-                    <div className="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0" />
+                    <Skeleton className="w-9 h-9 rounded-xl flex-shrink-0" />
                     <div className="flex-1 space-y-2 pt-1">
-                      <div className="h-4 bg-gray-100 rounded w-1/2" />
-                      <div className="h-3 bg-gray-100 rounded w-3/4" />
-                      <div className="h-3 bg-gray-100 rounded w-1/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-3 w-3/4" />
+                      <Skeleton className="h-3 w-1/4" />
                     </div>
                   </div>
                 ))}

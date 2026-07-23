@@ -21,10 +21,6 @@ export async function middleware(request: NextRequest) {
     "/veterinary/support",
 
     "/superadmin",
-    "/superadmin/users",
-    "/superadmin/consultations",
-    "/superadmin/dashboard",
-    "/superadmin/settings",
 
     "/admin",
   ]

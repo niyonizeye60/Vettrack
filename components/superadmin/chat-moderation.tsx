@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
   DialogContent,
@@ -433,7 +434,15 @@ export default function ChatModeration({ initialReports, initialConversations }:
           )}
           <div className="flex-1 overflow-y-auto space-y-3 py-2">
             {loadingMessages ? (
-              <div className="text-center text-gray-400 py-8">Loading...</div>
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="text-sm space-y-1.5">
+                  <div className="flex items-baseline gap-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              ))
             ) : viewMessages.length === 0 ? (
               <div className="text-center text-gray-400 py-8">No messages</div>
             ) : (

@@ -17,6 +17,7 @@ import { createNotificationTemplate, sendBulkNotification, scheduleNotification,
 import { Plus, Send, Clock, FileText, Users, Calendar, Trash2, RotateCcw, Eye, Search } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface NotificationsPageClientProps {
   initialTemplates: any[]
@@ -418,9 +419,43 @@ export default function NotificationsPageClient({
         {/* Manage Sent Tab */}
         <TabsContent value="manage" className="space-y-4">
           {sentLoading ? (
-            <div className="flex justify-center py-12">
-              <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
-            </div>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10" />
+                      <TableHead>Title</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Sent</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-40" />
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-3 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-3 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-7 w-14" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           ) : sentNotifications.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">

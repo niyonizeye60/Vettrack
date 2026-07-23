@@ -32,6 +32,7 @@ import { LanguageSwitcher } from "@/components/ui/language-switcher"
 import { getNotifications, markNotificationRead, generateSystemNotifications } from "@/lib/actions/superadmin"
 import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
 import { useMobileSidebar } from "./mobile-sidebar-context"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface SuperAdminHeaderProps {
   user: {
@@ -203,7 +204,18 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {isLoadingNotifications ? (
-                  <div className="p-4 text-center text-sm text-gray-500">Loading notifications...</div>
+                  <div>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="p-3 border-b last:border-b-0 flex items-start gap-3">
+                        <Skeleton className="h-4 w-4 rounded-full flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-4 w-2/3" />
+                          <Skeleton className="h-3 w-full" />
+                          <Skeleton className="h-3 w-16" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : notifications.length === 0 ? (
                   <div className="p-4 text-center text-sm text-gray-500">{t('superadmin.noNotifications') || 'No notifications'}</div>
                 ) : (
