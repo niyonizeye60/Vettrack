@@ -1,6 +1,6 @@
 "use server"
 
-import clientPromise from "./db"
+import clientPromise, { withDbRetry } from "./db"
 import { cookies } from "next/headers"
 import { ObjectId } from "mongodb"
 
@@ -30,11 +30,15 @@ export async function getCurrentUser(): Promise<User | null> {
       return null
     }
 
-    // First, find the session in the sessions collection
-    const session = await db.collection("sessions").findOne({
-      sessionId,
-      expiresAt: { $gt: new Date() },
-    })
+    // First, find the session in the sessions collection. Retried so a transient
+    // read failure isn't mistaken for an expired/missing session (which would
+    // redirect the user to /login on the next refresh).
+    const session = await withDbRetry(() =>
+      db.collection("sessions").findOne({
+        sessionId,
+        expiresAt: { $gt: new Date() },
+      })
+    )
 
     if (!session) {
       // Session expired or doesn't exist
@@ -43,9 +47,11 @@ export async function getCurrentUser(): Promise<User | null> {
     }
 
     // Then, find the user using the userId from the session
-    const user = await db.collection("users").findOne({ 
-      _id: session.userId
-    })
+    const user = await withDbRetry(() =>
+      db.collection("users").findOne({
+        _id: session.userId,
+      })
+    )
 
     if (!user) {
       // User doesn't exist, clean up the session from database

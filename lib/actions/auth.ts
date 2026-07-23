@@ -1,5 +1,5 @@
 "use server"
-import clientPromise from "../db"
+import clientPromise, { withDbRetry } from "../db"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { sendWelcomeEmail } from "../email" // Import the email function
@@ -247,19 +247,28 @@ export async function getCurrentUser() {
       return null
     }
 
-    const session = await db.collection("sessions").findOne({
-      sessionId,
-      expiresAt: { $gt: new Date() },
-    })
+    // Retried so a transient read failure isn't mistaken for a missing session.
+    // getCurrentUser is a read - it must never mutate the session cookie. This
+    // function is also invoked during page render (e.g. requireSuperAdmin ->
+    // getAllUsers), where cookies().delete() throws "Cookies can only be
+    // modified in a Server Action or Route Handler"; deleting here also risked
+    // signing out a perfectly valid session on a spurious miss. Cookie cleanup
+    // belongs in logoutUser, not here - matching lib/auth.getCurrentUser.
+    const session = await withDbRetry(() =>
+      db.collection("sessions").findOne({
+        sessionId,
+        expiresAt: { $gt: new Date() },
+      })
+    )
 
     if (!session) {
-      cookieStore.delete("session")
       return null
     }
 
-    const user = await db.collection("users").findOne({ _id: session.userId })
+    const user = await withDbRetry(() =>
+      db.collection("users").findOne({ _id: session.userId })
+    )
     if (!user) {
-      cookieStore.delete("session")
       return null
     }
 

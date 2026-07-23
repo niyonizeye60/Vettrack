@@ -41,6 +41,31 @@ if (!globalWithMongo._mongoClientPromise) {
 }
 clientPromise = globalWithMongo._mongoClientPromise
 
+// Transient MongoDB errors - a connection pool cleared during an Atlas
+// failover, a socket dropped on a cold serverless container, a brief DNS or
+// network blip - can make a single read throw even though nothing is actually
+// wrong. Every caller wraps its reads in try/catch and turns a throw into a
+// fallback value; for the auth path that fallback is `null`, which the layout
+// guards read as "logged out" (redirect to /login) and data loaders read as
+// "no data" (empty table). Retrying the read a second time with a short backoff
+// absorbs those blips so a healthy session isn't spuriously signed out. The
+// driver's own retryReads only covers a subset of these, and never a pool that
+// was momentarily unavailable - hence this app-level retry on top.
+export async function withDbRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastError: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (error) {
+      lastError = error
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * (i + 1)))
+      }
+    }
+  }
+  throw lastError
+}
+
 // Add a function to test the connection
 export async function testConnection() {
   try {
