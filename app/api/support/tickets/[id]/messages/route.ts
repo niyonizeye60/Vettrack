@@ -5,6 +5,7 @@ import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { encryptText } from "@/lib/crypto"
 import { ObjectId } from "mongodb"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 const STAFF_ROLES = ["admin", "superadmin"]
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       }).catch((err) => console.error("Error inserting support ticket notification:", err))
     }
 
+    await logActivity(currentUser._id, "support.ticket_replied", `Ticket ${params.id}`)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error replying to support ticket:", error)

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { ObjectId } from "mongodb"
 import { hashPassword } from "../password"
 import { getCurrentUser } from "./auth"
+import { logActivity, logSystemError as recordSystemError } from "../activity-log"
 
 // Every exported function in this file is a Next.js server action with its own
 // network-invocable endpoint, independent of which page renders it - so each one
@@ -217,7 +218,7 @@ export async function exportUsers(filters?: {
       lastLoginAt: user.lastLoginAt?.toISOString() || ''
     }))
 
-    await logAdminAction("admin.export.users", `${csvData.length} records`)
+    await logAdminAction("export.users", `${csvData.length} records`)
     return { success: true, data: csvData, count: csvData.length }
   } catch (error) {
     console.error("Error exporting users:", error)
@@ -247,7 +248,8 @@ export async function importUsers(userData: any[]) {
 
     const result = await db.collection("users").insertMany(validUsers)
     revalidatePath("/superadmin/users")
-    
+    await logAdminAction("admin.user.imported", `${result.insertedCount} users`)
+
     return { 
       success: true, 
       message: `${result.insertedCount} users imported successfully`,
@@ -292,6 +294,137 @@ export async function getUserActivityLogs(userId?: string, limit: number = 100) 
   }
 }
 
+// Shared by getActivityLogs and getActivityLogCategoryCounts: match on category/date,
+// then join in the actor's name/email/role so role + free-text search can filter on it.
+// chat.* is always excluded - chat moderation already has its own dedicated page for that.
+function buildActivityLogPipeline(options?: {
+  category?: string
+  role?: string
+  search?: string
+  startDate?: string
+  endDate?: string
+}) {
+  const match: Record<string, any> = {
+    action: options?.category
+      ? { $regex: `^${escapeRegex(options.category)}\\.`, $not: /^chat\./ }
+      : { $not: /^chat\./ }
+  }
+  if (options?.startDate || options?.endDate) {
+    match.createdAt = {}
+    if (options.startDate) match.createdAt.$gte = new Date(options.startDate)
+    if (options.endDate) match.createdAt.$lte = new Date(options.endDate)
+  }
+
+  const pipeline: any[] = [
+    { $match: match },
+    { $sort: { createdAt: -1 } },
+    {
+      $lookup: {
+        from: "users",
+        localField: "userId",
+        foreignField: "_id",
+        as: "user"
+      }
+    },
+    { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+  ]
+
+  if (options?.role) {
+    pipeline.push({ $match: { "user.role": options.role } })
+  }
+  if (options?.search) {
+    const re = new RegExp(escapeRegex(options.search), "i")
+    pipeline.push({ $match: { $or: [{ "user.name": re }, { "user.email": re }, { action: re }, { details: re }] } })
+  }
+
+  return pipeline
+}
+
+// Per-category counts for the current role/search/date filters, so the Activity Log
+// page can show an at-a-glance breakdown (e.g. category filter chips with counts).
+export async function getActivityLogCategoryCounts(options?: {
+  role?: string
+  search?: string
+  startDate?: string
+  endDate?: string
+}) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const pipeline = buildActivityLogPipeline(options)
+    pipeline.push(
+      { $addFields: { category: { $arrayElemAt: [{ $split: ["$action", "."] }, 0] } } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    )
+
+    const rows = await db.collection("user_activity_logs").aggregate(pipeline).toArray()
+    return {
+      total: rows.reduce((sum, r) => sum + (r.count as number), 0),
+      byCategory: rows.map(r => ({ category: r._id as string, count: r.count as number }))
+    }
+  } catch (error) {
+    console.error("Error fetching activity log category counts:", error)
+    return { total: 0, byCategory: [] as { category: string; count: number }[] }
+  }
+}
+
+export async function getActivityLogs(options?: {
+  page?: number
+  pageSize?: number
+  role?: string
+  category?: string
+  search?: string
+  startDate?: string
+  endDate?: string
+}) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const page = Math.max(1, options?.page || 1)
+    const pageSize = Math.min(100, options?.pageSize || 25)
+
+    const pipeline = buildActivityLogPipeline(options)
+    pipeline.push({
+      $facet: {
+        data: [{ $skip: (page - 1) * pageSize }, { $limit: pageSize }],
+        total: [{ $count: "count" }]
+      }
+    })
+
+    const [result] = await db.collection("user_activity_logs").aggregate(pipeline).toArray()
+    const rows = result?.data || []
+    const total = result?.total?.[0]?.count || 0
+
+    return {
+      logs: rows.map((row: any) => ({
+        _id: row._id.toString(),
+        action: row.action as string,
+        details: (row.details || "") as string,
+        createdAt: row.createdAt,
+        userId: row.userId ? row.userId.toString() : null,
+        userName: row.user?.name || "Unknown user",
+        userEmail: row.user?.email || "",
+        userRole: row.user?.role || "unknown",
+      })),
+      total,
+      page,
+      pageSize
+    }
+  } catch (error) {
+    console.error("Error fetching activity logs:", error)
+    return { logs: [], total: 0, page: 1, pageSize: 25 }
+  }
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 export async function logUserActivity(data: {
   userId: string
   action: string
@@ -299,25 +432,8 @@ export async function logUserActivity(data: {
   ipAddress?: string
   userAgent?: string
 }) {
-  try {
-    const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital")
-
-    const log = {
-      userId: new ObjectId(data.userId),
-      action: data.action,
-      details: data.details || '',
-      ipAddress: data.ipAddress || '',
-      userAgent: data.userAgent || '',
-      createdAt: new Date()
-    }
-
-    await db.collection("user_activity_logs").insertOne(log)
-    return { success: true }
-  } catch (error) {
-    console.error("Error logging user activity:", error)
-    return { success: false }
-  }
+  await logActivity(data.userId, data.action, data.details)
+  return { success: true }
 }
 
 // Records an admin/superadmin-initiated action against the currently authenticated actor,
@@ -400,7 +516,7 @@ export async function exportConsultations(filters?: {
       updatedAt: consultation.updatedAt?.toISOString() || ''
     }))
 
-    await logAdminAction("admin.export.consultations", `${csvData.length} records`)
+    await logAdminAction("export.consultations", `${csvData.length} records`)
 
     return { success: true, data: csvData, count: csvData.length }
   } catch (error) {
@@ -473,7 +589,7 @@ export async function exportSystemLogs(filters?: {
       }))
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-    await logAdminAction("admin.export.systemLogs", `${allLogs.length} records`)
+    await logAdminAction("export.systemLogs", `${allLogs.length} records`)
     return { success: true, data: allLogs, count: allLogs.length }
   } catch (error) {
     console.error("Error exporting system logs:", error)
@@ -532,7 +648,7 @@ export async function exportSystemReport() {
       recentActivity: recentActivity.slice(0, 10)
     }
 
-    await logAdminAction("admin.export.systemReport")
+    await logAdminAction("export.systemReport")
     return { success: true, data: reportData }
   } catch (error) {
     console.error("Error generating system report:", error)
@@ -559,6 +675,7 @@ export async function scheduleDataExport(data: {
     }
 
     const result = await db.collection("scheduled_exports").insertOne(scheduledExport)
+    await logAdminAction("export.scheduled", `${data.exportType} (${data.frequency})`)
     return { success: true, id: result.insertedId.toString() }
   } catch (error) {
     console.error("Error scheduling data export:", error)
@@ -623,6 +740,7 @@ export async function updateUser(userId: string, formData: FormData) {
 
     if (result.modifiedCount > 0) {
       revalidatePath("/superadmin/users")
+      await logAdminAction("admin.user.updated", (updateData.name as string) || userId)
       return { success: true, message: "User updated successfully" }
     }
 
@@ -652,6 +770,7 @@ export async function updateUserPassword(userId: string, newPassword: string) {
 
     if (result.modifiedCount > 0) {
       revalidatePath("/superadmin/users")
+      await logAdminAction("admin.user.passwordReset", userId)
       return { success: true, message: "Password updated successfully" }
     }
 
@@ -936,96 +1055,6 @@ function describeAdminAction(action: string, details?: string): string | null {
 // online-user counts, and registration trends already live on the main dashboard -
 // this focuses on data the dashboard doesn't cover: growth rates, consultation
 // volume/status, and service popularity.
-export async function getAnalyticsData() {
-  try {
-    await requireSuperAdmin()
-    const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital")
-
-    const now = new Date()
-    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-
-    const [totalUsers, newUsersLast30Days] = await Promise.all([
-      db.collection("users").countDocuments(),
-      db.collection("users").countDocuments({ createdAt: { $gte: last30Days } })
-    ])
-
-    const [totalConsultations, consultationsLast30Days, statusRows] = await Promise.all([
-      db.collection("consultations").countDocuments(),
-      db.collection("consultations").countDocuments({ createdAt: { $gte: last30Days } }),
-      db.collection("consultations").aggregate([
-        { $group: { _id: "$status", count: { $sum: 1 } } }
-      ]).toArray()
-    ])
-
-    const statusBreakdown = statusRows.reduce((acc, row) => {
-      acc[row._id] = row.count
-      return acc
-    }, {} as Record<string, number>)
-    const completedConsultations = statusBreakdown.completed || 0
-
-    // Consultation volume trend (last 30 days, zero-filled so the chart doesn't skip empty days)
-    const trendStart = new Date(last30Days)
-    trendStart.setHours(0, 0, 0, 0)
-    const consultationTrendRows = await db.collection("consultations").aggregate([
-      { $match: { createdAt: { $gte: trendStart } } },
-      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
-    ]).toArray()
-
-    const consultationTrend: { date: string; count: number }[] = []
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(trendStart)
-      d.setDate(d.getDate() + i)
-      consultationTrend.push({ date: d.toISOString().slice(0, 10), count: 0 })
-    }
-    const trendByDate = new Map(consultationTrend.map(entry => [entry.date, entry]))
-    for (const row of consultationTrendRows) {
-      const entry = trendByDate.get(row._id)
-      if (entry) entry.count = row.count
-    }
-
-    // Popular services
-    const popularServiceRows = await db.collection("consultations").aggregate([
-      {
-        $group: {
-          _id: "$service",
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { count: -1 } },
-      { $limit: 5 }
-    ]).toArray()
-    const popularServices = popularServiceRows.map(row => ({
-      _id: String(row._id),
-      count: row.count as number
-    }))
-
-    return {
-      users: {
-        total: totalUsers,
-        newLast30Days: newUsersLast30Days,
-        growthRate: totalUsers > 0 ? ((newUsersLast30Days / totalUsers) * 100).toFixed(1) : "0"
-      },
-      consultations: {
-        total: totalConsultations,
-        last30Days: consultationsLast30Days,
-        completionRate: totalConsultations > 0 ? ((completedConsultations / totalConsultations) * 100).toFixed(1) : "0",
-        statusBreakdown: {
-          pending: statusBreakdown.pending || 0,
-          accepted: statusBreakdown.accepted || 0,
-          rejected: statusBreakdown.rejected || 0,
-          completed: completedConsultations
-        }
-      },
-      consultationTrend,
-      popularServices
-    }
-  } catch (error) {
-    console.error("Error fetching analytics data:", error)
-    return null
-  }
-}
-
 // Get system health metrics
 export async function getSystemHealth() {
   try {
@@ -1099,18 +1128,7 @@ export async function logSystemError(error: {
   userId?: string
   action?: string
 }) {
-  try {
-    const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital")
-
-    await db.collection("error_logs").insertOne({
-      ...error,
-      createdAt: new Date(),
-      resolved: false
-    })
-  } catch (err) {
-    console.error("Failed to log system error:", err)
-  }
+  await recordSystemError(error)
 }
 
 // Content Management Functions
@@ -1226,6 +1244,7 @@ export async function createAnnouncement(data: {
     }
 
     revalidatePath("/superadmin/content")
+    await logAdminAction("admin.announcement.created", data.title)
     return { success: true, id: result.insertedId.toString() }
   } catch (error) {
     console.error("Error creating announcement:", error)
@@ -1256,6 +1275,7 @@ export async function updateAnnouncement(id: string, data: {
     )
 
     revalidatePath("/superadmin/content")
+    await logAdminAction("admin.announcement.updated", data.title)
     return { success: true }
   } catch (error) {
     console.error("Error updating announcement:", error)
@@ -1269,8 +1289,10 @@ export async function deleteAnnouncement(id: string) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
+    const announcement = await db.collection("announcements").findOne({ _id: new ObjectId(id) }, { projection: { title: 1 } })
     await db.collection("announcements").deleteOne({ _id: new ObjectId(id) })
     revalidatePath("/superadmin/content")
+    await logAdminAction("admin.announcement.deleted", announcement?.title || id)
     return { success: true }
   } catch (error) {
     console.error("Error deleting announcement:", error)
@@ -1434,6 +1456,7 @@ export async function updateSystemSettings(settings: any) {
       { upsert: true }
     )
 
+    await logAdminAction("admin.settings.updated")
     return { success: true, message: "Settings updated successfully" }
   } catch (error) {
     console.error("Error updating system settings:", error)
@@ -1452,21 +1475,24 @@ export async function performDatabaseAction(action: string) {
       case "backup":
         // In a real implementation, this would trigger a backup process
         console.log("Database backup initiated")
+        await logAdminAction("admin.database.backup")
         return { success: true, message: "Backup initiated successfully" }
-      
+
       case "optimize":
         // Optimize collections
         const collections = await db.listCollections().toArray()
         for (const collection of collections) {
           await db.collection(collection.name).createIndex({ createdAt: 1 })
         }
+        await logAdminAction("admin.database.optimized")
         return { success: true, message: "Database optimized successfully" }
-      
+
       case "clearCache":
         // Clear any cached data
         await db.collection("cache").deleteMany({})
+        await logAdminAction("admin.database.cacheCleared")
         return { success: true, message: "Cache cleared successfully" }
-      
+
       default:
         return { success: false, message: "Unknown action" }
     }
@@ -1583,8 +1609,8 @@ export async function getUserRegistrationTrend(days = 30) {
     const db = client.db("ntdm_animal_hospital")
 
     const start = new Date()
-    start.setDate(start.getDate() - (days - 1))
-    start.setHours(0, 0, 0, 0)
+    start.setUTCDate(start.getUTCDate() - (days - 1))
+    start.setUTCHours(0, 0, 0, 0)
 
     const rows = await db.collection("users").aggregate([
       { $match: { createdAt: { $gte: start } } },
@@ -1603,7 +1629,7 @@ export async function getUserRegistrationTrend(days = 30) {
     const byDate: Record<string, { date: string; farmer: number; doctor: number; admin: number; superadmin: number; total: number }> = {}
     for (let i = 0; i < days; i++) {
       const d = new Date(start)
-      d.setDate(d.getDate() + i)
+      d.setUTCDate(d.getUTCDate() + i)
       const key = d.toISOString().slice(0, 10)
       byDate[key] = { date: key, farmer: 0, doctor: 0, admin: 0, superadmin: 0, total: 0 }
     }
@@ -1666,8 +1692,8 @@ export async function getLoginActivityTrend(days = 30) {
     const db = client.db("ntdm_animal_hospital")
 
     const start = new Date()
-    start.setDate(start.getDate() - (days - 1))
-    start.setHours(0, 0, 0, 0)
+    start.setUTCDate(start.getUTCDate() - (days - 1))
+    start.setUTCHours(0, 0, 0, 0)
 
     const rows = await db.collection("login_events").aggregate([
       { $match: { createdAt: { $gte: start } } },
@@ -1690,7 +1716,7 @@ export async function getLoginActivityTrend(days = 30) {
     const byDate: Record<string, number> = {}
     for (let i = 0; i < days; i++) {
       const d = new Date(start)
-      d.setDate(d.getDate() + i)
+      d.setUTCDate(d.getUTCDate() + i)
       byDate[d.toISOString().slice(0, 10)] = 0
     }
     for (const row of rows) {
@@ -1706,6 +1732,152 @@ export async function getLoginActivityTrend(days = 30) {
   } catch (error) {
     console.error("Error fetching login activity trend:", error)
     return { series: [], trackingSince: null }
+  }
+}
+
+// Daily successful vs. failed login attempts for the last N days
+export async function getLoginAttemptsTrend(days = 30) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const start = new Date()
+    start.setUTCDate(start.getUTCDate() - (days - 1))
+    start.setUTCHours(0, 0, 0, 0)
+
+    const [successRows, failedRows, earliestFailedAttempt] = await Promise.all([
+      db.collection("login_events").aggregate([
+        { $match: { createdAt: { $gte: start } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
+      ]).toArray(),
+      db.collection("login_attempts").aggregate([
+        { $match: { createdAt: { $gte: start }, success: false } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
+      ]).toArray(),
+      db.collection("login_attempts").find({ success: false }).sort({ createdAt: 1 }).limit(1).toArray()
+    ])
+
+    const byDate: Record<string, { date: string; successful: number; failed: number }> = {}
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start)
+      d.setUTCDate(d.getUTCDate() + i)
+      const key = d.toISOString().slice(0, 10)
+      byDate[key] = { date: key, successful: 0, failed: 0 }
+    }
+    for (const row of successRows) {
+      if (byDate[row._id]) byDate[row._id].successful = row.count
+    }
+    for (const row of failedRows) {
+      if (byDate[row._id]) byDate[row._id].failed = row.count
+    }
+
+    return {
+      series: Object.values(byDate),
+      trackingSince: earliestFailedAttempt[0]?.createdAt ?? null
+    }
+  } catch (error) {
+    console.error("Error fetching login attempts trend:", error)
+    return { series: [], trackingSince: null }
+  }
+}
+
+// Cumulative newsletter subscriber count for the last N days
+export async function getNewsletterGrowthTrend(days = 30) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const start = new Date()
+    start.setUTCDate(start.getUTCDate() - (days - 1))
+    start.setUTCHours(0, 0, 0, 0)
+
+    const [baseline, rows] = await Promise.all([
+      db.collection("newsletter_subscribers").countDocuments({ subscribedAt: { $lt: start } }),
+      db.collection("newsletter_subscribers").aggregate([
+        { $match: { subscribedAt: { $gte: start } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$subscribedAt" } }, count: { $sum: 1 } } }
+      ]).toArray()
+    ])
+
+    const newByDate = new Map(rows.map(row => [row._id as string, row.count as number]))
+    const series: { date: string; total: number }[] = []
+    let running = baseline
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start)
+      d.setUTCDate(d.getUTCDate() + i)
+      const key = d.toISOString().slice(0, 10)
+      running += newByDate.get(key) || 0
+      series.push({ date: key, total: running })
+    }
+
+    return series
+  } catch (error) {
+    console.error("Error fetching newsletter growth trend:", error)
+    return []
+  }
+}
+
+// Daily count of new chat reports opened for the last N days
+export async function getChatReportsTrend(days = 30) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const start = new Date()
+    start.setUTCDate(start.getUTCDate() - (days - 1))
+    start.setUTCHours(0, 0, 0, 0)
+
+    const rows = await db.collection("chat_reports").aggregate([
+      { $match: { createdAt: { $gte: start } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
+    ]).toArray()
+
+    const byDate = new Map(rows.map(row => [row._id as string, row.count as number]))
+    const series: { date: string; count: number }[] = []
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start)
+      d.setUTCDate(d.getUTCDate() + i)
+      const key = d.toISOString().slice(0, 10)
+      series.push({ date: key, count: byDate.get(key) || 0 })
+    }
+    return series
+  } catch (error) {
+    console.error("Error fetching chat reports trend:", error)
+    return []
+  }
+}
+
+// Daily count of logged system errors for the last N days
+export async function getErrorLogsTrend(days = 30) {
+  try {
+    await requireSuperAdmin()
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const start = new Date()
+    start.setUTCDate(start.getUTCDate() - (days - 1))
+    start.setUTCHours(0, 0, 0, 0)
+
+    const rows = await db.collection("error_logs").aggregate([
+      { $match: { createdAt: { $gte: start } } },
+      { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, count: { $sum: 1 } } }
+    ]).toArray()
+
+    const byDate = new Map(rows.map(row => [row._id as string, row.count as number]))
+    const series: { date: string; count: number }[] = []
+    for (let i = 0; i < days; i++) {
+      const d = new Date(start)
+      d.setUTCDate(d.getUTCDate() + i)
+      const key = d.toISOString().slice(0, 10)
+      series.push({ date: key, count: byDate.get(key) || 0 })
+    }
+    return series
+  } catch (error) {
+    console.error("Error fetching error logs trend:", error)
+    return []
   }
 }
 
@@ -1764,6 +1936,7 @@ export async function updateUserProfile(userId: string, profileData: {
 
     if (result.modifiedCount > 0) {
       revalidatePath("/superadmin/profile")
+      await logAdminAction("admin.profile.updated")
       return { success: true, message: "Profile updated successfully" }
     }
 
@@ -1879,6 +2052,7 @@ export async function createSystemNotification(data: {
     }
 
     await db.collection("notifications").insertOne(notification)
+    await logAdminAction("admin.notification.created", data.title)
     return { success: true }
   } catch (error) {
     console.error("Error creating notification:", error)
@@ -1936,6 +2110,7 @@ export async function createNotificationTemplate(data: {
     }
 
     const result = await db.collection("notification_templates").insertOne(template)
+    await logAdminAction("admin.notificationTemplate.created", data.name)
     return { success: true, id: result.insertedId.toString() }
   } catch (error) {
     console.error("Error creating notification template:", error)
@@ -1971,6 +2146,7 @@ export async function sendBulkNotification(templateId: string, targetUsers: stri
     }))
 
     await db.collection("notifications").insertMany(notifications)
+    await logAdminAction("admin.notification.bulkSent", `${notifications.length} recipients: ${template.title}`)
     return { success: true, count: notifications.length }
   } catch (error) {
     console.error("Error sending bulk notification:", error)
@@ -1996,6 +2172,7 @@ export async function scheduleNotification(data: {
     }
 
     const result = await db.collection("scheduled_notifications").insertOne(scheduledNotification)
+    await logAdminAction("admin.notification.scheduled", data.scheduledFor ? new Date(data.scheduledFor).toLocaleString() : undefined)
     return { success: true, id: result.insertedId.toString() }
   } catch (error) {
     console.error("Error scheduling notification:", error)
@@ -2039,6 +2216,7 @@ export async function deleteNotificationTemplate(templateId: string) {
       .deleteOne({ _id: new ObjectId(templateId) })
 
     if (result.deletedCount > 0) {
+      await logAdminAction("admin.notificationTemplate.deleted", templateId)
       return { success: true, message: "Template deleted successfully" }
     }
 

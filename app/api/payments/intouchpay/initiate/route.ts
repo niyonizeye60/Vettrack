@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { getOrderById, updateOrderPaymentInit } from "@/lib/db-orders"
 import { initiateIntouchPayment } from "@/lib/payments/intouchpay"
+import { logSystemError } from "@/lib/activity-log"
 import { intouchPhoneSchema } from "@/lib/validations/checkout"
 
 export async function POST(request: NextRequest) {
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ requestTransactionId: result.requesttransactionid })
   } catch (error) {
     console.error("Error initiating IntouchPay payment:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "payment.intouchpay.initiate",
+    })
     return NextResponse.json({ error: "Failed to initiate payment" }, { status: 500 })
   }
 }

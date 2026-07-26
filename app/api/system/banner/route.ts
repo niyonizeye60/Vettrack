@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { deleteStorageFile } from "@/lib/storage-cleanup"
+import { logActivity } from "@/lib/activity-log"
 
 // system_settings uses a plain string _id ("global"), not an ObjectId.
 interface SystemSettingsBannerDoc {
@@ -42,6 +43,7 @@ export async function DELETE() {
       { upsert: true }
     )
 
+    await logActivity(currentUser._id, "admin.banner.removed")
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error removing banner:", error)

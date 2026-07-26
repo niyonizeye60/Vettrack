@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { getOrderById, updateOrderPaymentInit } from "@/lib/db-orders"
 import { initiatePesapalPayment } from "@/lib/payments/pesapal"
+import { logSystemError } from "@/lib/activity-log"
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +27,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ redirectUrl: result.redirectUrl })
   } catch (error) {
     console.error("Error initiating Pesapal payment:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "payment.pesapal.initiate",
+    })
     return NextResponse.json({ error: "Failed to initiate payment" }, { status: 500 })
   }
 }

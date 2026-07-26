@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import clientPromise from "@/lib/db"
 import { deleteStorageFile } from "@/lib/storage-cleanup"
+import { logActivity } from "@/lib/activity-log"
 
 export async function POST(req: NextRequest) {
   try {
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
       { upsert: true }
     )
 
+    await logActivity(currentUser._id, "admin.banner.uploaded")
     return NextResponse.json({ success: true, bannerImage: bannerUrl })
   } catch (error) {
     console.error("Banner upload error:", error)

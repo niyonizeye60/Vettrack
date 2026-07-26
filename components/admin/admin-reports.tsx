@@ -10,6 +10,7 @@ import { BarChart3, TrendingUp, Users, Calendar, Download, Eye } from "lucide-re
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
+import { logPortalExport } from "@/lib/actions"
 
 type ReportType = "users" | "appointments" | "performance" | "regional"
 
@@ -185,6 +186,7 @@ export default function AdminReports() {
         y = drawPdfLines(doc, y, table.rows.map((row) => row.join(" | ")))
       }
       doc.save(`${type}-report-${new Date().toISOString().split('T')[0]}.pdf`)
+      logPortalExport(`${type} report`, "PDF")
     } catch (error) {
       console.error('PDF export failed:', error)
       toast({ title: t('common.error'), variant: "destructive" })
@@ -208,6 +210,7 @@ export default function AdminReports() {
     link.download = `${type}-report-${new Date().toISOString().split('T')[0]}.csv`
     link.click()
     URL.revokeObjectURL(url)
+    logPortalExport(`${type} report`, "CSV")
   }
 
   const exportExcel = async (type: ReportType) => {
@@ -225,6 +228,7 @@ export default function AdminReports() {
         XLSX.utils.book_append_sheet(wb, tableSheet, "Data")
       }
       XLSX.writeFile(wb, `${type}-report-${new Date().toISOString().split('T')[0]}.xlsx`)
+      logPortalExport(`${type} report`, "Excel")
     } catch (error) {
       console.error('Excel export failed:', error)
       toast({ title: t('common.error'), variant: "destructive" })
@@ -275,6 +279,7 @@ export default function AdminReports() {
       XLSX.utils.book_append_sheet(wb, regionalSheet, "Regional Summary")
 
       XLSX.writeFile(wb, `vettrack-all-data-${new Date().toISOString().split('T')[0]}.xlsx`)
+      logPortalExport("All data", "Excel")
       toast({ title: t('admin.exportAllDataSuccess') })
     } catch (error) {
       console.error('Export all data failed:', error)

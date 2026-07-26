@@ -4,6 +4,7 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { hashPassword, verifyPassword } from "@/lib/password"
+import { logActivity } from "@/lib/activity-log"
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     )
 
     if (result.modifiedCount > 0) {
+      await logActivity(currentUser._id, "account.password_changed")
       return NextResponse.json({ success: true, message: "Password changed successfully" })
     }
 

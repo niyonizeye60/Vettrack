@@ -434,7 +434,12 @@ export default function SuperAdminDashboardClient({
                   <CardTitle className="text-lg font-semibold">{t('superadmin.recentActivity') || 'Recent Activity'}</CardTitle>
                   <CardDescription>{t('superadmin.latestSystemActivities') || 'Latest system activities and events'}</CardDescription>
                 </div>
-                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  onClick={() => router.push('/superadmin/activity')}
+                >
                   {t('superadmin.viewAll') || 'View All'}
                   <ArrowUpRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -442,7 +447,7 @@ export default function SuperAdminDashboardClient({
             </CardHeader>
             <CardContent className="pt-0">
               {formattedActivities.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
                   {formattedActivities.map((activity) => (
                     <div key={activity.id} className="flex items-start space-x-4 p-3 rounded-lg hover:bg-gray-50/80 transition-colors duration-150">
                       <div className={`p-2 rounded-lg bg-gray-100 ${activity.color}`}>
@@ -557,7 +562,7 @@ export default function SuperAdminDashboardClient({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Button 
             variant="outline" 
-            className="h-auto p-4 flex-col items-start space-y-2 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200"
+            className="h-auto p-4 rounded-xl flex-col items-start space-y-2 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200"
             onClick={() => router.push('/superadmin/users')}
           >
             <Users className="h-5 w-5 text-blue-600" />
@@ -569,7 +574,7 @@ export default function SuperAdminDashboardClient({
 
           <Button 
             variant="outline" 
-            className="h-auto p-4 flex-col items-start space-y-2 hover:bg-green-50 hover:border-green-200 transition-all duration-200"
+            className="h-auto p-4 rounded-xl flex-col items-start space-y-2 hover:bg-green-50 hover:border-green-200 transition-all duration-200"
             onClick={() => router.push('/superadmin/consultations')}
           >
             <FileText className="h-5 w-5 text-green-600" />
@@ -581,7 +586,7 @@ export default function SuperAdminDashboardClient({
 
           <Button 
             variant="outline" 
-            className="h-auto p-4 flex-col items-start space-y-2 hover:bg-purple-50 hover:border-purple-200 transition-all duration-200"
+            className="h-auto p-4 rounded-xl flex-col items-start space-y-2 hover:bg-purple-50 hover:border-purple-200 transition-all duration-200"
             onClick={() => router.push('/superadmin/analytics')}
           >
             <Activity className="h-5 w-5 text-purple-600" />
@@ -593,7 +598,7 @@ export default function SuperAdminDashboardClient({
 
           <Button 
             variant="outline" 
-            className="h-auto p-4 flex-col items-start space-y-2 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200"
+            className="h-auto p-4 rounded-xl flex-col items-start space-y-2 hover:bg-gray-50 hover:border-gray-200 transition-all duration-200"
             onClick={() => router.push('/superadmin/settings')}
           >
             <Settings className="h-5 w-5 text-gray-600" />

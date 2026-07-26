@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
+import { logSystemError } from "@/lib/activity-log"
 import { encryptText, decryptText } from "@/lib/crypto"
 import { sendNewMessageAlertEmail } from "@/lib/email"
 import { isPresenceOnline } from "@/lib/presence"
@@ -116,6 +117,11 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error fetching messages:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.messages.fetch",
+    })
     return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 })
   }
 }
@@ -259,6 +265,11 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error sending message:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.messages.send",
+    })
     return NextResponse.json({ error: "Failed to send message" }, { status: 500 })
   }
 }
@@ -317,6 +328,11 @@ export async function PATCH(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error editing message:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.messages.edit",
+    })
     return NextResponse.json({ error: "Failed to edit message" }, { status: 500 })
   }
 }
@@ -359,6 +375,11 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting message:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.messages.delete",
+    })
     return NextResponse.json({ error: "Failed to delete message" }, { status: 500 })
   }
 }

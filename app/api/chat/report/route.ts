@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
+import { logSystemError } from "@/lib/activity-log"
 import { ObjectId } from "mongodb"
 
 export async function POST(request: NextRequest) {
@@ -58,6 +59,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, reportId: result.insertedId.toString() })
   } catch (error) {
     console.error("Error filing report:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.report",
+    })
     return NextResponse.json({ error: "Failed to file report" }, { status: 500 })
   }
 }

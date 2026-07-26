@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
-import { getAnimals, getDoctorsList } from "@/lib/actions"
+import { getAnimals, getDoctorsList, logPortalExport } from "@/lib/actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -619,6 +619,7 @@ export default function InseminationPage() {
 
       const pdfSuffix = exportAnimalName ? `-${exportAnimalName.replace(/\s+/g, "_")}` : ""
       doc.save(`insemination-report${pdfSuffix}-${today}.pdf`)
+      logPortalExport("Insemination report", "PDF")
       setExportOpen(false)
     } catch (err) {
       console.error("PDF export failed:", err)
@@ -685,6 +686,7 @@ export default function InseminationPage() {
 
       const excelSuffix = exportAnimalName ? `-${exportAnimalName.replace(/\s+/g, "_")}` : ""
       XLSX.writeFile(wb, `insemination-report${excelSuffix}-${today}.xlsx`)
+      logPortalExport("Insemination report", "Excel")
       setExportOpen(false)
     } catch (err) {
       console.error("Excel export failed:", err)

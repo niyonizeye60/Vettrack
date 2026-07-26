@@ -4,6 +4,7 @@ import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { encryptText } from "@/lib/crypto"
 import { ObjectId } from "mongodb"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 const REQUESTER_ROLES = ["farmer", "doctor"]
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
       createdAt: now,
     })
 
+    await logActivity(currentUser._id, "support.ticket_created", trimmedSubject)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch (error) {
     console.error("Error creating support ticket:", error)

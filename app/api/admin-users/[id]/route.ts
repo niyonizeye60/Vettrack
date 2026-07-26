@@ -131,6 +131,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       }
     }
 
+    const targetUser = await db.collection("users").findOne({ _id: new ObjectId(params.id), role: MANAGED_ROLES }, { projection: { name: 1 } })
+
     const result = await db.collection("users").updateOne(
       { _id: new ObjectId(params.id), role: MANAGED_ROLES },
       { $set: { ...fields, updatedAt: new Date() } }
@@ -139,6 +141,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
+
+    await logUserActivity({
+      userId: currentUser._id,
+      action: "admin.user.updated",
+      details: targetUser?.name || params.id,
+    })
 
     return NextResponse.json({ success: true, message: "User updated successfully" })
   } catch (error) {

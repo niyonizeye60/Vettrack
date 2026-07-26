@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await db.collection("animal_transactions").insertOne(record)
+    await logActivity(currentUser._id, "livestock.transaction_logged", `${transactionType} of ${animalName}`)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch {
     return NextResponse.json({ error: "Failed to save animal transaction" }, { status: 500 })
@@ -114,6 +116,7 @@ export async function PUT(req: NextRequest) {
       { _id: new ObjectId(id) },
       { $set: { animalId: animalId || null, animalName, animalType: animalType || null, transactionType, quantity: quantity ? Number(quantity) : 1, amount: Number(amount), party: party || null, date, notes: notes || null, updatedAt: new Date() } }
     )
+    await logActivity(currentUser._id, "livestock.transaction_updated", `${transactionType} of ${animalName}`)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to update animal transaction" }, { status: 500 })
@@ -143,6 +146,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await db.collection("animal_transactions").deleteOne({ _id: new ObjectId(id) })
+    await logActivity(currentUser._id, "livestock.transaction_deleted", id)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to delete animal transaction" }, { status: 500 })

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
+import { logSystemError } from "@/lib/activity-log"
 import { decryptText } from "@/lib/crypto"
 import { isPresenceOnline } from "@/lib/presence"
 import { ObjectId } from "mongodb"
@@ -107,6 +108,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ conversations: conversationsWithDetails })
   } catch (error) {
     console.error("Error fetching conversations:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.conversations.fetch",
+    })
     return NextResponse.json({ error: "Failed to fetch conversations" }, { status: 500 })
   }
 }
@@ -166,6 +172,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ conversationId: result.insertedId.toString() })
   } catch (error) {
     console.error("Error creating conversation:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.conversations.create",
+    })
     return NextResponse.json({ error: "Failed to create conversation" }, { status: 500 })
   }
 }
@@ -215,6 +226,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error updating conversation:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.conversations.update",
+    })
     return NextResponse.json({ error: "Failed to update conversation" }, { status: 500 })
   }
 }
@@ -261,6 +277,11 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error removing conversation:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.conversations.remove",
+    })
     return NextResponse.json({ error: "Failed to remove conversation" }, { status: 500 })
   }
 }

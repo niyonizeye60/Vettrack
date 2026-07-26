@@ -8,6 +8,7 @@ import { RwandaMap } from "@/components/rwanda-map"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
+import { logPortalExport } from "@/lib/actions"
 import { getCurrentUser as getAuthUser } from "@/lib/auth"
 
 // Define our data types based on API response
@@ -422,6 +423,7 @@ export default function PetTrackingPage() {
 
 
       doc.save(`health-report-${new Date().toISOString().split('T')[0]}.pdf`)
+      logPortalExport("Health tracking report", "PDF")
     } catch (error) {
       console.error('PDF export failed:', error)
     }
@@ -449,6 +451,7 @@ export default function PetTrackingPage() {
     link.download = `health-data-${new Date().toISOString().split('T')[0]}.csv`
     link.click()
     URL.revokeObjectURL(url)
+    logPortalExport("Health tracking data", "CSV")
   }
 
   const exportToExcel = async () => {
@@ -491,6 +494,7 @@ export default function PetTrackingPage() {
       XLSX.utils.book_append_sheet(wb, dataWs, t('farmer.healthData'))
 
       XLSX.writeFile(wb, `health-report-${new Date().toISOString().split('T')[0]}.xlsx`)
+      logPortalExport("Health tracking report", "Excel")
     } catch (error) {
       console.error('Excel export failed:', error)
     }

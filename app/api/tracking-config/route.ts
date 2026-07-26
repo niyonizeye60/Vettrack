@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/actions/auth"
+import { logActivity } from "@/lib/activity-log"
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
     { $set: { channelId, apiKey } },
     { upsert: true }
   )
+  await logActivity(user._id, "account.tracking_config_saved", `Role: ${role}`)
   return NextResponse.json({ success: true })
 }
 

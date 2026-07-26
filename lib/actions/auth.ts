@@ -4,6 +4,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { sendWelcomeEmail } from "../email" // Import the email function
 import { hashPassword, verifyPassword, isHashedPassword } from "../password"
+import { logActivity, logSystemError } from "../activity-log"
 
 // Register a new user
 export async function registerUser(formData: FormData) {
@@ -90,6 +91,11 @@ export async function registerUser(formData: FormData) {
     }
   } catch (error) {
     console.error("Error registering user:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "auth.register",
+    })
     if (error instanceof Error) {
       return { success: false, message: `Registration failed: ${error.message}` }
     }
@@ -109,6 +115,12 @@ export async function loginUser(formData: FormData) {
     const user = await db.collection("users").findOne({ email })
 
     if (!user || !(await verifyPassword(password, user.password))) {
+      await db.collection("login_attempts").insertOne({
+        email,
+        success: false,
+        reason: "invalid_credentials",
+        createdAt: new Date(),
+      })
       return { success: false, message: "Invalid email or password" }
     }
 
@@ -122,18 +134,30 @@ export async function loginUser(formData: FormData) {
 
     // Check if user account is suspended or inactive
     if (user.status === "suspended") {
+      await db.collection("login_attempts").insertOne({
+        email, success: false, reason: "account_suspended", createdAt: new Date(),
+      })
       return { success: false, message: "Your account has been suspended. Please contact the administrator for assistance." }
     }
 
     if (user.status === "inactive") {
+      await db.collection("login_attempts").insertOne({
+        email, success: false, reason: "account_inactive", createdAt: new Date(),
+      })
       return { success: false, message: "Your account is inactive. Please contact the administrator for assistance." }
     }
 
     if (user.status === "pending_verification") {
+      await db.collection("login_attempts").insertOne({
+        email, success: false, reason: "pending_verification", createdAt: new Date(),
+      })
       return { success: false, message: "Your veterinarian account is pending verification by an Extension Officer. You'll be notified once it's approved." }
     }
 
     if (user.status === "rejected") {
+      await db.collection("login_attempts").insertOne({
+        email, success: false, reason: "application_rejected", createdAt: new Date(),
+      })
       return { success: false, message: "Your veterinarian account application was not approved. Please contact the administrator for details." }
     }
 
@@ -169,6 +193,8 @@ export async function loginUser(formData: FormData) {
       createdAt: new Date(),
     })
 
+    await logActivity(user._id, "auth.login", `Logged in as ${user.role}`)
+
     // Mark the user online immediately so presence checks don't have to wait
     // for their first heartbeat ping to land.
     await db.collection("presence").updateOne(
@@ -188,6 +214,11 @@ export async function loginUser(formData: FormData) {
     }
   } catch (error) {
     console.error("Error logging in:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "auth.login",
+    })
     if (error instanceof Error) {
       return { success: false, message: `Login failed: ${error.message}` }
     }
@@ -219,6 +250,8 @@ export async function logoutUser() {
           { $set: { isOnline: false } },
           { upsert: true }
         ).catch((err) => console.error("Error marking presence offline on logout:", err))
+
+        await logActivity(session.userId, "auth.logout", `Logged out as ${session.role || "user"}`)
       }
     }
 
@@ -228,6 +261,11 @@ export async function logoutUser() {
     return { success: true }
   } catch (error) {
     console.error("Error during logout:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "auth.logout",
+    })
     // Even if there's an error, try to clear the cookie
     const cookieStore = cookies()
     cookieStore.delete("session")

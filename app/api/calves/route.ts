@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await db.collection("calves").insertOne(calf)
+    await logActivity(currentUser._id, "livestock.calf_registered", name)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch {
     return NextResponse.json({ error: "Failed to save calf" }, { status: 500 })
@@ -98,6 +100,7 @@ export async function PUT(req: NextRequest) {
       { _id: new ObjectId(id) },
       { $set: { name, motherAnimalId: motherAnimalId || null, motherName: motherName || null, gender, breed: breed || null, birthDate, birthWeight: birthWeight ? Number(birthWeight) : null, status, notes: notes || null, updatedAt: new Date() } }
     )
+    await logActivity(currentUser._id, "livestock.calf_updated", name)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to update calf" }, { status: 500 })
@@ -129,6 +132,7 @@ export async function DELETE(req: NextRequest) {
     await db.collection("calves").deleteOne({ _id: new ObjectId(id) })
     await db.collection("calf_weights").deleteMany({ calfId: id })
     await db.collection("calf_expenses").deleteMany({ calfId: id })
+    await logActivity(currentUser._id, "livestock.calf_deleted", id)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to delete calf" }, { status: 500 })

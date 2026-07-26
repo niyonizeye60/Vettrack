@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
-import { getAnimals } from "@/lib/actions"
+import { getAnimals, logPortalExport } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -440,6 +440,7 @@ export default function MilkProductionPage() {
       }
 
       doc.save(`milk-report-${cowName.replace(/\s+/g, '-')}-${exportType}-${new Date().toISOString().split('T')[0]}.pdf`)
+      logPortalExport("Milk report", "PDF")
       setExportOpen(false)
     } catch (err) {
       console.error('Export failed:', err)
@@ -484,6 +485,7 @@ export default function MilkProductionPage() {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Milk Production')
       XLSX.writeFile(wb, `milk-report-${cowName.replace(/\s+/g, '-')}-${exportType}-${today}.xlsx`)
+      logPortalExport("Milk report", "Excel")
       setExportOpen(false)
     } catch (err) {
       console.error('Excel export failed:', err)

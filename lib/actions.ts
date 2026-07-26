@@ -5,6 +5,7 @@ import clientPromise from "./db"
 import { getCurrentUser } from "./auth"
 import { ObjectId } from "mongodb"
 import { sendConsultationRequestEmail } from "./email"
+import { logActivity, logSystemError } from "./activity-log"
 
 // Animal-related actions
 export async function registerAnimal(formData: FormData, ownerId: string) {
@@ -49,6 +50,9 @@ export async function registerAnimal(formData: FormData, ownerId: string) {
 
     // Revalidate the animals page
     revalidatePath("/farmer/animals")
+
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "livestock.animal_registered", `Registered animal "${animal.name}"`)
 
     return { success: true, id: result.insertedId }
   } catch (error) {
@@ -124,6 +128,9 @@ export async function updateAnimal(id: string, formData: FormData) {
     revalidatePath("/farmer/animals")
     revalidatePath("/dashboard/animals")
 
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "livestock.animal_updated", `Updated animal "${animal.name}"`)
+
     return { success: true, modifiedCount: result.modifiedCount }
   } catch (error) {
     console.error("Error updating animal:", error)
@@ -152,6 +159,8 @@ export async function deleteAnimal(id: string, ownerId?: string) {
       }
     }
 
+    const animalToDelete = await db.collection("animals").findOne({ _id: new ObjectId(id) })
+
     // Remove animal from the database
     const result = await db.collection("animals").deleteOne({
       _id: new ObjectId(id),
@@ -168,6 +177,9 @@ export async function deleteAnimal(id: string, ownerId?: string) {
     // Revalidate paths for both farmer and admin views
     revalidatePath("/farmer/animals")
     revalidatePath("/dashboard/animals")
+
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "livestock.animal_deleted", `Deleted animal "${animalToDelete?.name || id}"`)
 
     return { success: true, deletedCount: result.deletedCount }
   } catch (error) {
@@ -247,9 +259,17 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
       console.error("Error sending consultation request email:", emailError)
     }
 
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "consultation.booked", `Booked a ${consultation.service || "consultation"}${consultation.animalName ? ` for ${consultation.animalName}` : ""}`)
+
     return { success: true }
   } catch (error) {
     console.error("Error booking consultation:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "consultation.booked",
+    })
     return { success: false }
   }
 }
@@ -317,9 +337,17 @@ export async function updateConsultationStatus(id: string, status: string, feedb
     revalidatePath("/dashboard/veterinary/consultations");
     revalidatePath("/farmer/consultations");
 
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "consultation.status_updated", `Marked a consultation as ${status}`)
+
     return { success: true, modifiedCount: result.modifiedCount };
   } catch (error) {
     console.error("Error updating consultation status:", error);
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "consultation.status_updated",
+    })
     return { success: false, error: "Failed to update consultation status" };
   }
 }
@@ -604,9 +632,17 @@ export async function updateConsultation(id: string, formData: FormData, farmerI
     revalidatePath("/farmer/consultations");
     revalidatePath(`/farmer/consultations/${id}`);
 
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "consultation.updated", `Updated a ${consultation.service || "consultation"}`)
+
     return { success: true, modifiedCount: result.modifiedCount };
   } catch (error) {
     console.error("Error updating consultation:", error);
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "consultation.updated",
+    })
     return { success: false, error: "Failed to update consultation" };
   }
 }
@@ -635,9 +671,17 @@ export async function deleteConsultation(id: string, farmerId?: string) {
     // Revalidate paths
     revalidatePath("/farmer/consultations");
 
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "consultation.deleted", "Deleted a consultation")
+
     return { success: true, deletedCount: result.deletedCount };
   } catch (error) {
     console.error("Error deleting consultation:", error);
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "consultation.deleted",
+    })
     return { success: false, error: "Failed to delete consultation" };
   }
 }
@@ -695,6 +739,27 @@ export async function saveUserConfig(deviceId: string, apiKey: string, results: 
     return { success: false, error: "Failed to save user config" }
   }
 }
+// Logs a client-generated export (PDF/Excel/CSV built in-browser, no server round-trip
+// for the file itself) against whoever the session cookie says is currently logged in -
+// never trust a client-supplied userId for an audit-log entry.
+export async function logPortalExport(exportType: string, format?: string) {
+  const actor = await getCurrentUser()
+  if (!actor) return
+  await logActivity(actor._id, "export.portal", format ? `${exportType} (${format})` : exportType)
+}
+
+// Called from the top-level error boundaries (app/error.tsx, app/global-error.tsx) - those
+// are client components and can't reach the DB directly, so this is the server-side entry point.
+export async function reportClientError(message: string, stack?: string) {
+  const actor = await getCurrentUser().catch(() => null)
+  await logSystemError({
+    message,
+    stack,
+    userId: actor?._id ? String(actor._id) : undefined,
+    action: "client.unhandled_error",
+  })
+}
+
 export async function forceLogoutUser(userId: string) {
   try {
     const client = await clientPromise

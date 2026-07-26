@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { deleteStorageFile } from "@/lib/storage-cleanup"
+import { logActivity } from "@/lib/activity-log"
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest) {
       { $set: { image: imageUrl, updatedAt: new Date() } }
     )
 
+    await logActivity(currentUser._id, "account.avatar_updated")
     return NextResponse.json({ success: true, image: imageUrl })
   } catch (error) {
     console.error("Avatar upload error:", error)

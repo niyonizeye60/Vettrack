@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { registerUser } from "@/lib/actions/auth"
+import { logActivity } from "@/lib/activity-log"
 
 export async function GET(request: NextRequest) {
   try {
@@ -73,6 +74,8 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ error: result.message }, { status: 400 })
     }
+
+    await logActivity(currentUser._id, "admin.user.created", `Created ${role} account for ${name}`)
 
     return NextResponse.json({ success: true, message: result.message })
   } catch (error) {

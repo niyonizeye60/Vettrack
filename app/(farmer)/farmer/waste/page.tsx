@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
-import { getAnimals } from "@/lib/actions"
+import { getAnimals, logPortalExport } from "@/lib/actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -337,6 +337,7 @@ export default function WasteManagementPage() {
       }
 
       doc.save(`waste-report-${today}.pdf`)
+      logPortalExport("Waste report", "PDF")
       setExportOpen(false)
     } catch (err) {
       console.error('PDF export failed:', err)
@@ -370,6 +371,7 @@ export default function WasteManagementPage() {
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Waste Records')
       XLSX.writeFile(wb, `waste-report-${today}.xlsx`)
+      logPortalExport("Waste report", "Excel")
       setExportOpen(false)
     } catch (err) {
       console.error('Excel export failed:', err)

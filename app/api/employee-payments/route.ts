@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await db.collection("employee_payments").insertOne(payment)
+    await logActivity(currentUser._id, "employee.payment_recorded", `${amount}${employeeName ? ` to ${employeeName}` : ""}`)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch (error) {
     return NextResponse.json({ error: "Failed to save payment" }, { status: 500 })
@@ -103,6 +105,7 @@ export async function PUT(req: NextRequest) {
       { _id: new ObjectId(id) },
       { $set: { amount: Number(amount), paymentDate, period: period || null, method, notes: notes || null, updatedAt: new Date() } }
     )
+    await logActivity(currentUser._id, "employee.payment_updated", String(amount))
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: "Failed to update payment" }, { status: 500 })
@@ -132,6 +135,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await db.collection("employee_payments").deleteOne({ _id: new ObjectId(id) })
+    await logActivity(currentUser._id, "employee.payment_deleted", id)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete payment" }, { status: 500 })

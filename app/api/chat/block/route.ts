@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { logUserActivity } from "@/lib/actions/superadmin"
+import { logSystemError } from "@/lib/activity-log"
 import { ObjectId } from "mongodb"
 
 export async function POST(request: NextRequest) {
@@ -64,6 +65,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error updating block state:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.block",
+    })
     return NextResponse.json({ error: "Failed to update block state" }, { status: 500 })
   }
 }

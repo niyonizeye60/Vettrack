@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 const COLLECTION = "newsletter_subscribers"
@@ -86,7 +87,9 @@ export async function DELETE(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    const subscriber = await db.collection(COLLECTION).findOne({ _id: new ObjectId(id) }, { projection: { email: 1 } })
     await db.collection(COLLECTION).deleteOne({ _id: new ObjectId(id) })
+    await logActivity(currentUser._id, "admin.subscriber.removed", subscriber?.email || id)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to remove subscriber" }, { status: 500 })

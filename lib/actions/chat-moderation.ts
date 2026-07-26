@@ -7,6 +7,7 @@ import { updateUserStatus } from "./superadmin"
 import { logUserActivity } from "./superadmin"
 import { decryptText } from "../crypto"
 import { revalidatePath } from "next/cache"
+import { logSystemError } from "../activity-log"
 
 async function requireSuperAdmin() {
   const user = await getCurrentUser()
@@ -74,6 +75,11 @@ export async function getOpenChatReportsCount() {
     return await db.collection("chat_reports").countDocuments({ status: "open" })
   } catch (error) {
     console.error("Error fetching open chat reports count:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "chat.reports.count",
+    })
     return 0
   }
 }

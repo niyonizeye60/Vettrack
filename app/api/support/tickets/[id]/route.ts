@@ -5,6 +5,7 @@ import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { decryptText } from "@/lib/crypto"
 import { ObjectId } from "mongodb"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 const STAFF_ROLES = ["admin", "superadmin"]
@@ -121,6 +122,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       { $set: update }
     )
 
+    await logActivity(currentUser._id, "support.ticket_updated", `Status changed to ${update.status}`)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error updating support ticket:", error)

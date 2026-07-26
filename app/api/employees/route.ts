@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await db.collection("employees").insertOne(employee)
+    await logActivity(currentUser._id, "employee.created", name)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch (error) {
     return NextResponse.json({ error: "Failed to save employee" }, { status: 500 })
@@ -98,6 +100,7 @@ export async function PUT(req: NextRequest) {
       { _id: new ObjectId(id) },
       { $set: { name, position, phone: phone || null, nationalId: nationalId || null, hireDate: hireDate || null, wageType, wageAmount: Number(wageAmount), status, notes: notes || null, updatedAt: new Date() } }
     )
+    await logActivity(currentUser._id, "employee.updated", name)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: "Failed to update employee" }, { status: 500 })
@@ -128,6 +131,7 @@ export async function DELETE(req: NextRequest) {
 
     await db.collection("employees").deleteOne({ _id: new ObjectId(id) })
     await db.collection("employee_payments").deleteMany({ employeeId: id })
+    await logActivity(currentUser._id, "employee.deleted", id)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete employee" }, { status: 500 })

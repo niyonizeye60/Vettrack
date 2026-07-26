@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { getOrderById, updateOrderPaymentStatus, type OrderPaymentStatus } from "@/lib/db-orders"
 import { verifyPesapalPaymentStatus } from "@/lib/payments/pesapal"
+import { logSystemError } from "@/lib/activity-log"
 
 // Used by /checkout/callback right after Pesapal redirects the browser back
 // — the IPN webhook and this browser redirect can race, so we proactively
@@ -29,6 +30,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ paymentStatus: status })
   } catch (error) {
     console.error("Error verifying Pesapal payment:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "payment.pesapal.verify",
+    })
     return NextResponse.json({ error: "Failed to verify payment" }, { status: 500 })
   }
 }

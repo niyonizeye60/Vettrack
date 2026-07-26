@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
-import { getAnimals, getDoctorsList } from "@/lib/actions"
+import { getAnimals, getDoctorsList, logPortalExport } from "@/lib/actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -809,6 +809,7 @@ export default function DiseaseManagementPage() {
       }
 
       doc.save(`disease-report-${caseLabel.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${today}.pdf`)
+      logPortalExport("Disease report", "PDF")
       setExportOpen(false)
     } catch (err) {
       console.error('PDF export failed:', err)
@@ -919,6 +920,7 @@ export default function DiseaseManagementPage() {
       XLSX.utils.book_append_sheet(wb, ws4, 'Per-Animal Summary')
 
       XLSX.writeFile(wb, `disease-report-${caseLabel.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${today}.xlsx`)
+      logPortalExport("Disease report", "Excel")
       setExportOpen(false)
     } catch (err) {
       console.error('Excel export failed:', err)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
+import { logPortalExport } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -207,6 +208,7 @@ export default function GeneralReportPage() {
       }
 
       doc.save(`farm-general-report-${report.range.startDate}-to-${report.range.endDate}.pdf`)
+      logPortalExport("General report", "PDF")
     } catch (err) {
       console.error("Export failed:", err)
     } finally {
@@ -250,6 +252,7 @@ export default function GeneralReportPage() {
       XLSX.utils.book_append_sheet(wb, expenseSheet, "Expense Ledger")
 
       XLSX.writeFile(wb, `farm-general-report-${report.range.startDate}-to-${report.range.endDate}.xlsx`)
+      logPortalExport("General report", "Excel")
     } catch (err) {
       console.error("Excel export failed:", err)
     } finally {

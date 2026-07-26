@@ -6,6 +6,7 @@ import { MongoClient, MongoBulkWriteError } from "mongodb"
 import { gunzipSync } from "zlib"
 import { EJSON } from "bson"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const BATCH_SIZE = 500
 
@@ -154,6 +155,9 @@ export async function POST(request: NextRequest) {
         console.error(`Failed to recreate index "${name}" on "${collection}":`, error)
       }
     }
+
+    const totalInserted = Object.values(summary).reduce((sum, s) => sum + s.documentsInserted, 0)
+    await logActivity(currentUser._id, "admin.database.imported", `${totalInserted} documents into "${targetDatabaseName}"`)
 
     return NextResponse.json({ success: true, database: targetDatabaseName, summary })
   } catch (error) {

@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { getOrderByIntouchRequestId, updateOrderPaymentStatus } from "@/lib/db-orders"
 import { parseIntouchWebhook, checkIntouchPayStatus } from "@/lib/payments/intouchpay"
+import { logSystemError } from "@/lib/activity-log"
 
 function mapResponseCode(responsecode?: string): "completed" | "pending" | "failed" {
   if (responsecode === "01" || responsecode === "2001") return "completed"
@@ -37,6 +38,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (error) {
     console.error("Error processing IntouchPay callback:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "payment.intouchpay.callback",
+    })
     return NextResponse.json({ error: "Failed to process callback" }, { status: 500 })
   }
 }

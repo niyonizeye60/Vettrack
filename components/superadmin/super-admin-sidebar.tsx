@@ -19,6 +19,7 @@ import {
   Mail,
   Menu,
   LifeBuoy,
+  History,
 } from "lucide-react"
 
 export default function SuperAdminSidebar() {
@@ -43,6 +44,7 @@ export default function SuperAdminSidebar() {
   const navItems = [
     { href: "/superadmin", label: t('superadmin.dashboard'), icon: <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/analytics", label: t('superadmin.analytics') || 'Analytics', icon: <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/superadmin/activity", label: t('superadmin.activityLog') || 'Activity Log', icon: <History className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/content", label: t('superadmin.contentManagement') || 'Content', icon: <Edit3 className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/notifications", label: t('superadmin.notifications') || 'Notifications', icon: <Bell className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/exports", label: t('superadmin.dataExports') || 'Data Exports', icon: <Download className="h-4 w-4 sm:h-5 sm:w-5" /> },

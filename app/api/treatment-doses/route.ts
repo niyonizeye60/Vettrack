@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await db.collection("treatment_doses").insertOne(record)
+    await logActivity(currentUser._id, "livestock.treatment_logged", `${diseaseName || "treatment"}${animalName ? ` for ${animalName}` : ""}`)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch {
     return NextResponse.json({ error: "Failed to save treatment dose" }, { status: 500 })
@@ -125,6 +127,7 @@ export async function PUT(req: NextRequest) {
       { _id: new ObjectId(id) },
       { $set: { date, session, medicines: normalizedMedicines, vetCost: Number(vetCost) || 0, totalCost, notes, updatedAt: new Date() } }
     )
+    await logActivity(currentUser._id, "livestock.treatment_updated", id)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to update treatment dose" }, { status: 500 })
@@ -154,6 +157,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await db.collection("treatment_doses").deleteOne({ _id: new ObjectId(id) })
+    await logActivity(currentUser._id, "livestock.treatment_deleted", id)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to delete treatment dose" }, { status: 500 })

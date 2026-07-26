@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
+import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await db.collection("milk_records").insertOne(record)
+    await logActivity(currentUser._id, "livestock.milk_logged", `${liters}L for ${cowName}`)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch (error) {
     return NextResponse.json({ error: "Failed to save milk record" }, { status: 500 })
@@ -125,6 +127,7 @@ export async function PUT(req: NextRequest) {
       { _id: new ObjectId(id) },
       { $set: { liters: Number(liters), homeConsumption: homeConsumption ? Number(homeConsumption) : null, soldLiters: soldLiters != null ? Number(soldLiters) : null, pricePerLiter: pricePerLiter ? Number(pricePerLiter) : null, totalAmount: totalAmount ? Number(totalAmount) : null, session, date, time, waterLiters: waterLiters ? Number(waterLiters) : null, foodType: foodType || null, foodKg: foodKg ? Number(foodKg) : null, foodCost: foodCost ? Number(foodCost) : null, saltKg: saltKg ? Number(saltKg) : null, saltCost: saltCost ? Number(saltCost) : null, notes, updatedAt: new Date() } }
     )
+    await logActivity(currentUser._id, "livestock.milk_updated", `${liters}L`)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: "Failed to update milk record" }, { status: 500 })
@@ -154,6 +157,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     await db.collection("milk_records").deleteOne({ _id: new ObjectId(id) })
+    await logActivity(currentUser._id, "livestock.milk_deleted", id)
     return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: "Failed to delete milk record" }, { status: 500 })
