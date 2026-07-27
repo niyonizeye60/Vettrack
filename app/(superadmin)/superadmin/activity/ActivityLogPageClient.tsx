@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getActivityLogs, getActivityLogCategoryCounts } from "@/lib/actions/superadmin"
 import {
@@ -244,7 +245,20 @@ export default function ActivityLogPageClient({ initialData, initialCounts }: Ac
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
-          {data.logs.length > 0 ? (
+          {loading ? (
+            <div className="space-y-1">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-4 p-3 rounded-lg">
+                  <Skeleton className="h-8 w-8 rounded-lg flex-shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2 pt-0.5">
+                    <Skeleton className="h-3.5 w-3/5" />
+                    <Skeleton className="h-3 w-2/5" />
+                  </div>
+                  <Skeleton className="h-7 w-7 rounded-md flex-shrink-0" />
+                </div>
+              ))}
+            </div>
+          ) : data.logs.length > 0 ? (
             <>
               <div className="space-y-1">
                 {data.logs.map((log) => {
