@@ -274,7 +274,19 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
   }
 }
 
-export async function updateConsultationStatus(id: string, status: string, feedback?: string) {
+export async function updateConsultationStatus(
+  id: string,
+  status: string,
+  feedback?: string,
+  clinicalNotes?: {
+    diagnosis?: string
+    symptomsObserved?: string
+    treatmentGiven?: string
+    medicationDosage?: string
+    followUpNeeded?: boolean
+    followUpDate?: string
+  }
+) {
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
@@ -293,6 +305,12 @@ export async function updateConsultationStatus(id: string, status: string, feedb
       status: string;
       updatedAt: Date;
       feedback?: string;
+      diagnosis?: string;
+      symptomsObserved?: string;
+      treatmentGiven?: string;
+      medicationDosage?: string;
+      followUpNeeded?: boolean;
+      followUpDate?: string;
     } = {
       status,
       updatedAt: new Date()
@@ -301,6 +319,20 @@ export async function updateConsultationStatus(id: string, status: string, feedb
     // Only add feedback if it's defined and not empty
     if (feedback !== undefined && feedback !== '') {
       updateData.feedback = feedback;
+    }
+
+    // Structured clinical fields — only set what the vet actually filled in.
+    if (clinicalNotes) {
+      if (clinicalNotes.diagnosis) updateData.diagnosis = clinicalNotes.diagnosis
+      if (clinicalNotes.symptomsObserved) updateData.symptomsObserved = clinicalNotes.symptomsObserved
+      if (clinicalNotes.treatmentGiven) updateData.treatmentGiven = clinicalNotes.treatmentGiven
+      if (clinicalNotes.medicationDosage) updateData.medicationDosage = clinicalNotes.medicationDosage
+      if (clinicalNotes.followUpNeeded) {
+        updateData.followUpNeeded = true
+        if (clinicalNotes.followUpDate) updateData.followUpDate = clinicalNotes.followUpDate
+      } else if (clinicalNotes.followUpNeeded === false) {
+        updateData.followUpNeeded = false
+      }
     }
 
     const result = await db.collection("consultations").updateOne(
@@ -447,6 +479,41 @@ export async function getAnimals(ownerId?: string) {
   }
 }
 
+export async function getAnimalById(id: string) {
+  try {
+    if (!ObjectId.isValid(id)) return null
+
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const animal = await db.collection("animals").findOne({ _id: new ObjectId(id) })
+    if (!animal) return null
+
+    return {
+      _id: animal._id.toString(),
+      name: animal.name,
+      type: animal.type,
+      breed: animal.breed,
+      district: animal.district,
+      sector: animal.sector,
+      class: animal.class,
+      ownerName: animal.ownerName,
+      phoneNumber: animal.phoneNumber,
+      price: animal.price,
+      acquisitionType: animal.acquisitionType || null,
+      earTagId: animal.earTagId || null,
+      insuranceId: animal.insuranceId || null,
+      gender: animal.gender || null,
+      ownerId: animal.ownerId || null,
+      status: animal.status || "Healthy",
+      createdAt: animal.createdAt ? animal.createdAt.toISOString() : null,
+    }
+  } catch (error) {
+    console.error("Error fetching animal by id:", error)
+    return null
+  }
+}
+
 export async function getConsultations(doctorId?: string, farmerId?: string) {
   try {
     const client = await clientPromise
@@ -510,6 +577,12 @@ export async function getConsultations(doctorId?: string, farmerId?: string) {
       animalName: c.animalName || null,
       animalType: c.animalType || null,
       animalBreed: c.animalBreed || null,
+      diagnosis: c.diagnosis || null,
+      symptomsObserved: c.symptomsObserved || null,
+      treatmentGiven: c.treatmentGiven || null,
+      medicationDosage: c.medicationDosage || null,
+      followUpNeeded: c.followUpNeeded || false,
+      followUpDate: c.followUpDate || null,
     }))
   } catch (error) {
     console.error("Error fetching consultations:", error)
@@ -587,7 +660,13 @@ export async function getConsultationById(id: string, farmerId?: string) {
       animalId: consultation.animalId || null,
       animalName: consultation.animalName || null,
       animalType: consultation.animalType || null,
-      animalBreed: consultation.animalBreed || null
+      animalBreed: consultation.animalBreed || null,
+      diagnosis: consultation.diagnosis || null,
+      symptomsObserved: consultation.symptomsObserved || null,
+      treatmentGiven: consultation.treatmentGiven || null,
+      medicationDosage: consultation.medicationDosage || null,
+      followUpNeeded: consultation.followUpNeeded || false,
+      followUpDate: consultation.followUpDate || null,
     };
   } catch (error) {
     console.error("Error fetching consultation:", error);

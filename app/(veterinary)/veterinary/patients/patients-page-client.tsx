@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/dialog"
 import {
   MessageSquare, Phone, MapPin, Heart, User, Stethoscope,
-  PawPrint, Search, Users
+  PawPrint, Search, Users, History
 } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
+import AnimalHistoryPanel from "@/components/dashboard/animal-history-panel"
 
 interface Patient {
   id: string
@@ -47,6 +48,7 @@ export default function PatientsPageClient({
   const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '')
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [historyAnimalId, setHistoryAnimalId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
@@ -285,7 +287,7 @@ export default function PatientsPageClient({
 
       {/* Patient detail dialog */}
       <Dialog open={!!selectedPatient} onOpenChange={(open) => !open && setSelectedPatient(null)}>
-        <DialogContent className="sm:max-w-[520px] w-11/12">
+        <DialogContent className="sm:max-w-[520px] w-11/12 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('vet.patientDetails')}</DialogTitle>
             <DialogDescription>{t('vet.patientDetailsDesc')}</DialogDescription>
@@ -318,17 +320,27 @@ export default function PatientsPageClient({
                 {selectedPatient.animalDetails.length > 0 ? (
                   <div className="space-y-1.5">
                     {selectedPatient.animalDetails.map((a, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                        <div>
+                      <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg gap-2">
+                        <div className="min-w-0">
                           <span className="text-sm font-medium text-gray-800">{a.name}</span>
                           <span className="text-xs text-gray-400 ml-2">{a.type}{a.breed ? ` · ${a.breed}` : ''}</span>
                         </div>
-                        <Badge variant="outline" className={`text-xs ${
-                          a.status === 'Healthy'          ? 'bg-green-50 text-green-700 border-green-200' :
-                          a.status === 'Sick'             ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                          a.status === 'Under Treatment'  ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                            'bg-gray-50 text-gray-600 border-gray-200'
-                        }`}>{a.status}</Badge>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Badge variant="outline" className={`text-xs ${
+                            a.status === 'Healthy'          ? 'bg-green-50 text-green-700 border-green-200' :
+                            a.status === 'Sick'             ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            a.status === 'Under Treatment'  ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                              'bg-gray-50 text-gray-600 border-gray-200'
+                          }`}>{a.status}</Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-1.5 text-xs"
+                            onClick={() => setHistoryAnimalId(a.animalId)}
+                          >
+                            <History className="h-3 w-3 mr-1" />{t('vet.viewHistory')}
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -369,6 +381,12 @@ export default function PatientsPageClient({
           </div>
         </DialogContent>
       </Dialog>
+
+      <AnimalHistoryPanel
+        animalId={historyAnimalId}
+        open={!!historyAnimalId}
+        onOpenChange={(open) => !open && setHistoryAnimalId(null)}
+      />
     </div>
   )
 }

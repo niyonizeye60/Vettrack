@@ -30,11 +30,13 @@ interface AddConsultationFormProps {
   doctors: Doctor[]
   farmerId: string
   sickAnimals: SickAnimal[]
+  farmerName?: string
+  farmerPhone?: string
   onSuccess: () => void
   onCancel: () => void
 }
 
-export default function AddConsultationForm({ doctors, farmerId, sickAnimals, onSuccess, onCancel }: AddConsultationFormProps) {
+export default function AddConsultationForm({ doctors, farmerId, sickAnimals, farmerName, farmerPhone, onSuccess, onCancel }: AddConsultationFormProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -77,12 +79,12 @@ export default function AddConsultationForm({ doctors, farmerId, sickAnimals, on
 
         <div className="space-y-1.5">
           <Label htmlFor="add-fullName">{t('farmer.fullName')}</Label>
-          <Input id="add-fullName" name="fullName" placeholder={t('farmer.enterFullName')} required />
+          <Input id="add-fullName" name="fullName" defaultValue={farmerName} placeholder={t('farmer.enterFullName')} required />
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="add-phoneNumber">{t('farmer.phoneNumber')}</Label>
-          <Input id="add-phoneNumber" name="phoneNumber" placeholder={t('farmer.enterPhoneNumber')} required />
+          <Input id="add-phoneNumber" name="phoneNumber" defaultValue={farmerPhone} placeholder={t('farmer.enterPhoneNumber')} required />
         </div>
 
         {/* Sick animal selector — spans full width */}

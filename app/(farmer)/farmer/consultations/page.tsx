@@ -38,6 +38,8 @@ export default async function FarmerConsultationsPage({
       farmerId={farmerId}
       sickAnimals={sickAnimals}
       openAdd={searchParams.action === "add"}
+      farmerName={currentUser.name || ""}
+      farmerPhone={currentUser.phone || ""}
     />
   )
 }

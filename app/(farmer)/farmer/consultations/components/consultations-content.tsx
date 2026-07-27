@@ -40,6 +40,8 @@ interface ConsultationsContentProps {
   farmerId: string
   sickAnimals: SickAnimal[]
   openAdd?: boolean
+  farmerName?: string
+  farmerPhone?: string
 }
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -51,7 +53,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function ConsultationsContent({ consultations, doctors, farmerId, sickAnimals, openAdd }: ConsultationsContentProps) {
+export default function ConsultationsContent({ consultations, doctors, farmerId, sickAnimals, openAdd, farmerName, farmerPhone }: ConsultationsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
@@ -215,6 +217,8 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
             doctors={doctors}
             farmerId={farmerId}
             sickAnimals={sickAnimals}
+            farmerName={farmerName}
+            farmerPhone={farmerPhone}
             onSuccess={() => { setAddOpen(false); router.refresh() }}
             onCancel={() => setAddOpen(false)}
           />

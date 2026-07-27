@@ -10,10 +10,13 @@ import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { updateConsultationStatus } from "@/lib/actions"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Clock, CheckCircle, XCircle, ClipboardCheck, User, Phone, Check, X } from "lucide-react"
+import { Clock, CheckCircle, XCircle, ClipboardCheck, User, Phone, Check, X, PawPrint, History } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import AnimalHistoryPanel from "@/components/dashboard/animal-history-panel"
 
 interface Consultation {
   _id: string
@@ -27,6 +30,16 @@ interface Consultation {
   createdAt: string
   doctor: any
   feedback?: string
+  animalId?: string | null
+  animalName?: string | null
+  animalType?: string | null
+  animalBreed?: string | null
+  diagnosis?: string | null
+  symptomsObserved?: string | null
+  treatmentGiven?: string | null
+  medicationDosage?: string | null
+  followUpNeeded?: boolean
+  followUpDate?: string | null
 }
 
 export default function VeterinaryConsultations({ consultations }: { consultations: Consultation[] }) {
@@ -40,16 +53,47 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
   const [actionType, setActionType] = useState<"accept" | "reject" | "complete" | null>(null)
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false)
+  const [historyAnimalId, setHistoryAnimalId] = useState<string | null>(null)
 
-  const handleStatusUpdate = async (id: string, newStatus: string, feedbackText?: string) => {
+  // Structured clinical fields — only used/shown for the "complete" action
+  const [diagnosis, setDiagnosis] = useState("")
+  const [symptomsObserved, setSymptomsObserved] = useState("")
+  const [treatmentGiven, setTreatmentGiven] = useState("")
+  const [medicationDosage, setMedicationDosage] = useState("")
+  const [followUpNeeded, setFollowUpNeeded] = useState(false)
+  const [followUpDate, setFollowUpDate] = useState("")
+
+  const resetClinicalFields = () => {
+    setDiagnosis("")
+    setSymptomsObserved("")
+    setTreatmentGiven("")
+    setMedicationDosage("")
+    setFollowUpNeeded(false)
+    setFollowUpDate("")
+  }
+
+  const handleStatusUpdate = async (
+    id: string,
+    newStatus: string,
+    feedbackText?: string,
+    clinicalNotes?: {
+      diagnosis?: string
+      symptomsObserved?: string
+      treatmentGiven?: string
+      medicationDosage?: string
+      followUpNeeded?: boolean
+      followUpDate?: string
+    }
+  ) => {
     setIsUpdating(true)
     setLoadingId(id)
     try {
-      const result = await updateConsultationStatus(id, newStatus, feedbackText || undefined)
+      const result = await updateConsultationStatus(id, newStatus, feedbackText || undefined, clinicalNotes)
       if (result.success) {
         setSelectedConsultation(null)
         setFeedback("")
         setActionType(null)
+        resetClinicalFields()
         toast({ title: t("vet.statusUpdated") })
         router.refresh()
       } else {
@@ -73,7 +117,10 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
   const submitFeedback = () => {
     if (!selectedConsultation || !actionType) return
     const newStatus = actionType === "accept" ? "accepted" : actionType === "reject" ? "rejected" : "completed"
-    handleStatusUpdate(selectedConsultation._id, newStatus, feedback)
+    const clinicalNotes = actionType === "complete"
+      ? { diagnosis, symptomsObserved, treatmentGiven, medicationDosage, followUpNeeded, followUpDate: followUpNeeded ? followUpDate : undefined }
+      : undefined
+    handleStatusUpdate(selectedConsultation._id, newStatus, feedback, clinicalNotes)
   }
 
   const statusBadge = (status: string) => {
@@ -313,6 +360,50 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
                 <p className="font-semibold text-gray-500">{t("vet.status")}</p>
                 <div className="col-span-2">{statusBadge(selectedConsultation.status)}</div>
               </div>
+              {selectedConsultation.animalId && (
+                <div className="grid grid-cols-3 gap-4 text-sm items-center">
+                  <p className="font-semibold text-gray-500">{t("vet.animal")}</p>
+                  <div className="col-span-2 flex items-center justify-between gap-2">
+                    <span className="text-gray-900 flex items-center gap-1.5 min-w-0">
+                      <PawPrint className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                      <span className="truncate">
+                        {selectedConsultation.animalName}
+                        {selectedConsultation.animalType ? ` (${selectedConsultation.animalType}${selectedConsultation.animalBreed ? ` · ${selectedConsultation.animalBreed}` : ""})` : ""}
+                      </span>
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs flex-shrink-0"
+                      onClick={() => setHistoryAnimalId(selectedConsultation.animalId!)}
+                    >
+                      <History className="h-3 w-3 mr-1" />{t("vet.viewHistory")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {(selectedConsultation.diagnosis || selectedConsultation.treatmentGiven || selectedConsultation.medicationDosage) && (
+                <div className="border-t border-gray-100 pt-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("vet.completionDetails")}</p>
+                  {[
+                    { label: t("vet.diagnosis"), value: selectedConsultation.diagnosis },
+                    { label: t("vet.symptomsObserved"), value: selectedConsultation.symptomsObserved },
+                    { label: t("vet.treatmentGiven"), value: selectedConsultation.treatmentGiven },
+                    { label: t("vet.medicationDosage"), value: selectedConsultation.medicationDosage },
+                  ].filter(row => row.value).map(({ label, value }) => (
+                    <div key={label} className="grid grid-cols-3 gap-4 text-sm">
+                      <p className="font-semibold text-gray-500">{label}</p>
+                      <p className="col-span-2 text-gray-900 break-words">{value}</p>
+                    </div>
+                  ))}
+                  {selectedConsultation.followUpNeeded && (
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <p className="font-semibold text-gray-500">{t("vet.followUpDate")}</p>
+                      <p className="col-span-2 text-gray-900">{selectedConsultation.followUpDate || "—"}</p>
+                    </div>
+                  )}
+                </div>
+              )}
               {selectedConsultation.feedback && (
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <p className="font-semibold text-gray-500">{t("vet.feedback")}</p>
@@ -345,23 +436,57 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
       </Dialog>
 
       {/* Feedback Dialog */}
-      <Dialog open={isFeedbackDialogOpen} onOpenChange={(open) => { if (!open) { setFeedback(""); setActionType(null) } setIsFeedbackDialogOpen(open) }}>
-        <DialogContent className="sm:max-w-[500px] w-11/12">
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={(open) => { if (!open) { setFeedback(""); setActionType(null); resetClinicalFields() } setIsFeedbackDialogOpen(open) }}>
+        <DialogContent className="sm:max-w-[500px] w-11/12 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {actionType === "accept" ? t("vet.acceptConsultation") : actionType === "reject" ? t("vet.rejectConsultation") : t("vet.markConsultationComplete")}
             </DialogTitle>
             <DialogDescription>{t("vet.provideFeedback")}</DialogDescription>
           </DialogHeader>
-          <div className="py-3">
-            <Label htmlFor="feedback" className="mb-2 block text-sm font-medium">{t("vet.feedbackForFarmer")}</Label>
-            <Textarea
-              id="feedback"
-              placeholder={t("vet.feedbackPlaceholder")}
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              rows={5}
-            />
+          <div className="py-3 space-y-4">
+            {actionType === "complete" && (
+              <div className="space-y-3 border-b border-gray-100 pb-4">
+                <div>
+                  <Label htmlFor="diagnosis" className="mb-1.5 block text-sm font-medium">{t("vet.diagnosis")}</Label>
+                  <Textarea id="diagnosis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} rows={2} />
+                </div>
+                <div>
+                  <Label htmlFor="symptomsObserved" className="mb-1.5 block text-sm font-medium">{t("vet.symptomsObserved")}</Label>
+                  <Textarea id="symptomsObserved" value={symptomsObserved} onChange={(e) => setSymptomsObserved(e.target.value)} rows={2} />
+                </div>
+                <div>
+                  <Label htmlFor="treatmentGiven" className="mb-1.5 block text-sm font-medium">{t("vet.treatmentGiven")}</Label>
+                  <Textarea id="treatmentGiven" value={treatmentGiven} onChange={(e) => setTreatmentGiven(e.target.value)} rows={2} />
+                </div>
+                <div>
+                  <Label htmlFor="medicationDosage" className="mb-1.5 block text-sm font-medium">{t("vet.medicationDosage")}</Label>
+                  <Textarea id="medicationDosage" value={medicationDosage} onChange={(e) => setMedicationDosage(e.target.value)} rows={2} />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <Label htmlFor="followUpNeeded" className="text-sm font-medium">{t("vet.followUpNeeded")}</Label>
+                  <Switch id="followUpNeeded" checked={followUpNeeded} onCheckedChange={setFollowUpNeeded} />
+                </div>
+                {followUpNeeded && (
+                  <div>
+                    <Label htmlFor="followUpDate" className="mb-1.5 block text-sm font-medium">{t("vet.followUpDate")}</Label>
+                    <Input id="followUpDate" type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
+                  </div>
+                )}
+              </div>
+            )}
+            <div>
+              <Label htmlFor="feedback" className="mb-2 block text-sm font-medium">
+                {actionType === "complete" ? t("vet.additionalNotesForFarmer") : t("vet.feedbackForFarmer")}
+              </Label>
+              <Textarea
+                id="feedback"
+                placeholder={t("vet.feedbackPlaceholder")}
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                rows={4}
+              />
+            </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
@@ -371,12 +496,18 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
             >
               {isUpdating ? "…" : t("vet.submit")}
             </Button>
-            <Button variant="outline" onClick={() => { setIsFeedbackDialogOpen(false); setFeedback(""); setActionType(null) }}>
+            <Button variant="outline" onClick={() => { setIsFeedbackDialogOpen(false); setFeedback(""); setActionType(null); resetClinicalFields() }}>
               {t("vet.cancel")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AnimalHistoryPanel
+        animalId={historyAnimalId}
+        open={!!historyAnimalId}
+        onOpenChange={(open) => !open && setHistoryAnimalId(null)}
+      />
     </>
   )
 }

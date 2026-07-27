@@ -109,13 +109,61 @@ export default function ConsultationDetailContent({ consultation, doctorName, fa
               </AlertDescription>
             </Alert>
           )}
-          
+
+          {(consultation.diagnosis || consultation.symptomsObserved || consultation.treatmentGiven || consultation.medicationDosage || consultation.followUpNeeded) && (
+            <div className="mb-6 rounded-lg border border-gray-200 p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-900">{t('farmer.vetNotes')}</h3>
+              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+                {consultation.diagnosis && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500">{t('farmer.diagnosis')}</dt>
+                    <dd className="mt-0.5 text-sm text-gray-900">{consultation.diagnosis}</dd>
+                  </div>
+                )}
+                {consultation.symptomsObserved && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500">{t('farmer.symptomsObserved')}</dt>
+                    <dd className="mt-0.5 text-sm text-gray-900">{consultation.symptomsObserved}</dd>
+                  </div>
+                )}
+                {consultation.treatmentGiven && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500">{t('farmer.treatmentGiven')}</dt>
+                    <dd className="mt-0.5 text-sm text-gray-900">{consultation.treatmentGiven}</dd>
+                  </div>
+                )}
+                {consultation.medicationDosage && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500">{t('farmer.medicationDosage')}</dt>
+                    <dd className="mt-0.5 text-sm text-gray-900">{consultation.medicationDosage}</dd>
+                  </div>
+                )}
+                {consultation.followUpNeeded && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500">{t('farmer.followUpDate')}</dt>
+                    <dd className="mt-0.5 text-sm text-gray-900">{consultation.followUpDate || "—"}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6">
             <div>
               <dt className="text-sm font-medium text-gray-500">{t('farmer.fullName')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.fullName}</dd>
             </div>
-            
+
+            {consultation.animalName && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500">{t('farmer.animal')}</dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {consultation.animalName}
+                  {consultation.animalType ? ` (${consultation.animalType}${consultation.animalBreed ? ` · ${consultation.animalBreed}` : ""})` : ""}
+                </dd>
+              </div>
+            )}
+
             <div>
               <dt className="text-sm font-medium text-gray-500">{t('farmer.phoneNumber')}</dt>
               <dd className="mt-1 text-sm text-gray-900">{consultation.phoneNumber}</dd>
