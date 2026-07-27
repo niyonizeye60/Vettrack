@@ -78,6 +78,7 @@ export async function getAllUsers() {
       sector: user.sector || null,
       licenseNumber: user.licenseNumber || null,
       specialization: user.specialization || null,
+      isTestAccount: user.isTestAccount || false,
     }))
   } catch (error) {
     console.error("Error fetching users:", error)
@@ -711,6 +712,7 @@ export async function updateUser(userId: string, formData: FormData) {
       email: formData.get("email"),
       phone: formData.get("phone"),
       role: formData.get("role"),
+      isTestAccount: formData.get("isTestAccount") === "on",
       updatedAt: new Date()
     }
 

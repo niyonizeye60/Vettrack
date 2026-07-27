@@ -34,6 +34,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { 
   Search, 
   MoreHorizontal, 
@@ -81,6 +82,7 @@ interface User {
   sector?: string | null
   licenseNumber?: string | null
   specialization?: string | null
+  isTestAccount?: boolean
 }
 
 interface UsersManagementProps {
@@ -741,6 +743,19 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                       <SelectItem value="superadmin">{t('superadmin.superAdmin')}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5 pr-4">
+                    <Label htmlFor="isTestAccount">{t('superadmin.testAccount') || 'Test Account'}</Label>
+                    <p className="text-xs text-gray-500">
+                      {t('superadmin.testAccountDesc') || "Exclude this account's activity from tracking and analytics"}
+                    </p>
+                  </div>
+                  <Switch
+                    id="isTestAccount"
+                    name="isTestAccount"
+                    defaultChecked={selectedUser.isTestAccount || false}
+                  />
                 </div>
                 {selectedUser.role === "farmer" && (
                   <>
