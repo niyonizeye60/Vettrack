@@ -7,7 +7,7 @@ import PortalSection from "@/components/home/portal-section"
 import CTASection from "@/components/home/cta-section"
 
 export const metadata: Metadata = {
-  title: "NTDM Animal Hospital - Track, Consult, and Care",
+  title: "NTDM Animal Hospital - Track with IoT, Consult, and Care all powered by AI",
   description:
     "Leading animal hospital in Rwanda offering tracking devices (IoT), veterinary consultations, Disease monitoring, farm management all powered by AI and animal, medicine, feeds market place.",
 }
