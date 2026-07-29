@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import {
   Loader2, DollarSign, TrendingUp, Percent, Users, FileText, CheckCircle, Clock,
   AlertTriangle, RefreshCw, Eye, Smartphone, Copy, Check, Calendar, Send,
-  ArrowUpRight, History, Wallet, Banknote, Activity, Shield, BarChart3, Filter, Store, ChevronDown, ChevronUp, CreditCard, Landmark, CheckSquare, Square
+  ArrowUpRight, History, Wallet, Banknote, Activity, Shield, BarChart3, Filter, Store, ChevronDown, ChevronUp, CreditCard, Landmark, CheckSquare, Square, ThumbsUp, ThumbsDown
 } from "lucide-react"
 import { COMMISSION_PERCENTAGE } from "@/lib/constants"
 import { useToast } from "@/hooks/use-toast"
@@ -99,7 +99,7 @@ export default function SuperAdminCommissions() {
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [payingPayout, setPayingPayout] = useState<string | null>(null)
   const [selectedPayouts, setSelectedPayouts] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<"all" | "pending" | "paid" | "sellers" | "bookings">("all")
+  const [tab, setTab] = useState<"all" | "pending" | "paid" | "sellers" | "bookings" | "withdrawals">("all")
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
   const [sendingPayout, setSendingPayout] = useState<PayoutItem | null>(null)
   const [sendingStatus, setSendingStatus] = useState<"idle" | "sending" | "success" | "error">("idle")
@@ -118,6 +118,13 @@ export default function SuperAdminCommissions() {
   const [bookingsLoading, setBookingsLoading] = useState(false)
   const [bookingStats, setBookingStats] = useState<BookingStats | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(null)
+
+  // Withdrawal state
+  const [withdrawals, setWithdrawals] = useState<any[]>([])
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false)
+  const [withdrawalStats, setWithdrawalStats] = useState<any>(null)
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState<any>(null)
+  const [withdrawalDetailOpen, setWithdrawalDetailOpen] = useState(false)
 
   // IntouchPay gateway balance
   const [gatewayBalance, setGatewayBalance] = useState<{ balance: number; success: boolean; loading: boolean }>({
@@ -254,10 +261,66 @@ export default function SuperAdminCommissions() {
 
   useEffect(() => { fetchBookings() }, [fetchBookings])
 
+  const fetchWithdrawals = useCallback(async () => {
+    setWithdrawalsLoading(true)
+    try {
+      const res = await fetch("/api/withdrawals?admin=true")
+      const data = await res.json()
+      if (res.ok) {
+        setWithdrawals(data.withdrawals || [])
+        setWithdrawalStats(data.stats)
+      }
+    } catch {
+      console.error("Failed to fetch withdrawals")
+    } finally {
+      setWithdrawalsLoading(false)
+    }
+  }, [])
+
+  const handleApproveWithdrawal = async (withdrawalId: string, sendMoney: boolean = true) => {
+    try {
+      const res = await fetch("/api/withdrawals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ withdrawalId, status: "completed", sendMoney }),
+      })
+      if (res.ok) {
+        toast({ title: "✅ Withdrawal approved", description: "Seller withdrawal has been approved and payment sent" })
+        await fetchWithdrawals()
+      } else {
+        const data = await res.json()
+        toast({ title: "Error", description: data.error || "Failed to approve", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" })
+    }
+  }
+
+  const handleRejectWithdrawal = async (withdrawalId: string, note?: string) => {
+    const reason = note || window.prompt("Reason for rejection:")
+    if (!reason) return
+    try {
+      const res = await fetch("/api/withdrawals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ withdrawalId, status: "rejected", adminNote: reason }),
+      })
+      if (res.ok) {
+        toast({ title: "Withdrawal rejected", description: reason })
+        await fetchWithdrawals()
+      } else {
+        toast({ title: "Error", description: "Failed to reject", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" })
+    }
+  }
+
   useEffect(() => {
     if (tab === "sellers") fetchSellers()
     if (tab === "bookings") fetchBookings()
-  }, [tab, fetchSellers, fetchBookings])
+    if (tab === "withdrawals") fetchWithdrawals()
+  }, [tab, fetchSellers, fetchBookings, fetchWithdrawals])
 
   const handleMarkPaid = async (payoutId: string) => {
     setPayingPayout(payoutId)
@@ -720,10 +783,19 @@ export default function SuperAdminCommissions() {
           <Calendar className="h-3.5 w-3.5" />
           Bookings ({bookings.length})
         </button>
+        <button
+          onClick={() => setTab("withdrawals")}
+          className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
+            tab === "withdrawals" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <Wallet className="h-3.5 w-3.5" />
+          Withdrawals ({withdrawals.length})
+        </button>
       </div>
 
       {/* Product Payouts Table */}
-      {tab !== "bookings" && (
+      {tab !== "bookings" && tab !== "withdrawals" && (
         <Card className="border border-gray-200 shadow-sm">
           <CardContent className="p-0">
             {displayPayouts.length === 0 ? (
@@ -1071,6 +1143,142 @@ export default function SuperAdminCommissions() {
         </div>
       )}
 
+      {/* Withdrawals Tab */}
+      {tab === "withdrawals" && (
+        <div className="space-y-4">
+          {/* Withdrawal Stats */}
+          {withdrawalStats && (
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-orange-50 via-white to-white">
+                <CardContent className="p-4">
+                  <p className="text-xs text-gray-500 font-medium">Pending Withdrawals</p>
+                  <p className="text-2xl font-bold text-orange-600 mt-1">{withdrawalStats.pending}</p>
+                  <p className="text-xs text-gray-400">RWF {withdrawalStats.pendingAmount?.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-blue-50 via-white to-white">
+                <CardContent className="p-4">
+                  <p className="text-xs text-gray-500 font-medium">Approved</p>
+                  <p className="text-2xl font-bold text-blue-600 mt-1">{withdrawalStats.approved}</p>
+                  <p className="text-xs text-gray-400">RWF {withdrawalStats.approvedAmount?.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-green-50 via-white to-white">
+                <CardContent className="p-4">
+                  <p className="text-xs text-gray-500 font-medium">Completed</p>
+                  <p className="text-2xl font-bold text-green-600 mt-1">{withdrawalStats.completed}</p>
+                  <p className="text-xs text-gray-400">RWF {withdrawalStats.completedAmount?.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card className="border border-gray-200 shadow-sm">
+                <CardContent className="p-4">
+                  <p className="text-xs text-gray-500 font-medium">Total Withdrawn</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">
+                    RWF {((withdrawalStats.completedAmount || 0) + (withdrawalStats.approvedAmount || 0)).toLocaleString()}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Withdrawals List */}
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-0">
+              {withdrawalsLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : withdrawals.length === 0 ? (
+                <div className="text-center py-16">
+                  <Wallet className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-1">No withdrawals requested</h3>
+                  <p className="text-sm text-gray-500">Sellers haven't requested any withdrawals yet.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {/* Desktop header */}
+                  <div className="hidden md:grid md:grid-cols-12 gap-3 px-6 py-3 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="md:col-span-2">Seller</div>
+                    <div className="md:col-span-1">Amount</div>
+                    <div className="md:col-span-2">Status</div>
+                    <div className="md:col-span-2">Date</div>
+                    <div className="md:col-span-2">Note</div>
+                    <div className="md:col-span-3 text-right">Actions</div>
+                  </div>
+
+                  {withdrawals.map((w: any) => (
+                    <div
+                      key={w._id}
+                      className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 px-4 md:px-6 py-4 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="md:col-span-2">
+                        <p className="text-sm font-medium text-gray-900">{w.sellerName}</p>
+                        <p className="text-xs text-gray-500">{w.sellerPhone}</p>
+                      </div>
+                      <div className="md:col-span-1">
+                        <p className="text-sm font-semibold text-blue-600">RWF {w.amount?.toLocaleString()}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Badge className={
+                          w.status === "completed" ? "bg-green-100 text-green-800" :
+                          w.status === "approved" ? "bg-blue-100 text-blue-800" :
+                          w.status === "rejected" ? "bg-red-100 text-red-800" :
+                          "bg-yellow-100 text-yellow-800"
+                        }>
+                          {w.status === "completed" ? <><CheckCircle className="h-3 w-3 mr-1" /> Completed</> :
+                           w.status === "approved" ? <><CheckCircle className="h-3 w-3 mr-1" /> Approved</> :
+                           w.status === "rejected" ? <><AlertTriangle className="h-3 w-3 mr-1" /> Rejected</> :
+                           <><Clock className="h-3 w-3 mr-1" /> Pending</>}
+                        </Badge>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-sm text-gray-700">{formatDate(w.createdAt)}</p>
+                        {w.processedAt && (
+                          <p className="text-xs text-gray-400">Processed: {formatDate(w.processedAt)}</p>
+                        )}
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-sm text-gray-700 truncate max-w-[160px]">{w.note || w.adminNote || "—"}</p>
+                      </div>
+                      <div className="md:col-span-3 flex items-center justify-end gap-1.5">
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          setSelectedWithdrawal(w)
+                          setWithdrawalDetailOpen(true)
+                        }} title="View details">
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          View
+                        </Button>
+                        {w.status === "pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-xs"
+                              onClick={() => handleApproveWithdrawal(w._id, true)}
+                            >
+                              <ThumbsUp className="h-3 w-3 mr-1" />
+                              Approve & Send
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 border-red-300 hover:bg-red-50 text-xs"
+                              onClick={() => handleRejectWithdrawal(w._id)}
+                            >
+                              <ThumbsDown className="h-3 w-3 mr-1" />
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Seller Detail Dialog */}
       <Dialog open={sellerDetailOpen} onOpenChange={(open) => { if (!open) setSellerDetailOpen(false) }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -1286,6 +1494,102 @@ export default function SuperAdminCommissions() {
                         Send Money
                       </Button>
                     )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdrawal Detail Dialog */}
+      <Dialog open={withdrawalDetailOpen} onOpenChange={(open) => { if (!open) setWithdrawalDetailOpen(false) }}>
+        <DialogContent className="max-w-md">
+          {selectedWithdrawal && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-gray-500" />
+                  Withdrawal Details
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className={`p-4 rounded-lg border ${
+                  selectedWithdrawal.status === "completed" ? "bg-green-50 border-green-200" :
+                  selectedWithdrawal.status === "approved" ? "bg-blue-50 border-blue-200" :
+                  selectedWithdrawal.status === "rejected" ? "bg-red-50 border-red-200" :
+                  "bg-yellow-50 border-yellow-200"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {selectedWithdrawal.status === "completed" ? (
+                        <><CheckCircle className="h-5 w-5 text-green-600" /><span className="font-semibold text-green-800">Completed</span></>
+                      ) : selectedWithdrawal.status === "approved" ? (
+                        <><CheckCircle className="h-5 w-5 text-blue-600" /><span className="font-semibold text-blue-800">Approved</span></>
+                      ) : selectedWithdrawal.status === "rejected" ? (
+                        <><AlertTriangle className="h-5 w-5 text-red-600" /><span className="font-semibold text-red-800">Rejected</span></>
+                      ) : (
+                        <><Clock className="h-5 w-5 text-yellow-600" /><span className="font-semibold text-yellow-800">Pending</span></>
+                      )}
+                    </div>
+                    <span className="text-lg font-bold text-gray-900">
+                      RWF {selectedWithdrawal.amount?.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Seller</h4>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Name:</span>
+                    <span className="font-medium">{selectedWithdrawal.sellerName}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Phone:</span>
+                    <span className="font-medium">{selectedWithdrawal.sellerPhone}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Requested:</span>
+                    <span className="font-medium">{formatDate(selectedWithdrawal.createdAt)}</span>
+                  </div>
+                  {selectedWithdrawal.processedAt && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Processed:</span>
+                      <span className="font-medium">{formatDate(selectedWithdrawal.processedAt)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {selectedWithdrawal.note && (
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-1">
+                    <h4 className="text-sm font-semibold text-gray-900">Seller Note</h4>
+                    <p className="text-sm text-gray-600">{selectedWithdrawal.note}</p>
+                  </div>
+                )}
+
+                {selectedWithdrawal.adminNote && (
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-1">
+                    <h4 className="text-sm font-semibold text-gray-900">Admin Note</h4>
+                    <p className="text-sm text-gray-600">{selectedWithdrawal.adminNote}</p>
+                  </div>
+                )}
+
+                {selectedWithdrawal.status === "pending" && (
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      onClick={() => { setWithdrawalDetailOpen(false); handleApproveWithdrawal(selectedWithdrawal._id, true) }}
+                    >
+                      <ThumbsUp className="h-4 w-4 mr-2" />
+                      Approve & Send
+                    </Button>
+                    <Button
+                      className="flex-1 bg-red-600 hover:bg-red-700"
+                      onClick={() => { setWithdrawalDetailOpen(false); handleRejectWithdrawal(selectedWithdrawal._id) }}
+                    >
+                      <ThumbsDown className="h-4 w-4 mr-2" />
+                      Reject
+                    </Button>
                   </div>
                 )}
               </div>
