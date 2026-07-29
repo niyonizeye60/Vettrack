@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import {
   Loader2, DollarSign, TrendingUp, Percent, Users, FileText, CheckCircle, Clock,
   AlertTriangle, RefreshCw, Eye, Smartphone, Copy, Check, Calendar, Send,
-  ArrowUpRight, History, Wallet, Banknote, Activity, Shield, BarChart3, Filter, Store, ChevronDown, ChevronUp, CreditCard, Landmark
+  ArrowUpRight, History, Wallet, Banknote, Activity, Shield, BarChart3, Filter, Store, ChevronDown, ChevronUp, CreditCard, Landmark, CheckSquare, Square
 } from "lucide-react"
 import { COMMISSION_PERCENTAGE } from "@/lib/constants"
 import { useToast } from "@/hooks/use-toast"
@@ -98,6 +98,7 @@ export default function SuperAdminCommissions() {
   const [selectedPayout, setSelectedPayout] = useState<PayoutItem | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [payingPayout, setPayingPayout] = useState<string | null>(null)
+  const [selectedPayouts, setSelectedPayouts] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<"all" | "pending" | "paid" | "sellers" | "bookings">("all")
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
   const [sendingPayout, setSendingPayout] = useState<PayoutItem | null>(null)
@@ -317,6 +318,42 @@ export default function SuperAdminCommissions() {
     setSendDialogOpen(true)
   }
 
+  const handleSendSelected = async () => {
+    const selected = Array.from(selectedPayouts)
+    if (selected.length === 0) return
+    const selectedTotal = selected.reduce((sum, id) => {
+      const p = [...pendingPayouts, ...recentPayouts].find(pp => pp._id === id)
+      return sum + (p?.sellerAmount || 0)
+    }, 0)
+    const confirmed = window.confirm(
+      `Send RWF ${selectedTotal.toLocaleString()} to ${selected.length} selected seller(s)?`
+    )
+    if (!confirmed) return
+
+    let sent = 0
+    let failed = 0
+    for (const payoutId of selected) {
+      try {
+        const res = await fetch("/api/payouts/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payoutId }),
+        })
+        if (res.ok) sent++
+        else failed++
+      } catch {
+        failed++
+      }
+    }
+    toast({
+      title: "Bulk Send Complete",
+      description: `Sent: ${sent}, Failed: ${failed}`,
+      variant: failed > 0 ? "destructive" : "default",
+    })
+    setSelectedPayouts(new Set())
+    await fetchData()
+  }
+
   const handleSendAllPending = async () => {
     if (pendingPayouts.length === 0) return
     const confirmed = window.confirm(
@@ -345,7 +382,25 @@ export default function SuperAdminCommissions() {
       description: `Sent: ${sent}, Failed: ${failed}`,
       variant: failed > 0 ? "destructive" : "default",
     })
+    setSelectedPayouts(new Set())
     await fetchData()
+  }
+
+  const togglePayoutSelection = (id: string) => {
+    setSelectedPayouts(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedPayouts.size === displayPayouts.filter(p => p.status === "pending").length && selectedPayouts.size > 0) {
+      setSelectedPayouts(new Set())
+    } else {
+      setSelectedPayouts(new Set(displayPayouts.filter(p => p.status === "pending").map(p => p._id)))
+    }
   }
 
   const copyToClipboard = (text: string, field: string) => {
@@ -446,6 +501,16 @@ export default function SuperAdminCommissions() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedPayouts.size > 0 && (
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handleSendSelected}
+            >
+              <Send className="h-3.5 w-3.5 mr-1.5" />
+              Send Selected ({selectedPayouts.size})
+            </Button>
+          )}
           {pendingPayouts.length > 0 && (
             <Button
               size="sm"
@@ -673,7 +738,12 @@ export default function SuperAdminCommissions() {
               <div className="divide-y divide-gray-100">
                 {/* Table Header - Desktop */}
                 <div className="hidden md:grid md:grid-cols-12 gap-3 px-6 py-3 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <div className="md:col-span-3">Seller</div>
+                  <div className="md:col-span-1 flex items-center">
+                    <button onClick={toggleSelectAll} className="p-1 hover:bg-gray-200 rounded transition-colors" title="Select all pending">
+                      {selectedPayouts.size > 0 ? <CheckSquare className="h-4 w-4 text-blue-600" /> : <Square className="h-4 w-4 text-gray-400" />}
+                    </button>
+                  </div>
+                  <div className="md:col-span-2">Seller</div>
                   <div className="md:col-span-2">Item</div>
                   <div className="md:col-span-2">Commission</div>
                   <div className="md:col-span-2">Status</div>
@@ -683,9 +753,22 @@ export default function SuperAdminCommissions() {
                 {displayPayouts.map((payout) => (
                   <div
                     key={payout._id}
-                    className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 px-4 md:px-6 py-4 hover:bg-gray-50 transition-colors"
+                    className={`grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-3 px-4 md:px-6 py-4 hover:bg-gray-50 transition-colors ${selectedPayouts.has(payout._id) ? 'bg-blue-50' : ''}`}
                   >
-                    <div className="md:col-span-3">
+                    <div className="md:col-span-1 flex items-center">
+                      <button
+                        onClick={() => togglePayoutSelection(payout._id)}
+                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                        disabled={payout.status !== "pending"}
+                      >
+                        {selectedPayouts.has(payout._id) ? (
+                          <CheckSquare className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <Square className={`h-4 w-4 ${payout.status === "pending" ? "text-gray-400" : "text-gray-200"}`} />
+                        )}
+                      </button>
+                    </div>
+                    <div className="md:col-span-2">
                       <p className="text-sm font-medium text-gray-900">{payout.sellerName}</p>
                       <button
                         onClick={() => copyToClipboard(payout.sellerPhone, `phone-${payout._id}`)}
