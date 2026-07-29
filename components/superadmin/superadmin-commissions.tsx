@@ -137,6 +137,21 @@ export default function SuperAdminCommissions() {
   const [commissionInput, setCommissionInput] = useState<string>(String(COMMISSION_PERCENTAGE))
   const [savingCommission, setSavingCommission] = useState(false)
 
+  // Wallet actions state
+  const [directSendOpen, setDirectSendOpen] = useState(false)
+  const [depositOpen, setDepositOpen] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [walletActionAmount, setWalletActionAmount] = useState("")
+  const [walletActionPhone, setWalletActionPhone] = useState("")
+  const [walletActionName, setWalletActionName] = useState("")
+  const [walletActionDesc, setWalletActionDesc] = useState("")
+  const [walletActionRef, setWalletActionRef] = useState("")
+  const [walletProcessing, setWalletProcessing] = useState(false)
+  const [walletResult, setWalletResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [walletTxns, setWalletTxns] = useState<any[]>([])
+  const [walletTxnStats, setWalletTxnStats] = useState<any>(null)
+  const [walletTxnOpen, setWalletTxnOpen] = useState(false)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -186,6 +201,61 @@ export default function SuperAdminCommissions() {
     }
   }, [])
 
+  const handleWalletAction = async (action: "deposit" | "direct_send" | "withdraw") => {
+    const amount = Number(walletActionAmount)
+    if (!amount || amount <= 0) {
+      toast({ title: "Invalid amount", description: "Enter a valid amount", variant: "destructive" })
+      return
+    }
+    if ((action === "direct_send" || action === "withdraw") && !walletActionPhone) {
+      toast({ title: "Phone required", description: "Enter a recipient phone number", variant: "destructive" })
+      return
+    }
+
+    setWalletProcessing(true)
+    setWalletResult(null)
+    try {
+      const res = await fetch("/api/admin/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          amount,
+          recipientPhone: walletActionPhone,
+          recipientName: walletActionName || undefined,
+          description: walletActionDesc || undefined,
+          reference: walletActionRef || undefined,
+        }),
+      })
+      const data = await res.json()
+      setWalletResult({ success: res.ok, message: data.message || data.error || "Done" })
+      if (res.ok) {
+        toast({ title: action === "deposit" ? "✅ Deposit Recorded" : action === "direct_send" ? "✅ Money Sent!" : "✅ Withdrawal Complete", description: data.message })
+        // Reset & close after success
+        setTimeout(() => {
+          setWalletActionAmount("")
+          setWalletActionPhone("")
+          setWalletActionName("")
+          setWalletActionDesc("")
+          setWalletActionRef("")
+          setWalletResult(null)
+          if (action === "deposit") setDepositOpen(false)
+          else if (action === "direct_send") setDirectSendOpen(false)
+          else setWithdrawOpen(false)
+          fetchGatewayBalance()
+          fetchWalletTransactions()
+        }, 1500)
+      } else {
+        toast({ title: "Error", description: data.error || "Failed", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" })
+      setWalletResult({ success: false, message: "Network error" })
+    } finally {
+      setWalletProcessing(false)
+    }
+  }
+
   const handleSaveCommission = async () => {
     const val = Number(commissionInput)
     if (isNaN(val) || val < 0 || val > 100) {
@@ -213,9 +283,23 @@ export default function SuperAdminCommissions() {
     }
   }
 
+  const fetchWalletTransactions = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/wallet")
+      const data = await res.json()
+      if (res.ok) {
+        setWalletTxns(data.transactions || [])
+        setWalletTxnStats(data.stats)
+      }
+    } catch {
+      console.error("Failed to fetch wallet transactions")
+    }
+  }, [])
+
   useEffect(() => { fetchData() }, [fetchData])
   useEffect(() => { fetchGatewayBalance() }, [fetchGatewayBalance])
   useEffect(() => { fetchSettings() }, [fetchSettings])
+  useEffect(() => { fetchWalletTransactions() }, [fetchWalletTransactions])
 
   const fetchSellers = useCallback(async () => {
     setSellersLoading(true)
@@ -584,6 +668,30 @@ export default function SuperAdminCommissions() {
               Send All Pending (RWF {totalPendingAmount.toLocaleString()})
             </Button>
           )}
+          <Button
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => { setWalletActionAmount(""); setWalletActionPhone(""); setWalletActionDesc(""); setWalletActionRef(""); setWalletResult(null); setDepositOpen(true) }}
+          >
+            <Banknote className="h-3.5 w-3.5 mr-1.5" />
+            Deposit
+          </Button>
+          <Button
+            size="sm"
+            className="bg-purple-600 hover:bg-purple-700"
+            onClick={() => { setWalletActionAmount(""); setWalletActionPhone(""); setWalletActionName(""); setWalletActionDesc(""); setWalletResult(null); setDirectSendOpen(true) }}
+          >
+            <Send className="h-3.5 w-3.5 mr-1.5" />
+            Direct Send
+          </Button>
+          <Button
+            size="sm"
+            className="bg-red-600 hover:bg-red-700"
+            onClick={() => { setWalletActionAmount(""); setWalletActionPhone(""); setWalletActionName(""); setWalletActionDesc(""); setWalletResult(null); setWithdrawOpen(true) }}
+          >
+            <ArrowUpRight className="h-3.5 w-3.5 mr-1.5" />
+            Withdraw
+          </Button>
           <Button variant="outline" size="sm" onClick={() => { fetchData(); if (tab === "bookings") fetchBookings() }}>
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
           </Button>
@@ -687,6 +795,41 @@ export default function SuperAdminCommissions() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Wallet Activity Summary */}
+      {walletTxnStats && (
+        <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-gray-50 via-white to-white">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-gray-500" />
+                <p className="text-sm font-semibold text-gray-700">Wallet Activity</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setWalletTxnOpen(true)} className="text-xs">
+                <Eye className="h-3 w-3 mr-1" />
+                View History
+              </Button>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Deposits</p>
+                <p className="text-lg font-bold text-emerald-600">RWF {walletTxnStats.totalDeposits?.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">{walletTxnStats.deposits?.count || 0} transactions</p>
+              </div>
+              <div className="text-center border-x border-gray-200">
+                <p className="text-xs text-gray-500">Direct Sends</p>
+                <p className="text-lg font-bold text-purple-600">RWF {walletTxnStats.totalDirectSends?.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">{walletTxnStats.directSends?.count || 0} transactions</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-500">Withdrawals</p>
+                <p className="text-lg font-bold text-red-600">RWF {walletTxnStats.totalWithdrawals?.toLocaleString()}</p>
+                <p className="text-xs text-gray-400">{walletTxnStats.withdrawals?.count || 0} transactions</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Commission Config Card */}
       <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-orange-50 via-white to-white">
@@ -1731,6 +1874,256 @@ export default function SuperAdminCommissions() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Wallet History Dialog */}
+      <Dialog open={walletTxnOpen} onOpenChange={(open) => { if (!open) setWalletTxnOpen(false) }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-gray-500" />
+              Wallet Transaction History
+            </DialogTitle>
+            <DialogDescription>
+              All deposits, direct sends, and withdrawals recorded on the platform
+            </DialogDescription>
+          </DialogHeader>
+          {walletTxns.length === 0 ? (
+            <div className="text-center py-8">
+              <Activity className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-500">No wallet transactions yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {/* Header */}
+              <div className="hidden md:grid md:grid-cols-12 gap-3 px-2 py-3 text-xs font-medium text-gray-500 uppercase">
+                <div className="md:col-span-3">Date</div>
+                <div className="md:col-span-2">Type</div>
+                <div className="md:col-span-2">Amount</div>
+                <div className="md:col-span-3">Description</div>
+                <div className="md:col-span-2">By</div>
+              </div>
+              {walletTxns.map((txn: any) => (
+                <div key={txn._id} className="grid grid-cols-1 md:grid-cols-12 gap-1 md:gap-3 px-2 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="md:col-span-3 text-sm text-gray-600">{formatDate(txn.createdAt)}</div>
+                  <div className="md:col-span-2">
+                    <Badge className={
+                      txn.type === "deposit" ? "bg-emerald-100 text-emerald-800" :
+                      txn.type === "direct_send" ? "bg-purple-100 text-purple-800" :
+                      "bg-red-100 text-red-800"
+                    }>
+                      {txn.type === "deposit" ? "Deposit" : txn.type === "direct_send" ? "Direct Send" : "Withdraw"}
+                    </Badge>
+                  </div>
+                  <div className="md:col-span-2 text-sm font-semibold text-gray-900">RWF {txn.amount?.toLocaleString()}</div>
+                  <div className="md:col-span-3 text-sm text-gray-600 truncate" title={txn.description}>{txn.description || "—"}</div>
+                  <div className="md:col-span-2 text-sm text-gray-500">{txn.initiatedByName}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWalletTxnOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Wallet Action — Direct Send Dialog */}
+      <Dialog open={directSendOpen} onOpenChange={(open) => { if (!open) setDirectSendOpen(false) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-purple-600" />
+              Direct Send — Send Money to Any Phone
+            </DialogTitle>
+            <DialogDescription>
+              Send money directly from the IntouchPay account to any mobile money number
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Recipient Phone Number *</label>
+              <Input
+                placeholder="e.g. 0784086021 or +250784086021"
+                value={walletActionPhone}
+                onChange={(e) => setWalletActionPhone(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Recipient Name (optional)</label>
+              <Input
+                placeholder="e.g. John Farmer"
+                value={walletActionName}
+                onChange={(e) => setWalletActionName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Amount (RWF) *</label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="e.g. 10000"
+                value={walletActionAmount}
+                onChange={(e) => setWalletActionAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Description (optional)</label>
+              <Input
+                placeholder="e.g. Payment for veterinary consultation"
+                value={walletActionDesc}
+                onChange={(e) => setWalletActionDesc(e.target.value)}
+              />
+            </div>
+            {walletResult && (
+              <div className={`p-3 rounded-lg text-sm ${walletResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                {walletResult.message}
+              </div>
+            )}
+            <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
+              <p>💡 Money is sent via <strong>IntouchPay RequestDeposit</strong> to the recipient's mobile money. Ensure the phone number is correct.</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setDirectSendOpen(false); setWalletResult(null) }}>Cancel</Button>
+            <Button
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={() => handleWalletAction("direct_send")}
+              disabled={walletProcessing || !walletActionPhone || !walletActionAmount}
+            >
+              {walletProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+              {walletProcessing ? "Sending..." : `Send RWF ${Number(walletActionAmount || 0).toLocaleString()}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Wallet Action — Deposit Dialog */}
+      <Dialog open={depositOpen} onOpenChange={(open) => { if (!open) setDepositOpen(false) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-emerald-600" />
+              Record Manual Deposit
+            </DialogTitle>
+            <DialogDescription>
+              Record money that has been deposited into the platform wallet (e.g. bank transfer, cash)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Amount (RWF) *</label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="e.g. 500000"
+                value={walletActionAmount}
+                onChange={(e) => setWalletActionAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Reference (optional)</label>
+              <Input
+                placeholder="e.g. Bank transfer ref #1234"
+                value={walletActionRef}
+                onChange={(e) => setWalletActionRef(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Description (optional)</label>
+              <Input
+                placeholder="e.g. Top up from Equity Bank"
+                value={walletActionDesc}
+                onChange={(e) => setWalletActionDesc(e.target.value)}
+              />
+            </div>
+            {walletResult && (
+              <div className={`p-3 rounded-lg text-sm ${walletResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                {walletResult.message}
+              </div>
+            )}
+            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-800">
+              <p>📋 This records a deposit for tracking purposes. The actual money must be deposited into the IntouchPay account separately (bank transfer, etc.).</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setDepositOpen(false); setWalletResult(null) }}>Cancel</Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => handleWalletAction("deposit")}
+              disabled={walletProcessing || !walletActionAmount}
+            >
+              {walletProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Banknote className="h-4 w-4 mr-2" />}
+              {walletProcessing ? "Recording..." : `Record RWF ${Number(walletActionAmount || 0).toLocaleString()}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Wallet Action — Withdraw Dialog */}
+      <Dialog open={withdrawOpen} onOpenChange={(open) => { if (!open) setWithdrawOpen(false) }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowUpRight className="h-5 w-5 text-red-600" />
+              Withdraw from Platform Wallet
+            </DialogTitle>
+            <DialogDescription>
+              Withdraw money from the IntouchPay account to your personal mobile money number
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Your Phone Number *</label>
+              <Input
+                placeholder="e.g. 0784086021"
+                value={walletActionPhone}
+                onChange={(e) => setWalletActionPhone(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Amount (RWF) *</label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="e.g. 50000"
+                value={walletActionAmount}
+                onChange={(e) => setWalletActionAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Description (optional)</label>
+              <Input
+                placeholder="e.g. Monthly platform revenue withdrawal"
+                value={walletActionDesc}
+                onChange={(e) => setWalletActionDesc(e.target.value)}
+              />
+            </div>
+            {walletResult && (
+              <div className={`p-3 rounded-lg text-sm ${walletResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                {walletResult.message}
+              </div>
+            )}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
+              <p className="font-medium flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                This sends money from IntouchPay to your phone
+              </p>
+              <p className="mt-1">Money is sent via IntouchPay RequestDeposit. Ensure the phone number is correct. This will reduce the IntouchPay account balance.</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setWithdrawOpen(false); setWalletResult(null) }}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => handleWalletAction("withdraw")}
+              disabled={walletProcessing || !walletActionPhone || !walletActionAmount}
+            >
+              {walletProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowUpRight className="h-4 w-4 mr-2" />}
+              {walletProcessing ? "Processing..." : `Withdraw RWF ${Number(walletActionAmount || 0).toLocaleString()}`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
