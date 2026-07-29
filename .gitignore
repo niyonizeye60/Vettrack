@@ -26,6 +26,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# logs
+server.log
+
 # user config
 SUPERADMIN_README.md
 SUPERADMIN_SETUP.md

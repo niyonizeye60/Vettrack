@@ -4,17 +4,16 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
+import SearchBar from "@/components/search/search-bar"
 
 const reviewImages = [
   "/reviews/rev1.jpg",
   "/reviews/rev2.png",
-  // "/reviews/review3.jpg",
-  // "/reviews/review4.jpg",
-  // Add more as needed
 ]
 
 export default function HeroSection() {
   const { t } = useLanguage()
+
   return (
     <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
       <div className="absolute inset-0 z-0">
@@ -29,18 +28,26 @@ export default function HeroSection() {
       </div>
 
       <div className="container-custom relative z-10">
-        <div className="max-w-2xl text-white">
+        <div className="max-w-2xl text-white mx-auto text-center">
           <h1 className="text-5xl md:text-4xl lg:text-5xl font-extrabold mb-6 leading-tight">
             {t('home.hero.titleStart')}{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
               {t('home.hero.titleEnd')}
             </span>
           </h1>
-          <p className="text-xl md:text-2xl mb-8 text-gray-200 leading-relaxed">
+          <p className="text-xl md:text-2xl mb-10 text-gray-200 leading-relaxed">
             {t('home.hero.subtitle')}
           </p>
 
-          <div className="flex flex-wrap gap-4">
+          {/* Real-time Search with live results sorted by distance */}
+          <div className="max-w-xl mx-auto mb-10">
+            <SearchBar variant="hero" />
+            <p className="text-xs text-white/40 mt-2 text-left">
+              Type to search — results appear in real-time, sorted by nearest location
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-4 justify-center">
             <Button asChild size="lg" className="text-lg px-8 py-4">
               <Link href="/booking">{t('home.hero.bookConsultation')}</Link>
             </Button>
@@ -55,7 +62,7 @@ export default function HeroSection() {
             </Button>
           </div>
 
-          <div className="mt-12 flex items-center space-x-4">
+          <div className="mt-12 flex items-center justify-center space-x-4">
             <div className="flex -space-x-2">
               {reviewImages.map((src, i) => (
                 <div key={i} className="w-12 h-12 rounded-full border-2 border-white overflow-hidden">

@@ -10,6 +10,7 @@ export default function CheckoutCallbackPage() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<OrderPaymentStatus | "loading">("loading")
   const [total, setTotal] = useState<number | undefined>(undefined)
+  const [orderId, setOrderId] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     const orderId = searchParams.get("OrderMerchantReference")
@@ -17,6 +18,8 @@ export default function CheckoutCallbackPage() {
       setStatus("failed")
       return
     }
+
+    setOrderId(orderId)
 
     const verify = async () => {
       try {
@@ -52,7 +55,7 @@ export default function CheckoutCallbackPage() {
               <Loader2 className="h-10 w-10 text-primary mx-auto animate-spin" />
             </div>
           ) : (
-            <OrderResult status={status} total={total} />
+            <OrderResult status={status} total={total} orderId={orderId} />
           )}
         </div>
       </div>

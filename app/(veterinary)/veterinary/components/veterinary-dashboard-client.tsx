@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { updateConsultationStatus } from "@/lib/actions"
 import { getRecentMessagesData } from "@/lib/actions/veterinary-dashboard"
 import AnnouncementsBanner from "@/components/ui/announcements-banner"
+import SellerEarnings from "@/components/seller/seller-earnings"
 
 const RECENT_MESSAGES_POLL_MS = 4000
 
@@ -293,6 +294,9 @@ export default function VeterinaryDashboardClient({
             </CardContent>
           </Card>
         </div>
+
+        {/* Seller Earnings */}
+        <SellerEarnings />
 
       </div>
     </div>

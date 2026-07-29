@@ -22,7 +22,7 @@ interface TransactionQuery {
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    if (!user || !["admin", "superadmin"].includes(user.role)) {
+    if (!user || user.role !== "superadmin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

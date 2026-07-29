@@ -15,7 +15,12 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Plus, Edit, Trash2, Eye, Calendar, DollarSign, Pill, Wheat, Search, MapPin, Tag } from "lucide-react"
+import { FileText, Plus, Edit, Trash2, Eye, Calendar, DollarSign, Pill, Wheat, Search, MapPin, Tag, Crosshair, Navigation, Smartphone, Percent } from "lucide-react"
+import dynamic from "next/dynamic"
+
+// Dynamic import for LocationPicker (Leaflet only loads on client)
+const LocationPicker = dynamic(() => import("@/components/services/location-picker"), { ssr: false })
+import { COMMISSION_PERCENTAGE } from "@/lib/constants"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AdminProductCard from "@/components/admin/admin-product-card"
 
@@ -39,6 +44,10 @@ interface Service {
   village?: string
   sellerPhone?: string
   sellerEmail?: string
+  // Location fields
+  latitude?: number | null
+  longitude?: number | null
+  sellerName?: string
   // Drug fields
   drugType?: string
   usageDescription?: string
@@ -46,6 +55,8 @@ interface Service {
   feedType?: string
   quality?: string
   targetAnimal?: string
+  // Commission
+  commissionPercentage?: number
 }
 
 interface Category {
@@ -110,15 +121,21 @@ export default function AdminContentManagement() {
     district: '',
     sector: '',
     village: '',
-    sellerPhone: '',
+    sellerName: '',
+    sellerPhone: '0784086021',
     sellerEmail: '',
-    // Drug fields
+    // Location fields      latitude: null as number | null,
+      longitude: null as number | null,
+      sellerPhone: '0784086021',
+      // Drug fields
     drugType: '',
     usageDescription: '',
     // Feed fields
     feedType: '',
     quality: '',
-    targetAnimal: ''
+    targetAnimal: '',
+    // Commission
+    commissionPercentage: ''
   })
   const [categoryFormData, setCategoryFormData] = useState({
     name: '',
@@ -320,6 +337,10 @@ export default function AdminContentManagement() {
       duration: service.duration,
       image: service.image,
       categoryId: service.categoryId,
+      latitude: service.latitude ?? null,
+      longitude: service.longitude ?? null,
+      sellerName: service.sellerName || '',
+      sellerPhone: service.sellerPhone || '',
       animalType: service.animalType || '',
       breed: service.breed || '',
       age: service.age || '',
@@ -327,13 +348,13 @@ export default function AdminContentManagement() {
       district: service.district || '',
       sector: service.sector || '',
       village: service.village || '',
-      sellerPhone: service.sellerPhone || '',
       sellerEmail: service.sellerEmail || '',
       drugType: service.drugType || '',
       usageDescription: service.usageDescription || '',
       feedType: service.feedType || '',
       quality: service.quality || '',
-      targetAnimal: service.targetAnimal || ''
+      targetAnimal: service.targetAnimal || '',
+      commissionPercentage: service.commissionPercentage?.toString() || ''
     })
     setIsEditServiceOpen(true)
   }
@@ -346,6 +367,10 @@ export default function AdminContentManagement() {
       duration: '',
       image: '',
       categoryId: '',
+      latitude: null as number | null,
+      longitude: null as number | null,
+      sellerName: '',
+      sellerPhone: '0784086021',
       animalType: '',
       breed: '',
       age: '',
@@ -353,13 +378,13 @@ export default function AdminContentManagement() {
       district: '',
       sector: '',
       village: '',
-      sellerPhone: '',
       sellerEmail: '',
       drugType: '',
       usageDescription: '',
       feedType: '',
       quality: '',
-      targetAnimal: ''
+      targetAnimal: '',
+      commissionPercentage: ''
     })
   }
 
@@ -943,8 +968,80 @@ export default function AdminContentManagement() {
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
               />
             </div>
-            
-            {/* Animal Sales specific fields */}
+
+            {/* Commission configuration — prominent card */}
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Percent className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-semibold text-orange-800">Commission Configuration</span>
+              </div>
+              <p className="text-xs text-orange-700">
+                Set a custom commission percentage for this product. Leave empty to use the default global rate of {COMMISSION_PERCENTAGE}%.
+              </p>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="commissionPercentage"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder={`Default ${COMMISSION_PERCENTAGE}%`}
+                  value={formData.commissionPercentage}
+                  onChange={(e) => setFormData({...formData, commissionPercentage: e.target.value})}
+                  className="w-24 border-orange-300 focus:border-orange-500"
+                />
+                <span className="text-xs text-orange-600 font-medium">%</span>
+                <span className="text-xs text-gray-500">
+                  {formData.commissionPercentage 
+                    ? `Admin takes ${formData.commissionPercentage}% · Seller gets ${100 - Number(formData.commissionPercentage)}%`
+                    : `Default: Admin ${COMMISSION_PERCENTAGE}% · Seller ${100 - COMMISSION_PERCENTAGE}%`
+                  }
+                </span>
+              </div>
+            </div>
+
+            {/* Location fields for all categories */}
+            <div className="border-t border-gray-100 pt-4 mt-4 space-y-4">
+              <LocationPicker
+                latitude={formData.latitude}
+                longitude={formData.longitude}
+                onLocationChange={(lat, lng) => setFormData(prev => ({ ...prev, latitude: lat, longitude: lng }))}
+              />
+
+              {/* Seller name */}
+              <div>
+                <Label htmlFor="sellerName" className="flex items-center gap-2">
+                  <span className="h-4 w-4 text-primary flex items-center justify-center text-xs font-bold border border-primary rounded-full">P</span>
+                  Seller Name (who is selling this product)
+                </Label>
+                <Input
+                  id="sellerName"
+                  placeholder="Seller name"
+                  value={formData.sellerName}
+                  onChange={(e) => setFormData({...formData, sellerName: e.target.value})}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  The name displayed to buyers as the seller of this product/service
+                </p>
+              </div>
+
+              {/* Seller phone for receiving payments */}
+              <div>
+                <Label htmlFor="sellerPhone" className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 text-primary" />
+                  Payment Phone Number (seller receives money here)
+                </Label>
+                <Input
+                  id="sellerPhone"
+                  placeholder="+2507XXXXXXXX"
+                  value={formData.sellerPhone}
+                  onChange={(e) => setFormData({...formData, sellerPhone: e.target.value})}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  When someone buys this service, the payment is sent to this phone number
+                </p>
+              </div>
+            </div>
+
             {currentCategory === 'sales' && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1034,15 +1131,6 @@ export default function AdminContentManagement() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="sellerPhone">Seller Phone</Label>
-                    <Input 
-                      id="sellerPhone" 
-                      placeholder="+250..."
-                      value={formData.sellerPhone}
-                      onChange={(e) => setFormData({...formData, sellerPhone: e.target.value})}
-                    />
-                  </div>
                   <div>
                     <Label htmlFor="sellerEmail">Seller Email</Label>
                     <Input 
@@ -1278,6 +1366,64 @@ export default function AdminContentManagement() {
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
               />
+            </div>
+
+            {/* Commission configuration — prominent card */}
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Percent className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-semibold text-orange-800">Commission Configuration</span>
+              </div>
+              <p className="text-xs text-orange-700">
+                Set a custom commission percentage for this product. Leave empty to use the default global rate of {COMMISSION_PERCENTAGE}%.
+              </p>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="editCommissionPercentage"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder={`Default ${COMMISSION_PERCENTAGE}%`}
+                  value={formData.commissionPercentage}
+                  onChange={(e) => setFormData({...formData, commissionPercentage: e.target.value})}
+                  className="w-24 border-orange-300 focus:border-orange-500"
+                />
+                <span className="text-xs text-orange-600 font-medium">%</span>
+                <span className="text-xs text-gray-500">
+                  {formData.commissionPercentage 
+                    ? `Admin takes ${formData.commissionPercentage}% · Seller gets ${100 - Number(formData.commissionPercentage)}%`
+                    : `Default: Admin ${COMMISSION_PERCENTAGE}% · Seller ${100 - COMMISSION_PERCENTAGE}%`
+                  }
+                </span>
+              </div>
+            </div>
+
+            {/* Seller info for receiving payments */}
+            <div className="border-t border-gray-100 pt-4 mt-2 space-y-4">
+              <div>
+                <Label htmlFor="editSellerName" className="flex items-center gap-2">
+                  <span className="h-4 w-4 text-primary flex items-center justify-center text-xs font-bold border border-primary rounded-full">P</span>
+                  Seller Name
+                </Label>
+                <Input
+                  id="editSellerName"
+                  placeholder="Seller name"
+                  value={formData.sellerName}
+                  onChange={(e) => setFormData({...formData, sellerName: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label htmlFor="editSellerPhone" className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 text-primary" />
+                  Payment Phone Number
+                </Label>
+                <Input
+                  id="editSellerPhone"
+                  placeholder="+2507XXXXXXXX"
+                  value={formData.sellerPhone}
+                  onChange={(e) => setFormData({...formData, sellerPhone: e.target.value})}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

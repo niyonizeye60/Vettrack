@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server'
 import clientPromise from '@/lib/db'
 import { ObjectId } from 'mongodb'
+import { getCurrentUser } from '@/lib/auth'
+import { DEFAULT_SELLER_PHONE } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,9 +49,17 @@ export async function POST(request: NextRequest) {
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
     
+    const currentUser = await getCurrentUser()
+
     const service = {
       ...data,
       image: data.image || null,
+      latitude: data.latitude ? Number(data.latitude) : null,
+      longitude: data.longitude ? Number(data.longitude) : null,
+      sellerPhone: data.sellerPhone || DEFAULT_SELLER_PHONE,
+      commissionPercentage: data.commissionPercentage ? Number(data.commissionPercentage) : null,
+      userId: currentUser?._id?.toString() || null,
+      sellerName: currentUser?.name || data.sellerName || null,
       createdAt: new Date()
     }
     
@@ -78,6 +88,10 @@ export async function PUT(request: NextRequest) {
         $set: {
           ...data,
           image: data.image || null,
+          latitude: data.latitude ? Number(data.latitude) : null,
+          longitude: data.longitude ? Number(data.longitude) : null,
+          sellerPhone: data.sellerPhone || DEFAULT_SELLER_PHONE,
+          commissionPercentage: data.commissionPercentage ? Number(data.commissionPercentage) : null,
           updatedAt: new Date()
         }
       }

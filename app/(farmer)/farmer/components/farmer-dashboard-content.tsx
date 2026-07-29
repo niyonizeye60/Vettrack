@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AnnouncementsBanner from "@/components/ui/announcements-banner"
+import SellerEarnings from "@/components/seller/seller-earnings"
 
 import {
   PlusCircle, Calendar, FileText, Activity,
@@ -285,6 +286,9 @@ export default function FarmerDashboardContent({
             )}
           </CardContent>
         </Card>
+
+        {/* Seller Earnings */}
+        <SellerEarnings />
 
       </div>
     </div>

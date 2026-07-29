@@ -27,7 +27,8 @@ import {
   RefreshCw,
   Download,
   Mail,
-  Wifi
+  Wifi,
+  Percent
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -554,7 +555,7 @@ export default function SuperAdminDashboardClient({
         </div>
 
         {/* Quick Actions Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Button 
             variant="outline" 
             className="h-auto p-4 flex-col items-start space-y-2 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200"
@@ -588,6 +589,18 @@ export default function SuperAdminDashboardClient({
             <div className="text-left">
               <div className="font-medium text-sm">{t('superadmin.systemAnalytics') || 'System Analytics'}</div>
               <div className="text-xs text-gray-500">{t('superadmin.viewDetailedReports') || 'View detailed reports'}</div>
+            </div>
+          </Button>
+
+          <Button 
+            variant="outline" 
+            className="h-auto p-4 flex-col items-start space-y-2 hover:bg-orange-50 hover:border-orange-200 transition-all duration-200"
+            onClick={() => router.push('/superadmin/commissions')}
+          >
+            <Percent className="h-5 w-5 text-orange-600" />
+            <div className="text-left">
+              <div className="font-medium text-sm">Commissions</div>
+              <div className="text-xs text-gray-500">Manage commissions, payouts &amp; balances</div>
             </div>
           </Button>
 

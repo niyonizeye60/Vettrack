@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { hashPassword } from "@/lib/password"
 
-const ALLOWED_FIELDS = ["name", "email", "phone", "password", "licenseNumber", "specialization", "bio"] as const
+const ALLOWED_FIELDS = ["name", "email", "phone", "password", "licenseNumber", "specialization", "bio", "paymentPhone"] as const
 
 export async function GET() {
   try {

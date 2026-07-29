@@ -30,6 +30,7 @@ export default function VeterinaryProfilePage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  const [paymentPhone, setPaymentPhone] = useState("")
   const [licenseNumber, setLicenseNumber] = useState("")
   const [specialization, setSpecialization] = useState("")
   const [bio, setBio] = useState("")
@@ -49,6 +50,7 @@ export default function VeterinaryProfilePage() {
         setAvatarPreview((userData as any).image ?? null)
         setEmail(userData.email ?? "")
         setPhone((userData as any).phone ?? "")
+        setPaymentPhone((userData as any).paymentPhone ?? "")
         setLicenseNumber((userData as any).licenseNumber ?? "")
         setSpecialization((userData as any).specialization ?? "")
         setBio((userData as any).bio ?? "")
@@ -100,7 +102,7 @@ export default function VeterinaryProfilePage() {
     setSaving(true)
     try {
       const name = [firstName, lastName].filter(Boolean).join(" ").trim() || firstName
-      const payload: Record<string, string> = { name, email, phone, bio, licenseNumber, specialization }
+      const payload: Record<string, string> = { name, email, phone, bio, paymentPhone, licenseNumber, specialization }
       if (password) payload.password = password
 
       const res = await fetch("/api/profile", {
@@ -235,6 +237,22 @@ export default function VeterinaryProfilePage() {
               </Label>
               <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+250 ..." />
             </div>
+          </div>
+
+          {/* Payment Phone */}
+          <div className="space-y-1.5">
+            <Label htmlFor="paymentPhone" className="flex items-center gap-2">
+              <span className="text-green-600">💰</span>
+              Payment Phone (receive money when someone buys your service)
+            </Label>
+            <Input
+              id="paymentPhone"
+              type="tel"
+              value={paymentPhone}
+              onChange={(e) => setPaymentPhone(e.target.value)}
+              placeholder="+2507XXXXXXXX"
+            />
+            <p className="text-xs text-gray-400">When someone buys your product/service, the payment is sent to this number</p>
           </div>
 
           {/* License + Specialization */}

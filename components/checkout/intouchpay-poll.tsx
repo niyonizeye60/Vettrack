@@ -76,5 +76,5 @@ export default function IntouchPayPoll({ orderId, phone, total }: IntouchPayPoll
     )
   }
 
-  return <OrderResult status={status} total={total} />
+  return <OrderResult status={status} total={total} orderId={orderId} />
 }

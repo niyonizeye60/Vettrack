@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Loader2, ShoppingCart, ChevronLeft } from "lucide-react"
+import { Loader2, ShoppingCart, ChevronLeft, Smartphone, Shield, Lock } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useCart } from "@/contexts/CartContext"
 import { useToast } from "@/hooks/use-toast"
@@ -14,7 +14,6 @@ import PaymentMethodSelector from "@/components/checkout/payment-method-selector
 import IntouchPayPoll from "@/components/checkout/intouchpay-poll"
 import type { Buyer } from "@/lib/validations/checkout"
 import type { OrderPaymentMethod } from "@/lib/db-orders"
-
 type Step = "review" | "buyer" | "payment" | "intouchpay-poll"
 
 export default function CheckoutPage() {
@@ -25,6 +24,7 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<Step>("review")
   const [buyer, setBuyer] = useState<Buyer>({ name: "", phone: "", email: "", district: "", sector: "", village: "", notes: "" })
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod | null>(null)
+  const [mobileMoneyPhone, setMobileMoneyPhone] = useState("")
   const [placingOrder, setPlacingOrder] = useState(false)
   const [pollOrderId, setPollOrderId] = useState<string | null>(null)
 
@@ -63,11 +63,22 @@ export default function CheckoutPage() {
         return
       }
 
-      // IntouchPay
+      // IntouchPay — use the mobile money phone from the payment selector
+      const rawPhone = (mobileMoneyPhone || buyer.phone).replace(/\s+/g, "")
+      let formattedPhone = rawPhone
+      if (rawPhone.startsWith("0")) {
+        formattedPhone = "250" + rawPhone.slice(1)
+      } else if (rawPhone.startsWith("+250")) {
+        formattedPhone = rawPhone.slice(1)  // +250... → 250...
+      } else if (rawPhone.startsWith("250")) {
+        formattedPhone = rawPhone  // already starts with 250
+      } else {
+        formattedPhone = "250" + rawPhone
+      }
       const initRes = await fetch("/api/payments/intouchpay/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, mobilePhone: buyer.phone }),
+        body: JSON.stringify({ orderId, mobilePhone: formattedPhone }),
       })
       const initData = await initRes.json()
       if (!initRes.ok) {
@@ -131,7 +142,7 @@ export default function CheckoutPage() {
                   <span className="text-gray-600">{t('checkout.total')}</span>
                   <span className="text-lg font-bold text-gray-900">RWF {subtotal.toLocaleString()}</span>
                 </div>
-                <Button className="w-full mt-6" onClick={() => setStep("buyer")}>{t('checkout.continue')}</Button>
+                <Button className="w-full mt-4" onClick={() => setStep("buyer")}>{t('checkout.continue')}</Button>
               </>
             )}
 
@@ -159,21 +170,38 @@ export default function CheckoutPage() {
                   {t('checkout.back')}
                 </button>
                 <h2 className="text-base font-semibold text-gray-900 mb-4">{t('checkout.paymentMethod')}</h2>
-                <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
+                <PaymentMethodSelector
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                  mobilePhone={mobileMoneyPhone}
+                  onMobilePhoneChange={setMobileMoneyPhone}
+                />
 
-                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100 text-sm font-medium">
-                  <span className="text-gray-600">{t('checkout.total')}</span>
-                  <span className="text-lg font-bold text-gray-900">RWF {subtotal.toLocaleString()}</span>
+                <div className="mt-6 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">{t('checkout.total')}</span>
+                    <span className="text-lg font-bold text-gray-900">RWF {subtotal.toLocaleString()}</span>
+                  </div>
                 </div>
 
                 <Button
-                  className="w-full mt-4"
+                  className="w-full mt-4 h-12 text-base"
                   onClick={placeOrder}
-                  disabled={!paymentMethod || placingOrder}
+                  disabled={!paymentMethod || (paymentMethod === "intouchpay" && !mobileMoneyPhone) || placingOrder}
                 >
                   {placingOrder && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {placingOrder ? t('checkout.processing') : t('checkout.placeOrder')}
+                  {placingOrder ? t('checkout.processing') : (
+                    <>
+                      <Shield className="h-4 w-4 mr-2" />
+                      Pay RWF {subtotal.toLocaleString()}
+                    </>
+                  )}
                 </Button>
+
+                <p className="text-xs text-gray-400 text-center mt-3 flex items-center justify-center gap-1">
+                  <Lock className="h-3 w-3" />
+                  Secured payment — your information is protected
+                </p>
               </>
             )}
           </div>

@@ -27,6 +27,7 @@ export default function FarmerSettingsPage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  const [paymentPhone, setPaymentPhone] = useState("")
   const [bio, setBio] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -40,6 +41,7 @@ export default function FarmerSettingsPage() {
         setAvatarPreview(userData.image ?? null)
         setEmail(userData.email ?? "")
         setPhone((userData as any).phone ?? "")
+        setPaymentPhone((userData as any).paymentPhone ?? "")
         setBio((userData as any).bio ?? "")
         const parts = (userData.name ?? "").split(" ")
         setFirstName(parts[0] ?? "")
@@ -89,7 +91,7 @@ export default function FarmerSettingsPage() {
     setSaving(true)
     try {
       const name = [firstName, lastName].filter(Boolean).join(" ").trim() || firstName
-      const payload: Record<string, string> = { name, email, phone, bio }
+      const payload: Record<string, string> = { name, email, phone, bio, paymentPhone }
       if (password) payload.password = password
 
       const res = await fetch("/api/profile", {
@@ -214,6 +216,22 @@ export default function FarmerSettingsPage() {
               onChange={(e) => setPhone(e.target.value)}
               placeholder={t("farmer.enterPhoneNumber") || "+250 ..."}
             />
+          </div>
+
+          {/* Payment Phone */}
+          <div className="space-y-1.5">
+            <Label htmlFor="paymentPhone" className="flex items-center gap-2">
+              <span className="text-green-600">💰</span>
+              Payment Phone (receive money here when someone buys your service)
+            </Label>
+            <Input
+              id="paymentPhone"
+              type="tel"
+              value={paymentPhone}
+              onChange={(e) => setPaymentPhone(e.target.value)}
+              placeholder="+2507XXXXXXXX"
+            />
+            <p className="text-xs text-gray-400">When someone buys your product/service, the payment is sent to this phone number</p>
           </div>
 
           {/* Bio */}

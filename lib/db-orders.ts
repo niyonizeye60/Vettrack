@@ -1,5 +1,7 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
+import { COMMISSION_PERCENTAGE } from "@/lib/constants"
+import { createPayoutsForOrder } from "@/lib/db-payouts"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -17,6 +19,12 @@ export interface OrderItem {
   unitPrice: number
   quantity: number
   lineTotal: number
+  sellerPhone?: string
+  sellerName?: string
+  sellerId?: string
+  commissionPercentage?: number
+  commissionAmount?: number
+  sellerAmount?: number
 }
 
 export interface OrderBuyer {
@@ -44,6 +52,9 @@ export interface Order {
   items: OrderItem[]
   subtotal: number
   total: number
+  commissionPercentage: number
+  commissionTotal: number
+  sellerTotal: number
   currency: "RWF"
   buyer: OrderBuyer
   paymentMethod?: OrderPaymentMethod
@@ -90,6 +101,12 @@ export async function createOrder(
     const boundedQuantity = category === "sales" ? 1 : Math.max(1, Math.floor(quantity))
     const unitPrice = Number(service.price) || 0
 
+    const lineTotal = unitPrice * boundedQuantity
+    // Use per-service commission percentage if set, otherwise fall back to default
+    const itemCommissionPct = service.commissionPercentage || COMMISSION_PERCENTAGE
+    const commissionAmount = Math.round(lineTotal * itemCommissionPct / 100)
+    const sellerAmount = lineTotal - commissionAmount
+
     orderItems.push({
       serviceId,
       categoryId: service.categoryId,
@@ -98,17 +115,28 @@ export async function createOrder(
       image: service.image,
       unitPrice,
       quantity: boundedQuantity,
-      lineTotal: unitPrice * boundedQuantity,
+      lineTotal,
+      sellerPhone: service.sellerPhone || undefined,
+      sellerName: service.sellerName || undefined,
+      sellerId: service.userId?.toString() || undefined,
+      commissionPercentage: itemCommissionPct,
+      commissionAmount,
+      sellerAmount,
     })
   }
 
   const subtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0)
+  const commissionTotal = orderItems.reduce((sum, item) => sum + (item.commissionAmount || 0), 0)
+  const sellerTotal = orderItems.reduce((sum, item) => sum + (item.sellerAmount || 0), 0)
 
   const order: Omit<Order, "_id"> = {
     status: "pending_payment",
     items: orderItems,
     subtotal,
     total: subtotal,
+    commissionPercentage: COMMISSION_PERCENTAGE,
+    commissionTotal,
+    sellerTotal,
     currency: "RWF",
     buyer,
     paymentStatus: "pending",
@@ -174,4 +202,17 @@ export async function updateOrderPaymentStatus(
   }
 
   await collection.updateOne({ _id: new ObjectId(id) }, { $set: update })
+
+  // If payment completed, create payout records for sellers
+  if (paymentStatus === "completed") {
+    try {
+      const order = await getOrderById(id)
+      if (order) {
+        await createPayoutsForOrder(order)
+      }
+    } catch (error) {
+      console.error("Failed to create payouts for order:", error)
+      // Don't throw — payment already recorded successfully
+    }
+  }
 }
