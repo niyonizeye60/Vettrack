@@ -1,6 +1,7 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { COMMISSION_PERCENTAGE } from "@/lib/constants"
+import { getCommissionPercentage } from "@/lib/db-settings"
 import { createPayoutsForOrder } from "@/lib/db-payouts"
 
 const DB_NAME = "ntdm_animal_hospital"
@@ -129,12 +130,15 @@ export async function createOrder(
   const commissionTotal = orderItems.reduce((sum, item) => sum + (item.commissionAmount || 0), 0)
   const sellerTotal = orderItems.reduce((sum, item) => sum + (item.sellerAmount || 0), 0)
 
+  // Fetch the dynamic global commission percentage from DB settings
+  const globalCommissionPct = await getCommissionPercentage()
+
   const order: Omit<Order, "_id"> = {
     status: "pending_payment",
     items: orderItems,
     subtotal,
     total: subtotal,
-    commissionPercentage: COMMISSION_PERCENTAGE,
+    commissionPercentage: globalCommissionPct,
     commissionTotal,
     sellerTotal,
     currency: "RWF",

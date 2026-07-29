@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import {
@@ -122,6 +123,12 @@ export default function SuperAdminCommissions() {
     balance: 0, success: false, loading: false
   })
 
+  // Commission settings state
+  const [commissionPct, setCommissionPct] = useState<number>(COMMISSION_PERCENTAGE)
+  const [defaultCommissionPct, setDefaultCommissionPct] = useState<number>(COMMISSION_PERCENTAGE)
+  const [commissionInput, setCommissionInput] = useState<string>(String(COMMISSION_PERCENTAGE))
+  const [savingCommission, setSavingCommission] = useState(false)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -157,8 +164,50 @@ export default function SuperAdminCommissions() {
     }
   }, [])
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/settings")
+      const data = await res.json()
+      if (res.ok) {
+        setCommissionPct(data.commissionPercentage)
+        setDefaultCommissionPct(data.defaultCommissionPercentage)
+        setCommissionInput(String(data.commissionPercentage))
+      }
+    } catch {
+      console.error("Failed to fetch settings")
+    }
+  }, [])
+
+  const handleSaveCommission = async () => {
+    const val = Number(commissionInput)
+    if (isNaN(val) || val < 0 || val > 100) {
+      toast({ title: "Invalid value", description: "Must be between 0 and 100", variant: "destructive" })
+      return
+    }
+    setSavingCommission(true)
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commissionPercentage: val }),
+      })
+      if (res.ok) {
+        setCommissionPct(val)
+        toast({ title: "✅ Commission updated", description: `Global commission rate is now ${val}%` })
+      } else {
+        const data = await res.json()
+        toast({ title: "Error", description: data.error || "Failed to save", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Error", description: "Network error", variant: "destructive" })
+    } finally {
+      setSavingCommission(false)
+    }
+  }
+
   useEffect(() => { fetchData() }, [fetchData])
   useEffect(() => { fetchGatewayBalance() }, [fetchGatewayBalance])
+  useEffect(() => { fetchSettings() }, [fetchSettings])
 
   const fetchSellers = useCallback(async () => {
     setSellersLoading(true)
@@ -393,7 +442,7 @@ export default function SuperAdminCommissions() {
             Commission & Wallet Oversight
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Full platform financial management — {COMMISSION_PERCENTAGE}% commission on all sales + booking revenue
+            Full platform financial management — <strong>{commissionPct}%</strong> commission on all sales + booking revenue
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -505,6 +554,54 @@ export default function SuperAdminCommissions() {
               >
                 <RefreshCw className={`h-3 w-3 mr-1 ${gatewayBalance.loading ? "animate-spin" : ""}`} />
                 Refresh
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Commission Config Card */}
+      <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-orange-50 via-white to-white">
+        <CardContent className="p-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
+                <Percent className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Global Commission Rate</p>
+                <p className="text-xs text-gray-500">
+                  Current rate: <strong className="text-orange-600">{commissionPct}%</strong>
+                  {commissionPct !== defaultCommissionPct && (
+                    <span className="text-gray-400 ml-1">(default {defaultCommissionPct}%)</span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={commissionInput}
+                  onChange={(e) => setCommissionInput(e.target.value)}
+                  className="w-20 text-center border-orange-300 focus:border-orange-500"
+                />
+                <span className="text-sm font-medium text-gray-600">%</span>
+              </div>
+              <Button
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700"
+                onClick={handleSaveCommission}
+                disabled={savingCommission || commissionInput === String(commissionPct)}
+              >
+                {savingCommission ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                )}
+                Save
               </Button>
             </div>
           </div>
