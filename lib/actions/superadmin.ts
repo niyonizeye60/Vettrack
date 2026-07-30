@@ -304,6 +304,7 @@ function buildActivityLogPipeline(options?: {
   search?: string
   startDate?: string
   endDate?: string
+  userId?: string
 }) {
   const match: Record<string, any> = {
     action: options?.category
@@ -314,6 +315,9 @@ function buildActivityLogPipeline(options?: {
     match.createdAt = {}
     if (options.startDate) match.createdAt.$gte = new Date(options.startDate)
     if (options.endDate) match.createdAt.$lte = new Date(options.endDate)
+  }
+  if (options?.userId) {
+    match.userId = new ObjectId(options.userId)
   }
 
   const pipeline: any[] = [
@@ -380,6 +384,7 @@ export async function getActivityLogs(options?: {
   search?: string
   startDate?: string
   endDate?: string
+  userId?: string
 }) {
   try {
     await requireSuperAdmin()

@@ -62,7 +62,9 @@ export default function AdminSidebar() {
     { href: "/admin/reports", label: t("admin.reports"), icon: <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/support", label: t("admin.support"), icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/appointments", label: t("admin.appointments"), icon: <Calendar className="h-4 w-4 sm:h-5 sm:w-5" /> },
-//  { href: "/admin/diseases", label: t("admin.diseaseOversight"), icon: <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    ...(process.env.NODE_ENV !== "production"
+      ? [{ href: "/admin/diseases", label: t("admin.diseaseOversight"), icon: <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" /> }]
+      : []),
   ];
 
   const showSidebar = (isMobile && mobileOpen) || !isMobile;

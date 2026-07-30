@@ -15,13 +15,13 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import {
-  Calendar, CheckCircle, Clock, MessageSquare, PawPrint, Phone, User, Video, MapPin
+  Calendar, CheckCircle, Clock, MessageSquare, PawPrint, Phone, User, Video, MapPin, AlertTriangle
 } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { updateConsultationStatus } from "@/lib/actions"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 interface Appointment {
   _id: string
@@ -39,13 +39,17 @@ interface Appointment {
 
 interface AppointmentsPageClientProps {
   upcoming: Appointment[]
-  past: Appointment[]
+  missed: Appointment[]
+  completed: Appointment[]
 }
 
-export default function AppointmentsPageClient({ upcoming, past }: AppointmentsPageClientProps) {
+export default function AppointmentsPageClient({ upcoming, missed, completed }: AppointmentsPageClientProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get('tab')
+  const defaultTab = initialTab === 'missed' || initialTab === 'completed' ? initialTab : 'upcoming'
 
   const [selected, setSelected] = useState<Appointment | null>(null)
   const [feedback, setFeedback] = useState("")
@@ -75,7 +79,7 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
     ? <Badge variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200 gap-1"><Video className="h-2.5 w-2.5" />{type}</Badge>
     : <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 gap-1"><MapPin className="h-2.5 w-2.5" />{type}</Badge>
 
-  const AppointmentTable = ({ appointments }: { appointments: Appointment[] }) => (
+  const AppointmentTable = ({ appointments, variant }: { appointments: Appointment[]; variant?: 'missed' }) => (
     <>
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
@@ -95,9 +99,13 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-12">
                   <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
-                    <Calendar className="h-5 w-5 text-gray-400" />
+                    {variant === 'missed'
+                      ? <CheckCircle className="h-5 w-5 text-gray-400" />
+                      : <Calendar className="h-5 w-5 text-gray-400" />}
                   </div>
-                  <p className="text-gray-500 text-sm font-medium">{t('vet.noAppointments')}</p>
+                  <p className="text-gray-500 text-sm font-medium">
+                    {variant === 'missed' ? t('vet.noMissedAppointments') : t('vet.noAppointments')}
+                  </p>
                 </TableCell>
               </TableRow>
             ) : appointments.map((appt) => (
@@ -136,8 +144,10 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
                 </TableCell>
                 {/* Date & Time */}
                 <TableCell>
-                  <div className="flex items-center gap-1 text-sm text-gray-800">
-                    <Calendar className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                  <div className={`flex items-center gap-1 text-sm ${variant === 'missed' ? 'text-red-600' : 'text-gray-800'}`}>
+                    {variant === 'missed'
+                      ? <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                      : <Calendar className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />}
                     <span className="font-medium">{appt.date}</span>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
@@ -182,9 +192,13 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
         {appointments.length === 0 ? (
           <div className="text-center py-12">
             <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
-              <Calendar className="h-5 w-5 text-gray-400" />
+              {variant === 'missed'
+                ? <CheckCircle className="h-5 w-5 text-gray-400" />
+                : <Calendar className="h-5 w-5 text-gray-400" />}
             </div>
-            <p className="text-gray-500 text-sm font-medium">{t('vet.noAppointments')}</p>
+            <p className="text-gray-500 text-sm font-medium">
+              {variant === 'missed' ? t('vet.noMissedAppointments') : t('vet.noAppointments')}
+            </p>
           </div>
         ) : appointments.map((appt) => (
           <div key={appt._id} className="p-4 hover:bg-gray-50 transition-colors duration-150">
@@ -208,8 +222,11 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
                 <span>{appt.animalName}{appt.animalType ? ` · ${appt.animalType}` : ''}</span>
               </div>
             )}
-            <div className="flex items-center gap-3 mt-2 pl-8 text-xs text-gray-500">
-              <span className="flex items-center gap-1"><Calendar className="h-2.5 w-2.5" />{appt.date}</span>
+            <div className={`flex items-center gap-3 mt-2 pl-8 text-xs ${variant === 'missed' ? 'text-red-600' : 'text-gray-500'}`}>
+              <span className="flex items-center gap-1">
+                {variant === 'missed' ? <AlertTriangle className="h-2.5 w-2.5" /> : <Calendar className="h-2.5 w-2.5" />}
+                {appt.date}
+              </span>
               <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" />{appt.time}</span>
             </div>
             <div className="flex gap-2 mt-3 pl-8">
@@ -244,7 +261,7 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 max-w-sm">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg">
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
@@ -258,10 +275,20 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm text-gray-500 font-medium">{t('vet.past')}</p>
+              <p className="text-sm text-gray-500 font-medium">{t('vet.missed')}</p>
+              <AlertTriangle className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-red-600 mt-2">{missed.length}</h3>
+            <p className="text-xs text-gray-400 mt-1">{t('vet.missedVisits')}</p>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('vet.completed')}</p>
               <CheckCircle className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
-            <h3 className="text-3xl font-bold text-blue-600 mt-2">{past.length}</h3>
+            <h3 className="text-3xl font-bold text-blue-600 mt-2">{completed.length}</h3>
             <p className="text-xs text-gray-400 mt-1">{t('vet.completedVisits')}</p>
           </CardContent>
         </Card>
@@ -270,7 +297,7 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
       {/* Tabbed table */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader className="pb-0 border-b border-gray-100">
-          <Tabs defaultValue="upcoming">
+          <Tabs defaultValue={defaultTab}>
             <div className="flex items-center justify-between gap-4 pb-4">
               <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
                 <Calendar className="h-5 w-5 text-green-600" />
@@ -283,10 +310,16 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
                     <Badge className="ml-1.5 bg-green-600 text-white text-xs px-1.5 py-0 h-4">{upcoming.length}</Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="past" className="text-xs data-[state=active]:bg-white">
-                  {t('vet.past')}
-                  {past.length > 0 && (
-                    <Badge className="ml-1.5 bg-blue-600 text-white text-xs px-1.5 py-0 h-4">{past.length}</Badge>
+                <TabsTrigger value="missed" className="text-xs data-[state=active]:bg-white">
+                  {t('vet.missed')}
+                  {missed.length > 0 && (
+                    <Badge className="ml-1.5 bg-red-600 text-white text-xs px-1.5 py-0 h-4">{missed.length}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="text-xs data-[state=active]:bg-white">
+                  {t('vet.completed')}
+                  {completed.length > 0 && (
+                    <Badge className="ml-1.5 bg-blue-600 text-white text-xs px-1.5 py-0 h-4">{completed.length}</Badge>
                   )}
                 </TabsTrigger>
               </TabsList>
@@ -295,8 +328,11 @@ export default function AppointmentsPageClient({ upcoming, past }: AppointmentsP
             <TabsContent value="upcoming" className="mt-0">
               <AppointmentTable appointments={upcoming} />
             </TabsContent>
-            <TabsContent value="past" className="mt-0">
-              <AppointmentTable appointments={past} />
+            <TabsContent value="missed" className="mt-0">
+              <AppointmentTable appointments={missed} variant="missed" />
+            </TabsContent>
+            <TabsContent value="completed" className="mt-0">
+              <AppointmentTable appointments={completed} />
             </TabsContent>
           </Tabs>
         </CardHeader>

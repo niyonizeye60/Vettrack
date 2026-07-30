@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,11 +30,13 @@ import {
   AlertTriangle,
   Image,
   Upload,
-  X
+  X,
+  User as UserIcon
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { updateSystemSettings, performDatabaseAction } from "@/lib/actions/superadmin"
+import { getCurrentUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 
 interface SettingsPageClientProps {
@@ -51,6 +54,101 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
   const bannerInputRef = useRef<HTMLInputElement>(null)
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
   const [removeBannerConfirmOpen, setRemoveBannerConfirmOpen] = useState(false)
+
+  // Profile (this superadmin's own account) - separate from the system-wide settings above
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [profileUser, setProfileUser] = useState<any>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [profileName, setProfileName] = useState("")
+  const [profileEmail, setProfileEmail] = useState("")
+  const [profilePhone, setProfilePhone] = useState("")
+  const [profileBio, setProfileBio] = useState("")
+  const [profilePassword, setProfilePassword] = useState("")
+  const [profileConfirmPassword, setProfileConfirmPassword] = useState("")
+  const [profileSaving, setProfileSaving] = useState(false)
+
+  async function loadProfile() {
+    try {
+      const userData = await getCurrentUser()
+      if (userData) {
+        setProfileUser(userData)
+        setAvatarPreview((userData as any).image ?? null)
+        setProfileName(userData.name ?? "")
+        setProfileEmail(userData.email ?? "")
+        setProfilePhone((userData as any).phone ?? "")
+        setProfileBio((userData as any).bio ?? "")
+      }
+    } catch (err) {
+      console.error("Failed to load profile:", err)
+    }
+  }
+
+  useEffect(() => { loadProfile() }, [])
+
+  const profileInitials = profileUser?.name
+    ? profileUser.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "SA"
+
+  const handleProfileAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarUploading(true)
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch("/api/upload/avatar", { method: "POST", body: form })
+      const data = await res.json()
+      if (data.success) {
+        setAvatarPreview(data.image)
+        toast({ title: t("superadmin.profileUpdated"), description: t("superadmin.profileUpdatedDesc") })
+      } else {
+        toast({ title: t("common.error"), description: data.message ?? "Upload failed", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: t("common.error"), description: "Upload failed", variant: "destructive" })
+    } finally {
+      setAvatarUploading(false)
+      e.target.value = ""
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    if (profilePassword && profilePassword !== profileConfirmPassword) {
+      toast({ title: t("common.error"), description: t("superadmin.passwordMismatch"), variant: "destructive" })
+      return
+    }
+    setProfileSaving(true)
+    try {
+      const payload: Record<string, string> = {
+        name: profileName,
+        email: profileEmail,
+        phone: profilePhone,
+        bio: profileBio,
+      }
+      if (profilePassword) payload.password = profilePassword
+
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message ?? "Save failed")
+      }
+
+      toast({ title: t("superadmin.profileUpdated"), description: t("superadmin.profileUpdatedDesc") })
+      setProfilePassword("")
+      setProfileConfirmPassword("")
+      await loadProfile()
+    } catch (err: any) {
+      toast({ title: t("common.error"), description: err?.message ?? "Failed to save", variant: "destructive" })
+    } finally {
+      setProfileSaving(false)
+    }
+  }
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }))
@@ -135,6 +233,120 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
       </div>
 
       <div className="space-y-6">
+        {/* Profile - this superadmin's own account, separate from system-wide settings below */}
+        <Card id="profile">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <UserIcon className="h-5 w-5" />
+              <span>{t('superadmin.profile')}</span>
+            </CardTitle>
+            <p className="text-sm text-gray-500">{t('superadmin.updateYourPersonalDetails')}</p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-16 h-16 border-2 border-gray-100">
+                <AvatarImage src={avatarPreview ?? undefined} alt={profileUser?.name} />
+                <AvatarFallback className="bg-purple-100 text-purple-600 text-xl font-bold">
+                  {profileInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={avatarUploading}
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  {avatarUploading ? `${t('superadmin.saving')}` : t('superadmin.changeAvatar')}
+                </Button>
+                <p className="text-xs text-gray-400 mt-1">{t('superadmin.avatarHint')}</p>
+              </div>
+            </div>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              className="hidden"
+              onChange={handleProfileAvatarChange}
+            />
+
+            <Separator />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="profileName">{t('superadmin.fullName')}</Label>
+                <Input
+                  id="profileName"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder={t('superadmin.fullName')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="profileEmail">{t('superadmin.email')}</Label>
+                <Input
+                  id="profileEmail"
+                  type="email"
+                  value={profileEmail}
+                  onChange={(e) => setProfileEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="profilePhone">{t('superadmin.phone')}</Label>
+              <Input
+                id="profilePhone"
+                type="tel"
+                value={profilePhone}
+                onChange={(e) => setProfilePhone(e.target.value)}
+                placeholder={t('superadmin.phoneNumber')}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="profileBio">{t('superadmin.bio')}</Label>
+              <Textarea
+                id="profileBio"
+                value={profileBio}
+                onChange={(e) => setProfileBio(e.target.value)}
+                placeholder={t('superadmin.tellUsAboutYourself')}
+                rows={4}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="profilePassword">{t('superadmin.newPassword')}</Label>
+                <Input
+                  id="profilePassword"
+                  type="password"
+                  value={profilePassword}
+                  onChange={(e) => setProfilePassword(e.target.value)}
+                  placeholder={t('superadmin.leaveBlankPassword')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="profileConfirmPassword">{t('superadmin.confirmPassword')}</Label>
+                <Input
+                  id="profileConfirmPassword"
+                  type="password"
+                  value={profileConfirmPassword}
+                  onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                  placeholder={t('superadmin.confirmPassword')}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleSaveProfile} disabled={profileSaving}>
+                {profileSaving ? t('superadmin.saving') : t('superadmin.saveChanges')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* General Settings */}
         <Card>
           <CardHeader>

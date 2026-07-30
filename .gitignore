@@ -34,3 +34,6 @@ SUPERADMIN_SETUP.md
 /scripts/*
 !/scripts/fix-manifest.cjs
 !/scripts/mark-dynamic.mjs
+
+# calendar feature (not ready to ship)
+/app/(veterinary)/veterinary/calendar/

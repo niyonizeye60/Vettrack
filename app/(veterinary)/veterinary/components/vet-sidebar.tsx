@@ -6,6 +6,7 @@ import {
   Home,
   Stethoscope,
   Calendar,
+  CalendarDays,
   Users,
   Activity,
   MessageSquare,
@@ -41,6 +42,9 @@ export default function VetSidebar() {
     { href: "/veterinary", label: t("vet.dashboard"), icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/consultations", label: t("vet.consultations"), icon: <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/appointments", label: t("vet.appointments"), icon: <Calendar className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    ...(process.env.NODE_ENV !== "production"
+      ? [{ href: "/veterinary/calendar", label: t("vet.calendar"), icon: <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5" /> }]
+      : []),
     { href: "/veterinary/patients", label: t("vet.patients"), icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/tracking", label: t("vet.tracking"), icon: <Activity className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/messages", label: t("vet.messages"), icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },

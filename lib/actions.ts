@@ -274,6 +274,88 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
   }
 }
 
+// Vet-initiated appointment — created directly by the doctor (e.g. from the
+// calendar), so it starts "accepted" instead of going through the farmer's
+// pending-request flow.
+export async function createAppointment(formData: FormData) {
+  try {
+    const actor = await getCurrentUser()
+    if (!actor || actor.role !== "doctor") {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const farmerId = formData.get("farmerId") as string | null
+    if (!farmerId) {
+      return { success: false, error: "Patient is required" }
+    }
+
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const animalId    = formData.get("animalId")   as string | null
+    const animalName  = formData.get("animalName")  as string | null
+    const animalType  = formData.get("animalType")  as string | null
+    const animalBreed = formData.get("animalBreed") as string | null
+
+    const consultation: Record<string, any> = {
+      fullName:    formData.get("fullName"),
+      phoneNumber: formData.get("phoneNumber"),
+      service:     formData.get("service"),
+      doctor:      actor._id,
+      date:        formData.get("date"),
+      time:        formData.get("time"),
+      type:        formData.get("type"),
+      status:      "accepted",
+      createdAt:   new Date(),
+      farmerId,
+    }
+
+    if (animalId)    consultation.animalId    = animalId
+    if (animalName)  consultation.animalName  = animalName
+    if (animalType)  consultation.animalType  = animalType
+    if (animalBreed) consultation.animalBreed = animalBreed
+
+    await db.collection("consultations").insertOne(consultation)
+
+    revalidatePath("/veterinary/calendar")
+    revalidatePath("/veterinary/appointments")
+    revalidatePath("/veterinary")
+    revalidatePath("/farmer/consultations")
+
+    // Let the farmer know their vet scheduled this for them.
+    try {
+      if (ObjectId.isValid(farmerId)) {
+        await db.collection("notifications").insertOne({
+          title: "Appointment scheduled",
+          message: `Your vet scheduled ${consultation.animalName ? `a visit for ${consultation.animalName}` : "an appointment"} on ${consultation.date} at ${consultation.time}.`,
+          type: "consultation",
+          priority: "normal",
+          read: false,
+          deletedBy: [],
+          userId: new ObjectId(farmerId),
+          actionUrl: "/farmer/consultations",
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          createdAt: new Date(),
+        })
+      }
+    } catch (notifyError) {
+      console.error("Error notifying farmer of new appointment:", notifyError)
+    }
+
+    await logActivity(actor._id, "consultation.created", `Scheduled ${consultation.animalName ? `a visit for ${consultation.animalName}` : "an appointment"} on ${consultation.date}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error creating appointment:", error)
+    await logSystemError({
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      action: "consultation.created",
+    })
+    return { success: false, error: "Failed to create appointment" }
+  }
+}
+
 export async function updateConsultationStatus(
   id: string,
   status: string,

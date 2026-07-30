@@ -1,10 +1,15 @@
 "use client"
 
+import { notFound } from "next/navigation"
 import AdminDiseases from "@/components/admin/admin-diseases"
 import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function AdminDiseasesPage() {
   const { t } = useLanguage()
+
+  if (process.env.NODE_ENV === "production") {
+    notFound()
+  }
 
   return (
     <div className="space-y-6">

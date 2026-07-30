@@ -27,18 +27,23 @@ export default async function AppointmentsPage() {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // Split by date: upcoming = accepted with date >= today, past = completed or date < today
+  // Split: upcoming = accepted with date >= today, missed = accepted but date already passed
+  // without being completed, completed = actually marked completed
   const upcoming = appointments
     .filter(c => c.status === "accepted" && new Date(c.date) >= today)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.time.localeCompare(b.time))
 
-  const past = appointments
-    .filter(c => c.status === "completed" || new Date(c.date) < today)
+  const missed = appointments
+    .filter(c => c.status === "accepted" && new Date(c.date) < today)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+  const completed = appointments
+    .filter(c => c.status === "completed")
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   return (
     <ClientWrapper>
-      <AppointmentsPageClient upcoming={upcoming} past={past} />
+      <AppointmentsPageClient upcoming={upcoming} missed={missed} completed={completed} />
     </ClientWrapper>
   )
 }

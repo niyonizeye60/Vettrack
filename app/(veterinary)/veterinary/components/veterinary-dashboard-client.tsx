@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Stethoscope, ClipboardCheck, Mail, Clock,
-  CheckCircle, ArrowRight, Check, X, User, Phone
+  CheckCircle, ArrowRight, Check, X, User, Phone,
+  Calendar, PawPrint, FileText, AlertTriangle
 } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -25,6 +26,9 @@ interface VeterinaryDashboardClientProps {
   completedCases: any[]
   unreadMessages: number
   recentMessages: any[]
+  upcomingAppointments: any[]
+  missedAppointments: any[]
+  recentPatients: any[]
 }
 
 export default function VeterinaryDashboardClient({
@@ -35,6 +39,9 @@ export default function VeterinaryDashboardClient({
   completedCases,
   unreadMessages: initialUnreadMessages,
   recentMessages: initialRecentMessages,
+  upcomingAppointments,
+  missedAppointments,
+  recentPatients,
 }: VeterinaryDashboardClientProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
@@ -95,8 +102,8 @@ export default function VeterinaryDashboardClient({
           <p className="text-gray-400 text-xs mt-0.5">{today}</p>
         </div>
 
-        {/* 4 stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
 
           {/* Pending — black */}
           <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
@@ -143,6 +150,18 @@ export default function VeterinaryDashboardClient({
               </div>
               <h3 className="text-3xl font-bold text-orange-600 mt-2">{unreadMessages}</h3>
               <p className="text-xs text-gray-400 mt-1">{t('vet.unreadMessages')}</p>
+            </CardContent>
+          </Card>
+
+          {/* Missed — red */}
+          <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between">
+                <p className="text-sm text-gray-500 font-medium">{t('vet.missed')}</p>
+                <AlertTriangle className="h-5 w-5 text-gray-400 flex-shrink-0" />
+              </div>
+              <h3 className="text-3xl font-bold text-red-600 mt-2">{missedAppointments.length}</h3>
+              <p className="text-xs text-gray-400 mt-1">{t('vet.missedVisits')}</p>
             </CardContent>
           </Card>
         </div>
@@ -288,6 +307,127 @@ export default function VeterinaryDashboardClient({
                   </div>
                   <p className="text-gray-500 text-sm font-medium">{t('vet.noRecentMessages')}</p>
                   <p className="text-gray-400 text-xs mt-1">{t('vet.noMessagesYet')}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Upcoming & Recent Patients */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* Upcoming */}
+          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader className="pb-3 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <Calendar className="h-5 w-5 text-green-600" />
+                  {t('vet.upcoming')}
+                </CardTitle>
+                <Link href="/veterinary/appointments" className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium">
+                  {t('vet.viewAll')} <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-3">
+              {missedAppointments.length > 0 && (
+                <Link
+                  href="/veterinary/appointments?tab=missed"
+                  className="flex items-center justify-between gap-2 p-2.5 mb-2 rounded-lg bg-red-50 border border-red-200 hover:bg-red-100 transition-colors duration-150"
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-red-700">
+                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                    {missedAppointments.length} {t('vet.missed')}
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
+                </Link>
+              )}
+              {upcomingAppointments.length > 0 ? (
+                <div className="space-y-2">
+                  {upcomingAppointments.map((appt) => (
+                    <Link
+                      key={appt._id}
+                      href="/veterinary/appointments"
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150 gap-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
+                          <User className="h-3.5 w-3.5 text-amber-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 text-sm truncate">{appt.fullName}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                            <span className="truncate">{appt.animalName || appt.service}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-medium text-gray-700">{appt.date}</p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1 justify-end mt-0.5">
+                          <Clock className="h-2.5 w-2.5" />{appt.time}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10">
+                  <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm font-medium">{t('vet.allClearForNow')}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Patients */}
+          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardHeader className="pb-3 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <FileText className="h-5 w-5 text-green-600" />
+                  {t('vet.recentPatients')}
+                </CardTitle>
+                <Link href="/veterinary/patients" className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium">
+                  {t('vet.viewAll')} <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-3">
+              {recentPatients.length > 0 ? (
+                <div className="space-y-2">
+                  {recentPatients.map((patient) => (
+                    <Link
+                      key={patient._id}
+                      href="/veterinary/patients"
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150 gap-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
+                          <PawPrint className="h-3.5 w-3.5 text-amber-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 text-sm truncate">{patient.animalName}</p>
+                          <p className="text-xs text-gray-400 truncate mt-0.5">
+                            {patient.animalBreed ? `${patient.animalBreed} · ` : ''}{patient.fullName}
+                          </p>
+                        </div>
+                      </div>
+                      {patient.animalType && (
+                        <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200 flex-shrink-0">
+                          {patient.animalType}
+                        </Badge>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10">
+                  <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                    <FileText className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm font-medium">{t('vet.noPatientsYet')}</p>
                 </div>
               )}
             </CardContent>
