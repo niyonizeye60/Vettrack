@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
-import { hashPassword } from "@/lib/password"
+import { hashPassword, verifyPassword } from "@/lib/password"
 
-const ALLOWED_FIELDS = ["name", "email", "phone", "password", "licenseNumber", "specialization", "bio"] as const
+const ALLOWED_FIELDS = ["name", "email", "phone", "password", "licenseNumber", "specialization", "bio", "district", "sector"] as const
 
 export async function GET() {
   try {
@@ -29,7 +29,7 @@ async function updateProfile(request: NextRequest) {
     const body = await request.json()
     const updateData: Record<string, any> = {}
     for (const field of ALLOWED_FIELDS) {
-      if (body[field] !== undefined && body[field] !== "") {
+      if (typeof body[field] === "string" && body[field] !== "") {
         updateData[field] = body[field]
       }
     }
@@ -50,6 +50,13 @@ async function updateProfile(request: NextRequest) {
     if (updateData.password) {
       if (updateData.password.length < 6) {
         return NextResponse.json({ success: false, message: "Password must be at least 6 characters" }, { status: 400 })
+      }
+      if (!body.currentPassword) {
+        return NextResponse.json({ success: false, message: "Current password is required to set a new password" }, { status: 400 })
+      }
+      const existingUserDoc = await db.collection("users").findOne({ _id: new ObjectId(currentUser._id) })
+      if (!existingUserDoc || !(await verifyPassword(body.currentPassword, existingUserDoc.password))) {
+        return NextResponse.json({ success: false, message: "Current password is incorrect" }, { status: 400 })
       }
       updateData.password = await hashPassword(updateData.password)
     }

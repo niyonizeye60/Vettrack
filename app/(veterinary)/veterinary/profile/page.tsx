@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { User, Mail, Phone, BadgeCheck, Stethoscope, Camera, KeyRound } from "lucide-react"
+import { User, Mail, Phone, BadgeCheck, Stethoscope, Camera, KeyRound, MapPin, Calendar } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useToast } from "@/hooks/use-toast"
@@ -32,7 +32,10 @@ export default function VeterinaryProfilePage() {
   const [phone, setPhone] = useState("")
   const [licenseNumber, setLicenseNumber] = useState("")
   const [specialization, setSpecialization] = useState("")
+  const [district, setDistrict] = useState("")
+  const [sector, setSector] = useState("")
   const [bio, setBio] = useState("")
+  const [currentPassword, setCurrentPassword] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
@@ -51,6 +54,8 @@ export default function VeterinaryProfilePage() {
         setPhone((userData as any).phone ?? "")
         setLicenseNumber((userData as any).licenseNumber ?? "")
         setSpecialization((userData as any).specialization ?? "")
+        setDistrict((userData as any).district ?? "")
+        setSector((userData as any).sector ?? "")
         setBio((userData as any).bio ?? "")
         const parts = (userData.name ?? "").split(" ")
         setFirstName(parts[0] ?? "")
@@ -68,6 +73,11 @@ export default function VeterinaryProfilePage() {
   const initials = user?.name
     ? user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : "V"
+
+  const locationStr = [district, sector].filter(Boolean).join(", ")
+  const joinedDate = user?.createdAt
+    ? new Date(user.createdAt as string).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : null
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -97,11 +107,18 @@ export default function VeterinaryProfilePage() {
       toast({ title: t("common.error"), description: t("vet.passwordMismatch"), variant: "destructive" })
       return
     }
+    if (password && !currentPassword) {
+      toast({ title: t("common.error"), description: t("vet.currentPasswordRequired"), variant: "destructive" })
+      return
+    }
     setSaving(true)
     try {
       const name = [firstName, lastName].filter(Boolean).join(" ").trim() || firstName
-      const payload: Record<string, string> = { name, email, phone, bio, licenseNumber, specialization }
-      if (password) payload.password = password
+      const payload: Record<string, string> = { name, email, phone, bio, licenseNumber, specialization, district, sector }
+      if (password) {
+        payload.password = password
+        payload.currentPassword = currentPassword
+      }
 
       const res = await fetch("/api/profile", {
         method: "PATCH",
@@ -113,6 +130,7 @@ export default function VeterinaryProfilePage() {
       if (!res.ok || !data?.success) throw new Error(data?.message ?? "Save failed")
 
       toast({ title: t("vet.profileUpdated"), description: t("vet.profileUpdatedDesc") })
+      setCurrentPassword("")
       setPassword("")
       setConfirmPassword("")
       await loadProfile()
@@ -188,7 +206,34 @@ export default function VeterinaryProfilePage() {
               )}
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-3">{t("vet.avatarHint")}</p>
+
+          {/* Info bar */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-500 mt-4 pt-4 border-t border-gray-100">
+            {email && (
+              <span className="flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                {email}
+              </span>
+            )}
+            {locationStr && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                {locationStr}
+              </span>
+            )}
+            {phone && (
+              <span className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                {phone}
+              </span>
+            )}
+            {joinedDate && (
+              <span className="flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                {t("admin.joined")} {joinedDate}
+              </span>
+            )}
+          </div>
         </CardContent>
         <input
           ref={avatarInputRef}
@@ -253,6 +298,22 @@ export default function VeterinaryProfilePage() {
             </div>
           </div>
 
+          {/* District + Sector */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="district">
+                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.district")}</span>
+              </Label>
+              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="e.g., Kigali" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sector">
+                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.sector")}</span>
+              </Label>
+              <Input id="sector" value={sector} onChange={(e) => setSector(e.target.value)} placeholder="e.g., Nyarugenge" />
+            </div>
+          </div>
+
           {/* Bio */}
           <div className="space-y-1.5">
             <Label htmlFor="bio">{t("vet.professionalBio")}</Label>
@@ -276,6 +337,10 @@ export default function VeterinaryProfilePage() {
               <span className="text-xs text-gray-400">— {t("vet.leaveBlankPassword")}</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="currentPassword">{t("vet.currentPassword")}</Label>
+                <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" />
+              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="password">{t("vet.newPassword")}</Label>
                 <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />

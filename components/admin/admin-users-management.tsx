@@ -238,7 +238,7 @@ export default function AdminUsersManagement() {
         body: JSON.stringify(
           selectedUser.role === 'farmer'
             ? { name: editForm.name, email: editForm.email, phone: editForm.phone, district: editForm.district, sector: editForm.sector }
-            : { name: editForm.name, email: editForm.email, phone: editForm.phone, licenseNumber: editForm.licenseNumber, specialization: editForm.specialization }
+            : { name: editForm.name, email: editForm.email, phone: editForm.phone, licenseNumber: editForm.licenseNumber, specialization: editForm.specialization, district: editForm.district, sector: editForm.sector }
         )
       })
 
@@ -582,9 +582,7 @@ export default function AdminUsersManagement() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {user.role === 'farmer'
-                        ? [user.district, user.sector].filter(Boolean).join(", ") || "—"
-                        : "—"}
+                      {[user.district, user.sector].filter(Boolean).join(", ") || "—"}
                     </TableCell>
                     <TableCell>
                       {user.role === 'doctor' ? (user.specialization || "—") : "—"}
@@ -942,7 +940,7 @@ export default function AdminUsersManagement() {
                 />
               </div>
 
-              {selectedUser.role === 'farmer' && (
+              {(selectedUser.role === 'farmer' || selectedUser.role === 'doctor') && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-district">{t('admin.district')}</Label>
@@ -1142,7 +1140,7 @@ export default function AdminUsersManagement() {
             </div>
             
             {/* Role-specific fields */}
-            {newUser.role === "farmer" && (
+            {(newUser.role === "farmer" || newUser.role === "doctor") && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">{t('admin.locationInformation')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

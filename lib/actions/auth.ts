@@ -1,18 +1,79 @@
 "use server"
 import clientPromise, { withDbRetry } from "../db"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { sendWelcomeEmail } from "../email" // Import the email function
 import { hashPassword, verifyPassword, isHashedPassword } from "../password"
 import { logActivity, logSystemError } from "../activity-log"
+import { checkRateLimit, getRateLimitKey } from "../rate-limit"
+
+// Ensured once per warm process, not on every registration - createIndex is a
+// no-op after the first call, but there's no need to pay even that round trip
+// on every request. Failure (e.g. pre-existing duplicate emails in the
+// collection from before this index existed) must not block registration -
+// it just means we fall back to the findOne-only check below for this run.
+let usersEmailIndexEnsured = false
+async function ensureUsersEmailIndex(db: import("mongodb").Db) {
+  if (usersEmailIndexEnsured) return
+  try {
+    await db.collection("users").createIndex({ email: 1 }, { unique: true })
+    usersEmailIndexEnsured = true
+  } catch (error) {
+    console.error("Failed to ensure unique index on users.email:", error)
+  }
+}
+
+// Same fail-safe-ensure pattern as ensureUsersEmailIndex - speeds up the
+// per-email lockout lookup in loginUser without ever blocking login on
+// index-creation failure.
+let loginAttemptsIndexEnsured = false
+async function ensureLoginAttemptsIndex(db: import("mongodb").Db) {
+  if (loginAttemptsIndexEnsured) return
+  try {
+    await db.collection("login_attempts").createIndex({ email: 1, createdAt: 1 })
+    loginAttemptsIndexEnsured = true
+  } catch (error) {
+    console.error("Failed to ensure index on login_attempts:", error)
+  }
+}
+
+const LOGIN_LOCKOUT_THRESHOLD = 5
+const LOGIN_LOCKOUT_WINDOW_MS = 15 * 60 * 1000
+
+function getRequestRateLimitKey(sessionId: string | undefined) {
+  const headerList = headers()
+  const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() || headerList.get("x-real-ip")
+  return getRateLimitKey(sessionId, ip)
+}
 
 // Register a new user
 export async function registerUser(formData: FormData) {
   try {
+    const rateLimitKey = getRequestRateLimitKey(cookies().get("session")?.value)
+    const { success: withinLimit } = await checkRateLimit(rateLimitKey, "sensitive")
+    if (!withinLimit) {
+      return { success: false, message: "Too many attempts. Please try again in a minute." }
+    }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
+    await ensureUsersEmailIndex(db)
 
-    const role = formData.get("role") as "farmer" | "doctor" | "admin" | "superadmin"
+    const roleInput = formData.get("role")
+    if (roleInput !== "farmer" && roleInput !== "doctor" && roleInput !== "admin" && roleInput !== "superadmin") {
+      return { success: false, message: "Invalid account type" }
+    }
+    const role = roleInput
+
+    // This action is reachable directly (it's a server action, not gated by
+    // any UI), so admin/superadmin can only be created by an already
+    // authenticated superadmin - never trust the client for privileged roles.
+    if (role === "admin" || role === "superadmin") {
+      const currentUser = await getCurrentUser()
+      if (!currentUser || currentUser.role !== "superadmin") {
+        return { success: false, message: "Not authorized to create this account type" }
+      }
+    }
 
     // Create base user data
     const userData = {
@@ -34,6 +95,8 @@ export async function registerUser(formData: FormData) {
       Object.assign(userData, {
         licenseNumber: formData.get("licenseNumber"),
         specialization: formData.get("specialization"),
+        district: formData.get("district"),
+        sector: formData.get("sector"),
         availability: {
           days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
           hours: {
@@ -62,8 +125,18 @@ export async function registerUser(formData: FormData) {
       return { success: false, message: "Email already in use" }
     }
 
-    // Insert user into database
-    const result = await db.collection("users").insertOne(userData)
+    // Insert user into database. The findOne check above is only a fast
+    // path - the unique index is what actually prevents two concurrent
+    // registrations with the same email from both succeeding.
+    let result
+    try {
+      result = await db.collection("users").insertOne(userData)
+    } catch (insertError) {
+      if (insertError instanceof Error && "code" in insertError && (insertError as { code?: number }).code === 11000) {
+        return { success: false, message: "Email already in use" }
+      }
+      throw insertError
+    }
 
     // Send welcome email after successful registration
     try {
@@ -86,7 +159,9 @@ export async function registerUser(formData: FormData) {
 
     return {
       success: true,
-      message: "User registered successfully! Welcome email sent to your inbox.",
+      message: role === "doctor"
+        ? "Application submitted! Your veterinarian account is pending verification by an Extension Officer - we'll notify you by email once it's approved."
+        : "User registered successfully! Welcome email sent to your inbox.",
       userId: result.insertedId.toString(),
     }
   } catch (error) {
@@ -106,11 +181,31 @@ export async function registerUser(formData: FormData) {
 // Login user
 export async function loginUser(formData: FormData) {
   try {
+    // IP/session-keyed budget - catches one attacker spraying guesses across
+    // many different email addresses, which the per-email check below can't.
+    const rateLimitKey = getRequestRateLimitKey(cookies().get("session")?.value)
+    const { success: withinLimit } = await checkRateLimit(rateLimitKey, "sensitive")
+    if (!withinLimit) {
+      return { success: false, message: "Too many attempts. Please try again in a minute." }
+    }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
+    await ensureLoginAttemptsIndex(db)
 
     const email = formData.get("email") as string
     const password = formData.get("password") as string
+
+    // Per-email lockout - catches repeated password guesses against one
+    // account, even if the attacker rotates IPs to dodge the check above.
+    const recentFailures = await db.collection("login_attempts").countDocuments({
+      email,
+      success: false,
+      createdAt: { $gt: new Date(Date.now() - LOGIN_LOCKOUT_WINDOW_MS) },
+    })
+    if (recentFailures >= LOGIN_LOCKOUT_THRESHOLD) {
+      return { success: false, message: "Too many failed login attempts. Please try again in 15 minutes." }
+    }
 
     const user = await db.collection("users").findOne({ email })
 

@@ -12,8 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { registerUser, loginUser } from "@/lib/actions/auth"
-import { Home, CheckCircle, Mail } from "lucide-react"
+import { registerUser } from "@/lib/actions/auth"
+import { CheckCircle, Mail } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 
 type UserRole = "farmer" | "doctor" | "admin" | "superadmin"
@@ -39,11 +39,11 @@ export default function RegisterForm() {
 
   const validatePasswords = () => {
     if (password !== confirmPassword) {
-      setPasswordError("Passwords do not match")
+      setPasswordError(t('auth.passwordMismatch'))
       return false
     }
     if (password.length < 6) {
-      setPasswordError("Password must be at least 6 characters long")
+      setPasswordError(t('auth.passwordTooShort'))
       return false
     }
     return true
@@ -54,7 +54,7 @@ export default function RegisterForm() {
     setPasswordError("")
 
     if (!agreedToTerms) {
-      setPasswordError("You must agree to the Terms of Service and Privacy Policy to register")
+      setPasswordError(t('auth.mustAgreeToTerms'))
       return
     }
 
@@ -74,12 +74,11 @@ export default function RegisterForm() {
       formData.append("password", password)
       formData.append("phone", phone)
       formData.append("role", role)
+      formData.append("district", district)
+      formData.append("sector", sector)
       if (role === "doctor") {
         formData.append("licenseNumber", licenseNumber)
         formData.append("specialization", specialization)
-      } else if (role === "farmer") {
-        formData.append("district", district)
-        formData.append("sector", sector)
       }
 
       // Register the user
@@ -95,7 +94,7 @@ export default function RegisterForm() {
       
     } catch (error) {
       console.error("Registration error:", error)
-      setPasswordError(error instanceof Error ? error.message : "Registration failed")
+      setPasswordError(error instanceof Error ? error.message : t('auth.registrationFailed'))
     } finally {
       setIsLoading(false)
     }
@@ -131,20 +130,17 @@ export default function RegisterForm() {
                 📧 {t('auth.checkEmailTitle')}
               </p>
               <p className="text-xs text-blue-700">
-                We've sent a welcome email to <strong>{email}</strong> with important information about your account and next steps.
+                {t('auth.welcomeEmailSentPrefix')} <strong>{email}</strong> {t('auth.welcomeEmailSentSuffix')}
               </p>
               <p className="text-xs text-blue-600 mt-2">
-                Don't forget to check your spam/junk folder if you don't see the email in your inbox.
+                {t('auth.checkSpamFolder')}
               </p>
             </div>
 
           </div>
 
           <div className="flex justify-center pt-4">
-            <Button
-              onClick={() => router.push("/login")}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
+            <Button onClick={() => router.push("/login")}>
               {t('auth.continueLogin')}
             </Button>
           </div>
@@ -230,12 +226,12 @@ export default function RegisterForm() {
                   {t('auth.farmerPetOwner')}
                 </Label>
               </div>
-              {/* <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2">
                 <RadioGroupItem value="doctor" id="doctor" />
                 <Label htmlFor="doctor" className="cursor-pointer">
-                  Veterinarian
+                  {t('auth.veterinarian')}
                 </Label>
-              </div> */}
+              </div>
               {/* <div className="flex items-center space-x-2">
                 <RadioGroupItem value="superadmin" id="superadmin" />
                 <Label htmlFor="superadmin" className="cursor-pointer">
@@ -245,11 +241,10 @@ export default function RegisterForm() {
             </RadioGroup>
           </div>
 
-          {/* Conditional fields based on role */}
           {role === "doctor" && (
-            <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="licenseNumber">License Number</Label>
+                <Label htmlFor="licenseNumber">{t('auth.licenseNumber')}</Label>
                 <Input
                   id="licenseNumber"
                   placeholder="VET-12345"
@@ -260,7 +255,7 @@ export default function RegisterForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="specialization">Specialization</Label>
+                <Label htmlFor="specialization">{t('auth.specialization')}</Label>
                 <Input
                   id="specialization"
                   placeholder="e.g., Large Animal Medicine"
@@ -269,10 +264,10 @@ export default function RegisterForm() {
                   required
                 />
               </div>
-            </>
+            </div>
           )}
 
-          {role === "farmer" && (
+          {(role === "farmer" || role === "doctor") && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="district">{t('auth.district')}</Label>
@@ -309,13 +304,13 @@ export default function RegisterForm() {
               htmlFor="terms"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
-              I agree to the{" "}
+              {t('auth.agreeToTermsPrefix')}{" "}
               <Link href="/terms" className="text-primary hover:underline">
-                Terms of Service
+                {t('auth.termsOfService')}
               </Link>{" "}
-              and{" "}
+              {t('common.and')}{" "}
               <Link href="/privacy" className="text-primary hover:underline">
-                Privacy Policy
+                {t('auth.privacyPolicy')}
               </Link>
             </label>
           </div>

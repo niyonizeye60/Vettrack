@@ -118,7 +118,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     // Regular update - only known profile fields, never password (use action: "resetPassword" for that)
     const fields: Record<string, unknown> = {}
     for (const field of EDITABLE_FIELDS) {
-      if (updateData[field] !== undefined) fields[field] = updateData[field]
+      if (typeof updateData[field] === "string") fields[field] = updateData[field]
     }
 
     if (fields.email) {

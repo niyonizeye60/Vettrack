@@ -2,18 +2,16 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
-import { cookies } from "next/headers"
+import { getCurrentUser } from "@/lib/auth"
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const userCookie = cookieStore.get('user')
-    
-    if (!userCookie) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
       return NextResponse.json({ success: false, message: "Not authenticated" }, { status: 401 })
     }
 
-    const currentUser = JSON.parse(userCookie.value)
     const { settings } = await request.json()
 
     const client = await clientPromise

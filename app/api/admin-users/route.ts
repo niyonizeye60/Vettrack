@@ -60,13 +60,12 @@ export async function POST(request: NextRequest) {
     formData.append("password", password)
     formData.append("phone", phone)
     formData.append("role", role)
-    
+    formData.append("district", district)
+    formData.append("sector", sector)
+
     if (role === "doctor") {
       formData.append("licenseNumber", licenseNumber)
       formData.append("specialization", specialization)
-    } else if (role === "farmer") {
-      formData.append("district", district)
-      formData.append("sector", sector)
     }
 
     const result = await registerUser(formData)

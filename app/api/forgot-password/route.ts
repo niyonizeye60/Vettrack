@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json()
 
-    if (!email) {
+    if (!email || typeof email !== "string") {
       return NextResponse.json({ success: false, message: "Email is required" }, { status: 400 })
     }
 

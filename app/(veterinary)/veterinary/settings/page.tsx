@@ -14,7 +14,7 @@ import { getCurrentUser } from "@/lib/actions/auth"
 import { useToast } from "@/hooks/use-toast"
 
 export default function VeterinarySettingsPage() {
-  const { t } = useLanguage()
+  const { t, language, setLanguage } = useLanguage()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -24,8 +24,6 @@ export default function VeterinarySettingsPage() {
     pushNotifications: true,
     consultationReminders: true,
     marketingEmails: false,
-    language: "en",
-    timezone: "Africa/Kigali",
   })
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -169,23 +167,11 @@ export default function VeterinarySettingsPage() {
           <CardContent className="pt-5 space-y-5">
             <div className="space-y-1.5">
               <Label>{t("vet.language")}</Label>
-              <Select value={settings.language} onValueChange={(v) => setSettings({ ...settings, language: v })}>
+              <Select value={language} onValueChange={(v) => setLanguage(v as "en" | "rw")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="en">English</SelectItem>
                   <SelectItem value="rw">Kinyarwanda</SelectItem>
-                  <SelectItem value="fr">Français</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>{t("vet.timezone")}</Label>
-              <Select value={settings.timezone} onValueChange={(v) => setSettings({ ...settings, timezone: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Africa/Kigali">Kigali (GMT+2)</SelectItem>
-                  <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
-                  <SelectItem value="Africa/Nairobi">Nairobi (GMT+3)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

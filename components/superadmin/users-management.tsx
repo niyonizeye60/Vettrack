@@ -218,13 +218,12 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       formData.append("password", createUserData.password)
       formData.append("phone", createUserData.phone)
       formData.append("role", createUserData.role)
-      
+      formData.append("district", createUserData.district)
+      formData.append("sector", createUserData.sector)
+
       if (createUserData.role === "doctor") {
         formData.append("licenseNumber", createUserData.licenseNumber)
         formData.append("specialization", createUserData.specialization)
-      } else if (createUserData.role === "farmer") {
-        formData.append("district", createUserData.district)
-        formData.append("sector", createUserData.sector)
       }
 
       const result = await registerUser(formData)
@@ -757,7 +756,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                     defaultChecked={selectedUser.isTestAccount || false}
                   />
                 </div>
-                {selectedUser.role === "farmer" && (
+                {(selectedUser.role === "farmer" || selectedUser.role === "doctor") && (
                   <>
                     <div>
                       <Label htmlFor="district">{t('superadmin.district')}</Label>
@@ -1052,7 +1051,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                 </>
               )}
               
-              {createUserData.role === "farmer" && (
+              {(createUserData.role === "farmer" || createUserData.role === "doctor") && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="create-district">{t('superadmin.district')}</Label>

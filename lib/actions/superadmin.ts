@@ -728,12 +728,13 @@ export async function updateUser(userId: string, formData: FormData) {
     // }
 
     // Add role-specific fields
-    if (updateData.role === "farmer") {
+    if (updateData.role === "farmer" || updateData.role === "doctor") {
       Object.assign(updateData, {
         district: formData.get("district"),
         sector: formData.get("sector"),
       })
-    } else if (updateData.role === "doctor") {
+    }
+    if (updateData.role === "doctor") {
       Object.assign(updateData, {
         licenseNumber: formData.get("licenseNumber"),
         specialization: formData.get("specialization"),
