@@ -687,12 +687,12 @@ export default function AdminContentManagement() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="blog" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="blog">{t('content.blogPosts')}</TabsTrigger>
-          <TabsTrigger value="sales">{t('content.animalSales')}</TabsTrigger>
-          <TabsTrigger value="drugs">{t('content.pharmacy')}</TabsTrigger>
-          <TabsTrigger value="feeds">{t('content.feeds')}</TabsTrigger>
-          <TabsTrigger value="announcements">{t('content.announcements')}</TabsTrigger>
+        <TabsList className="flex w-full justify-start gap-1 overflow-x-auto sm:grid sm:grid-cols-5">
+          <TabsTrigger value="blog" className="flex-shrink-0">{t('content.blogPosts')}</TabsTrigger>
+          <TabsTrigger value="sales" className="flex-shrink-0">{t('content.animalSales')}</TabsTrigger>
+          <TabsTrigger value="drugs" className="flex-shrink-0">{t('content.pharmacy')}</TabsTrigger>
+          <TabsTrigger value="feeds" className="flex-shrink-0">{t('content.feeds')}</TabsTrigger>
+          <TabsTrigger value="announcements" className="flex-shrink-0">{t('content.announcements')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="blog" className="space-y-4">

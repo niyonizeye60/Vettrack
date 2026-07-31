@@ -298,25 +298,25 @@ export default function AppointmentsPageClient({ upcoming, missed, completed }: 
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader className="pb-0 border-b border-gray-100">
           <Tabs defaultValue={defaultTab}>
-            <div className="flex items-center justify-between gap-4 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4">
               <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
                 <Calendar className="h-5 w-5 text-green-600" />
                 {t('vet.appointments')}
               </CardTitle>
-              <TabsList className="bg-gray-100">
-                <TabsTrigger value="upcoming" className="text-xs data-[state=active]:bg-white">
+              <TabsList className="flex w-full justify-start gap-1 overflow-x-auto bg-gray-100 sm:w-auto sm:justify-center">
+                <TabsTrigger value="upcoming" className="flex-shrink-0 text-xs data-[state=active]:bg-white">
                   {t('vet.upcoming')}
                   {upcoming.length > 0 && (
                     <Badge className="ml-1.5 bg-green-600 text-white text-xs px-1.5 py-0 h-4">{upcoming.length}</Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="missed" className="text-xs data-[state=active]:bg-white">
+                <TabsTrigger value="missed" className="flex-shrink-0 text-xs data-[state=active]:bg-white">
                   {t('vet.missed')}
                   {missed.length > 0 && (
                     <Badge className="ml-1.5 bg-red-600 text-white text-xs px-1.5 py-0 h-4">{missed.length}</Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="text-xs data-[state=active]:bg-white">
+                <TabsTrigger value="completed" className="flex-shrink-0 text-xs data-[state=active]:bg-white">
                   {t('vet.completed')}
                   {completed.length > 0 && (
                     <Badge className="ml-1.5 bg-blue-600 text-white text-xs px-1.5 py-0 h-4">{completed.length}</Badge>

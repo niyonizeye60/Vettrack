@@ -236,10 +236,10 @@ export default function AdminAppointments() {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="appointments">{t('admin.appointments')}</TabsTrigger>
-          <TabsTrigger value="doctors">{t('admin.doctorAvailability')}</TabsTrigger>
-          <TabsTrigger value="schedule">{t('admin.scheduleManagement')}</TabsTrigger>
+        <TabsList className="flex w-full justify-start gap-1 overflow-x-auto sm:grid sm:grid-cols-3">
+          <TabsTrigger value="appointments" className="flex-shrink-0">{t('admin.appointments')}</TabsTrigger>
+          <TabsTrigger value="doctors" className="flex-shrink-0">{t('admin.doctorAvailability')}</TabsTrigger>
+          <TabsTrigger value="schedule" className="flex-shrink-0">{t('admin.scheduleManagement')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="appointments" className="space-y-4">

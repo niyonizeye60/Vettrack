@@ -304,23 +304,23 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
         </CardHeader>
         <CardContent className="pt-4">
           <Tabs defaultValue="pending" className="space-y-4">
-            <TabsList className="w-full sm:w-auto bg-gray-100/80">
-              <TabsTrigger value="pending" className="flex items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
+            <TabsList className="flex w-full justify-start gap-1 overflow-x-auto bg-gray-100/80 sm:w-auto sm:inline-flex sm:justify-center">
+              <TabsTrigger value="pending" className="flex flex-shrink-0 items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
                 <Clock className="h-3.5 w-3.5 text-amber-500" />
                 {t("vet.pending")}
                 <Badge className="bg-amber-100 text-amber-700 border-0 text-xs px-1.5 h-4 ml-0.5">{pending.length}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="accepted" className="flex items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
+              <TabsTrigger value="accepted" className="flex flex-shrink-0 items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
                 <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
                 {t("vet.accepted")}
                 <Badge className="bg-blue-100 text-blue-700 border-0 text-xs px-1.5 h-4 ml-0.5">{accepted.length}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="rejected" className="flex items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
+              <TabsTrigger value="rejected" className="flex flex-shrink-0 items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
                 <XCircle className="h-3.5 w-3.5 text-red-500" />
                 {t("vet.rejected")}
                 <Badge className="bg-red-100 text-red-700 border-0 text-xs px-1.5 h-4 ml-0.5">{rejected.length}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="completed" className="flex items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
+              <TabsTrigger value="completed" className="flex flex-shrink-0 items-center gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white">
                 <ClipboardCheck className="h-3.5 w-3.5 text-emerald-500" />
                 {t("vet.completed")}
                 <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs px-1.5 h-4 ml-0.5">{completed.length}</Badge>
