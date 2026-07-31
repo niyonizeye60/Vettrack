@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,55 +22,84 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
-import { createAnnouncement, updateAnnouncement, deleteAnnouncement } from "@/lib/actions/superadmin"
-import { Plus, Edit, Trash2, Megaphone, AlertTriangle, Info, Shield } from "lucide-react"
+import {
+  getAdminAnnouncements,
+  getTargetableUsers,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  type AnnouncementInput,
+  type TargetableUser,
+} from "@/lib/actions/announcements"
+import AnnouncementTargetFields from "@/components/announcements/announcement-target-fields"
+import { getAnnouncementTargetLabel } from "@/lib/announcement-utils"
+import { Plus, Edit, Trash2, Megaphone, AlertTriangle, Info, Shield, Users } from "lucide-react"
 
 interface ContentPageClientProps {
   initialAnnouncements: any[]
+  initialTargetableUsers: TargetableUser[]
 }
 
-export default function ContentPageClient({ initialAnnouncements }: ContentPageClientProps) {
+const emptyFormData: AnnouncementInput = {
+  title: "",
+  content: "",
+  type: "general",
+  priority: "normal",
+  active: true,
+  targetType: "all",
+  targetRole: "",
+  targetUserId: "",
+  targetUserName: "",
+  sendEmail: false,
+}
+
+export default function ContentPageClient({ initialAnnouncements, initialTargetableUsers }: ContentPageClientProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const [announcements, setAnnouncements] = useState(initialAnnouncements)
+  const [targetableUsers, setTargetableUsers] = useState(initialTargetableUsers)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingAnnouncement, setEditingAnnouncement] = useState<any>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [announcementToDelete, setAnnouncementToDelete] = useState<any>(null)
 
-  const [formData, setFormData] = useState<{
-    title: string
-    content: string
-    type: "general" | "maintenance" | "feature" | "security"
-    priority: "low" | "normal" | "high" | "critical"
-    active: boolean
-    sendEmail: boolean
-  }>({
-    title: "",
-    content: "",
-    type: "general",
-    priority: "normal",
-    active: true,
-    sendEmail: false
-  })
+  const [formData, setFormData] = useState<AnnouncementInput>(emptyFormData)
 
-  const resetForm = () => {
-    setFormData({
-      title: "",
-      content: "",
-      type: "general",
-      priority: "normal",
-      active: true,
-      sendEmail: false
-    })
+  useEffect(() => {
+    // Keep this in sync with announcements created/edited from the admin content
+    // page (they share the same collection) without requiring a manual refresh.
+    const interval = setInterval(async () => {
+      try {
+        const data = await getAdminAnnouncements()
+        setAnnouncements(data)
+      } catch (error) {
+        console.error("Failed to refresh announcements:", error)
+      }
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const resetForm = () => setFormData(emptyFormData)
+
+  const validateTarget = () => {
+    if (!formData.title || !formData.content) {
+      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
+      return false
+    }
+    if (formData.targetType === "role" && !formData.targetRole) {
+      toast({ title: "Error", description: "Please select a recipient role", variant: "destructive" })
+      return false
+    }
+    if (formData.targetType === "user" && !formData.targetUserId) {
+      toast({ title: "Error", description: "Please select a recipient", variant: "destructive" })
+      return false
+    }
+    return true
   }
 
   const handleCreate = async () => {
-    if (!formData.title || !formData.content) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
-      return
-    }
+    if (!validateTarget()) return
 
     setIsSubmitting(true)
     try {
@@ -79,8 +108,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
         toast({ title: "Success", description: "Announcement created successfully" })
         setIsCreateOpen(false)
         resetForm()
-        // Refresh announcements
-        window.location.reload()
+        setAnnouncements(await getAdminAnnouncements())
       } else {
         toast({ title: "Error", description: result.message || "Failed to create announcement", variant: "destructive" })
       }
@@ -92,19 +120,16 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
   }
 
   const handleUpdate = async () => {
-    if (!editingAnnouncement || !formData.title || !formData.content) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
-      return
-    }
+    if (!editingAnnouncement || !validateTarget()) return
 
     setIsSubmitting(true)
     try {
-      const result = await updateAnnouncement(editingAnnouncement._id, formData)
+      const result = await updateAnnouncement(editingAnnouncement.id, formData)
       if (result.success) {
         toast({ title: "Success", description: "Announcement updated successfully" })
         setEditingAnnouncement(null)
         resetForm()
-        window.location.reload()
+        setAnnouncements(await getAdminAnnouncements())
       } else {
         toast({ title: "Error", description: result.message || "Failed to update announcement", variant: "destructive" })
       }
@@ -119,10 +144,10 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
     if (!announcementToDelete) return
 
     try {
-      const result = await deleteAnnouncement(announcementToDelete._id)
+      const result = await deleteAnnouncement(announcementToDelete.id)
       if (result.success) {
         toast({ title: "Success", description: "Announcement deleted successfully" })
-        setAnnouncements(prev => prev.filter(a => a._id !== announcementToDelete._id))
+        setAnnouncements(prev => prev.filter(a => a.id !== announcementToDelete.id))
       } else {
         toast({ title: "Error", description: result.message || "Failed to delete announcement", variant: "destructive" })
       }
@@ -147,7 +172,11 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
       type: announcement.type as "general" | "maintenance" | "feature" | "security",
       priority: announcement.priority as "low" | "normal" | "high" | "critical",
       active: announcement.active,
-      sendEmail: false
+      targetType: announcement.targetType || "all",
+      targetRole: announcement.targetRole || "",
+      targetUserId: announcement.targetUserId || "",
+      targetUserName: announcement.targetUserName || "",
+      sendEmail: false,
     })
   }
 
@@ -213,7 +242,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>{t('superadmin.type') || 'Type'}</Label>
-                  <Select value={formData.type} onValueChange={(value: "general" | "maintenance" | "feature" | "security") => setFormData({...formData, type: value})}>
+                  <Select value={formData.type} onValueChange={(value: AnnouncementInput['type']) => setFormData({...formData, type: value})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -227,7 +256,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                 </div>
                 <div>
                   <Label>{t('superadmin.priority') || 'Priority'}</Label>
-                  <Select value={formData.priority} onValueChange={(value: "low" | "normal" | "high" | "critical") => setFormData({...formData, priority: value})}>
+                  <Select value={formData.priority} onValueChange={(value: AnnouncementInput['priority']) => setFormData({...formData, priority: value})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -240,6 +269,15 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                   </Select>
                 </div>
               </div>
+              <AnnouncementTargetFields
+                idPrefix="sa-create"
+                formData={formData}
+                setFormData={setFormData}
+                targetableUsers={targetableUsers}
+                targetableUsersLoading={false}
+                t={t}
+                allowAdminTarget
+              />
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -252,10 +290,10 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="sendEmail"
-                    checked={formData.sendEmail}
+                    checked={!!formData.sendEmail}
                     onCheckedChange={(checked) => setFormData({...formData, sendEmail: checked})}
                   />
-                  <Label htmlFor="sendEmail">{t('superadmin.sendEmailNotification') || 'Send email notification to all users'}</Label>
+                  <Label htmlFor="sendEmail">{t('superadmin.sendEmailNotification') || 'Send email notification to recipients'}</Label>
                 </div>
               </div>
             </div>
@@ -287,14 +325,14 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
           </Card>
         ) : (
           announcements.map((announcement) => (
-            <Card key={announcement._id}>
+            <Card key={announcement.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
                     {getTypeIcon(announcement.type)}
                     <div>
                       <CardTitle className="text-lg">{announcement.title}</CardTitle>
-                      <div className="flex items-center space-x-2 mt-1">
+                      <div className="flex items-center flex-wrap gap-2 mt-1">
                         <Badge variant={getPriorityColor(announcement.priority)}>
                           {announcement.priority}
                         </Badge>
@@ -304,6 +342,10 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                             {t('superadmin.active') || 'Active'}
                           </Badge>
                         )}
+                        <Badge variant="outline" className="flex items-center gap-1 text-gray-600">
+                          {announcement.targetType !== 'all' && <Users className="h-3 w-3" />}
+                          {getAnnouncementTargetLabel(announcement, t)}
+                        </Badge>
                       </div>
                     </div>
                   </div>
@@ -345,7 +387,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
       </div>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingAnnouncement} onOpenChange={() => setEditingAnnouncement(null)}>
+      <Dialog open={!!editingAnnouncement} onOpenChange={(open) => { if (!open) { setEditingAnnouncement(null); resetForm() } }}>
         <DialogContent className="max-w-2xl flex flex-col max-h-[90vh]">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>{t('superadmin.editAnnouncement') || 'Edit Announcement'}</DialogTitle>
@@ -373,7 +415,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>{t('superadmin.type') || 'Type'}</Label>
-                <Select value={formData.type} onValueChange={(value: "general" | "maintenance" | "feature" | "security") => setFormData({...formData, type: value})}>
+                <Select value={formData.type} onValueChange={(value: AnnouncementInput['type']) => setFormData({...formData, type: value})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -387,7 +429,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
               </div>
               <div>
                 <Label>{t('superadmin.priority') || 'Priority'}</Label>
-                <Select value={formData.priority} onValueChange={(value: "low" | "normal" | "high" | "critical") => setFormData({...formData, priority: value})}>
+                <Select value={formData.priority} onValueChange={(value: AnnouncementInput['priority']) => setFormData({...formData, priority: value})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -400,6 +442,15 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
                 </Select>
               </div>
             </div>
+            <AnnouncementTargetFields
+              idPrefix="sa-edit"
+              formData={formData}
+              setFormData={setFormData}
+              targetableUsers={targetableUsers}
+              targetableUsersLoading={false}
+              t={t}
+              allowAdminTarget
+            />
             <div className="flex items-center space-x-2">
               <Switch
                 id="edit-active"
@@ -410,7 +461,7 @@ export default function ContentPageClient({ initialAnnouncements }: ContentPageC
             </div>
           </div>
           <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setEditingAnnouncement(null)}>
+            <Button variant="outline" onClick={() => { setEditingAnnouncement(null); resetForm() }}>
               {t('superadmin.cancel') || 'Cancel'}
             </Button>
             <Button onClick={handleUpdate} disabled={isSubmitting}>

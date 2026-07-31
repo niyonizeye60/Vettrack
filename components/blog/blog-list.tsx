@@ -1,8 +1,26 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Calendar, User } from "lucide-react"
+import { getPublishedBlogPosts } from "@/lib/actions/blog"
+
+interface DynamicBlogPost {
+  id: string
+  title: string
+  excerpt: string
+  image: string
+  category: string
+  author: string
+  createdAt: string | Date
+}
+
+interface BlogListProps {
+  dynamicPosts?: DynamicBlogPost[]
+}
 
 const blogPosts = [
   {
@@ -70,11 +88,42 @@ const blogPosts = [
   },
 ]
 
-export default function BlogList() {
+export default function BlogList({ dynamicPosts: initialDynamicPosts = [] }: BlogListProps) {
+  const [dynamicPosts, setDynamicPosts] = useState(initialDynamicPosts)
+
+  useEffect(() => {
+    // Picks up newly published (or unpublished) posts without a full page reload.
+    const interval = setInterval(async () => {
+      try {
+        const posts = await getPublishedBlogPosts()
+        setDynamicPosts(posts)
+      } catch (error) {
+        console.error('Failed to refresh blog posts:', error)
+      }
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const formattedDynamicPosts = dynamicPosts.map((post) => ({
+    id: post.id,
+    title: post.title,
+    excerpt: post.excerpt,
+    image: post.image,
+    date: new Date(post.createdAt).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }),
+    author: post.author,
+    category: post.category,
+  }))
+
+  const allPosts = [...formattedDynamicPosts, ...blogPosts]
+
   return (
     <div className="space-y-12">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {blogPosts.map((post) => (
+        {allPosts.map((post) => (
           <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-shadow">
             <div className="relative h-48">
               <Image src={post.image || "/placeholder.svg"} alt={post.title} fill className="object-cover" />

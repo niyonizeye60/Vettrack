@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Calendar, User, ArrowLeft } from "lucide-react"
 import { notFound } from "next/navigation"
+import { getBlogPostById } from "@/lib/actions/blog"
+import ViewTracker from "@/components/blog/view-tracker"
 
 const blogPosts = [
   {
@@ -121,43 +123,96 @@ interface BlogPostPageProps {
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { id } = await params
-  const postId = Number.parseInt(id)
-  const post = blogPosts.find((p) => p.id === postId)
+  // Static posts use small numeric ids; dynamic posts use 24-char Mongo ObjectIds.
+  // Number.parseInt("6a1b2c...") would silently return 6, so only treat the id as a
+  // static post id when it's made up entirely of digits.
+  const staticPost = /^\d+$/.test(id) ? blogPosts.find((p) => p.id === Number(id)) : undefined
 
-  if (!post) {
+  if (staticPost) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 pt-16 pb-8 max-w-4xl">
+          <div className="mb-8">
+            <Card className="overflow-hidden">
+              <div className="relative h-64 md:h-96">
+                <Image src={staticPost.image || "/placeholder.svg"} alt={staticPost.title} fill className="object-cover" />
+                <div className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                  {staticPost.category}
+                </div>
+              </div>
+
+              <CardContent className="p-8">
+                <div className="flex items-center text-sm text-muted-foreground mb-6">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  <span>{staticPost.date}</span>
+                  <span className="mx-3">•</span>
+                  <User className="h-4 w-4 mr-2" />
+                  <span>{staticPost.author}</span>
+                </div>
+
+                <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-6 text-balance">{staticPost.title}</h1>
+
+                <div className="prose prose-lg max-w-none text-foreground">
+                  {staticPost.content.split("\n\n").map((paragraph, index) => (
+                    <p key={index} className="mb-6 leading-relaxed text-pretty">
+                      {paragraph}
+                    </p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center">
+            <Button asChild>
+              <Link href="/blog">Read More Articles</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const dynamicPost = await getBlogPostById(id)
+
+  if (!dynamicPost || dynamicPost.status !== "published") {
     notFound()
   }
 
+  const formattedDate = new Date(dynamicPost.createdAt).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
+
   return (
     <div className="min-h-screen bg-background">
+      <ViewTracker postId={dynamicPost.id} />
       <div className="container mx-auto px-4 pt-16 pb-8 max-w-4xl">
         <div className="mb-8">
           <Card className="overflow-hidden">
             <div className="relative h-64 md:h-96">
-              <Image src={post.image || "/placeholder.svg"} alt={post.title} fill className="object-cover" />
+              <Image src={dynamicPost.image || "/placeholder.svg"} alt={dynamicPost.title} fill className="object-cover" />
               <div className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                {post.category}
+                {dynamicPost.category}
               </div>
             </div>
 
             <CardContent className="p-8">
               <div className="flex items-center text-sm text-muted-foreground mb-6">
                 <Calendar className="h-4 w-4 mr-2" />
-                <span>{post.date}</span>
+                <span>{formattedDate}</span>
                 <span className="mx-3">•</span>
                 <User className="h-4 w-4 mr-2" />
-                <span>{post.author}</span>
+                <span>{dynamicPost.author}</span>
               </div>
 
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-6 text-balance">{post.title}</h1>
+              <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-6 text-balance">{dynamicPost.title}</h1>
 
-              <div className="prose prose-lg max-w-none text-foreground">
-                {post.content.split("\n\n").map((paragraph, index) => (
-                  <p key={index} className="mb-6 leading-relaxed text-pretty">
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
+              <div
+                className="prose prose-lg max-w-none text-foreground [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:text-xl [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-primary [&_a]:underline"
+                dangerouslySetInnerHTML={{ __html: dynamicPost.content }}
+              />
             </CardContent>
           </Card>
         </div>
