@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Users, FileText, Calendar, MessageSquare, TrendingUp, AlertCircle, Plus, ArrowRight, Mail, Phone, MapPin, BadgeCheck } from "lucide-react"
+import { Users, FileText, Calendar, MessageSquare, UserCheck, AlertCircle, Plus, ArrowRight, Mail, Phone, MapPin, BadgeCheck } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AnnouncementsBanner from "@/components/ui/announcements-banner"
@@ -42,10 +42,15 @@ type DashboardData = {
     priority: string
     createdAt: string
   }>
-  performance: {
-    userSatisfaction: number
-    responseTime: string
-    resolutionRate: number
+  pendingApprovals: {
+    count: number
+    users: Array<{
+      id: string
+      name: string
+      role: "farmer" | "doctor"
+      specialization: string | null
+      createdAt: string
+    }>
   }
 }
 
@@ -285,7 +290,7 @@ export default function AdminDashboard() {
                 {t('admin.recentAlerts')}
               </CardTitle>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/admin/support">
+                <Link href="/admin/users">
                   {t('admin.viewAll')}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
@@ -322,44 +327,47 @@ export default function AdminDashboard() {
         
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
-              <TrendingUp className="h-4 w-4 text-green-600" />
-              {t('admin.performance')}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                <UserCheck className="h-4 w-4 text-yellow-600" />
+                {t('admin.pendingApprovals')}
+              </CardTitle>
+              {data.pendingApprovals.count > 0 && (
+                <Badge className="bg-yellow-100 text-yellow-800">{data.pendingApprovals.count}</Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm">{t('admin.userSatisfaction')}</span>
-                  <span className="text-sm font-medium text-green-600">{data.performance.userSatisfaction}%</span>
+            <div className="space-y-3">
+              {data.pendingApprovals.users.length > 0 ? (
+                data.pendingApprovals.users.map((user) => (
+                  <div key={user.id} className="flex items-start justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-yellow-900 truncate">{user.name}</p>
+                      <p className="text-xs text-yellow-700 mt-0.5">
+                        {user.role === 'doctor' ? t('admin.doctor') : t('admin.farmer')}
+                        {user.specialization ? ` · ${user.specialization}` : ''}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-yellow-700 border-yellow-200 flex-shrink-0 ml-2"
+                      onClick={() => setViewingUserId(user.id)}
+                    >
+                      {t('admin.review')}
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>{t('admin.noPendingApprovals')}</p>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{width: `${data.performance.userSatisfaction}%`}}></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm">{t('admin.responseTime')}</span>
-                  <span className="text-sm font-medium text-blue-600">{data.performance.responseTime}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{width: '85%'}}></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm">{t('admin.resolutionRate')}</span>
-                  <span className="text-sm font-medium text-green-600">{data.performance.resolutionRate}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{width: `${data.performance.resolutionRate}%`}}></div>
-                </div>
-              </div>
+              )}
             </div>
             <Button className="w-full mt-4" variant="outline" asChild>
-              <Link href="/admin/reports">
-                {t('admin.viewDetailedReports')}
+              <Link href="/admin/users">
+                {t('admin.manageUsers')}
               </Link>
             </Button>
           </CardContent>

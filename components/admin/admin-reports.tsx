@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart3, TrendingUp, Users, Calendar, Download, Eye } from "lucide-react"
+import { BarChart3, TrendingUp, Users, Calendar, Download, Eye, MessageSquare, ArrowRight } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -75,11 +75,11 @@ export default function AdminReports() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const reportMeta: Record<ReportType, { title: string; description: string; icon: any }> = {
-    users: { title: t('admin.userActivityReport'), description: t('admin.userActivityDescription'), icon: Users },
-    appointments: { title: t('admin.appointmentAnalytics'), description: t('admin.appointmentAnalyticsDescription'), icon: Calendar },
-    performance: { title: t('admin.performanceMetrics'), description: t('admin.performanceMetricsDescription'), icon: TrendingUp },
-    regional: { title: t('admin.regionalOverview'), description: t('admin.regionalOverviewDescription'), icon: BarChart3 },
+  const reportMeta: Record<ReportType, { title: string; description: string; icon: any; iconBg: string; iconColor: string }> = {
+    users: { title: t('admin.userActivityReport'), description: t('admin.userActivityDescription'), icon: Users, iconBg: "bg-blue-100", iconColor: "text-blue-600" },
+    appointments: { title: t('admin.appointmentAnalytics'), description: t('admin.appointmentAnalyticsDescription'), icon: Calendar, iconBg: "bg-green-100", iconColor: "text-green-600" },
+    performance: { title: t('admin.performanceMetrics'), description: t('admin.performanceMetricsDescription'), icon: TrendingUp, iconBg: "bg-yellow-100", iconColor: "text-yellow-600" },
+    regional: { title: t('admin.regionalOverview'), description: t('admin.regionalOverviewDescription'), icon: BarChart3, iconBg: "bg-purple-100", iconColor: "text-purple-600" },
   }
 
   // ---- PDF helpers ----
@@ -353,60 +353,66 @@ export default function AdminReports() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
-            <p className="text-sm text-gray-500 font-medium">{t('admin.totalUsers')}</p>
-            <h3 className="text-2xl font-bold text-gray-900 mt-2">{totalUsers}</h3>
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.totalUsers')}</p>
+              <Users className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{totalUsers}</h3>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
-            <p className="text-sm text-gray-500 font-medium">{t('admin.totalAppointments')}</p>
-            <h3 className="text-2xl font-bold text-green-600 mt-2">{totalAppointments}</h3>
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.totalAppointments')}</p>
+              <Calendar className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{totalAppointments}</h3>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
-            <p className="text-sm text-gray-500 font-medium">{t('admin.completionRate')}</p>
-            <h3 className="text-2xl font-bold text-yellow-600 mt-2">{data?.performance.completionRate ?? 0}%</h3>
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.completionRate')}</p>
+              <TrendingUp className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-yellow-600 mt-2">{data?.performance.completionRate ?? 0}%</h3>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
-            <p className="text-sm text-gray-500 font-medium">{t('admin.openTickets')}</p>
-            <h3 className="text-2xl font-bold text-orange-600 mt-2">{data?.tickets.open ?? 0}</h3>
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('admin.openTickets')}</p>
+              <MessageSquare className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-orange-600 mt-2">{data?.tickets.open ?? 0}</h3>
           </CardContent>
         </Card>
       </div>
 
       {/* Reports Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {(Object.keys(reportMeta) as ReportType[]).map((type) => {
           const meta = reportMeta[type]
           const Icon = meta.icon
           return (
-            <Card key={type} className="border border-gray-200 shadow-sm">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Icon className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{meta.title}</CardTitle>
-                      <p className="text-sm text-gray-600">{meta.description}</p>
-                    </div>
+            <Card key={type} className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col">
+              <CardHeader className="flex-1">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className={`w-10 h-10 ${meta.iconBg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <Icon className={`h-5 w-5 ${meta.iconColor}`} />
                   </div>
-                  <div className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
-                    {t('admin.liveData')}
+                  <div className="min-w-0">
+                    <CardTitle className="text-lg">{meta.title}</CardTitle>
+                    <p className="text-sm text-gray-600 mt-0.5">{meta.description}</p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
+              <CardContent className="pt-0 sm:pt-0 border-t border-gray-100 mt-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
+                  <p className="text-xs text-gray-500 truncate">
                     {t('admin.lastGenerated')}: {data ? new Date(data.generatedAt).toLocaleString() : ""}
-                  </div>
-                  <div className="flex gap-2">
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-shrink-0">
                     <Button variant="outline" size="sm" onClick={() => setViewingReport(type)}>
                       <Eye className="h-4 w-4 mr-2" />
                       {t('admin.view')}
@@ -428,16 +434,49 @@ export default function AdminReports() {
         <CardHeader className="pb-4 border-b border-gray-100">
           <CardTitle className="text-base font-semibold text-gray-900">{t('admin.quickActions')}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button className="h-20 flex-col gap-2" onClick={() => setIsGenerateOpen(true)}>
-              <BarChart3 className="h-6 w-6" />
-              {t('admin.generateCustomReport')}
-            </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2" onClick={handleExportAllData} disabled={isExporting || !data}>
-              <Download className="h-6 w-6" />
-              {t('admin.exportAllData')}
-            </Button>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              <button
+                type="button"
+                className="w-full text-left p-4 sm:p-5 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+                onClick={() => setIsGenerateOpen(true)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <BarChart3 className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-medium text-gray-900">{t('admin.generateCustomReport')}</h3>
+                      <p className="text-sm text-gray-500 truncate">{t('admin.generateCustomReportDesc')}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                </div>
+              </button>
+            </Card>
+            <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+              <button
+                type="button"
+                className="w-full text-left p-4 sm:p-5 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+                onClick={handleExportAllData}
+                disabled={isExporting || !data}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Download className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-medium text-gray-900">{t('admin.exportAllData')}</h3>
+                      <p className="text-sm text-gray-500 truncate">{t('admin.exportAllDataDesc')}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                </div>
+              </button>
+            </Card>
           </div>
         </CardContent>
       </Card>
