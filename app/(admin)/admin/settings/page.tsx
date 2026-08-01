@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { MapPin } from "lucide-react"
 
 export default function AdminSettingsPage() {
   const { t } = useLanguage()
@@ -28,7 +29,10 @@ export default function AdminSettingsPage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  const [district, setDistrict] = useState("")
+  const [sector, setSector] = useState("")
   const [bio, setBio] = useState("")
+  const [currentPassword, setCurrentPassword] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
 
@@ -41,6 +45,8 @@ export default function AdminSettingsPage() {
         setAvatarPreview(userData.image ?? null)
         setEmail(userData.email ?? "")
         setPhone((userData as any).phone ?? "")
+        setDistrict((userData as any).district ?? "")
+        setSector((userData as any).sector ?? "")
         setBio((userData as any).bio ?? "")
         const parts = (userData.name ?? "").split(" ")
         setFirstName(parts[0] ?? "")
@@ -87,11 +93,18 @@ export default function AdminSettingsPage() {
       toast({ title: t("common.error") || "Error", description: t("admin.passwordMismatch") || "Passwords do not match.", variant: "destructive" })
       return
     }
+    if (password && !currentPassword) {
+      toast({ title: t("common.error") || "Error", description: t("admin.currentPasswordRequired") || "Current password is required to set a new password", variant: "destructive" })
+      return
+    }
     setSaving(true)
     try {
       const name = [firstName, lastName].filter(Boolean).join(" ").trim() || firstName
-      const payload: Record<string, string> = { name, email, phone, bio }
-      if (password) payload.password = password
+      const payload: Record<string, string> = { name, email, phone, district, sector, bio }
+      if (password) {
+        payload.password = password
+        payload.currentPassword = currentPassword
+      }
 
       const res = await fetch("/api/profile", {
         method: "PATCH",
@@ -105,6 +118,7 @@ export default function AdminSettingsPage() {
       }
 
       toast({ title: t("admin.profileUpdated") || "Saved", description: t("admin.profileUpdatedDesc") || "Your profile has been updated." })
+      setCurrentPassword("")
       setPassword("")
       setConfirmPassword("")
       await loadProfile()
@@ -252,6 +266,22 @@ export default function AdminSettingsPage() {
             />
           </div>
 
+          {/* District + Sector */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="district">
+                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.district") || "District"}</span>
+              </Label>
+              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="e.g., Kigali" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sector">
+                <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.sector") || "Sector"}</span>
+              </Label>
+              <Input id="sector" value={sector} onChange={(e) => setSector(e.target.value)} placeholder="e.g., Nyarugenge" />
+            </div>
+          </div>
+
           {/* Bio */}
           <div className="space-y-1.5">
             <Label htmlFor="bio">{t("admin.bio") || "Bio"}</Label>
@@ -266,6 +296,16 @@ export default function AdminSettingsPage() {
 
           {/* Password */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="currentPassword">{t("admin.currentPassword") || "Current password"}</Label>
+              <Input
+                id="currentPassword"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">{t("admin.newPassword") || "New password"}</Label>
               <Input

@@ -5,9 +5,10 @@ import UsersManagement from "@/components/superadmin/users-management"
 
 interface UsersPageClientProps {
   users: any[]
+  currentUserId: string | null
 }
 
-export default function UsersPageClient({ users }: UsersPageClientProps) {
+export default function UsersPageClient({ users, currentUserId }: UsersPageClientProps) {
   const { t } = useLanguage()
 
   return (
@@ -17,7 +18,7 @@ export default function UsersPageClient({ users }: UsersPageClientProps) {
         <p className="text-sm text-gray-500 mt-0.5">{t('superadmin.manageAllUsersSystem') || 'Manage all users in the system'}</p>
       </div>
 
-      <UsersManagement users={users} />
+      <UsersManagement users={users} currentUserId={currentUserId} />
     </div>
   )
 }

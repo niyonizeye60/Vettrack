@@ -64,6 +64,7 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
   const [profileEmail, setProfileEmail] = useState("")
   const [profilePhone, setProfilePhone] = useState("")
   const [profileBio, setProfileBio] = useState("")
+  const [profileCurrentPassword, setProfileCurrentPassword] = useState("")
   const [profilePassword, setProfilePassword] = useState("")
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("")
   const [profileSaving, setProfileSaving] = useState(false)
@@ -118,6 +119,10 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
       toast({ title: t("common.error"), description: t("superadmin.passwordMismatch"), variant: "destructive" })
       return
     }
+    if (profilePassword && !profileCurrentPassword) {
+      toast({ title: t("common.error"), description: t("superadmin.currentPasswordRequired"), variant: "destructive" })
+      return
+    }
     setProfileSaving(true)
     try {
       const payload: Record<string, string> = {
@@ -126,7 +131,10 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
         phone: profilePhone,
         bio: profileBio,
       }
-      if (profilePassword) payload.password = profilePassword
+      if (profilePassword) {
+        payload.password = profilePassword
+        payload.currentPassword = profileCurrentPassword
+      }
 
       const res = await fetch("/api/profile", {
         method: "PATCH",
@@ -140,6 +148,7 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
       }
 
       toast({ title: t("superadmin.profileUpdated"), description: t("superadmin.profileUpdatedDesc") })
+      setProfileCurrentPassword("")
       setProfilePassword("")
       setProfileConfirmPassword("")
       await loadProfile()
@@ -317,6 +326,16 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="profileCurrentPassword">{t('superadmin.currentPassword')}</Label>
+                <Input
+                  id="profileCurrentPassword"
+                  type="password"
+                  value={profileCurrentPassword}
+                  onChange={(e) => setProfileCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
               <div>
                 <Label htmlFor="profilePassword">{t('superadmin.newPassword')}</Label>
                 <Input

@@ -67,6 +67,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 
+// Some legacy/seeded user documents may lack createdAt (or hold a malformed
+// value) - date-fns' format() throws on an Invalid Date, which would crash
+// this whole page rather than just the one offending row.
+function formatDateSafe(value: string | Date | null | undefined, pattern: string) {
+  if (!value) return "—"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "—" : format(date, pattern)
+}
+
 interface User {
   _id: string
   name: string
@@ -87,13 +96,15 @@ interface User {
 
 interface UsersManagementProps {
   users: User[]
+  currentUserId?: string | null
 }
 
-export default function UsersManagement({ users }: UsersManagementProps) {
+export default function UsersManagement({ users, currentUserId }: UsersManagementProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [editRole, setEditRole] = useState<string>("farmer")
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
@@ -124,7 +135,8 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       user.role.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesRole = roleFilter === 'all' || user.role === roleFilter
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter
+    const matchesStatus = statusFilter === 'all'
+      || (statusFilter === 'online' ? user.isOnline === true : user.status === statusFilter)
     
     return matchesSearch && matchesRole && matchesStatus
   })
@@ -261,6 +273,10 @@ export default function UsersManagement({ users }: UsersManagementProps) {
         return "bg-red-100 text-red-800"
       case "inactive":
         return "bg-gray-100 text-gray-800"
+      case "pending_verification":
+        return "bg-yellow-100 text-yellow-800"
+      case "rejected":
+        return "bg-gray-200 text-gray-700"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -301,6 +317,8 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       case 'active': return t('superadmin.active')
       case 'suspended': return t('superadmin.suspended')
       case 'inactive': return 'Inactive' // Add this key if needed
+      case 'pending_verification': return t('superadmin.pendingVerification')
+      case 'rejected': return t('superadmin.rejected')
       default: return status
     }
   }
@@ -311,14 +329,14 @@ export default function UsersManagement({ users }: UsersManagementProps) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardContent className="p-3 sm:p-6">
-            <div className="text-xl sm:text-2xl font-bold">{filteredUsers.length}</div>
+            <div className="text-xl sm:text-2xl font-bold">{users.length}</div>
             <p className="text-xs sm:text-sm text-muted-foreground">{t('superadmin.totalUsers')}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 sm:p-6">
             <div className="text-xl sm:text-2xl font-bold text-green-600">
-              {filteredUsers.filter(u => u.status === 'active').length}
+              {users.filter(u => u.status === 'active').length}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">{t('superadmin.active')}</p>
           </CardContent>
@@ -326,7 +344,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
         <Card>
           <CardContent className="p-3 sm:p-6">
             <div className="text-xl sm:text-2xl font-bold text-blue-600">
-              {filteredUsers.filter(u => u.isOnline).length}
+              {users.filter(u => u.isOnline).length}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">{t('superadmin.online')}</p>
           </CardContent>
@@ -334,7 +352,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
         <Card>
           <CardContent className="p-3 sm:p-6">
             <div className="text-xl sm:text-2xl font-bold text-red-600">
-              {filteredUsers.filter(u => u.status === 'suspended').length}
+              {users.filter(u => u.status === 'suspended').length}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground">{t('superadmin.suspended')}</p>
           </CardContent>
@@ -408,6 +426,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('superadmin.allStatus')}</SelectItem>
+                <SelectItem value="online">{t('superadmin.online')}</SelectItem>
                 {statuses.map(status => (
                   <SelectItem key={status} value={status}>
                     {translateStatus(status)}
@@ -442,6 +461,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                       <DropdownMenuItem
                         onClick={() => {
                           setSelectedUser(user)
+                          setEditRole(user.role)
                           setIsEditDialogOpen(true)
                         }}
                       >
@@ -527,12 +547,12 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                   <div>
                     <span className="font-medium">{t('superadmin.joined')}:</span><br />
-                    {format(new Date(user.createdAt), "MMM dd, yyyy")}
+                    {formatDateSafe(user.createdAt, "MMM dd, yyyy")}
                   </div>
                   <div>
                     <span className="font-medium">{t('superadmin.lastLogin')}:</span><br />
-                    {user.lastLoginAt 
-                      ? format(new Date(user.lastLoginAt), "MMM dd, yyyy")
+                    {user.lastLoginAt
+                      ? formatDateSafe(user.lastLoginAt, "MMM dd, yyyy")
                       : t('superadmin.never')
                     }
                   </div>
@@ -595,11 +615,11 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {format(new Date(user.createdAt), "MMM dd, yyyy")}
+                        {formatDateSafe(user.createdAt, "MMM dd, yyyy")}
                       </TableCell>
                       <TableCell>
-                        {user.lastLoginAt 
-                          ? format(new Date(user.lastLoginAt), "MMM dd, yyyy 'at' h:mm a")
+                        {user.lastLoginAt
+                          ? formatDateSafe(user.lastLoginAt, "MMM dd, yyyy 'at' h:mm a")
                           : t('superadmin.never')
                         }
                       </TableCell>
@@ -731,7 +751,12 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                 </div>
                 <div>
                   <Label htmlFor="role">{t('superadmin.role')}</Label>
-                  <Select name="role" defaultValue={selectedUser.role}>
+                  <Select
+                    name="role"
+                    value={editRole}
+                    onValueChange={setEditRole}
+                    disabled={selectedUser._id === currentUserId}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -742,6 +767,11 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                       <SelectItem value="superadmin">{t('superadmin.superAdmin')}</SelectItem>
                     </SelectContent>
                   </Select>
+                  {selectedUser._id === currentUserId && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {t('superadmin.cannotChangeOwnRole') || "You cannot change your own role - ask another superadmin to do it."}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <div className="space-y-0.5 pr-4">
@@ -756,7 +786,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                     defaultChecked={selectedUser.isTestAccount || false}
                   />
                 </div>
-                {(selectedUser.role === "farmer" || selectedUser.role === "doctor") && (
+                {(editRole === "farmer" || editRole === "doctor") && (
                   <>
                     <div>
                       <Label htmlFor="district">{t('superadmin.district')}</Label>
@@ -776,7 +806,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                     </div>
                   </>
                 )}
-                {selectedUser.role === "doctor" && (
+                {editRole === "doctor" && (
                   <>
                     <div>
                       <Label htmlFor="licenseNumber">{t('superadmin.licenseNumber')}</Label>
@@ -928,7 +958,7 @@ export default function UsersManagement({ users }: UsersManagementProps) {
                 </p>
                 {selectedUser.lastLoginAt && (
                   <p className="text-sm text-gray-600">
-                    <strong>{t('superadmin.lastLogin')}:</strong> {format(new Date(selectedUser.lastLoginAt), "MMM dd, yyyy 'at' h:mm a")}
+                    <strong>{t('superadmin.lastLogin')}:</strong> {formatDateSafe(selectedUser.lastLoginAt, "MMM dd, yyyy 'at' h:mm a")}
                   </p>
                 )}
               </div>

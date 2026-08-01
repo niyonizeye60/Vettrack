@@ -923,9 +923,14 @@ export async function reportClientError(message: string, stack?: string) {
 
 export async function forceLogoutUser(userId: string) {
   try {
+    const actor = await getCurrentUser()
+    if (!actor || actor.role !== "superadmin") {
+      return { success: false, error: "Unauthorized" }
+    }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
-    
+
     // Convert userId string to ObjectId for MongoDB query
     const userObjectId = new ObjectId(userId)
     
@@ -937,14 +942,24 @@ export async function forceLogoutUser(userId: string) {
     // Update user's online status to false
     await db.collection("users").updateOne(
       { _id: userObjectId },
-      { 
-        $set: { 
+      {
+        $set: {
           isOnline: false,
           lastLogoutAt: new Date()
         }
       }
     )
-    
+
+    // Also flip the presence doc immediately - the "online" badge/count
+    // elsewhere reads from here (see lib/presence.ts), not from the users
+    // collection above, so without this the user could still show as
+    // online for up to ONLINE_THRESHOLD_MS after being force-logged-out.
+    await db.collection("presence").updateOne(
+      { _id: userObjectId } as any,
+      { $set: { isOnline: false } },
+      { upsert: true }
+    )
+
     console.log(`Force logged out user ${userId}, deleted ${deleteResult.deletedCount} sessions`)
     
     return { 

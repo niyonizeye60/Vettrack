@@ -6,6 +6,7 @@ import { ObjectId } from "mongodb"
 import { hashPassword } from "../password"
 import { getCurrentUser } from "./auth"
 import { logActivity, logSystemError as recordSystemError } from "../activity-log"
+import { isPresenceOnline, type PresenceDoc } from "../presence"
 
 // Every exported function in this file is a Next.js server action with its own
 // network-invocable endpoint, independent of which page renders it - so each one
@@ -55,12 +56,13 @@ export async function getAllUsers() {
 
     const users = await db.collection("users").find({}).toArray()
 
-    // Get active sessions to determine online status
-    const activeSessions = await db.collection("sessions").find({
-      expiresAt: { $gt: new Date() }
-    }).toArray()
-
-    const onlineUserIds = new Set(activeSessions.map(session => session.userId.toString()))
+    // Online status uses the same heartbeat-based presence collection as the rest of
+    // the app (chat, etc.) rather than raw session expiry - a session lasts 7 days, so
+    // "has an unexpired session" would call someone online days after they left.
+    const presenceDocs = await db.collection("presence").find({}).toArray()
+    const onlineUserIds = new Set(
+      presenceDocs.filter((doc) => isPresenceOnline(doc as PresenceDoc)).map((doc) => doc._id.toString())
+    )
 
     return users.map(user => ({
       _id: user._id.toString(),
@@ -89,7 +91,12 @@ export async function getAllUsers() {
 // Update user status (suspend/activate)
 export async function updateUserStatus(userId: string, status: "active" | "suspended" | "inactive") {
   try {
-    await requireSuperAdmin()
+    const currentUser = await requireSuperAdmin()
+
+    if (status !== "active" && currentUser._id.toString() === userId) {
+      return { success: false, message: "You cannot suspend or deactivate your own account" }
+    }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -708,15 +715,27 @@ function getNextRunDate(frequency: string): Date {
 // Update user information
 export async function updateUser(userId: string, formData: FormData) {
   try {
-    await requireSuperAdmin()
+    const currentUser = await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
+
+    const submittedRole = formData.get("role")
+
+    if (currentUser._id.toString() === userId) {
+      const existingUser = await db.collection("users").findOne(
+        { _id: new ObjectId(userId) },
+        { projection: { role: 1 } }
+      )
+      if (existingUser && submittedRole !== existingUser.role) {
+        return { success: false, message: "You cannot change your own role - ask another superadmin to do it" }
+      }
+    }
 
     const updateData = {
       name: formData.get("name"),
       email: formData.get("email"),
       phone: formData.get("phone"),
-      role: formData.get("role"),
+      role: submittedRole,
       isTestAccount: formData.get("isTestAccount") === "on",
       updatedAt: new Date()
     }
@@ -792,9 +811,19 @@ export async function updateUserPassword(userId: string, newPassword: string) {
 // Delete user
 export async function deleteUser(userId: string) {
   try {
-    await requireSuperAdmin()
+    const currentUser = await requireSuperAdmin()
+
+    if (currentUser._id.toString() === userId) {
+      return { success: false, message: "You cannot delete your own account" }
+    }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
+
+    const settings = await db.collection<SystemSettingsDoc>("system_settings").findOne({ _id: "global" })
+    if (settings?.allowUserDeletion === false) {
+      return { success: false, message: "User deletion is currently disabled in system settings" }
+    }
 
     const targetUser = await db.collection("users").findOne(
       { _id: new ObjectId(userId) },
@@ -1422,16 +1451,23 @@ export async function getOnlineUsersByRole() {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    // Collapse to distinct users first (a user can hold multiple active sessions),
-    // then count distinct users per role
-    const roleStats = await db.collection("sessions").aggregate([
-      { $match: { expiresAt: { $gt: new Date() } } },
-      { $group: { _id: "$userId", role: { $first: "$role" } } },
+    // Same heartbeat-based presence definition as getAllUsers - see comment there.
+    const presenceDocs = await db.collection("presence").find({}).toArray()
+    const onlineIds = presenceDocs
+      .filter((doc) => isPresenceOnline(doc as PresenceDoc))
+      .map((doc) => doc._id)
+
+    if (onlineIds.length === 0) {
+      return { total: 0, byRole: {} }
+    }
+
+    const roleStats = await db.collection("users").aggregate([
+      { $match: { _id: { $in: onlineIds } } },
       { $group: { _id: "$role", count: { $sum: 1 } } }
     ]).toArray()
 
     return {
-      total: roleStats.reduce((sum, stat) => sum + stat.count, 0),
+      total: onlineIds.length,
       byRole: roleStats.reduce((acc, stat) => {
         acc[stat._id] = stat.count
         return acc

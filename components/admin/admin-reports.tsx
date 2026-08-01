@@ -14,6 +14,8 @@ import { logPortalExport } from "@/lib/actions"
 
 type ReportType = "users" | "appointments" | "performance" | "regional"
 
+const REPORT_TIMESTAMPS_KEY = "vettrack-admin-report-timestamps"
+
 interface ReportsData {
   generatedAt: string
   stats: {
@@ -59,6 +61,30 @@ export default function AdminReports() {
   const [generateType, setGenerateType] = useState<ReportType>("users")
   const [generateFormat, setGenerateFormat] = useState<"pdf" | "csv" | "excel">("pdf")
   const [isExporting, setIsExporting] = useState(false)
+  const [reportTimestamps, setReportTimestamps] = useState<Partial<Record<ReportType, string>>>({})
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(REPORT_TIMESTAMPS_KEY)
+      if (stored) setReportTimestamps(JSON.parse(stored))
+    } catch (error) {
+      console.error("Failed to load report timestamps:", error)
+    }
+  }, [])
+
+  const markReportGenerated = useCallback((type: ReportType, when: Date = new Date()) => {
+    const iso = when.toISOString()
+    setReportTimestamps((prev) => {
+      const next = { ...prev, [type]: iso }
+      try {
+        window.localStorage.setItem(REPORT_TIMESTAMPS_KEY, JSON.stringify(next))
+      } catch (error) {
+        console.error("Failed to save report timestamps:", error)
+      }
+      return next
+    })
+    return iso
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -83,7 +109,7 @@ export default function AdminReports() {
   }
 
   // ---- PDF helpers ----
-  const drawPdfHeader = (doc: any, title: string) => {
+  const drawPdfHeader = (doc: any, title: string, generatedAt: string) => {
     doc.setTextColor(17, 24, 39)
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
@@ -91,7 +117,7 @@ export default function AdminReports() {
     doc.setTextColor(75, 85, 99)
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Vettrack · ${t('admin.lastGenerated')}: ${data ? new Date(data.generatedAt).toLocaleString() : ""}`, 15, 28)
+    doc.text(`Vettrack · ${t('admin.lastGenerated')}: ${new Date(generatedAt).toLocaleString()}`, 15, 28)
     doc.setDrawColor(226, 232, 240)
     doc.line(15, 34, 195, 34)
     return 46
@@ -176,7 +202,8 @@ export default function AdminReports() {
       const jsPDF = (await import('jspdf')).default
       const doc = new jsPDF()
       const { summary, table } = buildReportRows(type)
-      let y = drawPdfHeader(doc, reportMeta[type].title)
+      const generatedAt = markReportGenerated(type)
+      let y = drawPdfHeader(doc, reportMeta[type].title, generatedAt)
       if (summary.length) {
         y = drawPdfLines(doc, y, summary.map(([label, value]) => `${label}: ${value}`))
         y += 4
@@ -195,6 +222,7 @@ export default function AdminReports() {
 
   const exportCSV = (type: ReportType) => {
     if (!data) return
+    markReportGenerated(type)
     const { summary, table } = buildReportRows(type)
     const lines: string[] = []
     summary.forEach(([label, value]) => lines.push(`"${label}","${value}"`))
@@ -217,6 +245,7 @@ export default function AdminReports() {
     if (!data) return
     try {
       const XLSX = await import('xlsx')
+      markReportGenerated(type)
       const { summary, table } = buildReportRows(type)
       const wb = XLSX.utils.book_new()
       if (summary.length) {
@@ -410,7 +439,10 @@ export default function AdminReports() {
               <CardContent className="pt-0 sm:pt-0 border-t border-gray-100 mt-auto">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
                   <p className="text-xs text-gray-500 truncate">
-                    {t('admin.lastGenerated')}: {data ? new Date(data.generatedAt).toLocaleString() : ""}
+                    {t('admin.lastGenerated')}: {(() => {
+                      const timestamp = reportTimestamps[type] ?? data?.generatedAt
+                      return timestamp ? new Date(timestamp).toLocaleString() : ""
+                    })()}
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-shrink-0">
                     <Button variant="outline" size="sm" onClick={() => setViewingReport(type)}>
