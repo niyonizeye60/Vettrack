@@ -27,10 +27,12 @@ export async function registerAnimal(formData: FormData, ownerId: string) {
       ownerName: ownerName, // Use user's name from DB if available
       phoneNumber: formData.get("phoneNumber"),
       price: Number(formData.get("price")),
+      weight: formData.get("weight") ? Number(formData.get("weight")) : null,
       acquisitionType: formData.get("acquisitionType"),
       earTagId: formData.get("earTagId") || null,
       insuranceId: formData.get("insuranceId") || null,
       gender: formData.get("gender") || null,
+      lactationStatus: formData.get("type") === "cow" && formData.get("gender") === "female" ? "dry" : null,
       createdAt: new Date(),
       ownerId, // Associate this animal with its owner
       status: "Healthy", // Default status
@@ -105,10 +107,14 @@ export async function updateAnimal(id: string, formData: FormData) {
       ownerName: formData.get("ownerName"),
       phoneNumber: formData.get("phoneNumber"),
       price: Number(formData.get("price")),
+      weight: formData.get("weight") ? Number(formData.get("weight")) : (originalAnimal.weight ?? null),
       acquisitionType: formData.get("acquisitionType") || originalAnimal.acquisitionType || null,
       earTagId: formData.get("earTagId") || originalAnimal.earTagId || null,
       insuranceId: formData.get("insuranceId") || originalAnimal.insuranceId || null,
       gender: formData.get("gender") || originalAnimal.gender || null,
+      lactationStatus: formData.get("type") === "cow" && (formData.get("gender") || originalAnimal.gender) === "female"
+        ? (originalAnimal.lactationStatus || "dry")
+        : null,
       status: formData.get("status") || originalAnimal.status || "Healthy",
       updatedAt: new Date(),
       ownerId: ownerId,
@@ -135,6 +141,50 @@ export async function updateAnimal(id: string, formData: FormData) {
   } catch (error) {
     console.error("Error updating animal:", error)
     return { success: false, error: "Failed to update animal" }
+  }
+}
+
+export async function updateAnimalLactationStatus(id: string, status: "lactating" | "dry", ownerId?: string) {
+  try {
+    if (status !== "lactating" && status !== "dry") {
+      return { success: false, error: "Invalid lactation status" }
+    }
+
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const query: Record<string, any> = { _id: new ObjectId(id) }
+    if (ownerId) {
+      query.$or = [
+        { ownerId },
+        { 'owner._id': ownerId },
+        { 'owner': ownerId }
+      ]
+    }
+
+    const animal = await db.collection("animals").findOne(query)
+    if (!animal) {
+      return { success: false, error: "Animal not found or you don't have permission to edit it" }
+    }
+    if (animal.type !== "cow" || animal.gender !== "female") {
+      return { success: false, error: "Only female cows have a lactation status" }
+    }
+
+    await db.collection("animals").updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { lactationStatus: status, updatedAt: new Date() } }
+    )
+
+    revalidatePath("/farmer/animals")
+    revalidatePath("/dashboard/animals")
+
+    const actor = await getCurrentUser()
+    if (actor) await logActivity(actor._id, "livestock.animal_updated", `Marked "${animal.name}" as ${status}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating lactation status:", error)
+    return { success: false, error: "Failed to update lactation status" }
   }
 }
 
@@ -547,10 +597,12 @@ export async function getAnimals(ownerId?: string) {
       ownerName: animal.ownerName,
       phoneNumber: animal.phoneNumber,
       price: animal.price,
+      weight: animal.weight ?? null,
       acquisitionType: animal.acquisitionType || null,
       earTagId: animal.earTagId || null,
       insuranceId: animal.insuranceId || null,
       gender: animal.gender || null,
+      lactationStatus: animal.type === "cow" && animal.gender === "female" ? (animal.lactationStatus || "dry") : null,
       ownerId: animal.ownerId || null,
       status: animal.status || "Healthy",
       createdAt: animal.createdAt.toISOString()
@@ -582,10 +634,12 @@ export async function getAnimalById(id: string) {
       ownerName: animal.ownerName,
       phoneNumber: animal.phoneNumber,
       price: animal.price,
+      weight: animal.weight ?? null,
       acquisitionType: animal.acquisitionType || null,
       earTagId: animal.earTagId || null,
       insuranceId: animal.insuranceId || null,
       gender: animal.gender || null,
+      lactationStatus: animal.type === "cow" && animal.gender === "female" ? (animal.lactationStatus || "dry") : null,
       ownerId: animal.ownerId || null,
       status: animal.status || "Healthy",
       createdAt: animal.createdAt ? animal.createdAt.toISOString() : null,

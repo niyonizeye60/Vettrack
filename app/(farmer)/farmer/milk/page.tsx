@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Milk, Plus, Pencil, Trash2, BarChart3, History, TrendingUp, DollarSign, Droplets, Download, FileText, Eye } from "lucide-react"
@@ -16,7 +17,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
-interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null }
+interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null }
 interface MilkRecord {
   _id: string; cowId: string; cowName: string; liters: number
   homeConsumption: number | null; soldLiters: number | null
@@ -35,7 +36,13 @@ export default function MilkProductionPage() {
   const { t } = useLanguage()
   const [user, setUser] = useState<any>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
-  const milkableAnimals = animals.filter(a => MILK_PRODUCING_TYPES.includes((a.type || "").toLowerCase()) && (!a.gender || a.gender === "female"))
+  const milkableAnimals = animals.filter(a => {
+    const type = (a.type || "").toLowerCase()
+    if (!MILK_PRODUCING_TYPES.includes(type)) return false
+    if (a.gender && a.gender !== "female") return false
+    if (type === "cow" && a.lactationStatus !== "lactating") return false
+    return true
+  })
   const [records, setRecords] = useState<MilkRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -630,14 +637,15 @@ export default function MilkProductionPage() {
                 {/* Cow */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.cow')} *</label>
-                  <Select value={cowId} onValueChange={setCowId}>
-                    <SelectTrigger className={errors.cowId ? "border-red-500" : ""}>
-                      <SelectValue placeholder={t('farmer.cow')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {milkableAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    value={cowId}
+                    onValueChange={setCowId}
+                    options={milkableAnimals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` }))}
+                    placeholder={t('farmer.cow')}
+                    searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                    emptyText={t('farmer.noResultsFound') || "No animals found."}
+                    className={errors.cowId ? "border-red-500" : ""}
+                  />
                   {errors.cowId && <p className="text-xs text-red-500">{errors.cowId}</p>}
                 </div>
 
@@ -783,13 +791,17 @@ export default function MilkProductionPage() {
             <CardContent className="space-y-4">
               {/* Filters */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-gray-50 rounded-xl">
-                <Select value={filterCow || "all"} onValueChange={v => setFilterCow(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder={t('farmer.allCows')} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('farmer.allCows')}</SelectItem>
-                    {milkableAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  value={filterCow || "all"}
+                  onValueChange={v => setFilterCow(v === "all" ? "" : v)}
+                  options={[
+                    { value: "all", label: t('farmer.allCows') },
+                    ...milkableAnimals.map(a => ({ value: a._id, label: a.name })),
+                  ]}
+                  placeholder={t('farmer.allCows')}
+                  searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                  emptyText={t('farmer.noResultsFound') || "No animals found."}
+                />
                 <Select value={filterSession || "all"} onValueChange={v => setFilterSession(v === "all" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder={t('farmer.allSessions')} /></SelectTrigger>
                   <SelectContent>
@@ -1062,15 +1074,16 @@ export default function MilkProductionPage() {
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">{t('farmer.animal')}</label>
-              <Select value={exportCow} onValueChange={setExportCow}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
-                  {milkableAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={exportCow}
+                onValueChange={setExportCow}
+                options={[
+                  { value: "all", label: t('farmer.allAnimals') },
+                  ...milkableAnimals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` })),
+                ]}
+                searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                emptyText={t('farmer.noResultsFound') || "No animals found."}
+              />
             </div>
 
             <div className="space-y-1">

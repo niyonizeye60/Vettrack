@@ -31,6 +31,7 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
     ownerName: "",
     phoneNumber: "",
     price: "",
+    weight: "",
     acquisitionType: "",
     earTagId: "",
     insuranceId: "",
@@ -185,6 +186,12 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
           <Label htmlFor="add-price">{t('farmer.price')} (RWF)</Label>
           <Input id="add-price" name="price" type="number" value={formData.price}
             onChange={handleChange} placeholder={t('farmer.enterPrice')} required />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="add-weight">{t('farmer.weight')} (KG){optionalLabel}</Label>
+          <Input id="add-weight" name="weight" type="number" min="0" step="0.1" value={formData.weight}
+            onChange={handleChange} placeholder={t('farmer.enterWeight')} />
         </div>
 
         <div className="space-y-1.5">

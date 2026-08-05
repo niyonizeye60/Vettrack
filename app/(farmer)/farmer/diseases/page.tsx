@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -44,7 +45,7 @@ const SESSIONS = ["Morning", "Evening"]
 const COMMON_DISEASES = [
   "Foot and Mouth Disease", "Mastitis", "Bovine Respiratory Disease",
   "Brucellosis", "Tuberculosis", "Lumpy Skin Disease", "East Coast Fever",
-  "Trypanosomiasis", "Newcastle Disease", "Anthrax", "Blackleg", "Other"
+  "Trypanosomiasis", "Newcastle Disease", "Anthrax", "Blackleg"
 ]
 
 const STATUS_STYLES: Record<string, string> = {
@@ -75,7 +76,6 @@ export default function DiseaseManagementPage() {
   // Disease form
   const [animalId, setAnimalId] = useState("")
   const [diseaseName, setDiseaseName] = useState("")
-  const [customDisease, setCustomDisease] = useState("")
   const [symptoms, setSymptoms] = useState("")
   const [treatment, setTreatment] = useState("")
   const [diagnosedDate, setDiagnosedDate] = useState(today)
@@ -187,8 +187,7 @@ export default function DiseaseManagementPage() {
   const validate = () => {
     const e: Record<string, string> = {}
     if (!animalId) e.animalId = "Select an animal"
-    const finalDisease = diseaseName === "Other" ? customDisease : diseaseName
-    if (!finalDisease) e.diseaseName = "Enter the disease name"
+    if (!diseaseName.trim()) e.diseaseName = "Enter the disease name"
     if (!diagnosedDate) e.diagnosedDate = "Select a date"
     setErrors(e)
     return Object.keys(e).length === 0
@@ -210,7 +209,7 @@ export default function DiseaseManagementPage() {
   }
 
   const resetForm = () => {
-    setAnimalId(""); setDiseaseName(""); setCustomDisease(""); setSymptoms("")
+    setAnimalId(""); setDiseaseName(""); setSymptoms("")
     setTreatment(""); setDiagnosedDate(today); setResolvedDate("")
     setStatus("Active"); setVeterinarianName(""); setVetOrigin(""); setNotes("")
     setInsuranceId(""); setEarTagId("")
@@ -228,11 +227,10 @@ export default function DiseaseManagementPage() {
     if (!validate()) return
     setSaving(true)
     const animal = animals.find(a => a._id === animalId)
-    const finalDisease = diseaseName === "Other" ? customDisease : diseaseName
     const body = {
       farmerId: user._id.toString(), animalId,
       animalName: animal?.name || null,
-      diseaseName: finalDisease, symptoms, treatment,
+      diseaseName: diseaseName.trim(), symptoms, treatment,
       diagnosedDate, resolvedDate: resolvedDate || null,
       status, notes, veterinarianName, vetOrigin,
     }
@@ -281,9 +279,7 @@ export default function DiseaseManagementPage() {
     setAnimalId(r.animalId)
     setInsuranceId(animals.find(a => a._id === r.animalId)?.insuranceId || "")
     setEarTagId(animals.find(a => a._id === r.animalId)?.earTagId || "")
-    const isCommon = COMMON_DISEASES.includes(r.diseaseName)
-    setDiseaseName(isCommon ? r.diseaseName : "Other")
-    setCustomDisease(isCommon ? "" : r.diseaseName)
+    setDiseaseName(r.diseaseName)
     setSymptoms(r.symptoms || "")
     setTreatment(r.treatment || "")
     setDiagnosedDate(r.diagnosedDate)
@@ -1022,14 +1018,15 @@ export default function DiseaseManagementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.animal')} *</label>
-                  <Select value={animalId} onValueChange={setAnimalId}>
-                    <SelectTrigger className={errors.animalId ? "border-red-500" : ""}>
-                      <SelectValue placeholder={t('farmer.selectAnimal')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    value={animalId}
+                    onValueChange={setAnimalId}
+                    options={animals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` }))}
+                    placeholder={t('farmer.selectAnimal')}
+                    searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                    emptyText={t('farmer.noResultsFound') || "No animals found."}
+                    className={errors.animalId ? "border-red-500" : ""}
+                  />
                   {errors.animalId && <p className="text-xs text-red-500">{errors.animalId}</p>}
                 </div>
 
@@ -1053,23 +1050,18 @@ export default function DiseaseManagementPage() {
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.disease')} *</label>
-                  <Select value={diseaseName} onValueChange={setDiseaseName}>
-                    <SelectTrigger className={errors.diseaseName ? "border-red-500" : ""}>
-                      <SelectValue placeholder={t('farmer.disease')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMMON_DISEASES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    list="disease-suggestions"
+                    placeholder={t('farmer.enterDiseaseName') || "Type or select a disease..."}
+                    value={diseaseName}
+                    onChange={e => setDiseaseName(e.target.value)}
+                    className={errors.diseaseName ? "border-red-500" : ""}
+                  />
+                  <datalist id="disease-suggestions">
+                    {COMMON_DISEASES.map(d => <option key={d} value={d} />)}
+                  </datalist>
                   {errors.diseaseName && <p className="text-xs text-red-500">{errors.diseaseName}</p>}
                 </div>
-
-                {diseaseName === "Other" && (
-                  <div className="space-y-1 md:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">{t('farmer.specifyDisease')} *</label>
-                    <Input placeholder="Enter disease name..." value={customDisease} onChange={e => setCustomDisease(e.target.value)} className={errors.diseaseName ? "border-red-500" : ""} />
-                  </div>
-                )}
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.status')} *</label>
@@ -1354,13 +1346,17 @@ export default function DiseaseManagementPage() {
                     {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={filterAnimal || "all"} onValueChange={v => setFilterAnimal(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder={t('farmer.allAnimals')} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
-                    {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  value={filterAnimal || "all"}
+                  onValueChange={v => setFilterAnimal(v === "all" ? "" : v)}
+                  options={[
+                    { value: "all", label: t('farmer.allAnimals') },
+                    ...animals.map(a => ({ value: a._id, label: a.name })),
+                  ]}
+                  placeholder={t('farmer.allAnimals')}
+                  searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                  emptyText={t('farmer.noResultsFound') || "No animals found."}
+                />
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-gray-500 whitespace-nowrap">{filteredRecords.length} found</p>

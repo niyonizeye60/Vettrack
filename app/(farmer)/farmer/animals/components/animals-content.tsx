@@ -13,10 +13,11 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
-import { Bell, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Bell, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
-import { deleteAnimal } from "@/lib/actions"
+import { deleteAnimal, updateAnimalLactationStatus } from "@/lib/actions"
 import AddAnimalForm from "@/components/dashboard/add-animal-form"
 import EditAnimalForm from "@/components/dashboard/edit-animal-form"
 
@@ -48,6 +49,8 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
   const [inseminationRecords, setInseminationRecords] = useState<any[]>([])
   const [recordsLoaded, setRecordsLoaded] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
+  const [activeTab, setActiveTab] = useState<"all" | "lactating" | "dry">("all")
+  const [togglingId, setTogglingId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -111,7 +114,31 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
 
   const deletePregnancy = deleteAnimalTarget ? getPregnancy(deleteAnimalTarget._id) : null
 
-  const filteredAnimals = animals.filter((a) => {
+  const cows = animals.filter((a) => (a.type || "").toLowerCase() === "cow" && a.gender === "female")
+  const lactatingCows = cows.filter((a) => a.lactationStatus === "lactating")
+  const dryCows = cows.filter((a) => a.lactationStatus !== "lactating")
+
+  const handleToggleLactation = async (animal: any) => {
+    const next = animal.lactationStatus === "lactating" ? "dry" : "lactating"
+    setTogglingId(animal._id)
+    try {
+      const result = await updateAnimalLactationStatus(animal._id, next, farmerId)
+      if (result.success) {
+        router.refresh()
+      } else {
+        toast({ title: t('farmer.actionFailed'), description: result.error, variant: "destructive" })
+      }
+    } catch (error) {
+      console.error("Error updating lactation status:", error)
+      toast({ title: t('farmer.actionFailed'), variant: "destructive" })
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const tabAnimals = activeTab === "lactating" ? lactatingCows : activeTab === "dry" ? dryCows : animals
+
+  const filteredAnimals = tabAnimals.filter((a) => {
     const q = searchTerm.trim().toLowerCase()
     if (!q) return true
     return (
@@ -155,6 +182,18 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
               />
             </div>
           </div>
+          {cows.length > 0 && (
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "all" | "lactating" | "dry")} className="mt-4">
+              <TabsList>
+                <TabsTrigger value="all">{t('farmer.allAnimals')} ({animals.length})</TabsTrigger>
+                <TabsTrigger value="lactating" className="flex items-center gap-1.5">
+                  <Droplets className="h-3.5 w-3.5" />
+                  {t('farmer.lactatingCows')} ({lactatingCows.length})
+                </TabsTrigger>
+                <TabsTrigger value="dry">{t('farmer.dryCows')} ({dryCows.length})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           {animals.length === 0 ? (
@@ -182,6 +221,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                     <TableHead className="font-semibold text-gray-600">{t('farmer.acquisitionType')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.location')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.status')}</TableHead>
+                    <TableHead className="font-semibold text-gray-600">{t('farmer.milkStatus')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.gender')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.price')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.actions')}</TableHead>
@@ -190,7 +230,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                 <TableBody>
                   {filteredAnimals.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center py-12">
+                      <TableCell colSpan={12} className="text-center py-12">
                         <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
                           <PawPrint className="h-5 w-5 text-gray-400" />
                         </div>
@@ -217,6 +257,32 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                         <Badge variant="outline" className={getStatusColor(animal.status)}>
                           {getStatusText(animal.status)}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {animal.type === "cow" && animal.gender === "female" ? (
+                          <button
+                            type="button"
+                            disabled={togglingId === animal._id}
+                            onClick={() => handleToggleLactation(animal)}
+                            title={animal.lactationStatus === "lactating" ? t('farmer.markDry') : t('farmer.markLactating')}
+                            className="disabled:opacity-50"
+                          >
+                            <Badge
+                              variant="outline"
+                              className={
+                                animal.lactationStatus === "lactating"
+                                  ? "bg-sky-100 text-sky-800 border-sky-200 cursor-pointer hover:bg-sky-200"
+                                  : "bg-gray-100 text-gray-600 border-gray-200 cursor-pointer hover:bg-gray-200"
+                              }
+                            >
+                              {togglingId === animal._id
+                                ? "…"
+                                : animal.lactationStatus === "lactating" ? t('farmer.lactating') : t('farmer.dry')}
+                            </Badge>
+                          </button>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">{animal.gender ? t(`farmer.${animal.gender}`) : t('farmer.undefined')}</TableCell>
                       <TableCell className="text-sm text-gray-600">RWF {animal.price}</TableCell>
@@ -311,6 +377,10 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                 <DetailRow label={t('farmer.insuranceId')} value={detailAnimal.insuranceId || t('farmer.notAvailable')} />
                 <DetailRow label={t('animal.location')} value={`${detailAnimal.district}, ${detailAnimal.sector}`} />
                 <DetailRow label={t('animal.price')} value={`RWF ${detailAnimal.price}`} />
+                <DetailRow
+                  label={t('animal.weight')}
+                  value={detailAnimal.weight != null && detailAnimal.weight !== "" ? `${detailAnimal.weight} KG` : t('farmer.notAvailable')}
+                />
                 <DetailRow label={t('animal.owner')} value={detailAnimal.ownerName} />
                 <DetailRow label={t('animal.phone')} value={detailAnimal.phoneNumber} />
                 <DetailRow

@@ -22,6 +22,7 @@ type Animal = {
   ownerName: string
   phoneNumber: string
   price: number
+  weight?: number
   status: string
   acquisitionType?: string
   earTagId?: string
@@ -50,6 +51,7 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
     ownerName: animal.ownerName,
     phoneNumber: animal.phoneNumber,
     price: animal.price?.toString() ?? "",
+    weight: animal.weight?.toString() ?? "",
     status: animal.status || "Healthy",
     acquisitionType: animal.acquisitionType || "",
     earTagId: animal.earTagId || "",
@@ -230,6 +232,13 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
           <Label htmlFor="edit-price">{t('farmer.price')} (RWF)</Label>
           <Input id="edit-price" name="price" type="number" value={formData.price}
             onChange={handleChange} placeholder={t('farmer.enterPrice')} required />
+        </div>
+
+        {/* Weight — optional */}
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-weight">{t('farmer.weight')} (KG){optionalLabel}</Label>
+          <Input id="edit-weight" name="weight" type="number" min="0" step="0.1" value={formData.weight}
+            onChange={handleChange} placeholder={t('farmer.enterWeight')} />
         </div>
 
         {/* Ear Tag ID — optional */}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -797,20 +798,20 @@ export default function InseminationPage() {
                 {/* Animal — only non-pregnant females */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.animal')} *</label>
-                  <Select value={animalId} onValueChange={handleAnimalChange} disabled={availableAnimals.length === 0}>
-                    <SelectTrigger className={errors.animalId ? "border-red-500" : ""}>
-                      <SelectValue placeholder={
-                        availableAnimals.length === 0
-                          ? (femaleAnimals.length === 0 ? "No animals registered" : "All animals are pregnant")
-                          : "Select animal..."
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableAnimals.map(a => (
-                        <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    value={animalId}
+                    onValueChange={handleAnimalChange}
+                    disabled={availableAnimals.length === 0}
+                    options={availableAnimals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` }))}
+                    placeholder={
+                      availableAnimals.length === 0
+                        ? (femaleAnimals.length === 0 ? "No animals registered" : "All animals are pregnant")
+                        : "Select animal..."
+                    }
+                    searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                    emptyText={t('farmer.noResultsFound') || "No animals found."}
+                    className={errors.animalId ? "border-red-500" : ""}
+                  />
                   {availableAnimals.length === 0
                     ? (
                       femaleAnimals.length === 0
@@ -996,13 +997,17 @@ export default function InseminationPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl">
-                <Select value={filterAnimal || "all"} onValueChange={v => setFilterAnimal(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder={t('farmer.allAnimals')} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
-                    {femaleAnimals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  value={filterAnimal || "all"}
+                  onValueChange={v => setFilterAnimal(v === "all" ? "" : v)}
+                  options={[
+                    { value: "all", label: t('farmer.allAnimals') },
+                    ...femaleAnimals.map(a => ({ value: a._id, label: a.name })),
+                  ]}
+                  placeholder={t('farmer.allAnimals')}
+                  searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                  emptyText={t('farmer.noResultsFound') || "No animals found."}
+                />
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-1">
                   <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}</p>
@@ -1207,17 +1212,17 @@ export default function InseminationPage() {
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">{t('farmer.animal')}</label>
-              <Select value={exportAnimalFilter || "all"} onValueChange={v => setExportAnimalFilter(v === "all" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('farmer.allAnimals')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
-                  {femaleAnimals.map(a => (
-                    <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={exportAnimalFilter || "all"}
+                onValueChange={v => setExportAnimalFilter(v === "all" ? "" : v)}
+                options={[
+                  { value: "all", label: t('farmer.allAnimals') },
+                  ...femaleAnimals.map(a => ({ value: a._id, label: a.name })),
+                ]}
+                placeholder={t('farmer.allAnimals')}
+                searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                emptyText={t('farmer.noResultsFound') || "No animals found."}
+              />
             </div>
             <div className="p-3 bg-green-50 rounded-xl border border-green-100">
               <div className="text-sm space-y-1">
