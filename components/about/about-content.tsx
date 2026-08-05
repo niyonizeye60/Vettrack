@@ -79,31 +79,31 @@ export default function AboutContent() {
 
         <div className="mb-20">
           <h2 className="heading-lg text-center mb-12">{t('about.team')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               {
                 image: "/WhatsApp Image 2025-03-28 at 12.07.22_620388c5.jpg",
                 name: "Dr. Theophile Niyonizeye",
-                role: "Chief Veterinarian",
+                role: "CEO & Founder",
                 specialty: "Large Animal Medicine & Certified in IoT",
+              },
+              {
+                image: "/WhatsApp Image 2025-05-15 at 15.48.58_74fbf054.jpg",
+                name: "Dr. Benitte Ikuzwe",
+                role: "Co-founder & Managing Director",
+                specialty: "Veterinanry Technician & Certified in Finance",
               },
               {
                 image: "/NEW PHOTO.jpg",
                 name: "Dr. Charline Rutagengwa",
-                role: "Senior Veterinarian",
+                role: "Co-founder & Sales and Marketing Officer",
                 specialty: "Small Animal Medicine",
               },
               {
                 image: "/sano2.jpg",
                 name: "Dr. Gerard Sano",
-                role: "Technology Director",
+                role: "Co-founder & Chief Financial Officer",
                 specialty: "Animal Tracking Systems",
-              },
-              {
-                image: "/WhatsApp Image 2025-05-15 at 15.48.58_74fbf054.jpg",
-                name: "Dr. Benitte Ikuzwe",
-                role: "Managing Director",
-                specialty: "Veterinanry Technician & Certified in Finance",
               },
             ].map((member, index) => (
               <div key={index} className="salon-card text-center p-6">
