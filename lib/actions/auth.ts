@@ -1,5 +1,5 @@
 "use server"
-import clientPromise, { withDbRetry } from "../db"
+import clientPromise, { withDbRetry, userFacingDbErrorMessage } from "../db"
 import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { sendWelcomeEmail } from "../email" // Import the email function
@@ -171,10 +171,7 @@ export async function registerUser(formData: FormData) {
       stack: error instanceof Error ? error.stack : undefined,
       action: "auth.register",
     })
-    if (error instanceof Error) {
-      return { success: false, message: `Registration failed: ${error.message}` }
-    }
-    return { success: false, message: "Failed to register user" }
+    return { success: false, message: userFacingDbErrorMessage(error, "create your account") }
   }
 }
 
@@ -314,10 +311,7 @@ export async function loginUser(formData: FormData) {
       stack: error instanceof Error ? error.stack : undefined,
       action: "auth.login",
     })
-    if (error instanceof Error) {
-      return { success: false, message: `Login failed: ${error.message}` }
-    }
-    return { success: false, message: "Failed to log in" }
+    return { success: false, message: userFacingDbErrorMessage(error, "sign you in") }
   }
 }
 

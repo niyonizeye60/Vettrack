@@ -32,7 +32,8 @@ export default function LoginForm() {
       const result = await loginUser(formData)
 
       if (!result.success) {
-        throw new Error(result.message)
+        setError(result.message || "We couldn't sign you in. Please try again.")
+        return
       }
 
       // Handle redirect after successful login
@@ -40,8 +41,12 @@ export default function LoginForm() {
         router.push(result.redirectPath)
       }
     } catch (error) {
+      // Reaching here means the action never returned a result at all - the
+      // browser is offline, the request was dropped, or the server crashed and
+      // Next.js replaced the reason with an opaque digest. None of those read
+      // as anything useful to the user, so they never get shown.
       console.error("Login error:", error)
-      setError(error instanceof Error ? error.message : "Login failed")
+      setError("We couldn't reach the server. Please check your internet connection and try again.")
     } finally {
       setIsLoading(false)
     }
