@@ -144,7 +144,7 @@ const translations = {
     'home.hero.trusted': 'Trusted by 5,000+ animal owners across Rwanda',
     'home.services.title': 'Our Featured Services',
     'home.services.subtitle': 'Comprehensive solutions for animal health, tracking, and management to ensure the well-being of your livestock and pets',
-    'home.features.title': 'Why Choose NTDM Animal Hospital?',
+    'home.features.title': 'Why Choose NTDM Vettrack?',
     'home.features.subtitle': 'Experience the difference with our commitment to excellence, innovation, and comprehensive animal care',
     'home.features.expert.title': 'Expert Veterinarians',
     'home.features.expert.desc': 'Our team of certified veterinarians brings years of experience and specialized knowledge to every case',
