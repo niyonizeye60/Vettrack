@@ -136,8 +136,8 @@ const translations = {
     'common.optional': 'Optional',
     
     // Home Page
-    'home.hero.titleStart': 'Track, Consult, Manage and',
-    'home.hero.titleEnd': 'Care for Your Animals',
+    'home.hero.titleStart': 'Track, Monitor, Manage &',
+    'home.hero.titleEnd': 'Care for Your Animals with Ai and IoT',
     'home.hero.subtitle': 'VetTrack is livestock platform powered by (AI) and (IoT). Monitor your animals\' health, body temperature, and heart rate in combination with GPS in real time. Receive AI-powered disease predictions, consult and manage your entire farm\'s activities for record keeping and decision making.',
     'home.hero.cta': 'Explore Our Services',
     'home.hero.bookConsultation': 'Book a Consultation',
