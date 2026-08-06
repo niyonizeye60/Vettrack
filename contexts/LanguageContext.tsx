@@ -138,7 +138,7 @@ const translations = {
     // Home Page
     'home.hero.titleStart': 'Track, Consult, Manage and',
     'home.hero.titleEnd': 'Care for Your Animals',
-    'home.hero.subtitle': 'Innovative solutions for livestock and pet owners. Advanced tracking, expert consultations, farm management and comprehensive care - all in one place',
+    'home.hero.subtitle': 'VetTrack is livestock platform powered by (AI) and (IoT). Monitor your animals\' health, body temperature, and heart rate in combination with GPS in real time. Receive AI-powered disease predictions, consult and manage your entire farm\'s activities for record keeping and decision making.',
     'home.hero.cta': 'Explore Our Services',
     'home.hero.bookConsultation': 'Book a Consultation',
     'home.hero.trusted': 'Trusted by 5,000+ animal owners across Rwanda',
