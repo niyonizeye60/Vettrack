@@ -5,6 +5,7 @@ import WhyChooseUsSection from "@/components/home/why-choose-us-section"
 import TestimonialsSection from "@/components/home/testimonials-section"
 import PortalSection from "@/components/home/portal-section"
 import CTASection from "@/components/home/cta-section"
+import EpidemicMapSection from "@/components/home/epidemic-map-section"
 
 export const metadata: Metadata = {
   title: "NTDM Animal Hospital - Track with IoT, Consult, and Care all powered by AI",
@@ -21,6 +22,8 @@ export default function Home() {
       <TestimonialsSection />
       <PortalSection />
       <CTASection />
+      {/* Outbreak map sits right above the footer so it is always the last thing visitors see */}
+      <EpidemicMapSection />
     </>
   )
 }

@@ -8,12 +8,15 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AnnouncementsBanner from "@/components/ui/announcements-banner"
+import SellerEarnings from "@/components/seller/seller-earnings"
 
 import {
   PlusCircle, Calendar, FileText, Activity,
   MilkIcon as Cow, CheckCircle, XCircle, AlertCircle, ArrowRight, FileBarChart,
   ShieldAlert, Baby, Bell, MessageSquare, LifeBuoy, Droplets, Heart, Eye,
+  MapPin, AlertTriangle,
 } from "lucide-react"
+import EpidemicRegisterDialog from "@/components/epidemics/epidemic-register-dialog"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 interface FarmerDashboardContentProps {
@@ -58,6 +61,7 @@ export default function FarmerDashboardContent({
   const [pnlTrend, setPnlTrend] = useState<PnlTrendPoint[] | null>(null)
   const [trackingSummary, setTrackingSummary] = useState<TrackingSummary | null>(null)
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null)
+  const [epidemicOpen, setEpidemicOpen] = useState(false)
 
   useEffect(() => {
     async function fetchPnl() {
@@ -485,6 +489,43 @@ export default function FarmerDashboardContent({
           </Card>
         )}
 
+        {/* Epidemic outbreak reporting */}
+        <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-2xl shadow-lg overflow-hidden relative">
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 20% 50%, white 2px, transparent 2px)", backgroundSize: "24px 24px" }} />
+          <div className="relative p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="rounded-xl bg-white/20 p-2.5 flex-shrink-0">
+                <AlertTriangle className="h-6 w-6 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-white font-semibold text-sm sm:text-base">{t("farmer.epidemicReporting")}</p>
+                <p className="text-red-50 text-xs mt-0.5">{t("farmer.epidemicReportingDesc")}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 sm:ml-auto flex-shrink-0">
+              <Button
+                size="sm"
+                className="bg-white text-red-600 hover:bg-red-50 h-9 px-4"
+                onClick={() => setEpidemicOpen(true)}
+              >
+                <MapPin className="h-4 w-4 mr-1" />
+                {t("farmer.reportEpidemicCase")}
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="ghost"
+                className="text-white hover:bg-white/10 hover:text-white h-9 px-3"
+              >
+                <Link href="/farmer/epidemics">
+                  {t("farmer.viewEpidemicMap")}
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Quick actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Button asChild className="bg-green-600 hover:bg-green-700 text-white h-auto py-3 px-4 justify-between">
@@ -725,7 +766,18 @@ export default function FarmerDashboardContent({
           </Card>
         </div>
 
+        {/* Seller Earnings */}
+        <SellerEarnings />
+
       </div>
+
+      {/* Epidemic reporting dialog */}
+      <EpidemicRegisterDialog
+        open={epidemicOpen}
+        onOpenChange={setEpidemicOpen}
+        mode="farmer"
+        farmerId={currentUser._id.toString()}
+      />
 
       {/* Activity details dialog */}
       <Dialog open={!!selectedActivity} onOpenChange={(open) => !open && setSelectedActivity(null)}>

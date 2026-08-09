@@ -3,6 +3,9 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+// Bundle Leaflet's stylesheet locally so the epidemic/tracking maps render
+// correctly even when the browser cannot reach a CDN (offline, blocked, etc.).
+import "leaflet/dist/leaflet.css"
 import GoogleAnalytics from "@/components/analytics/google-analytics"
 import BodyWrapper from "@/components/layout/body-wrapper"
 import { LanguageProvider } from "@/contexts/LanguageContext"
