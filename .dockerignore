@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+Dockerfile
+docker-compose.yml
+.dockerignore
+.vercel
+vercel.json
+*.log
+README.md
+tmp-rwanda-repo

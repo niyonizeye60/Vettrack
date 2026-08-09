@@ -1,0 +1,43 @@
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: vettrack-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  app:
+    build: .
+    container_name: vettrack-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/ntdm_animal_hospital
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  # Run seeds once with:  docker compose run --rm seed
+  seed:
+    build: .
+    container_name: vettrack-seed
+    profiles: ["seed"]
+    command: node scripts/seed-epidemics.mjs
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/ntdm_animal_hospital
+      - SEED_PASSWORD=Password123!
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
