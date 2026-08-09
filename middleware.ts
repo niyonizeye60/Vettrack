@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
     "/farmer/messages",
     "/farmer/tracking",
     "/farmer/support",
+    "/farmer/veterinarians",
 
     "/veterinary",
     "/veterinary/animals",
@@ -42,6 +43,7 @@ export async function middleware(request: NextRequest) {
     "/veterinary/messages",
     "/veterinary/tracking",
     "/veterinary/support",
+    "/veterinary/farms",
 
     "/superadmin",
 

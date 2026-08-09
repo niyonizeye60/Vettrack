@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Stethoscope, Settings, MessageSquare, Bell, Menu,
-  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby, LifeBuoy
+  Activity, Trash2, ShieldAlert, ShieldCheck, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby, LifeBuoy
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -34,6 +34,7 @@ export default function FarmerSidebar() {
     { href: "/farmer/calves",        label: t("farmer.calves"),       icon: <Baby         className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/milk",          label: t("farmer.milk"),         icon: <Milk         className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/consultations", label: t("farmer.consultations"),icon: <Stethoscope  className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/veterinarians", label: t("farmer.veterinarians"),icon: <ShieldCheck  className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/tracking",      label: t("farmer.tracking"),     icon: <Activity     className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/waste",         label: t("farmer.waste"),        icon: <Trash2       className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/insemination",  label: t("farmer.insemination"), icon: <Syringe      className="h-4 w-4 sm:h-5 sm:w-5" /> },
