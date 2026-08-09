@@ -41,3 +41,6 @@ SUPERADMIN_SETUP.md
 
 # temporary scratch repo used for parsing Rwanda geo data
 /tmp-rwanda-repo/
+
+# Freebuff tool workspace (never commit)
+/.freebuff/
