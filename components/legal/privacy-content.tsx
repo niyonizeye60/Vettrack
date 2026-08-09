@@ -21,7 +21,7 @@ export default function PrivacyContent() {
           <div className="max-w-2xl text-white">
             <h1 className="heading-xl mb-4 text-blue-600">Privacy Policy</h1>
             <p className="text-xl text-white/90">
-              How NTDM Animal Hospital collects, uses, and protects your information.
+              How NTDM Vettrack collects, uses, and protects your information.
             </p>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function PrivacyContent() {
           <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">1. Introduction</h2>
             <p>
-              This Privacy Policy explains what information NTDM Animal Hospital ("Vettrack", "we", "us", "our")
+              This Privacy Policy explains what information NTDM Vettrack ("Vettrack", "we", "us", "our")
               collects through the platform, how we use it, and the choices you have. By using the platform, you
               agree to the practices described here.
             </p>

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import FarmerDashboardContent from "./components/farmer-dashboard-content"
 
 export const metadata: Metadata = {
-  title: "Farmer Dashboard - NTDM Animal Hospital",
+  title: "Farmer Dashboard - NTDM Vettrack",
   description: "Manage your animals, consultations, and more.",
 }
 

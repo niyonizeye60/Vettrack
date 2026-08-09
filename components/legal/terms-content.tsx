@@ -21,7 +21,7 @@ export default function TermsContent() {
           <div className="max-w-2xl text-white">
             <h1 className="heading-xl mb-4 text-blue-600">Terms of Service</h1>
             <p className="text-xl text-white/90">
-              The rules for using NTDM Animal Hospital's tracking, consultation, and marketplace platform.
+              The rules for using NTDM Vettrack's tracking, consultation, and marketplace platform.
             </p>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function TermsContent() {
           <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">1. Acceptance of Terms</h2>
             <p>
-              By creating an account or otherwise using the NTDM Animal Hospital platform ("Vettrack", "we", "us",
+              By creating an account or otherwise using the NTDM Vettrack platform ("Vettrack", "we", "us",
               "our"), you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree,
               please do not register for or use the platform.
             </p>
@@ -73,11 +73,11 @@ export default function TermsContent() {
           <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">5. Marketplace (Animal Sales, Pharmacy &amp; Feeds)</h2>
             <p>
-              Listings for animals, medications, and feed products are provided by NTDM Animal Hospital and, in
+              Listings for animals, medications, and feed products are provided by NTDM Vettrack and, in
               some cases, third-party sellers. We make reasonable efforts to ensure listings are accurate, but we
               do not guarantee the health, quality, or fitness of any animal or product listed. Any purchase
               arranged through a seller's contact details (phone or email) shown on a listing is a transaction
-              between you and that seller; NTDM Animal Hospital is not a party to it.
+              between you and that seller; NTDM Vettrack is not a party to it.
             </p>
           </section>
 
@@ -106,7 +106,7 @@ export default function TermsContent() {
             <h2 className="text-2xl font-bold text-gray-900 mb-3">8. Medical Disclaimer</h2>
             <p>
               Virtual consultations and health tracking are intended to support, not replace, in-person veterinary
-              care. In an emergency, contact a veterinarian or animal hospital directly rather than relying solely
+              care. In an emergency, contact a veterinarian or Vettrack directly rather than relying solely
               on the platform.
             </p>
           </section>
@@ -114,7 +114,7 @@ export default function TermsContent() {
           <section>
             <h2 className="text-2xl font-bold text-gray-900 mb-3">9. Limitation of Liability</h2>
             <p>
-              The platform is provided "as is." To the fullest extent permitted by law, NTDM Animal Hospital is not
+              The platform is provided "as is." To the fullest extent permitted by law, NTDM Vettrack is not
               liable for indirect, incidental, or consequential damages arising from your use of the platform,
               including reliance on tracking data or marketplace listings.
             </p>

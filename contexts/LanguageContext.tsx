@@ -155,7 +155,7 @@ const translations = {
     'home.features.comprehensive.title': 'Comprehensive Care',
     'home.features.comprehensive.desc': 'From preventive care to emergency services, we offer a complete range of solutions for all your animal needs',
     'home.testimonials.title': 'What Our Customers Say',
-    'home.testimonials.subtitle': 'Don\'t just take our word for it. Here\'s what animal owners across Rwanda have to say about NTDM Animal Hospital',
+    'home.testimonials.subtitle': 'Don\'t just take our word for it. Here\'s what animal owners across Rwanda have to say about NTDM Vettrack',
     'home.testimonials.farmer': 'Livestock Farmer',
     'home.testimonials.petOwner': 'Pet Owner',
     'home.testimonials.poultryFarmer': 'Poultry Farmer',
@@ -235,7 +235,7 @@ const translations = {
     'feeds.ingredients': 'Ingredients',
     
     // About
-    'about.title': 'About NTDM Animal Hospital',
+    'about.title': 'About NTDM Vettrack',
     'about.subtitle': 'Leading animal healthcare provider in Rwanda',
     'about.mission': 'Our Mission',
     'about.vision': 'Our Vision',
@@ -244,7 +244,7 @@ const translations = {
     'about.history': 'Our History',
     'about.mentor': 'Our Mentors',
     'about.experience': 'Experience the NTDM Difference',
-    'about.experienceParagraph': 'We invite you to visit NTDM Animal Hospital and experience our commitment to animal health, innovation, and exceptional service firsthand.',
+    'about.experienceParagraph': 'We invite you to visit NTDM Vettrack and experience our commitment to animal health, innovation, and exceptional service firsthand.',
     
     // Contact
     'contact.title': 'Contact Us',
@@ -267,7 +267,7 @@ const translations = {
     'common.today': 'Today',
     
     // Footer
-    'footer.company': 'NTDM Animal Hospital',
+    'footer.company': 'NTDM Vettrack',
     'footer.description': 'Revolutionizing animal health with innovative tracking, consultation, and care solutions for livestock and pets',
     'footer.quickLinks': 'Quick Links',
     'footer.services': 'Services',
@@ -290,7 +290,7 @@ const translations = {
     
     // Booking
     'booking.title': 'Book Your Consultation',
-    'booking.subtitle': 'Schedule your visit to NTDM Animal Hospital and experience our expert veterinary services',
+    'booking.subtitle': 'Schedule your visit to NTDM Vettrack and experience our expert veterinary services',
     
     // Sorting & Filtering
     'sort.newest': 'Newest First',
@@ -316,7 +316,7 @@ const translations = {
     'auth.noAccount': 'Don\'t have an account?',
     'auth.registerHere': 'Register here',
     'auth.accountCreated': 'Account Created Successfully!',
-    'auth.welcome': 'Welcome to NTDM Animal Hospital',
+    'auth.welcome': 'Welcome to NTDM Vettrack',
     'auth.checkEmail': 'Please check your email inbox for a welcome message',
     'auth.checkEmailTitle': 'Check Your Email',
     'auth.continueLogin': 'Continue to Login',
@@ -331,9 +331,9 @@ const translations = {
     'auth.creatingAccount': 'Creating account...',
     'auth.haveAccount': 'Already have an account?',
     'auth.signIn': 'Sign in',
-    'auth.welcomeBack': 'Welcome Back to NTDM Animal Hospital',
+    'auth.welcomeBack': 'Welcome Back to NTDM Vettrack',
     'auth.loginWelcomeDesc': 'Log in to access your dashboard, track your animals, and manage your consultations',
-    'auth.joinNTDM': 'Join NTDM Animal Hospital',
+    'auth.joinNTDM': 'Join NTDM Vettrack',
     'auth.registerWelcomeDesc': 'Create an account to access our services, track your animals, and manage your consultations',
     'auth.sector': 'Sector',
     'auth.district': 'District',
@@ -2575,7 +2575,7 @@ const translations = {
     'home.hero.trusted': 'Byizerwemo n\'abafite amatungo barenga 5,000 muri Rwanda',
     'home.services.title': 'Amaserivisi Yacu Akomeye',
     'home.services.subtitle': 'Ibisubizo byuzuye by\'ubuzima bw\'amatungo, gukurikirana, n\'imicungire kugira ngo twemeze ubuzima bwiza bw\'amatungo yawe n\'amatungo yo mu rugo',
-    'home.features.title': 'Impamvu wahitamo NTDM Animal Hospital?',
+    'home.features.title': 'Impamvu wahitamo NTDM Vettrack?',
     'home.features.subtitle': 'Menya itandukaniro hamwe n\'ubwiyunge bwacu bwo gukora neza, ubuhanga, n\'ubuvuzi byuzuye bw\'amatungo',
     'home.features.expert.title': 'Abaganga b\'amatungo b\'Inzobere',
     'home.features.expert.desc': 'Itsinda ryacu ry\'abaganga b\'amatungo bemerewe rizana uburambe bw\'imyaka myinshi n\'ubumenyi bwihariye muri buri kibazo',
@@ -2584,7 +2584,7 @@ const translations = {
     'home.features.comprehensive.title': 'Ubuvuzi Byuzuye',
     'home.features.comprehensive.desc': 'Kuva mu buvuzi bwo gukumira kugeza ku maserivisi y\'ubwiyunge, dutanga ibisubizo byuzuye by\'ibyo ukeneye byose ku matungo yawe',
     'home.testimonials.title': 'Icyo Abakiriya Bacu Bavuga',
-    'home.testimonials.subtitle': 'Ntiwemere gusa ijambo ryacu. Dore icyo abafite amatungo muri Rwanda bavuga kuri NTDM Animal Hospital',
+    'home.testimonials.subtitle': 'Ntiwemere gusa ijambo ryacu. Dore icyo abafite amatungo muri Rwanda bavuga kuri NTDM Vettrack',
     'home.testimonials.farmer': 'Umworozi w\'Amatungo',
     'home.testimonials.petOwner': 'Nyir\'itungo ryo mu Rugo',
     'home.testimonials.poultryFarmer': 'Umworozi w\'Inkoko',
@@ -2666,7 +2666,7 @@ const translations = {
     'feeds.ingredients': 'Ibigize',
     
     // About
-    'about.title': 'Ibibazo kuri NTDM Animal Hospital',
+    'about.title': 'Ibibazo kuri NTDM Vettrack',
     'about.subtitle': 'Ikigo gikomeye cy\'ubuvuzi bw\'amatungo mu Rwanda',
     'about.mission': 'Intego Yacu',
     'about.vision': 'Icyerekezo Cyacu',
@@ -2698,7 +2698,7 @@ const translations = {
     'common.today': 'Uyu Munsi',
     
     // Footer
-    'footer.company': 'NTDM Animal Hospital',
+    'footer.company': 'NTDM Vettrack',
     'footer.description': 'Guhindura ubuzima bw\'amatungo hakoreshejwe tekinoroji igezweho yo gukurikirana, kubaza randevu, n\'ubuvuzi bw\'amatungo yo mu rugo',
     'footer.quickLinks': 'Ihuza Ryihuse',
     'footer.services': 'Amaserivisi',
@@ -2723,7 +2723,7 @@ const translations = {
     
     // Booking
     'booking.title': 'Teganya Randevu Yawe',
-    'booking.subtitle': 'Teganya gusura NTDM Animal Hospital kandi umenye amaserivisi yacu y\'ubuvuzi bw\'amatungo',
+    'booking.subtitle': 'Teganya gusura NTDM Vettrack kandi umenye amaserivisi yacu y\'ubuvuzi bw\'amatungo',
     
     // Sorting & Filtering
     'sort.newest': 'Bishya Mbere',
@@ -2749,7 +2749,7 @@ const translations = {
     'auth.noAccount': 'Nta konti ufite?',
     'auth.registerHere': 'Iyandikishe hano',
     'auth.accountCreated': 'Konti Yaremwe Neza!',
-    'auth.welcome': 'Murakaza neza kuri NTDM Animal Hospital',
+    'auth.welcome': 'Murakaza neza kuri NTDM Vettrack',
     'auth.checkEmail': 'Nyamuneka reba mu meyili yawe ubone ubutumwa bwo kwakira',
     'auth.checkEmailTitle': 'Reba Imeyili Yawe',
     'auth.continueLogin': 'Komeza Kwinjira',
@@ -2764,9 +2764,9 @@ const translations = {
     'auth.creatingAccount': 'Gufungura konti...',
     'auth.haveAccount': 'Usanzwe ufite konti?',
     'auth.signIn': 'Injira',
-    'auth.welcomeBack': 'Murakaza Neza Nanone kuri NTDM Animal Hospital',
+    'auth.welcomeBack': 'Murakaza Neza Nanone kuri NTDM Vettrack',
     'auth.loginWelcomeDesc': 'Injira kugira ngo ubone dashboard yawe, ukurikire amatungo yawe, kandi ucunge randevu zawe',
-    'auth.joinNTDM': 'Jya muri NTDM Animal Hospital',
+    'auth.joinNTDM': 'Jya muri NTDM Vettrack',
     'auth.registerWelcomeDesc': 'Fungura konti kugira ngo ubone serivisi zacu, ukurikire amatungo yawe, kandi ucunge randevvu zawe',
     'auth.sector': 'Umurenge',
     'auth.district': 'Akarere',

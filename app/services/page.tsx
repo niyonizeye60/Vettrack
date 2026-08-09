@@ -3,7 +3,7 @@ import ServicesTabs from "@/components/services/services-tabs"
 import ServicesBanner from "@/components/services/services-banner"
 
 export const metadata: Metadata = {
-  title: "Our Services - NTDM Animal Hospital",
+  title: "Our Services - NTDM Vettrack",
   description:
     "Explore our wide range of animal health services including tracking devices, veterinary consultations, disease monitoring, and animal sales.",
 }

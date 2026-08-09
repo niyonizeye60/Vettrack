@@ -40,13 +40,13 @@ export default function Footer() {
     <footer className="bg-gray-900 text-white pt-20 pb-10">
       <div className="container-custom">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          {/* About NTDM Animal Hospital */}
+          {/* About NTDM Vettrack */}
           <div>
             <div className="flex items-center mb-6">
               <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center mr-3">
                 <span className="text-white font-bold">NTDM</span>
               </div>
-              <span className="text-2xl font-bold gradient-text">NTDM Animal Hospital</span>
+              <span className="text-2xl font-bold gradient-text">NTDM Vettrack</span>
             </div>
             <p className="text-gray-400 mb-6">
               {t('footer.description')}

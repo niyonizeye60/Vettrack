@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/auth"
 import { redirect } from "next/navigation"
 
 export const metadata: Metadata = {
-  title: "Login - NTDM Animal Hospital",
-  description: "Log in to your NTDM Animal Hospital account to access your dashboard and manage your animals.",
+  title: "Login - NTDM Vettrack",
+  description: "Log in to your NTDM Vettrack account to access your dashboard and manage your animals.",
 }
 
 // ⬅️ force Next.js to render this page dynamically (SSR)

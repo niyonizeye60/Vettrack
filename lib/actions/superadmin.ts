@@ -1272,7 +1272,7 @@ export async function getSystemSettings() {
     if (!settings) {
       const defaultSettings = {
         _id: "global",
-        siteName: "NTDM Animal Hospital",
+        siteName: "NTDM Vettrack",
         siteEmail: "admin@ntdm.com",
         siteDescription: "Professional veterinary services for animal health and care",
         autoApproveUsers: true,

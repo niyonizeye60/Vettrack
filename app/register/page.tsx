@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/auth"
 import { redirect } from "next/navigation"
 
 export const metadata: Metadata = {
-  title: "Register - NTDM Animal Hospital",
-  description: "Create an account with NTDM Animal Hospital to access our services.",
+  title: "Register - NTDM Vettrack",
+  description: "Create an account with NTDM Vettrack to access our services.",
 }
 
 export const dynamic = "force-dynamic"

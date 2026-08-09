@@ -48,14 +48,14 @@ export default function Header() {
             <div className="w-15 h-15  overflow-hidden">
               <Image
                 src="/Group 2.svg?height=40&width=40&text=NTDM"
-                alt="NTDM Animal Hospital Logo"
+                alt="NTDM Vettrack Logo"
                 width={100}
                 height={100}
                 className=" object-cover"
                 style={{ boxShadow: "0 0 12px 2px white" }}
               />
             </div>
-            {/* <span className="text-2xl font-bold gradient-text">NTDM Animal Hospital</span> */}
+            {/* <span className="text-2xl font-bold gradient-text">NTDM Vettrack</span> */}
           </Link>
 
           <nav className="hidden lg:flex items-center space-x-1">

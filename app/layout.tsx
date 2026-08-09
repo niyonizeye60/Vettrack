@@ -17,17 +17,17 @@ const inter = Inter({
 
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
-  title: "NTDM Animal Hospital",
+  title: "NTDM Vettrack",
   icons: {
     icon: "/logo/NTDM.png",
   },
   description:
-    "Leading animal hospital in Rwanda offering tracking devices, veterinary consultations, disease monitoring, and animal sales.",
-  keywords: "animal hospital, veterinary care, animal tracking, disease monitoring, pet care, livestock management",
+    "Leading Vettrack in Rwanda offering tracking devices, veterinary consultations, disease monitoring, and animal sales.",
+  keywords: "Vettrack, veterinary care, animal tracking, disease monitoring, pet care, livestock management",
   openGraph: {
-    title: "NTDM Animal Hospital - Track, Consult, and Care",
+    title: "NTDM Vettrack - Track, Consult, and Care",
     description:
-      "Leading animal hospital in Rwanda offering tracking devices, veterinary consultations, disease monitoring, and animal sales.",
+      "Leading Vettrack in Rwanda offering tracking devices, veterinary consultations, disease monitoring, and animal sales.",
     images: ["/images/og-image.jpg"],
     type: "website",
     locale: "en_RW",
