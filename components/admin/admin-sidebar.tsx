@@ -10,7 +10,10 @@ import {
   BarChart3,
   MessageSquare,
   Calendar,
+  PawPrint,
+  Stethoscope,
   Menu,
+  MapPin,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -60,8 +63,10 @@ export default function AdminSidebar() {
     { href: "/admin/reports", label: t("admin.reports"), icon: <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/support", label: t("admin.support"), icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/appointments", label: t("admin.appointments"), icon: <Calendar className="h-4 w-4 sm:h-5 sm:w-5" /> },
-
-//  { href: "/admin/diseases", label: t("admin.diseaseOversight"), icon: <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/admin/epidemics", label: t("admin.epidemics"), icon: <MapPin className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    ...(process.env.NODE_ENV !== "production"
+      ? [{ href: "/admin/diseases", label: t("admin.diseaseOversight"), icon: <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" /> }]
+      : []),
   ];
 
   const showSidebar = (isMobile && mobileOpen) || !isMobile;
@@ -86,15 +91,7 @@ export default function AdminSidebar() {
             <div className="h-16 px-3 sm:px-4 border-b border-gray-100 flex items-center justify-between gap-2">
               {(!collapsed || isMobile) && (
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="h-5 w-5 sm:h-6 sm:w-6 overflow-hidden flex-shrink-0">
-                    <Image
-                      src="/Group 2.svg?height=24&width=24&text=NTDM"
-                      alt="NTDM Logo"
-                      width={24}
-                      height={24}
-                      className="object-cover"
-                    />
-                  </div>
+                  <PawPrint className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 flex-shrink-0" />
                   <span className="font-bold text-gray-900 text-base sm:text-lg leading-tight tracking-tight min-w-0">
                     {t("admin.portal")}
                   </span>

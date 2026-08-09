@@ -26,9 +26,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# logs
-server.log
-
 # user config
 SUPERADMIN_README.md
 SUPERADMIN_SETUP.md
@@ -37,3 +34,10 @@ SUPERADMIN_SETUP.md
 /scripts/*
 !/scripts/fix-manifest.cjs
 !/scripts/mark-dynamic.mjs
+!/scripts/seed-epidemics.mjs
+
+# calendar feature (not ready to ship)
+/app/(veterinary)/veterinary/calendar/
+
+# temporary scratch repo used for parsing Rwanda geo data
+/tmp-rwanda-repo/

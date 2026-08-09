@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Stethoscope, Settings, MessageSquare, Bell, Menu,
-  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby, LifeBuoy
+  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby, LifeBuoy, MapPin
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -38,6 +38,7 @@ export default function FarmerSidebar() {
     { href: "/farmer/waste",         label: t("farmer.waste"),        icon: <Trash2       className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/insemination",  label: t("farmer.insemination"), icon: <Syringe      className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/diseases",      label: t("farmer.diseases"),     icon: <ShieldAlert  className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/epidemics",     label: t("farmer.epidemics"),    icon: <MapPin        className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/animal-sales",  label: t("farmer.animalSales"),  icon: <Tag          className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/employees",     label: t("farmer.employees"),    icon: <Wallet       className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/reports",       label: t("farmer.generalReport"),icon: <FileBarChart className="h-4 w-4 sm:h-5 sm:w-5" /> },
