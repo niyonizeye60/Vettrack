@@ -28,21 +28,14 @@ const services = {
     },
     {
       id: "t3",
-      name: "Pig Management System",
-      description: "Comprehensive tracking solution for large herds with analytics dashboard.",
+      name: "Farm Management System",
+      description: "Comprehensive farm management solution for livestocks with analytics dashboard.",
       price: 500,
-      duration: "10 devices + 6 months service",
+      duration: "6 free months + 6 months assistance",
       image:
-        "https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=500&h=350&fit=crop&crop=focalpoint&auto=format&q=80",
+        "https://media.gettyimages.com/id/2239330405/video/close-up-of-a-dairy-milkers-hands-milking-a-cow.jpg?s=640x640&k=20&c=Hla5QKxKt7S4LdWQJZEOAz2aYnFdYQ4Yf1Nsh_nugZs=",
     },
-    {
-      id: "t4",
-      name: "Pet Tracking Collar",
-      description: "Lightweight GPS collar for dogs and cats with geofencing alerts.",
-      price: 5000,
-      duration: "Device + 3 months service",
-      image: "/tracking/track3.png",
-    },
+    // Add more tracking services as needed
   ],
   consultations: [
     {
@@ -103,7 +96,7 @@ const services = {
       price: 2000,
       duration: "Quarterly treatment",
       image:
-        "https://images.unsplash.com/photo-1599443015574-be5fe8a05783?w=500&h=350&fit=crop&crop=focalpoint&auto=format&q=80",
+        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSZgWkk0rs23IB14Pn5JJuerkYGK4cUWvvJo2S7twaUJwr5K5xezs3t8YE-&s=10",
     },
     {
       id: "m4",
@@ -253,7 +246,7 @@ const services = {
       image:
         "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=500&h=350&fit=crop&crop=focalpoint&auto=format&q=80",
     },
-     {
+    {
       id: "f6",
       name: "Pig",
       description: "High-quality food for pig.",
@@ -263,40 +256,11 @@ const services = {
         "https://www.pigprogress.net/app/uploads/2021/12/001_198_IMG_PPR_25_EXPERT_FM_Feedstructureinswinediets-1024x683.jpg",
     },
   ],
-  government: [
-    {
-      id: "g1",
-      name: "Access RVSMS",
-      description: "Rwanda Veterinary SMS Management System - Access the government veterinary services portal.",
-      price: "Free Access",
-      duration: "Online portal",
-      image: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-7Mn99yF88tjmOB5fPByC1VgcKxCUhM.png",
-      link: "https://rvsms.vercel.app/",
-    },
-    {
-      id: "g3",
-      name: "Export Certification",
-      description: "Preparation of all documents for animal product exports.",
-      price: 15000,
-      duration: "Per certification",
-      image:
-        "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=500&h=350&fit=crop&crop=focalpoint&auto=format&q=80",
-    },
-    {
-      id: "g6",
-      name: "Disease Reporting",
-      description: "Proper documentation and reporting of notifiable diseases.",
-      price: 5000,
-      duration: "Per report",
-      image:
-        "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=500&h=350&fit=crop&crop=focalpoint&auto=format&q=80",
-    },
-  ],
 }
 
 export default function ServicesTabs() {
   const [activeTab, setActiveTab] = useState("tracking")
-  const [categories, setCategories] = useState<{sales: any[], drugs: any[], feeds: any[]}>({
+  const [categories, setCategories] = useState<{ sales: any[], drugs: any[], feeds: any[] }>({
     sales: [],
     drugs: [],
     feeds: []
@@ -356,10 +320,6 @@ export default function ServicesTabs() {
                 <Wheat className="h-4 w-4" />
                 <span className="hidden sm:inline">Feeds</span>
               </TabsTrigger>
-              <TabsTrigger value="government" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Gov Support</span>
-              </TabsTrigger>
               <TabsTrigger value="Ai" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <Brain className="h-4 w-4" />
                 <span className="hidden sm:inline">AI Disease Prediction</span>
@@ -367,7 +327,7 @@ export default function ServicesTabs() {
             </TabsList>
           </div>
         </div>
-        
+
         {/* Mobile hint */}
         <div className="text-center text-sm text-gray-500 mb-4 sm:hidden">
           👈 Swipe to see more services 👉
@@ -438,14 +398,6 @@ export default function ServicesTabs() {
                 image={category.image}
                 href={`/feeds?category=${category.id}`}
               />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="government" className="mt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {services.government.map((service) => (
-              <ServiceCard key={service.id} service={service} />
             ))}
           </div>
         </TabsContent>
