@@ -358,6 +358,13 @@ const translations = {
     'auth.next': 'Next',
     'auth.back': 'Back',
     'auth.fillRequiredFields': 'Please fill in all required fields',
+    'auth.selectDistrict': 'Select district',
+    'auth.selectSector': 'Select sector',
+    'auth.searchDistrict': 'Search district...',
+    'auth.searchSector': 'Search sector...',
+    'auth.noDistrictFound': 'No district found.',
+    'auth.noSectorFound': 'No sector found.',
+    'auth.selectDistrictFirst': 'Select a district first',
 
     // Password Reset
     'auth.forgotPassword': 'Forgot Password?',
@@ -2802,6 +2809,13 @@ const translations = {
     'auth.next': 'Komeza',
     'auth.back': 'Subira Inyuma',
     'auth.fillRequiredFields': 'Nyamuneka uzuza imyanya yose isabwa',
+    'auth.selectDistrict': 'Hitamo Akarere',
+    'auth.selectSector': 'Hitamo Umurenge',
+    'auth.searchDistrict': 'Shakisha akarere...',
+    'auth.searchSector': 'Shakisha umurenge...',
+    'auth.noDistrictFound': 'Nta karere kabonetse.',
+    'auth.noSectorFound': 'Nta murenge ubonetse.',
+    'auth.selectDistrictFirst': 'Banza uhitemo akarere',
 
     // Password Reset
     'auth.forgotPassword': 'Wibagiwe Ijambo Ryibanga?',

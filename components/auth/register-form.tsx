@@ -11,11 +11,17 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { Combobox } from "@/components/ui/combobox"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { registerUser } from "@/lib/actions/auth"
 import { CheckCircle, Mail, ChevronLeft, ChevronRight } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { rwandaData } from "@/lib/rwanda-data"
+
+const districtOptions = Object.keys(rwandaData)
+  .sort()
+  .map((district) => ({ value: district, label: district }))
 
 type UserRole = "farmer" | "doctor" | "admin" | "superadmin"
 
@@ -41,6 +47,15 @@ export default function RegisterForm() {
   const [successMessage, setSuccessMessage] = useState("")
   const router = useRouter()
   const { t } = useLanguage()
+
+  const sectorOptions = district
+    ? (rwandaData[district] ?? []).map((sector) => ({ value: sector, label: sector }))
+    : []
+
+  const handleDistrictChange = (value: string) => {
+    setDistrict(value)
+    setSector("")
+  }
 
   const validatePasswords = () => {
     if (password !== confirmPassword) {
@@ -300,23 +315,28 @@ export default function RegisterForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="district">{t('auth.district')}</Label>
-                    <Input
+                    <Combobox
                       id="district"
-                      placeholder="e.g., Kigali"
+                      options={districtOptions}
                       value={district}
-                      onChange={(e) => setDistrict(e.target.value)}
-                      required
+                      onValueChange={handleDistrictChange}
+                      placeholder={t('auth.selectDistrict')}
+                      searchPlaceholder={t('auth.searchDistrict')}
+                      emptyText={t('auth.noDistrictFound')}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="sector">{t('auth.sector')}</Label>
-                    <Input
+                    <Combobox
                       id="sector"
-                      placeholder="e.g., Nyarugenge"
+                      options={sectorOptions}
                       value={sector}
-                      onChange={(e) => setSector(e.target.value)}
-                      required
+                      onValueChange={setSector}
+                      placeholder={district ? t('auth.selectSector') : t('auth.selectDistrictFirst')}
+                      searchPlaceholder={t('auth.searchSector')}
+                      emptyText={t('auth.noSectorFound')}
+                      disabled={!district}
                     />
                   </div>
                 </div>
