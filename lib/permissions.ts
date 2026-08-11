@@ -18,6 +18,12 @@ export const PERMISSION_MODULES = [
     labelKey: "farmer.permHealth",
     descKey: "farmer.permHealthDesc",
   },
+  {
+    key: "vaccination",
+    collection: "vaccination_records",
+    labelKey: "farmer.permVaccination",
+    descKey: "farmer.permVaccinationDesc",
+  },
 ] as const
 
 export const PERMISSION_ACTIONS = ["view", "create", "update", "delete"] as const

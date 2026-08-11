@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
-import { MapPin, Warehouse, Syringe, ShieldAlert, Search, Info, Lock, List, Grid3X3 } from "lucide-react"
+import { MapPin, Warehouse, Syringe, ShieldAlert, ShieldPlus, Search, Info, Lock, List, Grid3X3 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { PERMISSION_MODULES, PERMISSION_ACTIONS, type PermissionMap, type PermissionModule } from "@/lib/permissions"
 
@@ -27,11 +27,13 @@ interface Farm {
 const MODULE_ICON: Record<string, JSX.Element> = {
   insemination: <Syringe className="h-3 w-3" />,
   health: <ShieldAlert className="h-3 w-3" />,
+  vaccination: <ShieldPlus className="h-3 w-3" />,
 }
 
 const MODULE_TONE: Record<string, string> = {
   insemination: "bg-blue-50 text-blue-700 border-blue-200",
   health: "bg-amber-50 text-amber-700 border-amber-200",
+  vaccination: "bg-green-50 text-green-700 border-green-200",
 }
 
 export default function FarmsPageClient({ farms }: { farms: Farm[] }) {
@@ -111,7 +113,7 @@ export default function FarmsPageClient({ farms }: { farms: Farm[] }) {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 max-w-lg">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-2xl">
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
@@ -139,6 +141,16 @@ export default function FarmsPageClient({ farms }: { farms: Farm[] }) {
               <ShieldAlert className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-orange-600 mt-2">{countWithAccess("health")}</h3>
+            <p className="text-xs text-gray-400 mt-1">{t("vet.farmsWithAccess")}</p>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t("farmer.permVaccination")}</p>
+              <ShieldPlus className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-green-600 mt-2">{countWithAccess("vaccination")}</h3>
             <p className="text-xs text-gray-400 mt-1">{t("vet.farmsWithAccess")}</p>
           </CardContent>
         </Card>

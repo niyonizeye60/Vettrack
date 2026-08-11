@@ -16,7 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 interface ReportData {
   range: { startDate: string; endDate: string }
   income: { milkSales: number; livestockSales: number; byProductSales: number; total: number }
-  expenses: { inseminationCosts: number; veterinaryHealth: number; labourWages: number; livestockPurchases: number; feedWaterCosts: number; calfRearingCosts: number; total: number }
+  expenses: { inseminationCosts: number; vaccinationCosts: number; veterinaryHealth: number; labourWages: number; livestockPurchases: number; feedWaterCosts: number; calfRearingCosts: number; total: number }
   netResult: number
   incomeLedger: { date: string; label: string; description: string; amount: number }[]
   expenseLedger: { date: string; label: string; description: string; amount: number }[]
@@ -171,6 +171,7 @@ export default function GeneralReportPage() {
         ["TOTAL INCOME", fmt(report.income.total)],
         ["EXPENSES", ""],
         ["  Insemination Costs", fmt(report.expenses.inseminationCosts)],
+        ["  Vaccination Costs", fmt(report.expenses.vaccinationCosts)],
         ["  Veterinary & Health", fmt(report.expenses.veterinaryHealth)],
         ["  Labour / Wages", fmt(report.expenses.labourWages)],
         ["  Livestock Purchases", fmt(report.expenses.livestockPurchases)],
@@ -231,6 +232,7 @@ export default function GeneralReportPage() {
         [],
         ["EXPENSES", ""],
         ["Insemination Costs", report.expenses.inseminationCosts],
+        ["Vaccination Costs", report.expenses.vaccinationCosts],
         ["Veterinary & Health", report.expenses.veterinaryHealth],
         ["Labour / Wages", report.expenses.labourWages],
         ["Livestock Purchases", report.expenses.livestockPurchases],
@@ -434,6 +436,11 @@ export default function GeneralReportPage() {
                           <TableCell className="text-red-700">{t('farmer.inseminationCosts')}</TableCell>
                           <TableCell className="hidden sm:table-cell text-sm text-gray-500">{t('farmer.inseminationCostsDesc')}</TableCell>
                           <TableCell className="text-right text-red-700 font-medium">{fmt(report.expenses.inseminationCosts)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="text-red-700">{t('farmer.vaccinationCosts')}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-gray-500">{t('farmer.vaccinationCostsDesc')}</TableCell>
+                          <TableCell className="text-right text-red-700 font-medium">{fmt(report.expenses.vaccinationCosts)}</TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell className="text-red-700">{t('farmer.veterinaryHealth')}</TableCell>

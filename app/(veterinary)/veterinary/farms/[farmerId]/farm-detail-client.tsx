@@ -5,18 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, MapPin, Info, ShieldOff, ShieldCheck, Syringe, ShieldAlert, Warehouse, Lock } from "lucide-react"
+import { ArrowLeft, MapPin, Info, ShieldOff, ShieldCheck, ShieldPlus, Syringe, ShieldAlert, Warehouse, Lock } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { PERMISSION_MODULES, type PermissionMap, type PermissionModule } from "@/lib/permissions"
 import type { RecordCapabilities } from "@/components/livestock/capabilities"
 import InseminationManager from "@/components/livestock/insemination-manager"
 import DiseaseManager from "@/components/livestock/disease-manager"
+import VaccinationManager from "@/components/livestock/vaccination-manager"
 
 interface Farm { farmerId: string; farmerName: string; district: string; sector: string }
 
 const MODULE_ICON: Record<string, JSX.Element> = {
   insemination: <Syringe className="h-3.5 w-3.5" />,
   health: <ShieldAlert className="h-3.5 w-3.5" />,
+  vaccination: <ShieldPlus className="h-3.5 w-3.5" />,
 }
 
 export default function FarmDetailClient({
@@ -153,6 +155,16 @@ export default function FarmDetailClient({
             <DiseaseManager
               farmerId={farm.farmerId}
               can={capabilitiesFor("health")}
+              showHeader={false}
+            />
+          </TabsContent>
+        )}
+
+        {modules.includes("vaccination") && (
+          <TabsContent value="vaccination" className="mt-6">
+            <VaccinationManager
+              farmerId={farm.farmerId}
+              can={capabilitiesFor("vaccination")}
               showHeader={false}
             />
           </TabsContent>

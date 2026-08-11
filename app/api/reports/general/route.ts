@@ -70,11 +70,12 @@ export async function GET(req: NextRequest) {
 
     const dateRange = { $gte: startDate, $lte: endDate }
 
-    const [milkRecords, animalTransactions, wasteRecords, inseminationRecords, treatmentDoses, employeePayments, calfExpenses] = await Promise.all([
+    const [milkRecords, animalTransactions, wasteRecords, inseminationRecords, vaccinationRecords, treatmentDoses, employeePayments, calfExpenses] = await Promise.all([
       db.collection("milk_records").find({ farmerId, date: dateRange }).toArray(),
       db.collection("animal_transactions").find({ farmerId, date: dateRange }).toArray(),
       db.collection("waste_records").find({ farmerId, date: dateRange }).toArray(),
       db.collection("insemination_records").find({ farmerId, date: dateRange }).toArray(),
+      db.collection("vaccination_records").find({ farmerId, date: dateRange }).toArray(),
       db.collection("treatment_doses").find({ farmerId, date: dateRange }).toArray(),
       db.collection("employee_payments").find({ farmerId, paymentDate: dateRange }).toArray(),
       db.collection("calf_expenses").find({ farmerId, date: dateRange }).toArray(),
@@ -88,12 +89,15 @@ export async function GET(req: NextRequest) {
 
     // ---- Expenses ----
     const inseminationCosts = inseminationRecords.reduce((s, r) => s + (r.semenPrice || 0) + (r.vetPrice || 0), 0)
+    // Kept separate from veterinaryHealth: that line is treatment of animals that fell
+    // ill, whereas vaccination is preventive spend the farmer chooses to budget.
+    const vaccinationCosts = vaccinationRecords.reduce((s, r) => s + (r.vaccinePrice || 0) + (r.vetPrice || 0), 0)
     const veterinaryHealth = treatmentDoses.reduce((s, d) => s + (d.totalCost || 0), 0)
     const labourWages = employeePayments.reduce((s, p) => s + (p.amount || 0), 0)
     const livestockPurchases = animalTransactions.filter(t => t.transactionType === "purchase").reduce((s, t) => s + (t.amount || 0), 0)
     const feedWaterCosts = milkRecords.reduce((s, r) => s + (r.foodCost || 0) + (r.saltCost || 0), 0)
     const calfRearingCosts = calfExpenses.reduce((s, e) => s + (e.amount || 0), 0)
-    const totalExpenses = inseminationCosts + veterinaryHealth + labourWages + livestockPurchases + feedWaterCosts + calfRearingCosts
+    const totalExpenses = inseminationCosts + vaccinationCosts + veterinaryHealth + labourWages + livestockPurchases + feedWaterCosts + calfRearingCosts
 
     const netResult = totalIncome - totalExpenses
 
@@ -113,6 +117,9 @@ export async function GET(req: NextRequest) {
     const expenseLedger: LedgerEntry[] = []
     inseminationRecords.filter(r => (r.semenPrice || 0) + (r.vetPrice || 0) > 0).forEach(r => expenseLedger.push({
       date: r.date, label: "Insemination Costs", description: r.animalName || "Insemination", amount: (r.semenPrice || 0) + (r.vetPrice || 0)
+    }))
+    vaccinationRecords.filter(r => (r.vaccinePrice || 0) + (r.vetPrice || 0) > 0).forEach(r => expenseLedger.push({
+      date: r.date, label: "Vaccination Costs", description: `${r.animalName || "Animal"}${r.vaccineName ? ` - ${r.vaccineName}` : ""}`, amount: (r.vaccinePrice || 0) + (r.vetPrice || 0)
     }))
     treatmentDoses.filter(d => (d.totalCost || 0) > 0).forEach(d => expenseLedger.push({
       date: d.date, label: "Veterinary & Health", description: `${d.animalName || "Animal"}${d.diseaseName ? ` - ${d.diseaseName}` : ""}`, amount: d.totalCost || 0
@@ -158,7 +165,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       range: { startDate, endDate },
       income: { milkSales, livestockSales, byProductSales, total: totalIncome },
-      expenses: { inseminationCosts, veterinaryHealth, labourWages, livestockPurchases, feedWaterCosts, calfRearingCosts, total: totalExpenses },
+      expenses: { inseminationCosts, vaccinationCosts, veterinaryHealth, labourWages, livestockPurchases, feedWaterCosts, calfRearingCosts, total: totalExpenses },
       netResult,
       incomeLedger,
       expenseLedger,
