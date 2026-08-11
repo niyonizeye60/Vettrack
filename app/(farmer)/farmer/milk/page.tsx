@@ -193,9 +193,11 @@ export default function MilkProductionPage() {
   // Export state
   const [exportOpen, setExportOpen] = useState(false)
   const [exportCow, setExportCow] = useState("all")
-  const [exportType, setExportType] = useState<"daily" | "monthly" | "total">("total")
+  const [exportType, setExportType] = useState<"daily" | "monthly" | "total" | "custom">("total")
   const [exportDate, setExportDate] = useState(today)
   const [exportMonth, setExportMonth] = useState(today.slice(0, 7))
+  const [exportStart, setExportStart] = useState(today)
+  const [exportEnd, setExportEnd] = useState(today)
   const [exporting, setExporting] = useState(false)
 
   const getExportRecords = () => {
@@ -203,6 +205,7 @@ export default function MilkProductionPage() {
     if (exportCow !== "all") data = data.filter(r => r.cowId === exportCow)
     if (exportType === "daily") data = data.filter(r => r.date === exportDate)
     if (exportType === "monthly") data = data.filter(r => r.date.startsWith(exportMonth))
+    if (exportType === "custom") data = data.filter(r => r.date >= exportStart && r.date <= exportEnd)
     return data.sort((a, b) => a.date.localeCompare(b.date))
   }
 
@@ -222,16 +225,13 @@ export default function MilkProductionPage() {
       const cowName = exportCow === "all" ? "All Animals" : animals.find(a => a._id === exportCow)?.name || "Unknown"
       const totalL = exportRecords.reduce((s, r) => s + r.liters, 0)
       const totalRev = exportRecords.reduce((s, r) => s + (r.totalAmount || 0), 0)
-      const reportLabel = exportType === "daily" ? `Daily Report — ${exportDate}` : exportType === "monthly" ? `Monthly Report — ${exportMonth}` : "Total Production Report"
+      const reportLabel = exportType === "daily" ? `Daily Report — ${exportDate}` : exportType === "monthly" ? `Monthly Report — ${exportMonth}` : exportType === "custom" ? `Custom Report — ${exportStart} to ${exportEnd}` : "Total Production Report"
 
       // Logo
-      try {
-        const logoImg = new Image()
-        logoImg.crossOrigin = 'anonymous'
-        logoImg.src = '/logo/Vet print.png'
-        await new Promise((resolve, reject) => { logoImg.onload = resolve; logoImg.onerror = reject })
-        doc.addImage(logoImg, 'PNG', 15, 7, 35, 24)
-      } catch { }
+      doc.setTextColor(22, 163, 74)
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text('VETTRACK', 15, 20)
 
       doc.setTextColor(17, 24, 39)
       doc.setFontSize(16)
@@ -1088,7 +1088,7 @@ export default function MilkProductionPage() {
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">{t('farmer.reportType')}</label>
-              <Select value={exportType} onValueChange={v => setExportType(v as "daily" | "monthly" | "total")}>
+              <Select value={exportType} onValueChange={v => setExportType(v as "daily" | "monthly" | "total" | "custom")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1096,6 +1096,7 @@ export default function MilkProductionPage() {
                   <SelectItem value="daily">{t('farmer.dailyReport')}</SelectItem>
                   <SelectItem value="monthly">{t('farmer.monthlyReport')}</SelectItem>
                   <SelectItem value="total">{t('farmer.totalProduction')}</SelectItem>
+                  <SelectItem value="custom">{t('farmer.customReport')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1111,6 +1112,19 @@ export default function MilkProductionPage() {
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.selectMonth')}</label>
                 <Input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)} />
+              </div>
+            )}
+
+            {exportType === "custom" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.startDate')}</label>
+                  <Input type="date" value={exportStart} max={exportEnd} onChange={e => setExportStart(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.endDate')}</label>
+                  <Input type="date" value={exportEnd} min={exportStart} onChange={e => setExportEnd(e.target.value)} />
+                </div>
               </div>
             )}
 

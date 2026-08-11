@@ -109,13 +109,10 @@ export default function GeneralReportPage() {
       const doc = new jsPDF("p", "mm", "a4")
       const pageWidth = doc.internal.pageSize.getWidth()
 
-      try {
-        const logoImg = new Image()
-        logoImg.crossOrigin = "anonymous"
-        logoImg.src = "/logo/Vet print.png"
-        await new Promise((resolve, reject) => { logoImg.onload = resolve; logoImg.onerror = reject })
-        doc.addImage(logoImg, "PNG", 15, 6, 29, 20)
-      } catch { }
+      doc.setTextColor(22, 163, 74)
+      doc.setFontSize(16)
+      doc.setFont("helvetica", "bold")
+      doc.text("VETTRACK", 15, 18)
       doc.setTextColor(17, 24, 39)
       doc.setFontSize(15)
       doc.setFont("helvetica", "bold")

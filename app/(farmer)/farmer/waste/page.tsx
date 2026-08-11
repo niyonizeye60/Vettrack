@@ -207,11 +207,9 @@ export default function WasteManagementPage() {
       const doc = new jsPDF({ orientation: 'landscape' })
 
       // Header
-      try {
-        const logoImg = new Image(); logoImg.crossOrigin = 'anonymous'; logoImg.src = '/logo/Vet print.png'
-        await new Promise((res, rej) => { logoImg.onload = res; logoImg.onerror = rej })
-        doc.addImage(logoImg, 'PNG', 15, 7, 35, 24)
-      } catch { }
+      doc.setTextColor(22, 163, 74)
+      doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+      doc.text('VETTRACK', 15, 20)
       doc.setTextColor(17, 24, 39)
       doc.setFontSize(16); doc.setFont('helvetica', 'bold')
       doc.text(t('farmer.wasteManagementReportTitle'), 55, 18)

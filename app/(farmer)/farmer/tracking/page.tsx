@@ -289,19 +289,11 @@ export default function PetTrackingPage() {
       const jsPDF = (await import('jspdf')).default
       const doc = new jsPDF()
 
-      // Logo (if available)
-      try {
-        const logoImg = new Image()
-        logoImg.crossOrigin = 'anonymous'
-        logoImg.src = '/logo/Vet print.png'
-        await new Promise((resolve, reject) => {
-          logoImg.onload = resolve
-          logoImg.onerror = reject
-        })
-        doc.addImage(logoImg, 'PNG', 15, 8, 35, 24)
-      } catch (error) {
-        console.log('Logo not loaded:', error)
-      }
+      // Logo
+      doc.setTextColor(22, 163, 74)
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text('VETTRACK', 15, 20)
 
       // Header text
       doc.setTextColor(17, 24, 39) // gray-900
