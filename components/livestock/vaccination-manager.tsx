@@ -240,13 +240,13 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
 
   /**
    * Picker options, animals first then calves, each under its own heading so the two
-   * never read as one flat list. A sold or deceased calf is left out - it can no
-   * longer be vaccinated - while still appearing in the filter list below so its past
-   * records stay reachable.
+   * never read as one flat list. A sold or deceased calf, or a deceased animal, is left
+   * out - it can no longer be vaccinated - while still appearing in the filter list
+   * below so its past records stay reachable.
    */
   const subjectOptions = useMemo(() => {
     const animalOpts = subjects
-      .filter(s => s.kind === "animal")
+      .filter(s => s.kind === "animal" && s.status !== "Deceased")
       .map(s => ({ value: subjectKey(s.kind, s._id), label: `${s.name} (${s.type})`, group: t("farmer.animals") }))
     const calfOpts = subjects
       .filter(s => s.kind === "calf" && VACCINABLE_CALF_STATUSES.includes(s.status || "active"))

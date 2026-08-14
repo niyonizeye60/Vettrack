@@ -18,7 +18,7 @@ import { Syringe, Plus, Pencil, Trash2, History, ChevronDown, Baby, FlaskConical
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
 
-interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null }
+interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null; status?: string | null }
 interface Vet { _id: string; name: string; specialization: string }
 interface InseminationRecord {
   _id: string
@@ -100,8 +100,8 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   const { t } = useLanguage()
   const [animals, setAnimals] = useState<Animal[]>([])
   const [vets, setVets] = useState<Vet[]>([])
-  // include females + animals with undefined/null gender (exclude confirmed males)
-  const femaleAnimals = animals.filter(a => a.gender !== "male")
+  // include females + animals with undefined/null gender (exclude confirmed males and deceased animals)
+  const femaleAnimals = animals.filter(a => a.gender !== "male" && a.status !== "Deceased")
   const [records, setRecords] = useState<InseminationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

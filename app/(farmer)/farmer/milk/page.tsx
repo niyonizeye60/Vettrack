@@ -17,7 +17,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
-interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null }
+interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null; status?: string | null }
 interface MilkRecord {
   _id: string; cowId: string; cowName: string; liters: number
   homeConsumption: number | null; soldLiters: number | null
@@ -37,6 +37,7 @@ export default function MilkProductionPage() {
   const [user, setUser] = useState<any>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
   const milkableAnimals = animals.filter(a => {
+    if (a.status === "Deceased") return false
     const type = (a.type || "").toLowerCase()
     if (!MILK_PRODUCING_TYPES.includes(type)) return false
     if (a.gender && a.gender !== "female") return false

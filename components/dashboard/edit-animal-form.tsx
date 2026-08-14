@@ -168,6 +168,7 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
               <SelectItem value="Healthy">{t('farmer.healthy')}</SelectItem>
               <SelectItem value="Sick">{t('farmer.sick')}</SelectItem>
               <SelectItem value="Under Treatment">{t('farmer.underTreatment')}</SelectItem>
+              <SelectItem value="Deceased">{t('farmer.deceased')}</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -85,12 +85,14 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
     status === "Healthy" ? "bg-green-100 text-green-800" :
     status === "Sick" ? "bg-yellow-100 text-yellow-800" :
     status === "Under Treatment" ? "bg-blue-100 text-blue-800" :
+    status === "Deceased" ? "bg-red-100 text-red-800" :
     "bg-gray-100 text-gray-800"
 
   const getStatusText = (status: string) =>
     status === "Healthy" ? t('farmer.healthy') :
     status === "Sick" ? t('farmer.sick') :
     status === "Under Treatment" ? t('farmer.underTreatment') :
+    status === "Deceased" ? t('farmer.deceased') :
     status
 
   const handleDelete = async () => {

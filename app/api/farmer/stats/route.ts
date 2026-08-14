@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     const db = client.db("ntdm_animal_hospital")
 
     const [totalAnimals, healthyAnimals, totalConsultations] = await Promise.all([
-      db.collection("animals").countDocuments({ ownerId: farmerId }),
+      db.collection("animals").countDocuments({ ownerId: farmerId, status: { $ne: "Deceased" } }),
       db.collection("animals").countDocuments({ ownerId: farmerId, status: "Healthy" }),
       db.collection("consultations").countDocuments({ farmerId }),
     ])
