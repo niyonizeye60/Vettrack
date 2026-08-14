@@ -18,12 +18,30 @@ import { ShieldPlus, Plus, Pencil, Trash2, History, BarChart3, CalendarClock, Al
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
 
-interface Animal { _id: string; name: string; type: string; insuranceId?: string | null; earTagId?: string | null }
+type SubjectType = "animal" | "calf"
+
+/**
+ * An animal or a calf, as /api/farm-animals?includeCalves=1 returns them. They live in
+ * separate collections with separate id spaces, so nothing here keys on `_id` alone -
+ * see subjectKey() below.
+ */
+interface Subject {
+  kind: SubjectType
+  _id: string
+  name: string
+  type: string
+  insuranceId?: string | null
+  earTagId?: string | null
+  status?: string | null
+  birthDate?: string | null
+  motherName?: string | null
+}
 interface Vet { _id: string; name: string; specialization: string }
 interface VaccinationRecord {
   _id: string
-  animalId: string
-  animalName: string | null
+  subjectType: SubjectType
+  subjectId: string
+  subjectName: string | null
   vaccineName: string
   diseasePrevented: string | null
   vaccineType: string | null
@@ -85,7 +103,25 @@ const TYPE_STYLES: Record<string, string> = {
   Other: "bg-gray-50 text-gray-700 border-gray-200",
 }
 
+/** Calves still on the farm. Sold and deceased ones stay out of the picker, but their
+ *  existing records remain in History. */
+const VACCINABLE_CALF_STATUSES = ["active", "weaned"]
+
 const today = new Date().toISOString().split("T")[0]
+
+/**
+ * The one identifier that is safe to compare, filter and group on.
+ *
+ * An animal `_id` and a calf `_id` are both Mongo ObjectIds from different
+ * collections, so an id on its own is ambiguous. Everything that selects, filters or
+ * buckets a subject in this component goes through this composite key.
+ */
+const subjectKey = (type: SubjectType, id: string) => `${type}:${id}`
+const recordKey = (r: VaccinationRecord) => subjectKey(r.subjectType, r.subjectId)
+const parseSubjectKey = (key: string) => {
+  const [type, ...rest] = key.split(":")
+  return { subjectType: (type === "calf" ? "calf" : "animal") as SubjectType, subjectId: rest.join(":") }
+}
 
 /** Whole days from today to `date`; negative when the date has passed. */
 const daysUntil = (date: string) =>
@@ -122,7 +158,7 @@ function DueBadge({ dueDate }: { dueDate: string }) {
 
 export default function VaccinationManager({ farmerId, can, showHeader = true }: VaccinationManagerProps) {
   const { t } = useLanguage()
-  const [animals, setAnimals] = useState<Animal[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
   const [vets, setVets] = useState<Vet[]>([])
   const [records, setRecords] = useState<VaccinationRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -137,8 +173,9 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
   // still needs it - but must not be able to submit it as a new record.
   const canSubmitForm = editRecord ? can.update : can.create
 
-  // Form fields
-  const [animalId, setAnimalId] = useState("")
+  // Form fields. The subject is held as a composite "type:id" key so one picker can
+  // offer both collections without their ids ever being confused.
+  const [subjectSel, setSubjectSel] = useState("")
   const [insuranceId, setInsuranceId] = useState("")
   const [earTagId, setEarTagId] = useState("")
   const [vaccineName, setVaccineName] = useState("")
@@ -162,17 +199,17 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   // Filters
-  const [filterAnimal, setFilterAnimal] = useState("")
+  const [filterSubject, setFilterSubject] = useState("")
   const [filterVaccine, setFilterVaccine] = useState("")
   const [filterMonth, setFilterMonth] = useState("")
 
   useEffect(() => {
     async function init() {
-      // Animals come from the guarded endpoint rather than the getAnimals() server
-      // action, which performs no authorization of its own.
-      const animalsRes = await fetch(`/api/farm-animals?farmerId=${farmerId}&module=vaccination`)
-      const animalsData = animalsRes.ok ? await animalsRes.json() : []
-      setAnimals(Array.isArray(animalsData) ? animalsData : [])
+      // Animals and calves come from the guarded endpoint rather than the getAnimals()
+      // server action or /api/calves, neither of which honours a vet's grant.
+      const subjectsRes = await fetch(`/api/farm-animals?farmerId=${farmerId}&module=vaccination&includeCalves=1`)
+      const subjectsData = subjectsRes.ok ? await subjectsRes.json() : []
+      setSubjects(Array.isArray(subjectsData) ? subjectsData : [])
       // Only the farmer picks a vaccinator from the roster. Skipping this for a
       // delegated vet avoids pulling every doctor's contact details into a portal
       // that has no use for them.
@@ -194,24 +231,62 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
     [records]
   )
 
+  const subjectByKey = useMemo(
+    () => new Map(subjects.map(s => [subjectKey(s.kind, s._id), s])),
+    [subjects]
+  )
+  const selectedSubject = subjectSel ? subjectByKey.get(subjectSel) : undefined
+  const isCalfSelected = selectedSubject?.kind === "calf"
+
+  /**
+   * Picker options, animals first then calves, each under its own heading so the two
+   * never read as one flat list. A sold or deceased calf is left out - it can no
+   * longer be vaccinated - while still appearing in the filter list below so its past
+   * records stay reachable.
+   */
+  const subjectOptions = useMemo(() => {
+    const animalOpts = subjects
+      .filter(s => s.kind === "animal")
+      .map(s => ({ value: subjectKey(s.kind, s._id), label: `${s.name} (${s.type})`, group: t("farmer.animals") }))
+    const calfOpts = subjects
+      .filter(s => s.kind === "calf" && VACCINABLE_CALF_STATUSES.includes(s.status || "active"))
+      // Calves have no ear tag to tell two "Calf 1"s apart, so the dam disambiguates.
+      .map(s => ({
+        value: subjectKey(s.kind, s._id),
+        label: s.motherName ? `${s.name} — dam: ${s.motherName}` : s.name,
+        group: t("farmer.calves"),
+      }))
+    return [...animalOpts, ...calfOpts]
+  }, [subjects, t])
+
+  const filterSubjectOptions = useMemo(() => [
+    { value: "all", label: t("farmer.allAnimals") },
+    ...subjects.map(s => ({
+      value: subjectKey(s.kind, s._id),
+      label: s.name,
+      group: s.kind === "calf" ? t("farmer.calves") : t("farmer.animals"),
+    })),
+  ], [subjects, t])
+
   const filteredRecords = useMemo(() => {
     let data = [...records]
-    if (filterAnimal) data = data.filter(r => r.animalId === filterAnimal)
+    if (filterSubject) data = data.filter(r => recordKey(r) === filterSubject)
     if (filterVaccine) data = data.filter(r => r.vaccineName === filterVaccine)
     if (filterMonth) data = data.filter(r => r.date.startsWith(filterMonth))
     return data
-  }, [records, filterAnimal, filterVaccine, filterMonth])
+  }, [records, filterSubject, filterVaccine, filterMonth])
 
   /**
-   * The live booster schedule: for each animal+vaccine pairing only the most recent
+   * The live booster schedule: for each subject+vaccine pairing only the most recent
    * dose carries a due date. A follow-up dose supersedes the schedule the previous
-   * one set, so an already-administered booster can never show up as overdue.
+   * one set, so an already-administered booster can never show up as overdue. The key
+   * includes the subject type, so a calf and an animal sharing an id cannot collide.
    */
   const schedule = useMemo(() => {
     const latest = new Map<string, VaccinationRecord>()
     for (const r of records) {
-      if (!r.animalId || !r.nextVaccinationDate) continue
-      const key = `${r.animalId}::${(r.vaccineName || "").toLowerCase()}`
+      if (!r.subjectId || !r.nextVaccinationDate) continue
+      const key = `${recordKey(r)}::${(r.vaccineName || "").toLowerCase()}`
       const prev = latest.get(key)
       if (!prev || r.date > prev.date) latest.set(key, r)
     }
@@ -223,14 +298,18 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
   const dueSoon = useMemo(() => schedule.filter(s => s.days >= 0 && s.days <= 30), [schedule])
   const overdue = useMemo(() => schedule.filter(s => s.days < 0), [schedule])
   const animalsVaccinated = useMemo(
-    () => new Set(records.map(r => r.animalId).filter(Boolean)).size,
+    () => new Set(records.filter(r => r.subjectId).map(recordKey)).size,
+    [records]
+  )
+  const calvesVaccinated = useMemo(
+    () => new Set(records.filter(r => r.subjectType === "calf" && r.subjectId).map(recordKey)).size,
     [records]
   )
   const totalCost = useMemo(() => records.reduce((s, r) => s + recordCost(r), 0), [records])
 
-  const handleAnimalChange = (val: string) => {
-    setAnimalId(val)
-    const selected = animals.find(a => a._id === val)
+  const handleSubjectChange = (val: string) => {
+    setSubjectSel(val)
+    const selected = subjectByKey.get(val)
     setInsuranceId(selected?.insuranceId || "")
     setEarTagId(selected?.earTagId || "")
   }
@@ -246,7 +325,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!animalId) e.animalId = "Select an animal"
+    if (!subjectSel) e.subject = "Select an animal or calf"
     if (!vaccineName.trim()) e.vaccineName = "Enter the vaccine name"
     if (!date) e.date = "Select the date given"
     if (dose && Number(dose) <= 0) e.dose = "Enter a valid dose"
@@ -258,7 +337,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
   }
 
   const resetForm = () => {
-    setAnimalId(""); setInsuranceId(""); setEarTagId("")
+    setSubjectSel(""); setInsuranceId(""); setEarTagId("")
     setVaccineName(""); setDiseasePrevented(""); setVaccineType("")
     setDate(today); setDose(""); setDoseUnit("ml"); setRoute(""); setSite("")
     setBatchNumber(""); setManufacturer(""); setExpiryDate("")
@@ -271,11 +350,12 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
   const handleSubmit = async () => {
     if (!validate()) return
     setSaving(true)
-    const animal = animals.find(a => a._id === animalId)
+    const { subjectType, subjectId } = parseSubjectKey(subjectSel)
     const body = {
       farmerId,
-      animalId,
-      animalName: animal?.name || null,
+      subjectType,
+      subjectId,
+      subjectName: selectedSubject?.name || null,
       vaccineName: vaccineName.trim(),
       diseasePrevented, vaccineType, date,
       dose, doseUnit, route, site,
@@ -297,9 +377,10 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
 
   const handleEdit = (r: VaccinationRecord) => {
     setEditRecord(r)
-    setAnimalId(r.animalId || "")
-    setInsuranceId(animals.find(a => a._id === r.animalId)?.insuranceId || "")
-    setEarTagId(animals.find(a => a._id === r.animalId)?.earTagId || "")
+    const key = recordKey(r)
+    setSubjectSel(key)
+    setInsuranceId(subjectByKey.get(key)?.insuranceId || "")
+    setEarTagId(subjectByKey.get(key)?.earTagId || "")
     setVaccineName(r.vaccineName || "")
     setDiseasePrevented(r.diseasePrevented || "")
     setVaccineType(r.vaccineType || "")
@@ -333,7 +414,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       if (!map[key]) map[key] = { name: key, doses: 0, animals: new Set(), lastDate: "", prevents: r.diseasePrevented || "—", cost: 0 }
       map[key].doses += 1
       map[key].cost += recordCost(r)
-      if (r.animalId) map[key].animals.add(r.animalId)
+      if (r.subjectId) map[key].animals.add(recordKey(r))
       if (!map[key].lastDate || r.date > map[key].lastDate) map[key].lastDate = r.date
       if (r.diseasePrevented) map[key].prevents = r.diseasePrevented
     })
@@ -347,27 +428,28 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
   const animalSummary = useMemo(() => {
     const map: Record<string, { name: string; doses: number }> = {}
     records.forEach(r => {
-      const key = r.animalId || "general"
-      if (!map[key]) map[key] = { name: r.animalName || "—", doses: 0 }
+      const key = recordKey(r)
+      // Calves are labelled in the chart so two same-named subjects stay distinct.
+      if (!map[key]) map[key] = { name: `${r.subjectName || "—"}${r.subjectType === "calf" ? " (calf)" : ""}`, doses: 0 }
       map[key].doses += 1
     })
     return Object.values(map).sort((a, b) => b.doses - a.doses)
   }, [records])
 
-  const getAnimalEarTag = (id: string | null) => animals.find(a => a._id === id)?.earTagId || "—"
+  const getEarTag = (r: VaccinationRecord) => subjectByKey.get(recordKey(r))?.earTagId || "—"
 
   // Export
   const [exportOpen, setExportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [exportAnimalFilter, setExportAnimalFilter] = useState("")
+  const [exportSubjectFilter, setExportSubjectFilter] = useState("")
 
   const exportRecords = useMemo(
-    () => exportAnimalFilter ? records.filter(r => r.animalId === exportAnimalFilter) : records,
-    [records, exportAnimalFilter]
+    () => exportSubjectFilter ? records.filter(r => recordKey(r) === exportSubjectFilter) : records,
+    [records, exportSubjectFilter]
   )
   const exportSummary = useMemo(() => summarizeByVaccine(exportRecords), [exportRecords])
   const exportTotalCost = useMemo(() => exportRecords.reduce((s, r) => s + recordCost(r), 0), [exportRecords])
-  const exportAnimalName = exportAnimalFilter ? animals.find(a => a._id === exportAnimalFilter)?.name || "" : ""
+  const exportSubjectName = exportSubjectFilter ? subjectByKey.get(exportSubjectFilter)?.name || "" : ""
 
   const exportToPDF = async () => {
     setExporting(true)
@@ -381,7 +463,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       doc.text("VETTRACK", 15, 20)
       doc.setTextColor(17, 24, 39)
       doc.setFontSize(16); doc.setFont("helvetica", "bold")
-      doc.text(exportAnimalName ? `${t("farmer.vaccinationReportTitle")} — ${exportAnimalName}` : t("farmer.vaccinationReportTitle"), 55, 18)
+      doc.text(exportSubjectName ? `${t("farmer.vaccinationReportTitle")} — ${exportSubjectName}` : t("farmer.vaccinationReportTitle"), 55, 18)
       doc.setTextColor(75, 85, 99)
       doc.setFontSize(10); doc.setFont("helvetica", "normal")
       doc.text("NTDM Vettrack", 55, 27)
@@ -447,7 +529,12 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       drawHeader()
 
       exportRecords.forEach((r, i) => {
-        const animalLines = doc.splitTextToSize(r.animalName || "—", cols.animal.width)
+        // Calves are marked inline rather than given their own column - the detail
+        // table is already 12 columns wide on landscape A4.
+        const animalLines = doc.splitTextToSize(
+          `${r.subjectName || "—"}${r.subjectType === "calf" ? " (calf)" : ""}`,
+          cols.animal.width
+        )
         const vaccineLines = doc.splitTextToSize(r.vaccineName || "—", cols.vaccine.width)
         const preventsLines = doc.splitTextToSize(r.diseasePrevented || "—", cols.prevents.width)
         const typeLines = doc.splitTextToSize(r.vaccineType || "—", cols.type.width)
@@ -563,7 +650,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         doc.text(`Page ${page} of ${totalPages}`, pw - 15, ph - 7, { align: "right" })
       }
 
-      const suffix = exportAnimalName ? `-${exportAnimalName.replace(/\s+/g, "_")}` : ""
+      const suffix = exportSubjectName ? `-${exportSubjectName.replace(/\s+/g, "_")}` : ""
       doc.save(`vaccination-report${suffix}-${today}.pdf`)
       logPortalExport("Vaccination report", "PDF")
       setExportOpen(false)
@@ -583,8 +670,9 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       // Sheet 1 — every dose
       const recordsData = exportRecords.map(r => ({
         "Date Given": r.date,
-        Animal: r.animalName || "—",
-        "Ear Tag ID": getAnimalEarTag(r.animalId),
+        Subject: r.subjectName || "—",
+        "Subject Type": r.subjectType === "calf" ? "Calf" : "Animal",
+        "Ear Tag ID": getEarTag(r),
         "Vaccine Name": r.vaccineName,
         "Disease Prevented": r.diseasePrevented || "—",
         "Vaccine Type": r.vaccineType || "—",
@@ -603,7 +691,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         Remarks: r.notes || "—",
       }))
       const ws1 = XLSX.utils.json_to_sheet(recordsData)
-      ws1["!cols"] = [14, 20, 16, 26, 28, 18, 12, 18, 18, 20, 24, 14, 22, 20, 20, 18, 22, 18, 30].map(w => ({ wch: w }))
+      ws1["!cols"] = [14, 20, 14, 16, 26, 28, 18, 12, 18, 18, 20, 24, 14, 22, 20, 20, 18, 22, 18, 30].map(w => ({ wch: w }))
       XLSX.utils.book_append_sheet(wb, ws1, "All Records")
 
       // Sheet 2 — per-vaccine summary
@@ -621,18 +709,19 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
 
       // Sheet 3 — the live booster schedule
       const scheduleData = schedule.map(s => ({
-        Animal: s.record.animalName || "—",
-        "Ear Tag ID": getAnimalEarTag(s.record.animalId),
+        Subject: s.record.subjectName || "—",
+        "Subject Type": s.record.subjectType === "calf" ? "Calf" : "Animal",
+        "Ear Tag ID": getEarTag(s.record),
         Vaccine: s.record.vaccineName,
         "Last Given": s.record.date,
         "Next Due": s.dueDate,
         Status: s.days < 0 ? `${Math.abs(s.days)} days overdue` : s.days === 0 ? "Due today" : `${s.days} days left`,
       }))
       const ws3 = XLSX.utils.json_to_sheet(scheduleData)
-      ws3["!cols"] = [22, 16, 28, 16, 16, 20].map(w => ({ wch: w }))
+      ws3["!cols"] = [22, 14, 16, 28, 16, 16, 20].map(w => ({ wch: w }))
       XLSX.utils.book_append_sheet(wb, ws3, "Schedule")
 
-      const suffix = exportAnimalName ? `-${exportAnimalName.replace(/\s+/g, "_")}` : ""
+      const suffix = exportSubjectName ? `-${exportSubjectName.replace(/\s+/g, "_")}` : ""
       XLSX.writeFile(wb, `vaccination-report${suffix}-${today}.xlsx`)
       logPortalExport("Vaccination report", "Excel")
       setExportOpen(false)
@@ -692,7 +781,11 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
               <Users className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-3xl font-bold text-green-600 mt-2">{animalsVaccinated}</h3>
-            <p className="text-xs text-gray-400 mt-1">{t("farmer.distinctAnimals")}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {calvesVaccinated > 0
+                ? `${t("farmer.including")} ${calvesVaccinated} ${t("farmer.calves").toLowerCase()}`
+                : t("farmer.distinctAnimals")}
+            </p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
@@ -751,30 +844,44 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                  {/* Animal */}
+                  {/* Subject - one picker, animals and calves under separate headings */}
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-gray-700">{t("farmer.animal")} *</label>
+                    <label className="text-sm font-medium text-gray-700">{t("farmer.animalOrCalf")} *</label>
                     <Combobox
-                      value={animalId}
-                      onValueChange={handleAnimalChange}
-                      disabled={animals.length === 0}
-                      options={animals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` }))}
-                      placeholder={animals.length === 0 ? "No animals registered" : "Select animal..."}
+                      value={subjectSel}
+                      onValueChange={handleSubjectChange}
+                      disabled={subjectOptions.length === 0}
+                      options={subjectOptions}
+                      placeholder={subjectOptions.length === 0 ? t("farmer.noAnimalsRegistered") : t("farmer.selectAnimalOrCalf")}
                       searchPlaceholder={t("farmer.searchAnimals") || "Search animals…"}
                       emptyText={t("farmer.noResultsFound") || "No animals found."}
-                      className={errors.animalId ? "border-red-500" : ""}
+                      className={errors.subject ? "border-red-500" : ""}
                     />
-                    {animals.length === 0 && <p className="text-xs text-red-500">{t("farmer.noAnimalsRegistered")}</p>}
-                    {errors.animalId && <p className="text-xs text-red-500">{errors.animalId}</p>}
+                    {selectedSubject && (
+                      <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                        <Badge variant="outline" className={`text-[10px] ${isCalfSelected ? "bg-pink-50 text-pink-700 border-pink-200" : "bg-sky-50 text-sky-700 border-sky-200"}`}>
+                          {isCalfSelected ? t("farmer.calf") : t("farmer.animal")}
+                        </Badge>
+                        {isCalfSelected
+                          ? [selectedSubject.motherName ? `${t("farmer.dam")}: ${selectedSubject.motherName}` : null, selectedSubject.birthDate ? `${t("farmer.born")} ${selectedSubject.birthDate}` : null].filter(Boolean).join(" · ")
+                          : selectedSubject.type}
+                      </p>
+                    )}
+                    {subjectOptions.length === 0 && <p className="text-xs text-red-500">{t("farmer.noAnimalsRegistered")}</p>}
+                    {errors.subject && <p className="text-xs text-red-500">{errors.subject}</p>}
                   </div>
 
-                  {/* Ear Tag ID */}
+                  {/* Ear Tag ID - calves are not tagged, so say so rather than showing
+                      an empty state that reads like the farmer forgot to fill it in. */}
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-gray-700">{t("farmer.earTagId")} <span className="text-gray-400 text-xs">{t("farmer.autoDetected")}</span></label>
                     <Input
                       readOnly
-                      value={earTagId || (animalId ? "No ear tag registered" : "Select an animal first")}
-                      className={earTagId ? "bg-amber-50 text-amber-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
+                      value={
+                        isCalfSelected ? t("farmer.notApplicableForCalves")
+                          : earTagId || (subjectSel ? "No ear tag registered" : t("farmer.selectSubjectFirst"))
+                      }
+                      className={earTagId && !isCalfSelected ? "bg-amber-50 text-amber-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                     />
                   </div>
 
@@ -783,8 +890,11 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <label className="text-sm font-medium text-gray-700">{t("farmer.insuranceId")} <span className="text-gray-400 text-xs">{t("farmer.autoDetected")}</span></label>
                     <Input
                       readOnly
-                      value={insuranceId || (animalId ? "No insurance registered" : "Select an animal first")}
-                      className={insuranceId ? "bg-blue-50 text-blue-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
+                      value={
+                        isCalfSelected ? t("farmer.notApplicableForCalves")
+                          : insuranceId || (subjectSel ? "No insurance registered" : t("farmer.selectSubjectFirst"))
+                      }
+                      className={insuranceId && !isCalfSelected ? "bg-blue-50 text-blue-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                     />
                   </div>
 
@@ -1039,12 +1149,9 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
               {/* Filters */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-gray-50 rounded-xl">
                 <Combobox
-                  value={filterAnimal || "all"}
-                  onValueChange={v => setFilterAnimal(v === "all" ? "" : v)}
-                  options={[
-                    { value: "all", label: t("farmer.allAnimals") },
-                    ...animals.map(a => ({ value: a._id, label: a.name })),
-                  ]}
+                  value={filterSubject || "all"}
+                  onValueChange={v => setFilterSubject(v === "all" ? "" : v)}
+                  options={filterSubjectOptions}
                   placeholder={t("farmer.allAnimals")}
                   searchPlaceholder={t("farmer.searchAnimals") || "Search animals…"}
                   emptyText={t("farmer.noResultsFound") || "No animals found."}
@@ -1059,7 +1166,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-1">
                   <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}</p>
-                  <Button variant="outline" onClick={() => { setFilterAnimal(""); setFilterVaccine(""); setFilterMonth("") }} className="rounded-lg ml-auto text-xs">Clear</Button>
+                  <Button variant="outline" onClick={() => { setFilterSubject(""); setFilterVaccine(""); setFilterMonth("") }} className="rounded-lg ml-auto text-xs">Clear</Button>
                 </div>
               </div>
 
@@ -1068,7 +1175,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t("farmer.dateGiven")}</TableHead>
-                      <TableHead>{t("farmer.animal")}</TableHead>
+                      <TableHead>{t("farmer.animalOrCalf")}</TableHead>
                       <TableHead>{t("farmer.vaccineName")}</TableHead>
                       <TableHead>{t("farmer.diseasePrevented")}</TableHead>
                       <TableHead>{t("farmer.vaccineType")}</TableHead>
@@ -1090,7 +1197,14 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     ) : filteredRecords.map(r => (
                       <TableRow key={r._id}>
                         <TableCell className="text-sm">{r.date}</TableCell>
-                        <TableCell className="text-sm">{r.animalName || <span className="text-gray-400">—</span>}</TableCell>
+                        <TableCell className="text-sm">
+                          <span className="flex items-center gap-1.5">
+                            {r.subjectName || <span className="text-gray-400">—</span>}
+                            {r.subjectType === "calf" && (
+                              <Badge variant="outline" className="bg-pink-50 text-pink-700 border-pink-200 text-[10px]">{t("farmer.calf")}</Badge>
+                            )}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-sm font-medium text-green-700">{r.vaccineName}</TableCell>
                         <TableCell className="text-sm">{r.diseasePrevented || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell>
@@ -1170,7 +1284,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>{t("farmer.animal")}</TableHead>
+                        <TableHead>{t("farmer.animalOrCalf")}</TableHead>
                         <TableHead>{t("farmer.vaccineName")}</TableHead>
                         <TableHead>{t("farmer.lastGiven")}</TableHead>
                         <TableHead>{t("farmer.nextVaccination")}</TableHead>
@@ -1181,7 +1295,14 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                         <TableRow><TableCell colSpan={4} className="text-center py-6 text-gray-400">{t("farmer.noVaccinationData")}</TableCell></TableRow>
                       ) : schedule.map(s => (
                         <TableRow key={s.record._id}>
-                          <TableCell className="font-medium">{s.record.animalName || "—"}</TableCell>
+                          <TableCell className="font-medium">
+                            <span className="flex items-center gap-1.5">
+                              {s.record.subjectName || "—"}
+                              {s.record.subjectType === "calf" && (
+                                <Badge variant="outline" className="bg-pink-50 text-pink-700 border-pink-200 text-[10px]">{t("farmer.calf")}</Badge>
+                              )}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-sm">{s.record.vaccineName}</TableCell>
                           <TableCell className="text-sm text-gray-500">{s.record.date}</TableCell>
                           <TableCell><DueBadge dueDate={s.dueDate} /></TableCell>
@@ -1293,14 +1414,11 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">{t("farmer.animal")}</label>
+              <label className="text-sm font-medium text-gray-700">{t("farmer.animalOrCalf")}</label>
               <Combobox
-                value={exportAnimalFilter || "all"}
-                onValueChange={v => setExportAnimalFilter(v === "all" ? "" : v)}
-                options={[
-                  { value: "all", label: t("farmer.allAnimals") },
-                  ...animals.map(a => ({ value: a._id, label: a.name })),
-                ]}
+                value={exportSubjectFilter || "all"}
+                onValueChange={v => setExportSubjectFilter(v === "all" ? "" : v)}
+                options={filterSubjectOptions}
                 placeholder={t("farmer.allAnimals")}
                 searchPlaceholder={t("farmer.searchAnimals") || "Search animals…"}
                 emptyText={t("farmer.noResultsFound") || "No animals found."}
@@ -1308,7 +1426,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
             </div>
             <div className="p-3 bg-green-50 rounded-xl border border-green-100">
               <div className="text-sm space-y-1">
-                <p className="font-medium text-green-700">{t("farmer.preview")}{exportAnimalName ? ` — ${exportAnimalName}` : ""}</p>
+                <p className="font-medium text-green-700">{t("farmer.preview")}{exportSubjectName ? ` — ${exportSubjectName}` : ""}</p>
                 <p className="text-gray-600">
                   {exportRecords.length} dose{exportRecords.length !== 1 ? "s" : ""} &bull; {exportSummary.length} vaccine{exportSummary.length !== 1 ? "s" : ""} &bull; {animalsVaccinated} animal(s)
                 </p>

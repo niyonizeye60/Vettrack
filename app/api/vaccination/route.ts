@@ -4,7 +4,7 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
-import { resolveFarmAccess, logVetAction, diffRecord, provenanceFor, animalBelongsToFarm } from "@/lib/farm-access"
+import { resolveFarmAccess, logVetAction, diffRecord, provenanceFor, subjectBelongsToFarm, isRecordSubjectType } from "@/lib/farm-access"
 
 const DB = "ntdm_animal_hospital"
 const MODULE = "vaccination" as const
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const {
-      farmerId, animalId, animalName, vaccineName, diseasePrevented, vaccineType,
+      farmerId, subjectType, subjectId, subjectName, vaccineName, diseasePrevented, vaccineType,
       date, dose, doseUnit, route, site, batchNumber, manufacturer, expiryDate,
       vaccinePrice, vetPrice, vaccinator, nextVaccinationDate, notes,
     } = body
@@ -61,18 +61,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: access.reason }, { status: access.status })
     }
 
-    // A vaccination is always given to a specific animal, and that animal must be on
-    // this farm - a caller authorized on farm A can never file against farm B's animal.
-    if (!animalId) return NextResponse.json({ error: "Animal required" }, { status: 400 })
-    if (!(await animalBelongsToFarm(animalId, farmerId))) {
-      return NextResponse.json({ error: "That animal is not on this farm" }, { status: 403 })
+    // A vaccination is always given to one specific animal or calf, and it must be on
+    // this farm - a caller authorized on farm A can never file against farm B's stock.
+    // The type is validated too, so a calf id can never be checked against the animals
+    // collection or vice versa.
+    if (!subjectId) return NextResponse.json({ error: "Animal or calf required" }, { status: 400 })
+    if (!isRecordSubjectType(subjectType)) {
+      return NextResponse.json({ error: "Invalid subject type" }, { status: 400 })
+    }
+    if (!(await subjectBelongsToFarm(subjectType, subjectId, farmerId))) {
+      return NextResponse.json({ error: `That ${subjectType} is not on this farm` }, { status: 403 })
     }
 
     const client = await clientPromise
     const db = client.db(DB)
 
     const record = {
-      farmerId, animalId, animalName: animalName || null,
+      farmerId, subjectType, subjectId, subjectName: subjectName || null,
       vaccineName,
       diseasePrevented: diseasePrevented || null,
       vaccineType: vaccineType || null,
@@ -106,13 +111,13 @@ export async function POST(req: NextRequest) {
         module: MODULE,
         action: "vaccination.create",
         recordId: result.insertedId.toString(),
-        animalId,
-        animalName: animalName || null,
-        summary: `${currentUser.name} recorded a ${vaccineName} vaccination${animalName ? ` for ${animalName}` : ""}`,
+        animalId: subjectId,
+        animalName: subjectName || null,
+        summary: `${currentUser.name} recorded a ${vaccineName} vaccination${subjectName ? ` for ${subjectName}` : ""}${subjectType === "calf" ? " (calf)" : ""}`,
       })
     }
 
-    await logActivity(currentUser._id, "livestock.vaccination_logged", `${vaccineName}${animalName ? ` — ${animalName}` : ""}`)
+    await logActivity(currentUser._id, "livestock.vaccination_logged", `${vaccineName}${subjectName ? ` — ${subjectName}` : ""}`)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch {
     return NextResponse.json({ error: "Failed to save record" }, { status: 500 })
@@ -128,7 +133,7 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json()
     const {
-      id, animalId, animalName, vaccineName, diseasePrevented, vaccineType,
+      id, subjectType, subjectId, subjectName, vaccineName, diseasePrevented, vaccineType,
       date, dose, doseUnit, route, site, batchNumber, manufacturer, expiryDate,
       vaccinePrice, vetPrice, vaccinator, nextVaccinationDate, notes,
     } = body
@@ -149,13 +154,23 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: access.reason }, { status: access.status })
     }
 
-    if (animalId && !(await animalBelongsToFarm(animalId, existing.farmerId))) {
-      return NextResponse.json({ error: "That animal is not on this farm" }, { status: 403 })
+    // Re-point the record only when a new subject is actually supplied, and re-check
+    // the type/id pair against this farm before accepting it.
+    const nextSubjectType = subjectId ? subjectType : existing.subjectType
+    const nextSubjectId = subjectId || existing.subjectId
+    if (subjectId) {
+      if (!isRecordSubjectType(subjectType)) {
+        return NextResponse.json({ error: "Invalid subject type" }, { status: 400 })
+      }
+      if (!(await subjectBelongsToFarm(subjectType, subjectId, existing.farmerId))) {
+        return NextResponse.json({ error: `That ${subjectType} is not on this farm` }, { status: 403 })
+      }
     }
 
     const updated = {
-      animalId: animalId || existing.animalId,
-      animalName: animalName || null,
+      subjectType: nextSubjectType,
+      subjectId: nextSubjectId,
+      subjectName: subjectName || null,
       vaccineName,
       diseasePrevented: diseasePrevented || null,
       vaccineType: vaccineType || null,
@@ -188,14 +203,14 @@ export async function PUT(req: NextRequest) {
         module: MODULE,
         action: "vaccination.update",
         recordId: id,
-        animalId: animalId || existing.animalId,
-        animalName: animalName || null,
-        summary: `${currentUser.name} updated a vaccination record${animalName ? ` for ${animalName}` : ""}`,
+        animalId: nextSubjectId,
+        animalName: subjectName || null,
+        summary: `${currentUser.name} updated a vaccination record${subjectName ? ` for ${subjectName}` : ""}${nextSubjectType === "calf" ? " (calf)" : ""}`,
         changes: diffRecord(existing, updated),
       })
     }
 
-    await logActivity(currentUser._id, "livestock.vaccination_updated", animalName || id)
+    await logActivity(currentUser._id, "livestock.vaccination_updated", subjectName || id)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: "Failed to update record" }, { status: 500 })
@@ -236,9 +251,9 @@ export async function DELETE(req: NextRequest) {
         module: MODULE,
         action: "vaccination.delete",
         recordId: id,
-        animalId: existing.animalId || null,
-        animalName: existing.animalName || null,
-        summary: `${currentUser.name} deleted a vaccination record${existing.animalName ? ` for ${existing.animalName}` : ""}`,
+        animalId: existing.subjectId || null,
+        animalName: existing.subjectName || null,
+        summary: `${currentUser.name} deleted a vaccination record${existing.subjectName ? ` for ${existing.subjectName}` : ""}${existing.subjectType === "calf" ? " (calf)" : ""}`,
       })
     }
 

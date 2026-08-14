@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
       date: r.date, label: "Insemination Costs", description: r.animalName || "Insemination", amount: (r.semenPrice || 0) + (r.vetPrice || 0)
     }))
     vaccinationRecords.filter(r => (r.vaccinePrice || 0) + (r.vetPrice || 0) > 0).forEach(r => expenseLedger.push({
-      date: r.date, label: "Vaccination Costs", description: `${r.animalName || "Animal"}${r.vaccineName ? ` - ${r.vaccineName}` : ""}`, amount: (r.vaccinePrice || 0) + (r.vetPrice || 0)
+      date: r.date, label: "Vaccination Costs", description: `${r.subjectName || "Animal"}${r.subjectType === "calf" ? " (calf)" : ""}${r.vaccineName ? ` - ${r.vaccineName}` : ""}`, amount: (r.vaccinePrice || 0) + (r.vetPrice || 0)
     }))
     treatmentDoses.filter(d => (d.totalCost || 0) > 0).forEach(d => expenseLedger.push({
       date: d.date, label: "Veterinary & Health", description: `${d.animalName || "Animal"}${d.diseaseName ? ` - ${d.diseaseName}` : ""}`, amount: d.totalCost || 0

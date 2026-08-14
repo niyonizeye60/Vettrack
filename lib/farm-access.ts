@@ -217,6 +217,52 @@ export async function animalBelongsToFarm(animalId: string, farmerId: string): P
   return !!animal
 }
 
+/**
+ * What a farm record can be filed against. Calves live in their own collection with
+ * their own id space, so an id alone cannot say which one it came from - every record
+ * that accepts both must store the type alongside it and re-check the pair here.
+ */
+export type RecordSubjectType = "animal" | "calf"
+
+export function isRecordSubjectType(value: unknown): value is RecordSubjectType {
+  return value === "animal" || value === "calf"
+}
+
+/**
+ * Confirm a calf actually belongs to the farm a record is being filed against.
+ *
+ * Same role as animalBelongsToFarm(): the record routes take an id from the request
+ * body, so without this a caller authorized on farm A could name farm B's calf.
+ * Calves are always stored with a flat farmerId - there are no legacy owner shapes.
+ */
+export async function calfBelongsToFarm(calfId: string, farmerId: string): Promise<boolean> {
+  if (!calfId || !ObjectId.isValid(calfId)) return false
+  const client = await clientPromise
+  const db = client.db(DB)
+  const calf = await db.collection("calves").findOne(
+    { _id: new ObjectId(calfId), farmerId },
+    { projection: { _id: 1 } }
+  )
+  return !!calf
+}
+
+/**
+ * Ownership check for a record that may target either an animal or a calf.
+ *
+ * Dispatches on the caller-supplied type, so a calf id can never be validated against
+ * the animals collection or vice versa. Fails closed on an unrecognised type.
+ */
+export async function subjectBelongsToFarm(
+  subjectType: unknown,
+  subjectId: string,
+  farmerId: string
+): Promise<boolean> {
+  if (!isRecordSubjectType(subjectType)) return false
+  return subjectType === "calf"
+    ? calfBelongsToFarm(subjectId, farmerId)
+    : animalBelongsToFarm(subjectId, farmerId)
+}
+
 export interface VetActionEntry {
   farmerId: string
   vetId: string
