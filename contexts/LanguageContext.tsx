@@ -637,6 +637,8 @@ const translations = {
     'farmer.viewFullReport': 'View Full Report',
     'farmer.calfRearingCosts': 'Calf Rearing Costs',
     'farmer.calfRearingCostsDesc': 'Milk, feed, and veterinary costs for calves',
+    'farmer.milkingSuppliesCosts': 'Milking Supplies Costs',
+    'farmer.milkingSuppliesCostsDesc': 'Washing drugs and milking oil',
 
     // Calf Management
     'farmer.calves': 'Calves',
@@ -689,6 +691,13 @@ const translations = {
     'farmer.noCalfExpensesYet': 'No expenses recorded yet',
     'farmer.deleteExpense': 'Delete Expense',
     'farmer.deleteExpenseConfirm': 'Are you sure you want to delete this expense? This action cannot be undone.',
+    'farmer.expenses': 'Expenses',
+    'farmer.expensesDesc': 'Track spending on washing drugs and milking oil',
+    'farmer.washingDrugs': 'Washing Drugs',
+    'farmer.milkingOil': 'Milking Oil',
+    'farmer.totalWashingDrugsCost': 'Washing Drugs Cost',
+    'farmer.totalMilkingOilCost': 'Milking Oil Cost',
+    'farmer.noExpensesYet': 'No expenses recorded yet',
 
     'farmer.myConsultations': 'My Consultations',
     'farmer.newConsultation': 'New Consultation',
@@ -3153,6 +3162,8 @@ const translations = {
     'farmer.viewFullReport': 'Reba Raporo Yuzuye',
     'farmer.calfRearingCosts': 'Amafaranga yo Kurera Inyana',
     'farmer.calfRearingCostsDesc': 'Amata, ibiribwa, n' + "'" + 'ubuvuzi by' + "'" + 'inyana',
+    'farmer.milkingSuppliesCosts': 'Amafaranga yo Konka',
+    'farmer.milkingSuppliesCostsDesc': 'Imiti yo kwoza n' + "'" + 'amavuta yo konka',
 
     // Calf Management
     'farmer.calves': 'Inyana',
@@ -3205,6 +3216,13 @@ const translations = {
     'farmer.noCalfExpensesYet': 'Nta mafaranga yanditswe',
     'farmer.deleteExpense': 'Siba Amafaranga',
     'farmer.deleteExpenseConfirm': 'Uzi neza ko ushaka gusiba aya mafaranga? Ntibishobora gusubizwa.',
+    'farmer.expenses': 'Amafaranga Yasohotse',
+    'farmer.expensesDesc': 'Kurikirana amafaranga yakoreshejwe ku miti yo kwoza no ku mavuta yo konka',
+    'farmer.washingDrugs': 'Imiti yo Kwoza',
+    'farmer.milkingOil': 'Amavuta yo Konka',
+    'farmer.totalWashingDrugsCost': 'Amafaranga y' + "'" + 'Imiti yo Kwoza',
+    'farmer.totalMilkingOilCost': 'Amafaranga y' + "'" + 'Amavuta yo Konka',
+    'farmer.noExpensesYet': 'Nta mafaranga yanditswe',
 
     'farmer.myConsultations': 'Randevu Zanjye',
     'farmer.newConsultation': 'Randevu Nshya',
