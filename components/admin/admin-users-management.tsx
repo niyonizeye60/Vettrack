@@ -1167,6 +1167,14 @@ export default function AdminUsersManagement() {
                 </div>
               </div>
             )}
+
+            {newUser.role === "farmer" && (
+              <Alert className="bg-yellow-50 border-yellow-200">
+                <AlertDescription className="text-yellow-800 text-sm">
+                  {t('admin.verifyFarmerAccount')}
+                </AlertDescription>
+              </Alert>
+            )}
             
             {newUser.role === "doctor" && (
               <div className="space-y-4">

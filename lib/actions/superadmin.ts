@@ -1073,6 +1073,8 @@ function describeAdminAction(action: string, details?: string): string | null {
     case 'admin.user.passwordReset': return `reset password for user: ${details}`
     case 'admin.vet.approved': return `approved veterinarian: ${details}`
     case 'admin.vet.rejected': return `rejected veterinarian application: ${details}`
+    case 'admin.farmer.approved': return `approved farmer: ${details}`
+    case 'admin.farmer.rejected': return `rejected farmer application: ${details}`
     case 'admin.export.users': return `exported user data (${details})`
     case 'admin.export.consultations': return `exported consultation data (${details})`
     case 'admin.export.systemLogs': return `exported system logs (${details})`

@@ -107,6 +107,9 @@ export async function registerUser(formData: FormData) {
         consultations: [],
       })
     } else if (role === "farmer") {
+      // Farmer accounts also require admin verification before they can log
+      // in - see loginUser's status check below.
+      userData.status = "pending_verification"
       Object.assign(userData, {
         district: formData.get("district"),
         sector: formData.get("sector"),
@@ -161,6 +164,8 @@ export async function registerUser(formData: FormData) {
       success: true,
       message: role === "doctor"
         ? "Application submitted! Your veterinarian account is pending verification by an Extension Officer - we'll notify you by email once it's approved."
+        : role === "farmer"
+        ? "Application submitted! Your farmer account is pending verification by an Administrator - we'll notify you by email once it's approved."
         : "User registered successfully! Welcome email sent to your inbox.",
       userId: result.insertedId.toString(),
     }
@@ -243,14 +248,24 @@ export async function loginUser(formData: FormData) {
       await db.collection("login_attempts").insertOne({
         email, success: false, reason: "pending_verification", createdAt: new Date(),
       })
-      return { success: false, message: "Your veterinarian account is pending verification by an Extension Officer. You'll be notified once it's approved." }
+      return {
+        success: false,
+        message: user.role === "doctor"
+          ? "Your veterinarian account is pending verification by an Extension Officer. You'll be notified once it's approved."
+          : "Your farmer account is pending verification by an Administrator. You'll be notified once it's approved.",
+      }
     }
 
     if (user.status === "rejected") {
       await db.collection("login_attempts").insertOne({
         email, success: false, reason: "application_rejected", createdAt: new Date(),
       })
-      return { success: false, message: "Your veterinarian account application was not approved. Please contact the administrator for details." }
+      return {
+        success: false,
+        message: user.role === "doctor"
+          ? "Your veterinarian account application was not approved. Please contact the administrator for details."
+          : "Your farmer account application was not approved. Please contact the administrator for details.",
+      }
     }
 
     // Set a session cookie
