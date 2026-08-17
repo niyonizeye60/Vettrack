@@ -74,6 +74,11 @@ export async function POST(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    const duplicate = await db.collection("milk_records").findOne({ farmerId, cowId, date, session })
+    if (duplicate) {
+      return NextResponse.json({ error: `${cowName || "This animal"} was already milked during the ${session} session on this date` }, { status: 409 })
+    }
+
     const record = {
       farmerId, cowId, cowName,
       liters: Number(liters),
@@ -115,12 +120,20 @@ export async function PUT(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    const existing = await db.collection("milk_records").findOne({ _id: new ObjectId(id) })
+    if (!existing) return NextResponse.json({ error: "Record not found" }, { status: 404 })
+
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff) {
-      const existing = await db.collection("milk_records").findOne({ _id: new ObjectId(id) })
-      if (!existing || existing.farmerId !== currentUser._id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
+    if (!isStaff && existing.farmerId !== currentUser._id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const duplicate = await db.collection("milk_records").findOne({
+      _id: { $ne: new ObjectId(id) },
+      farmerId: existing.farmerId, cowId: existing.cowId, date, session,
+    })
+    if (duplicate) {
+      return NextResponse.json({ error: `${existing.cowName || "This animal"} was already milked during the ${session} session on this date` }, { status: 409 })
     }
 
     await db.collection("milk_records").updateOne(

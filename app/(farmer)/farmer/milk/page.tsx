@@ -152,10 +152,15 @@ export default function MilkProductionPage() {
     const soldLiters = Math.max(0, Number(liters) - Number(homeConsumption || 0))
     const body = { farmerId: user._id.toString(), cowId, cowName: cow?.name, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }
 
-    if (editRecord) {
-      await fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }) })
-    } else {
-      await fetch("/api/milk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = editRecord
+      ? await fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }) })
+      : await fetch("/api/milk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: "Failed to save milk record" }))
+      setErrors({ session: error })
+      setSaving(false)
+      return
     }
 
     await fetchRecords(user._id.toString())
