@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -459,12 +460,16 @@ export default function ExpensesPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="text-sm font-medium text-gray-700">{t('farmer.selectAnimal')} *</label>
-                          <Select value={aAnimalId} onValueChange={setAAnimalId} disabled={!!editAExpense}>
-                            <SelectTrigger className={aErrors.aAnimalId ? "border-red-500" : ""}><SelectValue placeholder={t('farmer.selectAnimal')} /></SelectTrigger>
-                            <SelectContent>
-                              {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          <Combobox
+                            value={aAnimalId}
+                            onValueChange={setAAnimalId}
+                            options={animals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` }))}
+                            placeholder={t('farmer.selectAnimal')}
+                            searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                            emptyText={t('farmer.noResultsFound') || "No animals found."}
+                            disabled={!!editAExpense}
+                            className={aErrors.aAnimalId ? "border-red-500" : ""}
+                          />
                           {aErrors.aAnimalId && <p className="text-xs text-red-500">{aErrors.aAnimalId}</p>}
                         </div>
 
@@ -527,13 +532,17 @@ export default function ExpensesPage() {
                 <CardContent className="space-y-4">
                   {/* Filters */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl">
-                    <Select value={filterAAnimal || "all"} onValueChange={v => setFilterAAnimal(v === "all" ? "" : v)}>
-                      <SelectTrigger><SelectValue placeholder={t('farmer.allAnimals')} /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t('farmer.allAnimals')}</SelectItem>
-                        {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Combobox
+                      value={filterAAnimal || "all"}
+                      onValueChange={v => setFilterAAnimal(v === "all" ? "" : v)}
+                      options={[
+                        { value: "all", label: t('farmer.allAnimals') },
+                        ...animals.map(a => ({ value: a._id, label: a.name })),
+                      ]}
+                      placeholder={t('farmer.allAnimals')}
+                      searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                      emptyText={t('farmer.noResultsFound') || "No animals found."}
+                    />
                     <Select value={filterAType || "all"} onValueChange={v => setFilterAType(v === "all" ? "" : v)}>
                       <SelectTrigger><SelectValue placeholder={t('farmer.allTypes')} /></SelectTrigger>
                       <SelectContent>
