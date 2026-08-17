@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
 
     const dateRange = { $gte: startDate, $lte: endDate }
 
-    const [milkRecords, animalTransactions, wasteRecords, inseminationRecords, vaccinationRecords, treatmentDoses, employeePayments, calfExpenses, milkingExpenses] = await Promise.all([
+    const [milkRecords, animalTransactions, wasteRecords, inseminationRecords, vaccinationRecords, treatmentDoses, employeePayments, calfExpenses, milkingExpenses, animalExpenses] = await Promise.all([
       db.collection("milk_records").find({ farmerId, date: dateRange }).toArray(),
       db.collection("animal_transactions").find({ farmerId, date: dateRange }).toArray(),
       db.collection("waste_records").find({ farmerId, date: dateRange }).toArray(),
@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
       db.collection("employee_payments").find({ farmerId, paymentDate: dateRange }).toArray(),
       db.collection("calf_expenses").find({ farmerId, date: dateRange }).toArray(),
       db.collection("milking_expenses").find({ farmerId, date: dateRange }).toArray(),
+      db.collection("animal_expenses").find({ farmerId, date: dateRange }).toArray(),
     ])
 
     // ---- Income ----
@@ -99,7 +100,10 @@ export async function GET(req: NextRequest) {
     const feedWaterCosts = milkRecords.reduce((s, r) => s + (r.foodCost || 0) + (r.saltCost || 0), 0)
     const calfRearingCosts = calfExpenses.reduce((s, e) => s + (e.amount || 0), 0)
     const milkingSuppliesCosts = milkingExpenses.reduce((s, e) => s + (e.amount || 0), 0)
-    const totalExpenses = inseminationCosts + vaccinationCosts + veterinaryHealth + labourWages + livestockPurchases + feedWaterCosts + calfRearingCosts + milkingSuppliesCosts
+    // Feed/water/health/misc costs for animals outside the milking flow (dry cows,
+    // males, etc.) - milking animals already get feed/water cost via feedWaterCosts.
+    const animalExpenseCosts = animalExpenses.reduce((s, e) => s + (e.amount || 0), 0)
+    const totalExpenses = inseminationCosts + vaccinationCosts + veterinaryHealth + labourWages + livestockPurchases + feedWaterCosts + calfRearingCosts + milkingSuppliesCosts + animalExpenseCosts
 
     const netResult = totalIncome - totalExpenses
 
@@ -141,6 +145,9 @@ export async function GET(req: NextRequest) {
     milkingExpenses.forEach(e => expenseLedger.push({
       date: e.date, label: "Milking Supplies Costs", description: `${e.expenseType === "washing_drugs" ? "Washing Drugs" : "Milking Oil"} - ${e.quantity}${e.unit}`, amount: e.amount || 0
     }))
+    animalExpenses.forEach(e => expenseLedger.push({
+      date: e.date, label: "Animal Expenses", description: `${e.animalName || "Animal"}${e.description ? ` - ${e.description}` : ""}`, amount: e.amount || 0
+    }))
     expenseLedger.sort((a, b) => b.date.localeCompare(a.date))
 
     // ---- Cash flow (weekly) ----
@@ -170,7 +177,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       range: { startDate, endDate },
       income: { milkSales, livestockSales, byProductSales, total: totalIncome },
-      expenses: { inseminationCosts, vaccinationCosts, veterinaryHealth, labourWages, livestockPurchases, feedWaterCosts, calfRearingCosts, milkingSuppliesCosts, total: totalExpenses },
+      expenses: { inseminationCosts, vaccinationCosts, veterinaryHealth, labourWages, livestockPurchases, feedWaterCosts, calfRearingCosts, milkingSuppliesCosts, animalExpenseCosts, total: totalExpenses },
       netResult,
       incomeLedger,
       expenseLedger,

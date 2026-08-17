@@ -16,7 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 interface ReportData {
   range: { startDate: string; endDate: string }
   income: { milkSales: number; livestockSales: number; byProductSales: number; total: number }
-  expenses: { inseminationCosts: number; vaccinationCosts: number; veterinaryHealth: number; labourWages: number; livestockPurchases: number; feedWaterCosts: number; calfRearingCosts: number; milkingSuppliesCosts: number; total: number }
+  expenses: { inseminationCosts: number; vaccinationCosts: number; veterinaryHealth: number; labourWages: number; livestockPurchases: number; feedWaterCosts: number; calfRearingCosts: number; milkingSuppliesCosts: number; animalExpenseCosts: number; total: number }
   netResult: number
   incomeLedger: { date: string; label: string; description: string; amount: number }[]
   expenseLedger: { date: string; label: string; description: string; amount: number }[]
@@ -178,6 +178,7 @@ export default function GeneralReportPage() {
         ["  Feed & Water Costs", fmt(report.expenses.feedWaterCosts)],
         ["  Calf Rearing Costs", fmt(report.expenses.calfRearingCosts)],
         ["  Milking Supplies Costs", fmt(report.expenses.milkingSuppliesCosts)],
+        ["  Animal Expenses", fmt(report.expenses.animalExpenseCosts)],
         ["TOTAL EXPENSES", fmt(report.expenses.total)],
       ]
 
@@ -240,6 +241,7 @@ export default function GeneralReportPage() {
         ["Feed & Water Costs", report.expenses.feedWaterCosts],
         ["Calf Rearing Costs", report.expenses.calfRearingCosts],
         ["Milking Supplies Costs", report.expenses.milkingSuppliesCosts],
+        ["Animal Expenses", report.expenses.animalExpenseCosts],
         ["TOTAL EXPENSES", report.expenses.total],
         [],
         ["NET PROFIT / (LOSS)", report.netResult],
@@ -473,6 +475,11 @@ export default function GeneralReportPage() {
                           <TableCell className="text-red-700">{t('farmer.milkingSuppliesCosts')}</TableCell>
                           <TableCell className="hidden sm:table-cell text-sm text-gray-500">{t('farmer.milkingSuppliesCostsDesc')}</TableCell>
                           <TableCell className="text-right text-red-700 font-medium">{fmt(report.expenses.milkingSuppliesCosts)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="text-red-700">{t('farmer.animalExpenseCosts')}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-gray-500">{t('farmer.animalExpenseCostsDesc')}</TableCell>
+                          <TableCell className="text-right text-red-700 font-medium">{fmt(report.expenses.animalExpenseCosts)}</TableCell>
                         </TableRow>
                         <TableRow className="border-t-2 border-gray-200">
                           <TableCell className="font-bold">{t('farmer.totalExpenses')}</TableCell>

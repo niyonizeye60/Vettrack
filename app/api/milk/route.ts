@@ -4,6 +4,7 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
+import { animalBelongsToFarm } from "@/lib/farm-access"
 
 const DB = "ntdm_animal_hospital"
 
@@ -69,6 +70,10 @@ export async function POST(req: NextRequest) {
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
     if (!isStaff && farmerId !== currentUser._id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    if (!(await animalBelongsToFarm(cowId, farmerId))) {
+      return NextResponse.json({ error: "That animal is not on this farm" }, { status: 403 })
     }
 
     const client = await clientPromise
