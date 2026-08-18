@@ -136,7 +136,7 @@ export default function SuperAdminSidebar() {
               {(!collapsed || isMobile) && (
                 <>
                   <p className="text-center sm:text-left">© {new Date().getFullYear()} {t('superadmin.superAdmin') || 'Super Admin'}</p>
-                  <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" />
+                  {/* <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" /> */}
                 </>
               )}
             </div>

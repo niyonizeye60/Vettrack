@@ -124,7 +124,7 @@ export default function FarmerSidebar() {
               {(!collapsed || isMobile) && (
                 <>
                   <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("farmer.portal")}</p>
-                  <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" />
+                  {/* <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" /> */}
                 </>
               )}
             </div>

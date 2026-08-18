@@ -142,14 +142,14 @@ export default function AdminSidebar() {
             <div className="p-3 sm:p-4 border-t border-gray-200 text-xs text-gray-500">
               {(!collapsed || isMobile) ? (
                 <div className="space-y-2">
-                  {/* <div className="flex justify-between">
+                  <div className="flex justify-between">
                     <span>{t("admin.activeUsersCount")} <strong className="text-gray-700">{activeUsersCount}</strong></span>
                   </div>
                   <div className="flex justify-between">
                     <span>{t("admin.ticketsCount")} <strong className="text-gray-700">{supportTickets}</strong></span>
-                  </div> */}
+                  </div>
                   <p className="text-center sm:text-left pt-1">© {new Date().getFullYear()} {t("admin.portal")}</p>
-                  <DeveloperCredit label="Built by" className="text-center sm:text-left" />
+                  {/* <DeveloperCredit label="Built by" className="text-center sm:text-left" /> */}
                 </div>
               ) : null}
             </div>

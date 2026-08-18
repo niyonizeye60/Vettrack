@@ -127,7 +127,7 @@ export default function VetSidebar() {
               {(!collapsed || isMobile) && (
                 <>
                   <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("vet.portal")}</p>
-                  <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" />
+                  {/* <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" /> */}
                 </>
               )}
             </div>
