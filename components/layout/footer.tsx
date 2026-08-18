@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Facebook, Instagram, Twitter, MapPin, Phone, Mail, Clock, Youtube, Linkedin, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { DeveloperCredit } from "@/components/layout/developer-credit"
 
 export default function Footer() {
   const { t } = useLanguage()
@@ -247,6 +248,7 @@ export default function Footer() {
               Privacy Policy
             </Link>
           </p>
+          <DeveloperCredit className="mt-2" />
         </div>
       </div>
     </footer>

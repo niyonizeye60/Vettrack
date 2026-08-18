@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { DeveloperCredit } from "@/components/layout/developer-credit";
 import {
   Home,
   Stethoscope,
@@ -124,7 +125,10 @@ export default function VetSidebar() {
 
             <div className="p-3 sm:p-4 border-t border-gray-200 text-xs text-gray-500">
               {(!collapsed || isMobile) && (
-                <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("vet.portal")}</p>
+                <>
+                  <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("vet.portal")}</p>
+                  <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" />
+                </>
               )}
             </div>
           </nav>

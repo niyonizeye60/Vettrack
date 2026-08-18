@@ -8,6 +8,7 @@ import {
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMobileSidebar } from "./mobile-sidebar-context";
+import { DeveloperCredit } from "@/components/layout/developer-credit";
 
 export default function FarmerSidebar() {
   const { t } = useLanguage();
@@ -121,7 +122,10 @@ export default function FarmerSidebar() {
             {/* Footer */}
             <div className="p-3 sm:p-4 border-t border-gray-200 text-xs text-gray-500">
               {(!collapsed || isMobile) && (
-                <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("farmer.portal")}</p>
+                <>
+                  <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("farmer.portal")}</p>
+                  <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" />
+                </>
               )}
             </div>
           </nav>

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useMobileSidebar } from "./mobile-sidebar-context"
+import { DeveloperCredit } from "@/components/layout/developer-credit"
 import {
   LayoutDashboard,
   Users,
@@ -20,6 +21,8 @@ import {
   Menu,
   LifeBuoy,
   History,
+  DollarSign,
+  Percent,
 } from "lucide-react"
 
 export default function SuperAdminSidebar() {
@@ -51,6 +54,8 @@ export default function SuperAdminSidebar() {
     { href: "/superadmin/users", label: t('superadmin.manageUsers'), icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/consultations", label: t('superadmin.reviewConsultations'), icon: <FileText className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/moderation", label: t('superadmin.chatModeration') || 'Chat Moderation', icon: <ShieldAlert className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/superadmin/transactions", label: t('superadmin.transactions') || 'Transactions', icon: <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/superadmin/commissions", label: 'Commissions', icon: <Percent className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/support", label: t('superadmin.support') || 'Support', icon: <LifeBuoy className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/subscribers", label: t('superadmin.newsletterSubscribers') || 'Subscribers', icon: <Mail className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/superadmin/settings", label: t('superadmin.settings'), icon: <Settings className="h-4 w-4 sm:h-5 sm:w-5" /> },
@@ -129,7 +134,10 @@ export default function SuperAdminSidebar() {
             {/* Footer */}
             <div className="p-3 sm:p-4 border-t border-gray-200 text-xs text-gray-500">
               {(!collapsed || isMobile) && (
-                <p className="text-center sm:text-left">© {new Date().getFullYear()} {t('superadmin.superAdmin') || 'Super Admin'}</p>
+                <>
+                  <p className="text-center sm:text-left">© {new Date().getFullYear()} {t('superadmin.superAdmin') || 'Super Admin'}</p>
+                  <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" />
+                </>
               )}
             </div>
           </nav>
