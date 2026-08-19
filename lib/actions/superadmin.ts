@@ -785,6 +785,11 @@ export async function updateUserPassword(userId: string, newPassword: string) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
+    const targetUser = await db.collection("users").findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { name: 1 } }
+    )
+
     const result = await db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
       {
@@ -797,7 +802,7 @@ export async function updateUserPassword(userId: string, newPassword: string) {
 
     if (result.modifiedCount > 0) {
       revalidatePath("/superadmin/users")
-      await logAdminAction("admin.user.passwordReset", userId)
+      await logAdminAction("admin.user.passwordReset", targetUser?.name || userId)
       return { success: true, message: "Password updated successfully" }
     }
 
