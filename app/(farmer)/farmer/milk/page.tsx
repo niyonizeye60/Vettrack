@@ -45,6 +45,7 @@ export default function MilkProductionPage() {
     return true
   })
   const [records, setRecords] = useState<MilkRecord[]>([])
+  const [homeConsumptionBalance, setHomeConsumptionBalance] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editRecord, setEditRecord] = useState<MilkRecord | null>(null)
@@ -85,7 +86,7 @@ export default function MilkProductionPage() {
       setUser(userData)
       const animalsData = await getAnimals(userData._id.toString())
       setAnimals(animalsData)
-      await fetchRecords(userData._id.toString())
+      await Promise.all([fetchRecords(userData._id.toString()), fetchHomeConsumptionBalance(userData._id.toString())])
       setLoading(false)
     }
     init()
@@ -95,6 +96,12 @@ export default function MilkProductionPage() {
     const res = await fetch(`/api/milk?farmerId=${farmerId}`)
     const data = await res.json()
     setRecords(Array.isArray(data) ? data : [])
+  }
+
+  const fetchHomeConsumptionBalance = async (farmerId: string) => {
+    const res = await fetch(`/api/milk/home-consumption?farmerId=${farmerId}`)
+    const data = await res.json()
+    setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
 
   // Client-side filtered records
@@ -163,7 +170,7 @@ export default function MilkProductionPage() {
       return
     }
 
-    await fetchRecords(user._id.toString())
+    await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     resetForm()
     setSaving(false)
   }
@@ -188,7 +195,7 @@ export default function MilkProductionPage() {
 
   const handleDelete = async (id: string) => {
     await fetch(`/api/milk?id=${id}`, { method: "DELETE" })
-    await fetchRecords(user._id.toString())
+    await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     setDeleteId(null)
   }
 
@@ -556,8 +563,8 @@ export default function MilkProductionPage() {
         <div className="h-7 bg-gray-200 rounded w-40" />
         <div className="h-4 bg-gray-200 rounded w-64 mt-2" />
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 space-y-3">
             <div className="h-4 bg-gray-200 rounded w-20" />
             <div className="h-8 bg-gray-200 rounded w-16" />
@@ -579,7 +586,7 @@ export default function MilkProductionPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
@@ -598,6 +605,16 @@ export default function MilkProductionPage() {
             </div>
             <h3 className="text-3xl font-bold text-orange-600 mt-2">{totalConsumed.toFixed(1)}L</h3>
             <p className="text-xs text-gray-400 mt-1">{t('farmer.notSold')}</p>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.homeConsumptionMilk')}</p>
+              <Milk className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-amber-600 mt-2">{homeConsumptionBalance.toFixed(1)}L</h3>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.availableForCalves')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">

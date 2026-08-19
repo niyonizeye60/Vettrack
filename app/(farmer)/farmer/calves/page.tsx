@@ -53,6 +53,7 @@ export default function CalvesPage() {
   const [calves, setCalves] = useState<Calf[]>([])
   const [weights, setWeights] = useState<WeightRecord[]>([])
   const [expenses, setExpenses] = useState<CalfExpense[]>([])
+  const [homeConsumptionBalance, setHomeConsumptionBalance] = useState(0)
 
   // Calf form
   const [editCalf, setEditCalf] = useState<Calf | null>(null)
@@ -115,6 +116,7 @@ export default function CalvesPage() {
         fetchCalves(userData._id.toString()),
         fetchWeights(userData._id.toString()),
         fetchExpenses(userData._id.toString()),
+        fetchHomeConsumptionBalance(userData._id.toString()),
       ])
       setLoading(false)
     }
@@ -135,6 +137,11 @@ export default function CalvesPage() {
     const res = await fetch(`/api/calf-expenses?farmerId=${farmerId}`)
     const data = await res.json()
     setExpenses(Array.isArray(data) ? data : [])
+  }
+  const fetchHomeConsumptionBalance = async (farmerId: string) => {
+    const res = await fetch(`/api/milk/home-consumption?farmerId=${farmerId}`)
+    const data = await res.json()
+    setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
 
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
@@ -182,7 +189,7 @@ export default function CalvesPage() {
 
   const handleCalfDelete = async (id: string) => {
     await fetch(`/api/calves?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchCalves(user._id.toString()), fetchWeights(user._id.toString()), fetchExpenses(user._id.toString())])
+    await Promise.all([fetchCalves(user._id.toString()), fetchWeights(user._id.toString()), fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     setDeleteCalfId(null)
   }
 
@@ -286,11 +293,19 @@ export default function CalvesPage() {
     setExpDate(today); setExpNotes(""); setExpErrors({}); setEditExpense(null)
   }
 
+  // When editing an existing milk entry, its own liters are already subtracted out of
+  // homeConsumptionBalance - add them back so the farmer can keep the same value.
+  const availableHomeConsumptionForForm = homeConsumptionBalance + (editExpense?.expenseType === "milk" ? (editExpense.milkLiters || 0) : 0)
+
   const validateExpense = () => {
     const e: Record<string, string> = {}
     if (!expCalfId) e.expCalfId = "Select a calf"
     if (!amount || Number(amount) <= 0) e.amount = "Enter a valid amount"
     if (!expDate) e.expDate = "Select a date"
+    if (expenseType === "milk") {
+      if (!milkLiters || Number(milkLiters) <= 0) e.milkLiters = "Enter how many liters the calf consumed"
+      else if (Number(milkLiters) > availableHomeConsumptionForForm) e.milkLiters = `Only ${availableHomeConsumptionForForm.toFixed(1)}L of home consumption milk is available`
+    }
     setExpErrors(e)
     return Object.keys(e).length === 0
   }
@@ -301,13 +316,18 @@ export default function CalvesPage() {
     const calf = calves.find(c => c._id === expCalfId)
     const body = { farmerId: user._id.toString(), calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }
 
-    if (editExpense) {
-      await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }) })
-    } else {
-      await fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = editExpense
+      ? await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }) })
+      : await fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: "Failed to save expense" }))
+      setExpErrors({ [expenseType === "milk" ? "milkLiters" : "amount"]: error })
+      setSaving(false)
+      return
     }
 
-    await fetchExpenses(user._id.toString())
+    await Promise.all([fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     resetExpenseForm()
     setSaving(false)
   }
@@ -316,11 +336,12 @@ export default function CalvesPage() {
     setEditExpense(e); setExpCalfId(e.calfId); setExpenseType(e.expenseType)
     setMilkLiters(e.milkLiters ? String(e.milkLiters) : ""); setDescription(e.description || "")
     setAmount(String(e.amount)); setExpDate(e.date); setExpNotes(e.notes || "")
+    setExpErrors({})
   }
 
   const handleExpenseDelete = async (id: string) => {
     await fetch(`/api/calf-expenses?id=${id}`, { method: "DELETE" })
-    await fetchExpenses(user._id.toString())
+    await Promise.all([fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     setDeleteExpenseId(null)
   }
 
@@ -342,8 +363,8 @@ export default function CalvesPage() {
         <div className="h-7 bg-gray-200 rounded w-40" />
         <div className="h-4 bg-gray-200 rounded w-64 mt-2" />
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 space-y-3">
             <div className="h-4 bg-gray-200 rounded w-20" />
             <div className="h-8 bg-gray-200 rounded w-16" />
@@ -364,7 +385,7 @@ export default function CalvesPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
@@ -390,6 +411,16 @@ export default function CalvesPage() {
               <Milk className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-2xl font-bold text-sky-600 mt-2">{totalMilkGiven.toFixed(1)} L</h3>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.homeConsumptionMilk')}</p>
+              <Milk className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-2xl font-bold text-orange-600 mt-2">{homeConsumptionBalance.toFixed(1)} L</h3>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.availableForCalves')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
@@ -724,8 +755,13 @@ export default function CalvesPage() {
 
                     {expenseType === "milk" && (
                       <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">{t('farmer.milkLitersGiven')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                        <Input type="number" min="0" step="0.1" placeholder="e.g. 3" value={milkLiters} onChange={e => setMilkLiters(e.target.value)} />
+                        <label className="text-sm font-medium text-gray-700">{t('farmer.milkLitersGiven')} *</label>
+                        <Input type="number" min="0" step="0.1" max={availableHomeConsumptionForForm} placeholder="e.g. 3" value={milkLiters} onChange={e => setMilkLiters(e.target.value)} className={expErrors.milkLiters ? "border-red-500" : ""} />
+                        {expErrors.milkLiters ? (
+                          <p className="text-xs text-red-500">{expErrors.milkLiters}</p>
+                        ) : (
+                          <p className="text-xs text-gray-400">{t('farmer.homeConsumptionAvailable')}: {availableHomeConsumptionForForm.toFixed(1)}L</p>
+                        )}
                       </div>
                     )}
 

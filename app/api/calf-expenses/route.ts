@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
 import { calfBelongsToFarm } from "@/lib/farm-access"
+import { getHomeConsumptionBalance } from "@/lib/home-consumption"
 
 const DB = "ntdm_animal_hospital"
 
@@ -71,6 +72,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "That calf is not on this farm" }, { status: 403 })
     }
 
+    if (expenseType === "milk") {
+      const liters = Number(milkLiters)
+      if (!milkLiters || !(liters > 0)) {
+        return NextResponse.json({ error: "Enter how many liters of milk the calf consumed" }, { status: 400 })
+      }
+      const { balance } = await getHomeConsumptionBalance(farmerId)
+      if (liters > balance) {
+        return NextResponse.json({ error: `Only ${balance.toFixed(1)}L of home consumption milk is available` }, { status: 400 })
+      }
+    }
+
     const client = await clientPromise
     const db = client.db(DB)
 
@@ -105,11 +117,24 @@ export async function PUT(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    const existing = await db.collection("calf_expenses").findOne({ _id: new ObjectId(id) })
+    if (!existing) return NextResponse.json({ error: "Expense not found" }, { status: 404 })
+
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff) {
-      const existing = await db.collection("calf_expenses").findOne({ _id: new ObjectId(id) })
-      if (!existing || existing.farmerId !== currentUser._id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    if (!isStaff && existing.farmerId !== currentUser._id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    if (expenseType === "milk") {
+      const liters = Number(milkLiters)
+      if (!milkLiters || !(liters > 0)) {
+        return NextResponse.json({ error: "Enter how many liters of milk the calf consumed" }, { status: 400 })
+      }
+      const { totalRecorded, totalConsumedByCalves } = await getHomeConsumptionBalance(existing.farmerId)
+      const consumedByOthers = totalConsumedByCalves - (existing.expenseType === "milk" ? (existing.milkLiters || 0) : 0)
+      const availableBalance = Math.max(0, totalRecorded - consumedByOthers)
+      if (liters > availableBalance) {
+        return NextResponse.json({ error: `Only ${availableBalance.toFixed(1)}L of home consumption milk is available` }, { status: 400 })
       }
     }
 
