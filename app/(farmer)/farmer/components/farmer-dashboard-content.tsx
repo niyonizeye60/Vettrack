@@ -254,7 +254,7 @@ export default function FarmerDashboardContent({
     fetchCalfCount()
   }, [currentUser._id])
 
-  const totalAnimals = animals.length
+  const totalAnimals = animals.filter((a) => a.status !== "Deceased").length
   const healthyAnimals = animals.filter((a) => a.status === "Healthy").length
   const cows = animals.filter((a) => (a.type || "").toLowerCase() === "cow" && a.gender === "female")
   const lactatingCowCount = cows.filter((a) => a.lactationStatus === "lactating").length
