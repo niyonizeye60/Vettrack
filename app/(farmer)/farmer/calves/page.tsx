@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
-interface Animal { _id: string; name: string; type: string }
+interface Animal { _id: string; name: string; type: string; status?: string }
 interface Calf {
   _id: string; farmerId: string; name: string; motherAnimalId: string | null; motherName: string | null
   gender: "male" | "female"; breed: string | null; birthDate: string; birthWeight: number | null
@@ -41,6 +41,13 @@ function formatAge(birthDate: string, t: (k: string) => string) {
   const days = Math.max(0, Math.floor((Date.now() - new Date(birthDate).getTime()) / 86400000))
   if (days < 60) return `${days} ${t('farmer.days')}`
   return `${Math.floor(days / 30)} ${t('farmer.months')}`
+}
+
+function animalStatusText(status: string | undefined, t: (k: string) => string) {
+  if (status === "Sick") return t('farmer.sick')
+  if (status === "Under Treatment") return t('farmer.underTreatment')
+  if (status === "Deceased") return t('farmer.deceased')
+  return t('farmer.healthy')
 }
 
 export default function CalvesPage() {
@@ -464,7 +471,12 @@ export default function CalvesPage() {
                     <SelectTrigger><SelectValue placeholder={t('farmer.selectMotherOptional')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">{t('common.optional')}</SelectItem>
-                      {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
+                      {animals.map(a => (
+                        <SelectItem key={a._id} value={a._id}>
+                          {a.name} ({a.type})
+                          <span className={a.status === "Deceased" ? "text-red-500" : "text-gray-400"}> — {animalStatusText(a.status, t)}</span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
