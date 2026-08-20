@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AnnouncementsBanner from "@/components/ui/announcements-banner"
-import SellerEarnings from "@/components/seller/seller-earnings"
 
 import {
   PlusCircle, Calendar, FileText, Activity,
@@ -255,7 +254,7 @@ export default function FarmerDashboardContent({
     fetchCalfCount()
   }, [currentUser._id])
 
-  const totalAnimals = animals.filter((a) => a.status !== "Deceased").length
+  const totalAnimals = animals.length
   const healthyAnimals = animals.filter((a) => a.status === "Healthy").length
   const cows = animals.filter((a) => (a.type || "").toLowerCase() === "cow" && a.gender === "female")
   const lactatingCowCount = cows.filter((a) => a.lactationStatus === "lactating").length
@@ -778,9 +777,6 @@ export default function FarmerDashboardContent({
             </CardContent>
           </Card>
         </div>
-
-        {/* Seller Earnings */}
-        <SellerEarnings />
 
       </div>
 
