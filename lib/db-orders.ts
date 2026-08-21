@@ -151,27 +151,65 @@ export async function updateOrderPaymentInit(
   )
 }
 
+/**
+ * Move an order's payment state forward.
+ *
+ * "paid" is terminal. Both gateways can deliver duplicate or out-of-order
+ * notifications - Pesapal fires an IPN *and* the browser-redirect verify route,
+ * IntouchPay fires a callback *and* gets polled by the order GET handler - so all
+ * four call sites can land on the same order. The `status: { $ne: "paid" }` filter
+ * is what makes the transition happen exactly once, rather than each caller
+ * remembering to check for itself. It also stops a stale "pending" notification
+ * arriving late from knocking an already-paid order back to pending_payment.
+ *
+ * Returns whether *this* call performed the transition into paid. Phase 4 hangs
+ * recordIncome() off that boolean, so one sale books one income entry however many
+ * times a gateway retries.
+ */
 export async function updateOrderPaymentStatus(
   id: string,
   paymentStatus: OrderPaymentStatus,
   payment?: Partial<OrderPayment>
-): Promise<void> {
+): Promise<{ transitionedToPaid: boolean }> {
+  if (!ObjectId.isValid(id)) return { transitionedToPaid: false }
+
   const collection = await getOrdersCollection()
+  const _id = new ObjectId(id)
   const status: OrderStatus = paymentStatus === "completed" ? "paid" : paymentStatus === "pending" ? "pending_payment" : "failed"
 
+  // Gateway reference ids are reconciliation breadcrumbs rather than state, so
+  // they stay safe to merge even onto an order that is already paid.
+  const refs: Record<string, unknown> = {}
+  if (payment) {
+    for (const [key, value] of Object.entries(payment)) {
+      if (value !== undefined) refs[`payment.${key}`] = value
+    }
+  }
+
   const update: Record<string, unknown> = {
+    ...refs,
     paymentStatus,
     status,
     updatedAt: new Date(),
-  }
-  if (payment) {
-    for (const [key, value] of Object.entries(payment)) {
-      update[`payment.${key}`] = value
-    }
   }
   if (paymentStatus === "completed") {
     update.paidAt = new Date()
   }
 
-  await collection.updateOne({ _id: new ObjectId(id) }, { $set: update })
+  // A reversal is a legitimate move *out* of paid, so it is the one status allowed
+  // to overwrite it.
+  const filter: any = { _id }
+  if (paymentStatus !== "reversed") filter.status = { $ne: "paid" }
+
+  const result = await collection.updateOne(filter, { $set: update })
+
+  if (result.matchedCount === 0) {
+    // Either already paid, or no such order. Keep the breadcrumbs, leave state alone.
+    if (Object.keys(refs).length > 0) {
+      await collection.updateOne({ _id }, { $set: { ...refs, updatedAt: new Date() } })
+    }
+    return { transitionedToPaid: false }
+  }
+
+  return { transitionedToPaid: paymentStatus === "completed" }
 }

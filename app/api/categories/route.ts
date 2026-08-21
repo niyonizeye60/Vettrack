@@ -2,7 +2,14 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server'
 import clientPromise from '@/lib/db'
 import { ObjectId } from 'mongodb'
+import { getCurrentUser } from '@/lib/auth'
+import { isStaffRole } from '@/lib/roles'
+import { logActivity } from '@/lib/activity-log'
 
+const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+// Categories are public catalogue structure - the browse pages read them
+// unauthenticated. Only the writes below are staff-gated.
 export async function GET() {
   try {
     const client = await clientPromise
@@ -31,6 +38,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!isStaffRole(currentUser?.role)) return unauthorized()
+
     const { name, description, image, type } = await request.json()
     
     const client = await clientPromise
@@ -45,6 +55,7 @@ export async function POST(request: NextRequest) {
     }
     
     const result = await db.collection('categories').insertOne(category)
+    await logActivity(currentUser!._id, 'marketplace.category.created', `Created ${type} category: ${name}`)
     
     return NextResponse.json({ 
       ...category, 
@@ -58,7 +69,14 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!isStaffRole(currentUser?.role)) return unauthorized()
+
     const { id, name, description, image } = await request.json()
+
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+    }
     
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
@@ -78,6 +96,8 @@ export async function PUT(request: NextRequest) {
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
+
+    await logActivity(currentUser!._id, 'marketplace.category.updated', `Updated category ${id}`)
     
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -88,11 +108,14 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!isStaffRole(currentUser?.role)) return unauthorized()
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     
-    if (!id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
     }
     
     const client = await clientPromise
@@ -105,6 +128,8 @@ export async function DELETE(request: NextRequest) {
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
+
+    await logActivity(currentUser!._id, 'marketplace.category.deleted', `Deleted category ${id}`)
     
     return NextResponse.json({ success: true })
   } catch (error) {

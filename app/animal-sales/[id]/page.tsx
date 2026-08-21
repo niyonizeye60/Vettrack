@@ -176,23 +176,44 @@ export default function AnimalDetailPage() {
                 }}
               />
 
-              {(animal.sellerPhone || animal.sellerEmail) && (
-                <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Listed by</p>
-                  {animal.sellerPhone && (
-                    <div className="flex items-center text-sm text-gray-700">
-                      <Phone className="h-4 w-4 mr-2 text-gray-400" />
-                      {animal.sellerPhone}
-                    </div>
-                  )}
-                  {animal.sellerEmail && (
-                    <div className="flex items-center text-sm text-gray-700">
-                      <Mail className="h-4 w-4 mr-2 text-gray-400" />
-                      {animal.sellerEmail}
-                    </div>
-                  )}
-                </div>
-              )}
+              {/*
+                Seller contact is what a buyer pays the connection fee for, so the
+                API only sends sellerPhone/sellerEmail to callers entitled to them
+                (see canViewSellerContact in lib/roles.ts). Until Phase 3 ships the
+                fee, the public falls through to the Vettrack contact route below.
+              */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {t('animals.contactSeller')}
+                </p>
+                {animal.sellerPhone || animal.sellerEmail ? (
+                  <>
+                    {animal.sellerPhone && (
+                      <div className="flex items-center text-sm text-gray-700">
+                        <Phone className="h-4 w-4 mr-2 text-gray-400" />
+                        {animal.sellerPhone}
+                      </div>
+                    )}
+                    {animal.sellerEmail && (
+                      <div className="flex items-center text-sm text-gray-700">
+                        <Mail className="h-4 w-4 mr-2 text-gray-400" />
+                        {animal.sellerEmail}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-600">{t('animals.contactSellerNote')}</p>
+                    <Link
+                      href="/contact"
+                      className="inline-flex items-center text-sm font-medium text-green-700 hover:text-green-800 underline underline-offset-2"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      {t('nav.contact')}
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
