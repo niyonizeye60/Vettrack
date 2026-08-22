@@ -159,7 +159,7 @@ export default function BookingForm() {
         if (whatsappConfirm) {
           const serviceLabel = getServiceLabel(selectedService)
           const msg = [
-            `Hello NTDM Animal Hospital! 🐾`,
+            `Hello NTDM Vettrack! 🐾`,
             `I just submitted a consultation booking and would like WhatsApp confirmation.`,
             ``,
             `📋 Booking Summary:`,
