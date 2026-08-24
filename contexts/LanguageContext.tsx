@@ -2674,7 +2674,7 @@ const translations = {
     // Home Page
     'home.hero.titleStart': 'Gukurikirana, Gusaba Randevu, no',
     'home.hero.titleEnd': 'Kwita ku Matungo Yawe',
-    'home.hero.subtitle': 'Ibisubizo bigezweho by\'abafite amatungo n\'amatungo yo mu rugo. Gukurikirana mu buryo bugezweho, kubaza inama inzobere, n\'ubuvuzi byuzuye - byose ahantu hamwe',
+    'home.hero.subtitle': 'Kuba urubuga rwa mbere rw’ikoranabuhanga mu Rwanda mu gucunga ubworozi, rukoresha ubwenge buhangano (AI) na Internet of Things (IoT) mu gukurikirana ubuzima bw’amatungo, gufasha aborozi gutahura indwara hakiri kare, gucunga ibikorwa by’ubworozi, no gufata ibyemezo bishingiye ku makuru nyayo.',
     'home.hero.cta': 'Reba Amaserivisi Yacu',
     'home.hero.bookConsultation': 'Fata Randevu',
     'home.hero.trusted': 'Byizerwemo n\'abafite amatungo barenga 5,000 muri Rwanda',
