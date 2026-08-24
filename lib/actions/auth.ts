@@ -6,6 +6,8 @@ import { sendWelcomeEmail } from "../email" // Import the email function
 import { hashPassword, verifyPassword, isHashedPassword } from "../password"
 import { logActivity, logSystemError } from "../activity-log"
 import { checkRateLimit, getRateLimitKey } from "../rate-limit"
+import { isRole, isPrivilegedRole, homePathForRole } from "../roles"
+import { normalizeMarketplaceAccess } from "../marketplace-access"
 
 // Ensured once per warm process, not on every registration - createIndex is a
 // no-op after the first call, but there's no need to pay even that round trip
@@ -60,7 +62,7 @@ export async function registerUser(formData: FormData) {
     await ensureUsersEmailIndex(db)
 
     const roleInput = formData.get("role")
-    if (roleInput !== "farmer" && roleInput !== "doctor" && roleInput !== "admin" && roleInput !== "superadmin") {
+    if (!isRole(roleInput)) {
       return { success: false, message: "Invalid account type" }
     }
     const role = roleInput
@@ -68,7 +70,7 @@ export async function registerUser(formData: FormData) {
     // This action is reachable directly (it's a server action, not gated by
     // any UI), so admin/superadmin can only be created by an already
     // authenticated superadmin - never trust the client for privileged roles.
-    if (role === "admin" || role === "superadmin") {
+    if (isPrivilegedRole(role)) {
       const currentUser = await getCurrentUser()
       if (!currentUser || currentUser.role !== "superadmin") {
         return { success: false, message: "Not authorized to create this account type" }
@@ -120,6 +122,12 @@ export async function registerUser(formData: FormData) {
         permissions: ["manage_users", "view_consultations", "manage_system"],
         lastLoginAt: null,
       })
+    } else if (role === "marketplace_admin") {
+      const marketplaceAccess = normalizeMarketplaceAccess(formData.getAll("marketplaceAccess"))
+      if (marketplaceAccess.length === 0) {
+        return { success: false, message: "Select at least one marketplace this account can access" }
+      }
+      Object.assign(userData, { marketplaceAccess })
     }
 
     // Check if email already exists
@@ -314,10 +322,7 @@ export async function loginUser(formData: FormData) {
     return {
       success: true,
       message: "Login successful",
-      redirectPath: user.role === "doctor" ? "/veterinary" : 
-                   user.role === "farmer" ? "/farmer" : 
-                   user.role === "superadmin" ? "/superadmin" : 
-                   user.role === "admin" ? "/admin" : "/"
+      redirectPath: homePathForRole(user.role)
     }
   } catch (error) {
     console.error("Error logging in:", error)

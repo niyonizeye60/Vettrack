@@ -3,14 +3,15 @@
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Heart, Share2, MapPin, Calendar, Tag, Mail, Phone } from "lucide-react"
+import { Heart, Share2, MapPin, Calendar, Tag, Mail, Phone, Expand } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductDetailRows from "@/components/products/product-detail-rows"
-import AddToCartControls from "@/components/products/add-to-cart-controls"
+import ConnectCta from "@/components/marketplace/connect-cta"
+import PhotoLightbox from "@/components/marketplace/photo-lightbox"
 
 interface Animal {
   id: string
@@ -19,6 +20,7 @@ interface Animal {
   price: number
   duration: string
   image: string
+  images?: string[]
   categoryId: string
   animalType?: string
   breed?: string
@@ -35,6 +37,8 @@ export default function AnimalDetailPage() {
   const [animal, setAnimal] = useState<Animal | null>(null)
   const [loading, setLoading] = useState(true)
   const [wishlist, setWishlist] = useState<string[]>([])
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const params = useParams()
   const animalId = params.id as string
   const { t } = useLanguage()
@@ -53,12 +57,21 @@ export default function AnimalDetailPage() {
       const animals = await response.json()
       const foundAnimal = animals.find((a: Animal) => a.id === animalId)
       setAnimal(foundAnimal || null)
+      setActiveIndex(0)
     } catch (error) {
       console.error('Failed to fetch animal:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  const photos = animal
+    ? animal.images && animal.images.length > 0
+      ? animal.images
+      : animal.image
+        ? [animal.image]
+        : []
+    : []
 
   const toggleWishlist = () => {
     if (!animal) return
@@ -120,10 +133,47 @@ export default function AnimalDetailPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div className="relative">
-              <div className="relative h-96 rounded-lg overflow-hidden">
-                <Image src={animal.image} alt={animal.name} fill className="object-cover" />
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                className="group relative block h-96 w-full rounded-lg overflow-hidden"
+              >
+                <Image src={photos[activeIndex] || animal.image} alt={animal.name} fill className="object-cover" />
                 <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
-              </div>
+                <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <Expand className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </span>
+                {photos.length > 1 && (
+                  <span className="absolute bottom-4 right-4 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                    {activeIndex + 1} / {photos.length}
+                  </span>
+                )}
+              </button>
+
+              {photos.length > 1 && (
+                <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+                  {photos.map((url, i) => (
+                    <button
+                      key={url + i}
+                      type="button"
+                      onClick={() => setActiveIndex(i)}
+                      className={`relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden border-2 transition-colors ${
+                        i === activeIndex ? "border-primary" : "border-transparent hover:border-gray-300"
+                      }`}
+                    >
+                      <Image src={url} alt={`${animal.name} ${i + 1}`} fill className="object-cover" sizes="64px" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <PhotoLightbox
+                photos={photos}
+                alt={animal.name}
+                open={lightboxOpen}
+                onOpenChange={setLightboxOpen}
+                initialIndex={activeIndex}
+              />
             </div>
 
             <div className="space-y-6">
@@ -165,55 +215,33 @@ export default function AnimalDetailPage() {
                 </Button>
               </div>
 
-              <AddToCartControls
-                item={{
-                  id: animal.id,
-                  categoryId: animal.categoryId,
-                  category: "sales",
-                  name: animal.name,
-                  image: animal.image,
-                  price: animal.price,
-                }}
-              />
+              <ConnectCta listingId={animal.id} />
 
               {/*
-                Seller contact is what a buyer pays the connection fee for, so the
-                API only sends sellerPhone/sellerEmail to callers entitled to them
-                (see canViewSellerContact in lib/roles.ts). Until Phase 3 ships the
-                fee, the public falls through to the Vettrack contact route below.
+                Only staff, the seller, and a buyer who has paid the connection fee
+                ever receive sellerPhone/sellerEmail - the API strips them for
+                everyone else (canViewSellerContact in lib/roles.ts). For the public
+                this block simply doesn't render; ConnectCta above is their route in.
               */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-2">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  {t('animals.contactSeller')}
-                </p>
-                {animal.sellerPhone || animal.sellerEmail ? (
-                  <>
-                    {animal.sellerPhone && (
-                      <div className="flex items-center text-sm text-gray-700">
-                        <Phone className="h-4 w-4 mr-2 text-gray-400" />
-                        {animal.sellerPhone}
-                      </div>
-                    )}
-                    {animal.sellerEmail && (
-                      <div className="flex items-center text-sm text-gray-700">
-                        <Mail className="h-4 w-4 mr-2 text-gray-400" />
-                        {animal.sellerEmail}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-gray-600">{t('animals.contactSellerNote')}</p>
-                    <Link
-                      href="/contact"
-                      className="inline-flex items-center text-sm font-medium text-green-700 hover:text-green-800 underline underline-offset-2"
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      {t('nav.contact')}
-                    </Link>
-                  </>
-                )}
-              </div>
+              {(animal.sellerPhone || animal.sellerEmail) && (
+                <div className="border border-gray-200 rounded-lg p-4 bg-white space-y-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    {t('animals.contactSeller')}
+                  </p>
+                  {animal.sellerPhone && (
+                    <div className="flex items-center text-sm text-gray-700">
+                      <Phone className="h-4 w-4 mr-2 text-gray-400" />
+                      {animal.sellerPhone}
+                    </div>
+                  )}
+                  {animal.sellerEmail && (
+                    <div className="flex items-center text-sm text-gray-700">
+                      <Mail className="h-4 w-4 mr-2 text-gray-400" />
+                      {animal.sellerEmail}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

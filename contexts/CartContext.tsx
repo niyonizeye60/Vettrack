@@ -33,7 +33,12 @@ function readStoredCart(): CartItem[] {
   if (typeof window === "undefined") return []
   try {
     const raw = window.localStorage.getItem(CART_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    const stored: CartItem[] = raw ? JSON.parse(raw) : []
+    // Animals are brokered through a connection fee rather than bought in the cart.
+    // A cart saved before that changed can still be carrying one, and the order API
+    // rejects the whole basket if it is - which would block the shopper from buying
+    // their feed too. Drop them quietly on load instead.
+    return stored.filter((item) => item.category !== "sales")
   } catch {
     return []
   }

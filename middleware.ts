@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { checkRateLimit, getRateLimitKey } from "./lib/rate-limit"
+import { isPortalPath } from "./lib/roles"
 
 // Endpoints most valuable to brute-force or spam get the tight "sensitive"
 // budget; everything else under /api gets the generous "standard" one.
@@ -28,30 +29,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const protectedRoutes = [
-    "/farmer",
-    "/farmer/animals",
-    "/farmer/consultations",
-    "/farmer/messages",
-    "/farmer/tracking",
-    "/farmer/support",
-    "/farmer/veterinarians",
-
-    "/veterinary",
-    "/veterinary/animals",
-    "/veterinary/consultations",
-    "/veterinary/messages",
-    "/veterinary/tracking",
-    "/veterinary/support",
-    "/veterinary/farms",
-
-    "/superadmin",
-
-    "/admin",
-  ]
-
-  // If trying to access a protected route without a session, redirect to login
-  if (protectedRoutes.some((route) => pathname.startsWith(route)) && !session) {
+  // If trying to access a portal without a session, redirect to login. The prefix
+  // list lives in lib/roles.ts so this and BodyWrapper cannot drift apart.
+  if (isPortalPath(pathname) && !session) {
     return NextResponse.redirect(new URL("/login", request.url))
   }
 

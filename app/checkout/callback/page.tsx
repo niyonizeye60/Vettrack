@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
-import OrderResult from "@/components/checkout/order-result"
+import OrderResult, { type SellerContact } from "@/components/checkout/order-result"
 import type { OrderPaymentStatus } from "@/lib/db-orders"
 
 export default function CheckoutCallbackPage() {
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<OrderPaymentStatus | "loading">("loading")
   const [total, setTotal] = useState<number | undefined>(undefined)
+  const [sellerContact, setSellerContact] = useState<SellerContact | null>(null)
 
   useEffect(() => {
     const orderId = searchParams.get("OrderMerchantReference")
@@ -31,6 +32,7 @@ export default function CheckoutCallbackPage() {
         const orderData = await orderRes.json()
         if (orderRes.ok) {
           setTotal(orderData.total)
+          if (orderData.sellerContact) setSellerContact(orderData.sellerContact)
         }
 
         setStatus(verifyRes.ok ? verifyData.paymentStatus : "failed")
@@ -52,7 +54,7 @@ export default function CheckoutCallbackPage() {
               <Loader2 className="h-10 w-10 text-primary mx-auto animate-spin" />
             </div>
           ) : (
-            <OrderResult status={status} total={total} />
+            <OrderResult status={status} total={total} sellerContact={sellerContact} />
           )}
         </div>
       </div>

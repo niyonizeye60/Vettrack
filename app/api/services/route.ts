@@ -3,10 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import clientPromise from '@/lib/db'
 import { ObjectId } from 'mongodb'
 import { getCurrentUser } from '@/lib/auth'
-import { canViewSellerContact, isStaffRole } from '@/lib/roles'
+import { can, canViewSellerContact } from '@/lib/roles'
+import { canAccessMarketplaceCategory } from '@/lib/marketplace-access'
 import { logActivity } from '@/lib/activity-log'
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+const forbidden = () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+const canManage = (role: unknown) => can(role, 'marketplace.listings.manage')
 
 /**
  * Shape a listing for the wire, dropping seller contact unless the caller is
@@ -57,16 +60,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Writes are staff-only. Until Phase 2 lands the farmer request flow, publishing
-// is an internal action - a farmer asks, staff publishes. `data` is still spread
-// unfiltered, which is tolerable only because the caller is now known staff;
+// Writes require marketplace.listings.manage. Until Phase 2 lands the farmer
+// request flow, publishing is an internal action - a farmer asks, staff or
+// marketplace_admin publishes. `data` is still spread unfiltered, which is
+// tolerable only because the caller is now known to hold that capability;
 // Phase 2 adds field validation alongside the farmer-facing path.
 export async function POST(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
-    if (!isStaffRole(currentUser?.role)) return unauthorized()
+    if (!canManage(currentUser?.role)) return unauthorized()
 
     const data = await request.json()
+    if (!canAccessMarketplaceCategory(currentUser, data.category)) return forbidden()
 
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
@@ -93,7 +98,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
-    if (!isStaffRole(currentUser?.role)) return unauthorized()
+    if (!canManage(currentUser?.role)) return unauthorized()
 
     const { id, ...data } = await request.json()
 
@@ -103,6 +108,23 @@ export async function PUT(request: NextRequest) {
 
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
+
+    const existing = await db.collection('services').findOne(
+      { _id: new ObjectId(id) },
+      { projection: { category: 1 } }
+    )
+    if (!existing) {
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+    }
+    // Check both the listing's current category and the one it's being moved
+    // to, so a scoped marketplace_admin can neither touch a listing outside
+    // their grant nor reassign one of theirs into a category they don't hold.
+    if (
+      !canAccessMarketplaceCategory(currentUser, existing.category) ||
+      !canAccessMarketplaceCategory(currentUser, data.category ?? existing.category)
+    ) {
+      return forbidden()
+    }
 
     const result = await db.collection('services').updateOne(
       { _id: new ObjectId(id) },
@@ -131,7 +153,7 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
-    if (!isStaffRole(currentUser?.role)) return unauthorized()
+    if (!canManage(currentUser?.role)) return unauthorized()
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -142,6 +164,15 @@ export async function DELETE(request: NextRequest) {
 
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
+
+    const existing = await db.collection('services').findOne(
+      { _id: new ObjectId(id) },
+      { projection: { category: 1 } }
+    )
+    if (!existing) {
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+    }
+    if (!canAccessMarketplaceCategory(currentUser, existing.category)) return forbidden()
 
     const result = await db.collection('services').deleteOne({
       _id: new ObjectId(id)

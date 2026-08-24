@@ -88,17 +88,25 @@ export default function ProductCard({
 
         <ProductDetailRows details={details} className="mb-3" />
 
+        {/*
+          Animals are brokered, not sold through the cart: the buyer pays a
+          connection fee on the listing page and settles the animal's price with the
+          seller directly. Only Vettrack's own stock - feed and medicine - is bought
+          here.
+        */}
         <div className="mt-auto space-y-2 pt-2">
           <Link href={detailHref}>
-            <Button variant="outline" size="sm" className="w-full">
+            <Button variant={category === "sales" ? "default" : "outline"} size="sm" className="w-full">
               <Info className="h-3.5 w-3.5 mr-1.5" />
-              {t('common.learnMore')}
+              {category === "sales" ? t('listing.viewAndContact') : t('common.learnMore')}
             </Button>
           </Link>
-          <AddToCartControls
-            size="sm"
-            item={{ id, categoryId, category, name, image, price }}
-          />
+          {category !== "sales" && (
+            <AddToCartControls
+              size="sm"
+              item={{ id, categoryId, category, name, image, price }}
+            />
+          )}
         </div>
       </div>
     </div>

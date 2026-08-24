@@ -1,4 +1,5 @@
 import clientPromise from "@/lib/db";
+import type { Role } from "@/lib/roles";
 
 export interface User {
   id: string
@@ -6,7 +7,7 @@ export interface User {
   email: string
   password: string // In a real app, this would be hashed
   phone: string
-  role: "farmer" | "doctor" | "admin" | "superadmin"
+  role: Role
   status: "active" | "suspended" | "inactive"
   createdAt: Date
   updatedAt: Date

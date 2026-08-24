@@ -5,7 +5,7 @@ import { Smartphone, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
 import type { OrderPaymentStatus } from "@/lib/db-orders"
-import OrderResult from "@/components/checkout/order-result"
+import OrderResult, { type SellerContact } from "@/components/checkout/order-result"
 
 const POLL_INTERVAL_MS = 3000
 const POLL_TIMEOUT_MS = 2 * 60 * 1000
@@ -21,6 +21,7 @@ export default function IntouchPayPoll({ orderId, phone, total }: IntouchPayPoll
   const [status, setStatus] = useState<OrderPaymentStatus>("pending")
   const [checking, setChecking] = useState(false)
   const [autoPollActive, setAutoPollActive] = useState(true)
+  const [sellerContact, setSellerContact] = useState<SellerContact | null>(null)
   const startedAt = useRef(Date.now())
 
   const checkStatus = async () => {
@@ -30,6 +31,8 @@ export default function IntouchPayPoll({ orderId, phone, total }: IntouchPayPoll
       const data = await res.json()
       if (res.ok) {
         setStatus(data.paymentStatus)
+        // Present only once a connection fee has cleared - see the orders route.
+        if (data.sellerContact) setSellerContact(data.sellerContact)
       }
     } catch (error) {
       console.error("Failed to check order status:", error)
@@ -76,5 +79,5 @@ export default function IntouchPayPoll({ orderId, phone, total }: IntouchPayPoll
     )
   }
 
-  return <OrderResult status={status} total={total} />
+  return <OrderResult status={status} total={total} sellerContact={sellerContact} />
 }

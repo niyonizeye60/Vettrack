@@ -7,6 +7,7 @@ import { hashPassword } from "../password"
 import { getCurrentUser } from "./auth"
 import { logActivity, logSystemError as recordSystemError } from "../activity-log"
 import { isPresenceOnline, type PresenceDoc } from "../presence"
+import { normalizeMarketplaceAccess } from "../marketplace-access"
 
 // Every exported function in this file is a Next.js server action with its own
 // network-invocable endpoint, independent of which page renders it - so each one
@@ -81,6 +82,7 @@ export async function getAllUsers() {
       licenseNumber: user.licenseNumber || null,
       specialization: user.specialization || null,
       isTestAccount: user.isTestAccount || false,
+      marketplaceAccess: user.marketplaceAccess || null,
     }))
   } catch (error) {
     console.error("Error fetching users:", error)
@@ -758,6 +760,13 @@ export async function updateUser(userId: string, formData: FormData) {
         licenseNumber: formData.get("licenseNumber"),
         specialization: formData.get("specialization"),
       })
+    }
+    if (updateData.role === "marketplace_admin") {
+      const marketplaceAccess = normalizeMarketplaceAccess(formData.getAll("marketplaceAccess"))
+      if (marketplaceAccess.length === 0) {
+        return { success: false, message: "Select at least one marketplace this account can access" }
+      }
+      Object.assign(updateData, { marketplaceAccess })
     }
 
     const result = await db.collection("users").updateOne(

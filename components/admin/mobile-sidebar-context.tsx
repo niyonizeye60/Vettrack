@@ -1,35 +1,4 @@
-"use client";
-
-import { createContext, useContext, useState, ReactNode } from "react";
-
-interface MobileSidebarContextValue {
-  mobileOpen: boolean;
-  setMobileOpen: (open: boolean) => void;
-  toggleMobileSidebar: () => void;
-}
-
-const MobileSidebarContext = createContext<MobileSidebarContextValue | null>(null);
-
-export function MobileSidebarProvider({ children }: { children: ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  return (
-    <MobileSidebarContext.Provider
-      value={{
-        mobileOpen,
-        setMobileOpen,
-        toggleMobileSidebar: () => setMobileOpen((prev) => !prev),
-      }}
-    >
-      {children}
-    </MobileSidebarContext.Provider>
-  );
-}
-
-export function useMobileSidebar() {
-  const ctx = useContext(MobileSidebarContext);
-  if (!ctx) {
-    throw new Error("useMobileSidebar must be used within MobileSidebarProvider");
-  }
-  return ctx;
-}
+// The admin portal was the first staff portal, so this context lived here. It now
+// belongs to the shared staff shell - re-exported so existing admin imports (and
+// the provider identity they depend on) keep working.
+export { MobileSidebarProvider, useMobileSidebar } from "@/components/staff/mobile-sidebar-context";
