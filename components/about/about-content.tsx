@@ -7,7 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function AboutContent() {
   const { t } = useLanguage()
-  
+
   return (
     <>
       <section className="relative pt-32 pb-8">
@@ -62,9 +62,7 @@ export default function AboutContent() {
             <div className="bg-primary/5 p-8 rounded-lg">
               <h2 className="text-2xl font-bold mb-4">{t('about.mission')}</h2>
               <p className="text-gray-700">
-                To revolutionize animal health and management through technology-driven innovation.
-                At NTDM Vettrack, we provide smart tracking devices, AI-powered disease prediction, and an integrated digital platform. where farmers can buy feeds, medicines, and sell animals while connecting directly with veterinarians.
-                Our mission is to empower farmers, improve livestock productivity, and support the government's efforts to monitor the national animal population efficiently and accurately.
+                To transform livestock health and farm management through innovative, technology driven solutions that enable smarter, more sustainable, and data driven farming with AI & IoT.
               </p>
             </div>
             <div className="bg-secondary/5 p-8 rounded-lg">
