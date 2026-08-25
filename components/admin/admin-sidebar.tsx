@@ -40,7 +40,7 @@ export default function AdminSidebar() {
     { href: "/admin", label: t("admin.dashboard"), icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/users", label: t("admin.users"), icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/content", label: t("admin.content"), icon: <FileText className="h-4 w-4 sm:h-5 sm:w-5" /> },
-    { href: "/marketplace/listings", label: t("admin.marketplaceListings"), icon: <Store className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    // { href: "/marketplace/listings", label: t("admin.marketplaceListings"), icon: <Store className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/reports", label: t("admin.reports"), icon: <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/support", label: t("admin.support"), icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/admin/appointments", label: t("admin.appointments"), icon: <Calendar className="h-4 w-4 sm:h-5 sm:w-5" /> },
