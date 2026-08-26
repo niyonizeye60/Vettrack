@@ -83,6 +83,27 @@ async function notifyFarmer(
   }
 }
 
+/** Tell superadmin a new request needs review - the queue otherwise has no push signal. */
+async function notifySuperadmin(title: string, message: string, actionUrl: string) {
+  try {
+    const db = await getDb()
+    await db.collection("notifications").insertOne({
+      title,
+      message,
+      type: "marketplace",
+      priority: "normal",
+      role: "superadmin",
+      read: false,
+      deletedBy: [],
+      actionUrl,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+    })
+  } catch (error) {
+    console.error("Failed to insert superadmin marketplace notification:", error)
+  }
+}
+
 export async function createListingRequest(
   farmer: { _id: string; name: string; phone?: string; email: string },
   input: ListingRequestInput
@@ -117,6 +138,13 @@ export async function createListingRequest(
   }
 
   const result = await collection.insertOne(doc as ListingRequest)
+
+  await notifySuperadmin(
+    "New listing request",
+    `${farmer.name} submitted "${doc.title}" for review.`,
+    "/marketplace/requests"
+  )
+
   return { ...doc, _id: result.insertedId } as ListingRequest
 }
 

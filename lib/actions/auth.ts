@@ -149,6 +149,24 @@ export async function registerUser(formData: FormData) {
       throw insertError
     }
 
+    // Privileged accounts can only be created by an already-authenticated
+    // superadmin (checked above) - still worth an audit trail of who was granted
+    // elevated access and when.
+    if (isPrivilegedRole(role)) {
+      await db.collection("notifications").insertOne({
+        title: "Privileged account created",
+        message: `A new ${role} account was created for ${userData.email}.`,
+        type: "system",
+        priority: "high",
+        role: "superadmin",
+        read: false,
+        deletedBy: [],
+        actionUrl: "/superadmin/users",
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      }).catch((err) => console.error("Failed to insert privileged-account notification:", err))
+    }
+
     // Send welcome email after successful registration
     try {
       const emailResult = await sendWelcomeEmail(
@@ -214,6 +232,17 @@ export async function loginUser(formData: FormData) {
       createdAt: { $gt: new Date(Date.now() - LOGIN_LOCKOUT_WINDOW_MS) },
     })
     if (recentFailures >= LOGIN_LOCKOUT_THRESHOLD) {
+      await db.collection("notifications").insertOne({
+        title: "Account locked out",
+        message: `${email} was locked out after ${recentFailures} failed login attempts.`,
+        type: "security",
+        priority: "high",
+        role: "superadmin",
+        read: false,
+        deletedBy: [],
+        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      }).catch((err) => console.error("Failed to insert lockout notification:", err))
       return { success: false, message: "Too many failed login attempts. Please try again in 15 minutes." }
     }
 

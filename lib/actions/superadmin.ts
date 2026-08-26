@@ -1207,10 +1207,18 @@ export async function generateSystemNotifications() {
 
     // Check for system issues (failed logins, etc.)
     const failedLogins = await db.collection("login_attempts")
-      .countDocuments({ 
-        success: false, 
-        createdAt: { $gte: last24Hours } 
+      .countDocuments({
+        success: false,
+        createdAt: { $gte: last24Hours }
       })
+
+    // Check for pending marketplace listing requests
+    const pendingListingRequests = await db.collection("listing_requests")
+      .countDocuments({ status: "pending" })
+
+    // Check for a spike in failed marketplace/order payments
+    const failedPayments = await db.collection("orders")
+      .countDocuments({ paymentStatus: "failed", updatedAt: { $gte: last24Hours } })
 
     const notifications = []
 
@@ -1245,6 +1253,28 @@ export async function generateSystemNotifications() {
       })
     }
 
+    if (pendingListingRequests > 5) {
+      notifications.push({
+        title: "High Pending Listing Requests",
+        message: `${pendingListingRequests} marketplace listing requests are pending review`,
+        type: "system",
+        priority: "high",
+        role: "superadmin",
+        actionUrl: "/marketplace/requests"
+      })
+    }
+
+    if (failedPayments > 5) {
+      notifications.push({
+        title: "Payment Failure Spike",
+        message: `${failedPayments} order payments failed in the last 24 hours`,
+        type: "system",
+        priority: "high",
+        role: "superadmin",
+        actionUrl: "/superadmin/analytics"
+      })
+    }
+
     // Insert notifications — only if not already created today
     if (notifications.length > 0) {
       const startOfDay = new Date(now)
@@ -1272,6 +1302,30 @@ export async function generateSystemNotifications() {
   } catch (error) {
     console.error("Error generating system notifications:", error)
     return { success: false, count: 0 }
+  }
+}
+
+/**
+ * Called from a cron route's catch block, not a superadmin session - so this
+ * can't gate on requireSuperAdmin the way the rest of this file does.
+ */
+export async function notifyCronFailure(jobName: string, error: unknown) {
+  try {
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+    await db.collection("notifications").insertOne({
+      title: "Scheduled job failed",
+      message: `${jobName} failed to run: ${error instanceof Error ? error.message : String(error)}`,
+      type: "system",
+      priority: "high",
+      role: "superadmin",
+      read: false,
+      deletedBy: [],
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      createdAt: new Date(),
+    })
+  } catch (notifyError) {
+    console.error("Failed to insert cron-failure notification:", notifyError)
   }
 }
 
@@ -1848,12 +1902,14 @@ export async function getNotifications(userId: string) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    // Get system notifications and user-specific notifications
+    // Get notifications addressed to this user or explicitly tagged for superadmin.
+    // NOTE: deliberately does NOT match on `type: "system"` alone - sendBulkNotification
+    // sends per-user broadcasts (to farmers/vets) whose `type` can be "system" too, and
+    // matching on type would leak those into every superadmin's inbox.
     const notifications = await db.collection("notifications")
       .find({
         $or: [
           { userId: new ObjectId(userId) },
-          { type: "system" },
           { role: "superadmin" }
         ]
       })
@@ -1904,10 +1960,9 @@ export async function markAllNotificationsRead(userId: string) {
     const db = client.db("ntdm_animal_hospital")
 
     await db.collection("notifications").updateMany(
-      { 
+      {
         $or: [
           { userId: new ObjectId(userId) },
-          { type: "system" },
           { role: "superadmin" }
         ],
         read: false

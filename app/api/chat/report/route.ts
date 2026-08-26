@@ -56,6 +56,19 @@ export async function POST(request: NextRequest) {
       details: otherParticipantId
     }).catch(() => {})
 
+    await db.collection("notifications").insertOne({
+      title: "Chat report filed",
+      message: `${currentUser.name} reported a conversation: ${reason.trim().slice(0, 80)}`,
+      type: "chat",
+      priority: "normal",
+      role: "superadmin",
+      read: false,
+      deletedBy: [],
+      actionUrl: "/superadmin/moderation",
+      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+    }).catch((err) => console.error("Failed to insert chat-report notification:", err))
+
     return NextResponse.json({ success: true, reportId: result.insertedId.toString() })
   } catch (error) {
     console.error("Error filing report:", error)
