@@ -1574,17 +1574,17 @@ export async function getUserRegistrationTrend(days = 30) {
     ]).toArray()
 
     // Build a zero-filled day-by-day series so the chart doesn't skip empty days
-    const byDate: Record<string, { date: string; farmer: number; doctor: number; admin: number; superadmin: number; total: number }> = {}
+    const byDate: Record<string, { date: string; farmer: number; doctor: number; admin: number; superadmin: number; marketplace_admin: number; finance_manager: number; total: number }> = {}
     for (let i = 0; i < days; i++) {
       const d = new Date(start)
       d.setUTCDate(d.getUTCDate() + i)
       const key = d.toISOString().slice(0, 10)
-      byDate[key] = { date: key, farmer: 0, doctor: 0, admin: 0, superadmin: 0, total: 0 }
+      byDate[key] = { date: key, farmer: 0, doctor: 0, admin: 0, superadmin: 0, marketplace_admin: 0, finance_manager: 0, total: 0 }
     }
 
     for (const row of rows) {
       const key = row._id.date
-      const role = row._id.role as "farmer" | "doctor" | "admin" | "superadmin"
+      const role = row._id.role as "farmer" | "doctor" | "admin" | "superadmin" | "marketplace_admin" | "finance_manager"
       if (byDate[key] && role in byDate[key]) {
         byDate[key][role] += row.count
         byDate[key].total += row.count
