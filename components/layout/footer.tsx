@@ -248,7 +248,7 @@ export default function Footer() {
               Privacy Policy
             </Link>
           </p>
-          <DeveloperCredit className="mt-2" />
+          {/* <DeveloperCredit className="mt-2" /> */}
         </div>
       </div>
     </footer>
