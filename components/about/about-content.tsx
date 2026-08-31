@@ -129,7 +129,7 @@ export default function AboutContent() {
               specialty: "PHD holder",
             },
           ].map((member, index) => (
-            <div key={index} className="salon-card text-center p-6">
+            <div key={index} className="salon-card text-center p-6 max-w-xs mx-auto">
               <div className="relative w-40 h-40 rounded-full overflow-hidden mx-auto mb-4">
                 <Image src={member.image || "/placeholder.svg"} alt={member.name} fill className="object-cover" />
               </div>
@@ -138,6 +138,36 @@ export default function AboutContent() {
               <p className="text-gray-600 mb-4"> {member.specialty}</p>
               <Link href="/booking" className="text-primary hover:text-primary/80 transition-colors">
                 {t('home.hero.bookConsultation')}
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-20">
+          <h2 className="heading-lg text-center mb-12">{t('about.techTeam')}</h2>
+          {[
+            {
+              image: "/Software Engineer.png",
+              name: "Munyarukina Abel",
+              role: "Software Engineer",
+              tagline: "Designer & Developer of this platform",
+              link: "https://www.linkedin.com/in/munyarukina-abel-4041a1184",
+            },
+          ].map((member, index) => (
+            <div key={index} className="salon-card text-center p-6 max-w-xs mx-auto">
+              <div className="relative w-40 h-40 rounded-full overflow-hidden mx-auto mb-4">
+                <Image src={member.image} alt={member.name} fill className="object-cover" />
+              </div>
+              <h3 className="text-xl font-semibold mb-1">{member.name}</h3>
+              <p className="text-primary font-medium mb-2">{member.role}</p>
+              <p className="text-gray-600 mb-4">{member.tagline}</p>
+              <Link
+                href={member.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 transition-colors"
+              >
+                {t('about.viewLinkedIn')}
               </Link>
             </div>
           ))}

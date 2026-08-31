@@ -391,6 +391,8 @@ const translations = {
     'about.team': 'Our Team',
     'about.history': 'Our History',
     'about.mentor': 'Our Mentors',
+    'about.techTeam': 'Platform Development',
+    'about.viewLinkedIn': 'View LinkedIn',
     'about.experience': 'Experience the NTDM Difference',
     'about.experienceParagraph': 'We invite you to visit NTDM Vettrack and experience our commitment to animal health, innovation, and exceptional service firsthand.',
     
@@ -3074,6 +3076,8 @@ const translations = {
     'about.team': 'Itsinda Ryacu',
     'about.history': 'Amateka Yacu',
     'about.mentor': 'Abajyanama Bacu',
+    'about.techTeam': 'Iyubakwa ry\'Urubuga',
+    'about.viewLinkedIn': 'Reba kuri LinkedIn',
     'about.experience': 'Menya Itandukaniro rya NTDM',
     'about.experienceParagraph': 'Turagutumiye mu gusura ibitaro by’amatungo bya NTDM no kwibonera ibyo twiyemeje ku buzima bw’amatungo, guhanga udushya, naserivisi idasanzwe.',
     
