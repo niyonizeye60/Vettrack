@@ -12,6 +12,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 export interface ComboboxOption {
   value: string
   label: string
+  /**
+   * Optional heading to file this option under. Options sharing a group render
+   * together beneath it, in first-seen order; leaving it off keeps the flat
+   * single-list rendering every existing caller relies on.
+   */
+  group?: string
 }
 
 interface ComboboxProps {
@@ -40,6 +46,19 @@ export function Combobox({
   const [open, setOpen] = React.useState(false)
   const selected = options.find((o) => o.value === value)
 
+  // One entry per distinct group, in the order the groups first appear. Ungrouped
+  // options collapse to a single headless group, which is the pre-existing shape.
+  const groups = React.useMemo(() => {
+    const buckets = new Map<string, ComboboxOption[]>()
+    for (const option of options) {
+      const key = option.group ?? ""
+      const bucket = buckets.get(key)
+      if (bucket) bucket.push(option)
+      else buckets.set(key, [option])
+    }
+    return Array.from(buckets.entries())
+  }, [options])
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -65,21 +84,23 @@ export function Combobox({
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    onValueChange(option.value)
-                    setOpen(false)
-                  }}
-                >
-                  <Check className={cn("mr-2 h-4 w-4 shrink-0", value === option.value ? "opacity-100" : "opacity-0")} />
-                  <span className="truncate">{option.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {groups.map(([heading, groupOptions]) => (
+              <CommandGroup key={heading || "_"} heading={heading || undefined}>
+                {groupOptions.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    onSelect={() => {
+                      onValueChange(option.value)
+                      setOpen(false)
+                    }}
+                  >
+                    <Check className={cn("mr-2 h-4 w-4 shrink-0", value === option.value ? "opacity-100" : "opacity-0")} />
+                    <span className="truncate">{option.label}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
       </PopoverContent>

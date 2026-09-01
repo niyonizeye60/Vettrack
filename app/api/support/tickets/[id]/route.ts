@@ -122,6 +122,26 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       { $set: update }
     )
 
+    // Let the requester know their ticket was resolved or reopened - a
+    // status change carries the same "you need to know this" weight as a
+    // reply, so it should notify the same way.
+    if (action === "resolve" || action === "reopen") {
+      await db.collection("notifications").insertOne({
+        title: action === "resolve" ? "Support ticket resolved" : "Support ticket reopened",
+        message: action === "resolve"
+          ? `${currentUser.name} marked your ticket "${ticket.subject}" as resolved`
+          : `${currentUser.name} reopened your ticket "${ticket.subject}"`,
+        type: "support_ticket",
+        priority: "normal",
+        read: false,
+        deletedBy: [],
+        userId: new ObjectId(ticket.requesterId),
+        actionUrl: `/${ticket.requesterRole === "doctor" ? "veterinary" : "farmer"}/support?ticketId=${ticketId.toString()}`,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        createdAt: update.updatedAt,
+      }).catch((err) => console.error("Error inserting ticket status notification:", err))
+    }
+
     await logActivity(currentUser._id, "support.ticket_updated", `Status changed to ${update.status}`)
     return NextResponse.json({ success: true })
   } catch (error) {

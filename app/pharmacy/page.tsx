@@ -8,6 +8,8 @@ import { useSearchParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductCard from "@/components/products/product-card"
+import ProductGridSkeleton from "@/components/products/product-grid-skeleton"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Drug {
   id: string
@@ -133,16 +135,6 @@ export default function PharmacyPage() {
 
   const currentCategory = categories.find(cat => cat.id === categoryId)
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container-custom">
-          <div className="text-center">{t('common.loading')}</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <>
       <ServicesBanner
@@ -225,7 +217,11 @@ export default function PharmacyPage() {
           </div>
 
           <div className="mb-4 flex justify-between items-center">
-            <p className="text-gray-600">{filteredDrugs.length} {t('pharmacy.title').toLowerCase()} found</p>
+            {loading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : (
+              <p className="text-gray-600">{filteredDrugs.length} {t('pharmacy.title').toLowerCase()} found</p>
+            )}
             {wishlist.length > 0 && (
               <p className="text-sm text-gray-500">
                 <Heart className="h-4 w-4 inline mr-1" />
@@ -234,31 +230,35 @@ export default function PharmacyPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDrugs.map((drug) => (
-              <ProductCard
-                key={drug.id}
-                id={drug.id}
-                categoryId={drug.categoryId}
-                category="drugs"
-                name={drug.name}
-                description={drug.description}
-                image={drug.image}
-                price={drug.price}
-                unit={drug.duration}
-                detailHref={`/pharmacy/${drug.id}`}
-                badges={[{ label: t('common.inStock'), className: "bg-blue-600 text-white" }]}
-                wishlisted={wishlist.includes(drug.id)}
-                onToggleWishlist={() => toggleWishlist(drug.id)}
-                details={[
-                  ...(drug.drugType ? [{ icon: Pill, text: drug.drugType }] : []),
-                  ...(drug.district
-                    ? [{ icon: MapPin, text: [drug.district, drug.sector].filter(Boolean).join(', ') }]
-                    : []),
-                ]}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <ProductGridSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredDrugs.map((drug) => (
+                <ProductCard
+                  key={drug.id}
+                  id={drug.id}
+                  categoryId={drug.categoryId}
+                  category="drugs"
+                  name={drug.name}
+                  description={drug.description}
+                  image={drug.image}
+                  price={drug.price}
+                  unit={drug.duration}
+                  detailHref={`/pharmacy/${drug.id}`}
+                  badges={[{ label: t('common.inStock'), className: "bg-blue-600 text-white" }]}
+                  wishlisted={wishlist.includes(drug.id)}
+                  onToggleWishlist={() => toggleWishlist(drug.id)}
+                  details={[
+                    ...(drug.drugType ? [{ icon: Pill, text: drug.drugType }] : []),
+                    ...(drug.district
+                      ? [{ icon: MapPin, text: [drug.district, drug.sector].filter(Boolean).join(', ') }]
+                      : []),
+                  ]}
+                />
+              ))}
+            </div>
+          )}
 
           {filteredDrugs.length === 0 && !loading && (
             <div className="text-center py-12">

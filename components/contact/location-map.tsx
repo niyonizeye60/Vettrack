@@ -8,7 +8,7 @@ export default function LocationMap() {
         style={{ border: 0 }}
         allowFullScreen
         loading="lazy"
-        title="NTDM Animal Hospital Location - Nyagatare"
+        title="NTDM Vettrack Location - Nyagatare"
       ></iframe>
     </div>
   );

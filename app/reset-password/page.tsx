@@ -5,8 +5,8 @@ import { Loader2 } from "lucide-react"
 import ResetPasswordForm from "@/components/auth/reset-password-form"
 
 export const metadata: Metadata = {
-  title: "Reset Password - NTDM Animal Hospital",
-  description: "Choose a new password for your NTDM Animal Hospital account.",
+  title: "Reset Password - NTDM Vettrack",
+  description: "Choose a new password for your NTDM Vettrack account.",
 }
 
 export const dynamic = "force-dynamic"

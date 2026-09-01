@@ -8,6 +8,8 @@ import { useSearchParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductCard from "@/components/products/product-card"
+import ProductGridSkeleton from "@/components/products/product-grid-skeleton"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Animal {
   id: string
@@ -138,16 +140,6 @@ export default function AnimalSalesPage() {
 
   const currentCategory = categories.find(cat => cat.id === categoryId)
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container-custom">
-          <div className="text-center">Loading animals...</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <>
       <ServicesBanner
@@ -232,7 +224,11 @@ export default function AnimalSalesPage() {
           </div>
 
           <div className="mb-4 flex justify-between items-center">
-            <p className="text-gray-600">{filteredAnimals.length} {t('animals.title').toLowerCase()} found</p>
+            {loading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : (
+              <p className="text-gray-600">{filteredAnimals.length} {t('animals.title').toLowerCase()} found</p>
+            )}
             {wishlist.length > 0 && (
               <p className="text-sm text-gray-500">
                 <Heart className="h-4 w-4 inline mr-1" />
@@ -241,34 +237,38 @@ export default function AnimalSalesPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredAnimals.map((animal) => (
-              <ProductCard
-                key={animal.id}
-                id={animal.id}
-                categoryId={animal.categoryId}
-                category="sales"
-                name={animal.name}
-                description={animal.description}
-                image={animal.image}
-                price={animal.price}
-                unit={animal.duration}
-                detailHref={`/animal-sales/${animal.id}`}
-                badges={[{ label: t('common.available') }]}
-                wishlisted={wishlist.includes(animal.id)}
-                onToggleWishlist={() => toggleWishlist(animal.id)}
-                details={[
-                  ...(animal.animalType || animal.breed
-                    ? [{ icon: Tag, text: [animal.animalType, animal.breed].filter(Boolean).join(' · ') }]
-                    : []),
-                  ...(animal.age ? [{ icon: Calendar, text: animal.age }] : []),
-                  ...(animal.district
-                    ? [{ icon: MapPin, text: [animal.district, animal.sector].filter(Boolean).join(', ') }]
-                    : []),
-                ]}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <ProductGridSkeleton />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredAnimals.map((animal) => (
+                <ProductCard
+                  key={animal.id}
+                  id={animal.id}
+                  categoryId={animal.categoryId}
+                  category="sales"
+                  name={animal.name}
+                  description={animal.description}
+                  image={animal.image}
+                  price={animal.price}
+                  unit={animal.duration}
+                  detailHref={`/animal-sales/${animal.id}`}
+                  badges={[{ label: t('common.available') }]}
+                  wishlisted={wishlist.includes(animal.id)}
+                  onToggleWishlist={() => toggleWishlist(animal.id)}
+                  details={[
+                    ...(animal.animalType || animal.breed
+                      ? [{ icon: Tag, text: [animal.animalType, animal.breed].filter(Boolean).join(' · ') }]
+                      : []),
+                    ...(animal.age ? [{ icon: Calendar, text: animal.age }] : []),
+                    ...(animal.district
+                      ? [{ icon: MapPin, text: [animal.district, animal.sector].filter(Boolean).join(', ') }]
+                      : []),
+                  ]}
+                />
+              ))}
+            </div>
+          )}
 
           {filteredAnimals.length === 0 && !loading && (
             <div className="text-center py-12">

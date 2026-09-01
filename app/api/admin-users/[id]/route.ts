@@ -74,20 +74,23 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     if (action === "approve" || action === "reject") {
       const newStatus = action === "approve" ? "active" : "rejected"
-      const targetUser = await db.collection("users").findOne({ _id: new ObjectId(params.id) }, { projection: { name: 1 } })
+      const targetUser = await db.collection("users").findOne({ _id: new ObjectId(params.id), role: MANAGED_ROLES }, { projection: { name: 1, role: 1 } })
 
       await db.collection("users").updateOne(
-        { _id: new ObjectId(params.id), role: "doctor", status: "pending_verification" },
+        { _id: new ObjectId(params.id), role: MANAGED_ROLES, status: "pending_verification" },
         { $set: { status: newStatus, updatedAt: new Date() } }
       )
 
+      const isVet = targetUser?.role === "doctor"
       await logUserActivity({
         userId: currentUser._id,
-        action: action === "approve" ? "admin.vet.approved" : "admin.vet.rejected",
+        action: action === "approve"
+          ? (isVet ? "admin.vet.approved" : "admin.farmer.approved")
+          : (isVet ? "admin.vet.rejected" : "admin.farmer.rejected"),
         details: targetUser?.name || params.id,
       })
 
-      return NextResponse.json({ success: true, message: `Veterinarian ${action}d successfully` })
+      return NextResponse.json({ success: true, message: `${isVet ? "Veterinarian" : "Farmer"} ${action}d successfully` })
     }
 
     if (action === "resetPassword") {

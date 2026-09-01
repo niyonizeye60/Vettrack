@@ -1,7 +1,13 @@
 export const dynamicParams = true;
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
-import { getOrderById, updateOrderPaymentStatus, type Order } from "@/lib/db-orders"
+import {
+  getOrderById,
+  updateOrderPaymentStatus,
+  getListingForOrder,
+  sellerContactForPaidOrder,
+  type Order,
+} from "@/lib/db-orders"
 import { checkIntouchPayStatus } from "@/lib/payments/intouchpay"
 
 const STALE_CHECK_MS = 5000
@@ -15,6 +21,8 @@ function mapIntouchResponseCode(responsecode?: string): "completed" | "pending" 
 function serializeOrder(order: Order) {
   return {
     id: order._id.toString(),
+    orderType: order.orderType ?? "direct",
+    brokerage: order.brokerage ?? null,
     status: order.status,
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
@@ -57,7 +65,18 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
       }
     }
 
-    return NextResponse.json(serializeOrder(order!))
+    // A paid connection fee is what buys the seller's details, so this is where the
+    // buyer finally receives them. The order id acts as the bearer token, matching
+    // how the rest of guest checkout already works - there is no account to log in to.
+    let sellerContact: { phone: string | null; email: string | null } | null = null
+    if (order!.orderType === "brokerage" && order!.status === "paid") {
+      const listing = await getListingForOrder(order!)
+      if (listing) {
+        sellerContact = sellerContactForPaidOrder(order!, listing as any)
+      }
+    }
+
+    return NextResponse.json({ ...serializeOrder(order!), sellerContact })
   } catch (error) {
     console.error("Error fetching order:", error)
     return NextResponse.json({ error: "Failed to fetch order" }, { status: 500 })

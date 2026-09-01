@@ -2,7 +2,17 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from 'next/server'
 import clientPromise from '@/lib/db'
 import { ObjectId } from 'mongodb'
+import { getCurrentUser } from '@/lib/auth'
+import { can } from '@/lib/roles'
+import { canAccessMarketplaceCategory } from '@/lib/marketplace-access'
+import { logActivity } from '@/lib/activity-log'
 
+const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+const forbidden = () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+const canManage = (role: unknown) => can(role, 'marketplace.listings.manage')
+
+// Categories are public catalogue structure - the browse pages read them
+// unauthenticated. Only the writes below require marketplace.listings.manage.
 export async function GET() {
   try {
     const client = await clientPromise
@@ -31,8 +41,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!canManage(currentUser?.role)) return unauthorized()
+
     const { name, description, image, type } = await request.json()
-    
+    if (!canAccessMarketplaceCategory(currentUser, type)) return forbidden()
+
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
     
@@ -45,6 +59,7 @@ export async function POST(request: NextRequest) {
     }
     
     const result = await db.collection('categories').insertOne(category)
+    await logActivity(currentUser!._id, 'marketplace.category.created', `Created ${type} category: ${name}`)
     
     return NextResponse.json({ 
       ...category, 
@@ -58,14 +73,30 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!canManage(currentUser?.role)) return unauthorized()
+
     const { id, name, description, image } = await request.json()
+
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+    }
     
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
-    
+
+    const existing = await db.collection('categories').findOne(
+      { _id: new ObjectId(id) },
+      { projection: { type: 1 } }
+    )
+    if (!existing) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+    }
+    if (!canAccessMarketplaceCategory(currentUser, existing.type)) return forbidden()
+
     const result = await db.collection('categories').updateOne(
       { _id: new ObjectId(id) },
-      { 
+      {
         $set: {
           name,
           description,
@@ -74,10 +105,12 @@ export async function PUT(request: NextRequest) {
         }
       }
     )
-    
+
     if (result.matchedCount === 0) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
+
+    await logActivity(currentUser!._id, 'marketplace.category.updated', `Updated category ${id}`)
     
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -88,23 +121,37 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const currentUser = await getCurrentUser()
+    if (!canManage(currentUser?.role)) return unauthorized()
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
     }
-    
+
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
-    
+
+    const existing = await db.collection('categories').findOne(
+      { _id: new ObjectId(id) },
+      { projection: { type: 1 } }
+    )
+    if (!existing) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+    }
+    if (!canAccessMarketplaceCategory(currentUser, existing.type)) return forbidden()
+
     const result = await db.collection('categories').deleteOne({
       _id: new ObjectId(id)
     })
-    
+
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
+
+    await logActivity(currentUser!._id, 'marketplace.category.deleted', `Deleted category ${id}`)
     
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -26,7 +26,7 @@ GPS features allow you to know where your animals are at all times, especially u
 
 We also discuss how data collected from these devices can help improve feeding plans, grazing schedules, and breeding programs. Learn about cost considerations, ease of use, and how mobile apps can help you track everything from your phone.
 
-Whether you have a small farm or manage hundreds of animals, NTDM animal hospital will help you understand and use and access this smart tracking technology at your farm thus, saving money, reducing losses and, improve your animal welfare.`,
+Whether you have a small farm or manage hundreds of animals, NTDM Vettrack will help you understand and use and access this smart tracking technology at your farm thus, saving money, reducing losses and, improve your animal welfare.`,
   },
   {
     id: 2,

@@ -3,12 +3,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home, Stethoscope, Settings, MessageSquare, Bell, Menu,
-  Activity, Trash2, ShieldAlert, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby, LifeBuoy,
-  MapPin
+  Activity, Trash2, ShieldAlert, ShieldCheck, ShieldPlus, Syringe, Milk, PawPrint, Users, Wallet, Tag, FileBarChart, Baby, LifeBuoy, MapPin, Receipt, Store
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMobileSidebar } from "./mobile-sidebar-context";
+import { DeveloperCredit } from "@/components/layout/developer-credit";
 
 export default function FarmerSidebar() {
   const { t } = useLanguage();
@@ -35,13 +35,17 @@ export default function FarmerSidebar() {
     { href: "/farmer/calves",        label: t("farmer.calves"),       icon: <Baby         className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/milk",          label: t("farmer.milk"),         icon: <Milk         className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/consultations", label: t("farmer.consultations"),icon: <Stethoscope  className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/veterinarians", label: t("farmer.veterinarians"),icon: <ShieldCheck  className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/tracking",      label: t("farmer.tracking"),     icon: <Activity     className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/waste",         label: t("farmer.waste"),        icon: <Trash2       className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/insemination",  label: t("farmer.insemination"), icon: <Syringe      className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/diseases",      label: t("farmer.diseases"),     icon: <ShieldAlert  className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/epidemics",     label: t("farmer.epidemics"),    icon: <MapPin        className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/vaccination",   label: t("farmer.vaccination"),  icon: <ShieldPlus   className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/animal-sales",  label: t("farmer.animalSales"),  icon: <Tag          className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/listings",      label: t("listing.myListings"),  icon: <Store        className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/employees",     label: t("farmer.employees"),    icon: <Wallet       className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/farmer/expenses",      label: t("farmer.expenses"),     icon: <Receipt      className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/reports",       label: t("farmer.generalReport"),icon: <FileBarChart className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/messages",      label: t("farmer.messages"),     icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/farmer/support",       label: t("farmer.support"),      icon: <LifeBuoy      className="h-4 w-4 sm:h-5 sm:w-5" /> },
@@ -120,7 +124,10 @@ export default function FarmerSidebar() {
             {/* Footer */}
             <div className="p-3 sm:p-4 border-t border-gray-200 text-xs text-gray-500">
               {(!collapsed || isMobile) && (
-                <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("farmer.portal")}</p>
+                <>
+                  <p className="text-center sm:text-left">© {new Date().getFullYear()} {t("farmer.portal")}</p>
+                  {/* <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" /> */}
+                </>
               )}
             </div>
           </nav>

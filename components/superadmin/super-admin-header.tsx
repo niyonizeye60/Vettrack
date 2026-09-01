@@ -23,12 +23,13 @@ import {
   AlertTriangle,
   Info,
   Loader2,
+  RefreshCw,
 } from "lucide-react"
 import { logoutUser } from "@/lib/actions/auth"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
-import { LanguageSwitcher } from "@/components/ui/language-switcher"
+import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { getNotifications, markNotificationRead, generateSystemNotifications } from "@/lib/actions/superadmin"
 import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
 import { useMobileSidebar } from "./mobile-sidebar-context"
@@ -50,18 +51,11 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
   const [notifications, setNotifications] = useState<any[]>([])
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true)
   const [notificationOpen, setNotificationOpen] = useState(false)
-  const [isOnline, setIsOnline] = useState(true)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [avatarImage, setAvatarImage] = useState<string | undefined>(user.image)
   const router = useRouter()
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-
     const handleFocus = async () => {
       try {
         const res = await fetch("/api/profile").then(r => r.json()).catch(() => null)
@@ -74,8 +68,6 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
     const interval = setInterval(loadNotifications, 30000)
 
     return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
       window.removeEventListener('focus', handleFocus)
       clearInterval(interval)
     }
@@ -155,32 +147,22 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
             variant="ghost"
             size="sm"
             onClick={toggleMobileSidebar}
-            className="lg:hidden p-2"
+            className="md:hidden p-2"
             aria-label="Toggle navigation menu"
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex items-center space-x-2">
+          <Link href="/superadmin" className="flex items-center space-x-2 group">
             <Shield className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 flex-shrink-0" />
             <div className="hidden sm:block">
               <h1 className="text-base sm:text-lg font-semibold text-gray-900 leading-tight">{t('superadmin.superAdmin') || 'Super Admin'}</h1>
               <p className="text-xs text-gray-500 hidden md:block">{t('superadmin.systemControlPanel') || 'System Control Panel'}</p>
             </div>
-            <div className="block sm:hidden">
-              <h1 className="text-sm font-semibold text-gray-900">{t('superadmin.admin') || 'Admin'}</h1>
-            </div>
-          </div>
+          </Link>
         </div>
 
-        {/* Right: online status, language, notifications, avatar */}
+        {/* Right: language, notifications, avatar */}
         <div className="flex items-center space-x-2 sm:space-x-4">
-          <div className="hidden md:flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-sm text-gray-600">
-              {isOnline ? t('superadmin.online') || 'Online' : t('superadmin.offline') || 'Offline'}
-            </span>
-          </div>
-
           <LanguageSwitcher />
 
           {/* Notifications */}
@@ -198,9 +180,18 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
             <DropdownMenuContent align="end" className="w-80 p-0">
               <div className="p-3 border-b flex items-center justify-between">
                 <h3 className="font-semibold text-sm">{t('superadmin.notifications') || 'Notifications'}</h3>
-                <Link href="/superadmin/notifications" className="text-xs text-blue-600 hover:text-blue-800">
-                  {t('superadmin.viewAll') || 'View All'}
-                </Link>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={loadNotifications}
+                    className="text-gray-500 hover:text-gray-700"
+                    aria-label={t('superadmin.refresh') || 'Refresh'}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
+                  <Link href="/superadmin/notifications" className="text-xs text-blue-600 hover:text-blue-800">
+                    {t('superadmin.viewAll') || 'View All'}
+                  </Link>
+                </div>
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {isLoadingNotifications ? (
@@ -236,9 +227,6 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
                           <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notification.message}</p>
                           <p className="text-xs text-gray-400 mt-1">{getTimeAgo(notification.createdAt)}</p>
                         </div>
-                        {!notification.read && (
-                          <div className="w-2 h-2 rounded-full flex-shrink-0 mt-2 bg-blue-500" />
-                        )}
                       </div>
                     </div>
                   ))
@@ -279,14 +267,6 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
                 <Settings className="mr-2 h-4 w-4" />
                 {t('superadmin.settings') || 'Settings'}
               </DropdownMenuItem>
-              {/* Mobile-only online status */}
-              <div className="md:hidden">
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <div className={`mr-2 w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  {t('superadmin.status')}: {isOnline ? t('superadmin.online') || 'Online' : t('superadmin.offline') || 'Offline'}
-                </DropdownMenuItem>
-              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={handleLogout}

@@ -2,10 +2,11 @@ import type { Metadata } from "next"
 import LoginContent from "@/components/auth/login-content"
 import { getCurrentUser } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { homePathForRole } from "@/lib/roles"
 
 export const metadata: Metadata = {
-  title: "Login - NTDM Animal Hospital",
-  description: "Log in to your NTDM Animal Hospital account to access your dashboard and manage your animals.",
+  title: "Login - NTDM Vettrack",
+  description: "Log in to your NTDM Vettrack account to access your dashboard and manage your animals.",
 }
 
 // ⬅️ force Next.js to render this page dynamically (SSR)
@@ -16,18 +17,7 @@ export default async function LoginPage() {
   
   // If user is already authenticated, redirect to their dashboard
   if (user) {
-    if (user.role === "farmer") {
-      redirect("/farmer")
-    } else if (user.role === "doctor") {
-      redirect("/veterinary")
-    } else if(user.role === "admin") {
-      redirect("/admin")
-    }
-    else if (user.role === "superadmin") {
-      redirect("/superadmin")
-    } else {
-      redirect("/")
-    }
+    redirect(homePathForRole(user.role))
   }
 
   return <LoginContent />

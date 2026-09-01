@@ -17,7 +17,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
-interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null }
+interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null; status?: string | null }
 interface MilkRecord {
   _id: string; cowId: string; cowName: string; liters: number
   homeConsumption: number | null; soldLiters: number | null
@@ -37,6 +37,7 @@ export default function MilkProductionPage() {
   const [user, setUser] = useState<any>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
   const milkableAnimals = animals.filter(a => {
+    if (a.status === "Deceased") return false
     const type = (a.type || "").toLowerCase()
     if (!MILK_PRODUCING_TYPES.includes(type)) return false
     if (a.gender && a.gender !== "female") return false
@@ -44,6 +45,7 @@ export default function MilkProductionPage() {
     return true
   })
   const [records, setRecords] = useState<MilkRecord[]>([])
+  const [homeConsumptionBalance, setHomeConsumptionBalance] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editRecord, setEditRecord] = useState<MilkRecord | null>(null)
@@ -84,7 +86,7 @@ export default function MilkProductionPage() {
       setUser(userData)
       const animalsData = await getAnimals(userData._id.toString())
       setAnimals(animalsData)
-      await fetchRecords(userData._id.toString())
+      await Promise.all([fetchRecords(userData._id.toString()), fetchHomeConsumptionBalance(userData._id.toString())])
       setLoading(false)
     }
     init()
@@ -94,6 +96,12 @@ export default function MilkProductionPage() {
     const res = await fetch(`/api/milk?farmerId=${farmerId}`)
     const data = await res.json()
     setRecords(Array.isArray(data) ? data : [])
+  }
+
+  const fetchHomeConsumptionBalance = async (farmerId: string) => {
+    const res = await fetch(`/api/milk/home-consumption?farmerId=${farmerId}`)
+    const data = await res.json()
+    setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
 
   // Client-side filtered records
@@ -151,13 +159,18 @@ export default function MilkProductionPage() {
     const soldLiters = Math.max(0, Number(liters) - Number(homeConsumption || 0))
     const body = { farmerId: user._id.toString(), cowId, cowName: cow?.name, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }
 
-    if (editRecord) {
-      await fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }) })
-    } else {
-      await fetch("/api/milk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = editRecord
+      ? await fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }) })
+      : await fetch("/api/milk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: "Failed to save milk record" }))
+      setErrors({ session: error })
+      setSaving(false)
+      return
     }
 
-    await fetchRecords(user._id.toString())
+    await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     resetForm()
     setSaving(false)
   }
@@ -182,7 +195,7 @@ export default function MilkProductionPage() {
 
   const handleDelete = async (id: string) => {
     await fetch(`/api/milk?id=${id}`, { method: "DELETE" })
-    await fetchRecords(user._id.toString())
+    await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     setDeleteId(null)
   }
 
@@ -193,9 +206,11 @@ export default function MilkProductionPage() {
   // Export state
   const [exportOpen, setExportOpen] = useState(false)
   const [exportCow, setExportCow] = useState("all")
-  const [exportType, setExportType] = useState<"daily" | "monthly" | "total">("total")
+  const [exportType, setExportType] = useState<"daily" | "monthly" | "total" | "custom">("total")
   const [exportDate, setExportDate] = useState(today)
   const [exportMonth, setExportMonth] = useState(today.slice(0, 7))
+  const [exportStart, setExportStart] = useState(today)
+  const [exportEnd, setExportEnd] = useState(today)
   const [exporting, setExporting] = useState(false)
 
   const getExportRecords = () => {
@@ -203,6 +218,7 @@ export default function MilkProductionPage() {
     if (exportCow !== "all") data = data.filter(r => r.cowId === exportCow)
     if (exportType === "daily") data = data.filter(r => r.date === exportDate)
     if (exportType === "monthly") data = data.filter(r => r.date.startsWith(exportMonth))
+    if (exportType === "custom") data = data.filter(r => r.date >= exportStart && r.date <= exportEnd)
     return data.sort((a, b) => a.date.localeCompare(b.date))
   }
 
@@ -222,25 +238,15 @@ export default function MilkProductionPage() {
       const cowName = exportCow === "all" ? "All Animals" : animals.find(a => a._id === exportCow)?.name || "Unknown"
       const totalL = exportRecords.reduce((s, r) => s + r.liters, 0)
       const totalRev = exportRecords.reduce((s, r) => s + (r.totalAmount || 0), 0)
-      const reportLabel = exportType === "daily" ? `Daily Report — ${exportDate}` : exportType === "monthly" ? `Monthly Report — ${exportMonth}` : "Total Production Report"
-
-      // Logo
-      try {
-        const logoImg = new Image()
-        logoImg.crossOrigin = 'anonymous'
-        logoImg.src = '/logo/Vet print.png'
-        await new Promise((resolve, reject) => { logoImg.onload = resolve; logoImg.onerror = reject })
-        doc.addImage(logoImg, 'PNG', 15, 7, 35, 24)
-      } catch { }
+      const reportLabel = exportType === "daily" ? `Daily Report — ${exportDate}` : exportType === "monthly" ? `Monthly Report — ${exportMonth}` : exportType === "custom" ? `Custom Report — ${exportStart} to ${exportEnd}` : "Total Production Report"
 
       doc.setTextColor(17, 24, 39)
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
-      doc.text(t('farmer.milkProductionReportTitle'), 55, 18)
+      doc.text(t('farmer.milkProductionReportTitle'), 15, 18)
       doc.setTextColor(75, 85, 99)
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text('NTDM Animal Hospital', 55, 27)
 
       // Divider under header
       doc.setDrawColor(226, 232, 240)
@@ -310,9 +316,9 @@ export default function MilkProductionPage() {
         doc.text("Home.Val", cols.consumedVal.x, y)
         doc.text("Total(RWF)", cols.total.x, y)
         doc.text("Water(L)", cols.water.x, y)
-        doc.text("Food Type", cols.foodType.x, y)
-        doc.text("Food(KG)", cols.foodKg.x, y)
-        doc.text("Food Cost", cols.foodCost.x, y)
+        doc.text("Feed Type", cols.foodType.x, y)
+        doc.text("Feed(KG)", cols.foodKg.x, y)
+        doc.text("Feed Cost", cols.foodCost.x, y)
         doc.text("Salt(KG)", cols.salt.x, y)
         doc.text("Salt Cost", cols.saltCost.x, y)
         doc.setFont("helvetica", "normal")
@@ -431,10 +437,17 @@ export default function MilkProductionPage() {
 
         // Left side
         doc.text(
-          `NTDM Animal Hospital | Generated by: ${user?.name || "Unknown"
-          }`,
+          `Generated by: ${user?.name || "Unknown"}`,
           15,
           pageHeight - 7
+        )
+
+        // Center: copyright
+        doc.text(
+          `© ${new Date().getFullYear()} NTDM Vettrack. All rights reserved`,
+          pageWidth / 2,
+          pageHeight - 7,
+          { align: "center" }
         )
 
         // Right side page number
@@ -550,8 +563,8 @@ export default function MilkProductionPage() {
         <div className="h-7 bg-gray-200 rounded w-40" />
         <div className="h-4 bg-gray-200 rounded w-64 mt-2" />
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 space-y-3">
             <div className="h-4 bg-gray-200 rounded w-20" />
             <div className="h-8 bg-gray-200 rounded w-16" />
@@ -573,7 +586,7 @@ export default function MilkProductionPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
@@ -592,6 +605,16 @@ export default function MilkProductionPage() {
             </div>
             <h3 className="text-3xl font-bold text-orange-600 mt-2">{totalConsumed.toFixed(1)}L</h3>
             <p className="text-xs text-gray-400 mt-1">{t('farmer.notSold')}</p>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.homeConsumptionMilk')}</p>
+              <Milk className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-3xl font-bold text-amber-600 mt-2">{homeConsumptionBalance.toFixed(1)}L</h3>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.availableForCalves')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
@@ -1088,7 +1111,7 @@ export default function MilkProductionPage() {
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">{t('farmer.reportType')}</label>
-              <Select value={exportType} onValueChange={v => setExportType(v as "daily" | "monthly" | "total")}>
+              <Select value={exportType} onValueChange={v => setExportType(v as "daily" | "monthly" | "total" | "custom")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1096,6 +1119,7 @@ export default function MilkProductionPage() {
                   <SelectItem value="daily">{t('farmer.dailyReport')}</SelectItem>
                   <SelectItem value="monthly">{t('farmer.monthlyReport')}</SelectItem>
                   <SelectItem value="total">{t('farmer.totalProduction')}</SelectItem>
+                  <SelectItem value="custom">{t('farmer.customReport')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1111,6 +1135,19 @@ export default function MilkProductionPage() {
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.selectMonth')}</label>
                 <Input type="month" value={exportMonth} onChange={e => setExportMonth(e.target.value)} />
+              </div>
+            )}
+
+            {exportType === "custom" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.startDate')}</label>
+                  <Input type="date" value={exportStart} max={exportEnd} onChange={e => setExportStart(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{t('farmer.endDate')}</label>
+                  <Input type="date" value={exportEnd} min={exportStart} onChange={e => setExportEnd(e.target.value)} />
+                </div>
               </div>
             )}
 

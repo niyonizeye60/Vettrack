@@ -11,7 +11,7 @@ export default function LoginContent() {
     <div className="min-h-screen flex pt-20">
       <div className="hidden lg:block lg:w-1/2 relative">
         <Image
-          src="https://images.unsplash.com/photo-1568572933382-74d440642117?w=1200&h=1600&fit=crop&crop=focalpoint&auto=format&q=80"
+          src="https://images.unsplash.com/photo-1527153857715-3908f2bae5e8?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y293c3xlbnwwfHwwfHx8MA%3D%3D"
           alt="Veterinarian with animals"
           fill
           className="object-cover"

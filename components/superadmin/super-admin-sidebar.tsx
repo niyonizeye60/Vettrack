@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useMobileSidebar } from "./mobile-sidebar-context"
+import { DeveloperCredit } from "@/components/layout/developer-credit"
 import {
   LayoutDashboard,
   Users,
@@ -129,7 +130,10 @@ export default function SuperAdminSidebar() {
             {/* Footer */}
             <div className="p-3 sm:p-4 border-t border-gray-200 text-xs text-gray-500">
               {(!collapsed || isMobile) && (
-                <p className="text-center sm:text-left">© {new Date().getFullYear()} {t('superadmin.superAdmin') || 'Super Admin'}</p>
+                <>
+                  <p className="text-center sm:text-left">© {new Date().getFullYear()} {t('superadmin.superAdmin') || 'Super Admin'}</p>
+                  {/* <DeveloperCredit label="Built by" className="text-center sm:text-left mt-1" /> */}
+                </>
               )}
             </div>
           </nav>

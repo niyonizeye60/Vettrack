@@ -7,7 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function AboutContent() {
   const { t } = useLanguage()
-  
+
   return (
     <>
       <section className="relative pt-32 pb-8">
@@ -35,7 +35,7 @@ export default function AboutContent() {
           <div>
             <h2 className="heading-lg mb-6">{t('about.history')}</h2>
             <p className="text-gray-600 mb-4">
-              Founded in 2020, NTDM Animal Hospital has been at the forefront of veterinary innovation in Rwanda. Our
+              Founded in 2020, NTDM Vettrack has been at the forefront of veterinary innovation in Rwanda. Our
               journey began with a simple vision: to revolutionize animal health management through technology and
               expert care.
             </p>
@@ -49,8 +49,8 @@ export default function AboutContent() {
           </div>
           <div className="relative h-[400px] rounded-lg overflow-hidden">
             <Image
-              src="https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=800&h=600&fit=crop&crop=focalpoint&auto=format&q=80"
-              alt="NTDM Animal Hospital Team"
+              src="https://images.unsplash.com/photo-1567879656049-f2265f23d8f8?q=80&w=927&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+              alt="NTDM Vettrack Team"
               fill
               className="object-cover"
             />
@@ -62,9 +62,7 @@ export default function AboutContent() {
             <div className="bg-primary/5 p-8 rounded-lg">
               <h2 className="text-2xl font-bold mb-4">{t('about.mission')}</h2>
               <p className="text-gray-700">
-                To revolutionize animal health and management through technology-driven innovation.
-                At NTDM ANIMAL HOSPITAL, we provide smart tracking devices, AI-powered disease prediction, and an integrated digital platform. where farmers can buy feeds, medicines, and sell animals while connecting directly with veterinarians.
-                Our mission is to empower farmers, improve livestock productivity, and support the government's efforts to monitor the national animal population efficiently and accurately.
+                To transform livestock health and farm management through innovative, technology driven solutions that enable smarter, more sustainable, and data driven farming with AI & IoT.
               </p>
             </div>
             <div className="bg-secondary/5 p-8 rounded-lg">
@@ -131,7 +129,7 @@ export default function AboutContent() {
               specialty: "PHD holder",
             },
           ].map((member, index) => (
-            <div key={index} className="salon-card text-center p-6">
+            <div key={index} className="salon-card text-center p-6 max-w-xs mx-auto">
               <div className="relative w-40 h-40 rounded-full overflow-hidden mx-auto mb-4">
                 <Image src={member.image || "/placeholder.svg"} alt={member.name} fill className="object-cover" />
               </div>
@@ -140,6 +138,36 @@ export default function AboutContent() {
               <p className="text-gray-600 mb-4"> {member.specialty}</p>
               <Link href="/booking" className="text-primary hover:text-primary/80 transition-colors">
                 {t('home.hero.bookConsultation')}
+              </Link>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-20">
+          <h2 className="heading-lg text-center mb-12">{t('about.techTeam')}</h2>
+          {[
+            {
+              image: "/Software Engineer.png",
+              name: "Munyarukina Abel",
+              role: "Software Engineer",
+              tagline: "Designer & Developer of this platform",
+              link: "https://www.linkedin.com/in/munyarukina-abel-4041a1184",
+            },
+          ].map((member, index) => (
+            <div key={index} className="salon-card text-center p-6 max-w-xs mx-auto">
+              <div className="relative w-40 h-40 rounded-full overflow-hidden mx-auto mb-4">
+                <Image src={member.image} alt={member.name} fill className="object-cover" />
+              </div>
+              <h3 className="text-xl font-semibold mb-1">{member.name}</h3>
+              <p className="text-primary font-medium mb-2">{member.role}</p>
+              <p className="text-gray-600 mb-4">{member.tagline}</p>
+              <Link
+                href={member.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 transition-colors"
+              >
+                {t('about.viewLinkedIn')}
               </Link>
             </div>
           ))}

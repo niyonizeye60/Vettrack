@@ -88,17 +88,22 @@ export async function PUT(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    const existing = await db.collection("calves").findOne({ _id: new ObjectId(id) })
+    if (!existing) return NextResponse.json({ error: "Calf not found" }, { status: 404 })
+
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff) {
-      const existing = await db.collection("calves").findOne({ _id: new ObjectId(id) })
-      if (!existing || existing.farmerId !== currentUser._id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
+    if (!isStaff && existing.farmerId !== currentUser._id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
+
+    // Once a calf has been moved into the animals herd its status is a fact about
+    // what happened, not a field to edit - reverting it would leave the animal row
+    // orphaned and let the calf be graduated a second time.
+    const nextStatus = existing.graduatedToAnimalId ? "graduated" : status
 
     await db.collection("calves").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { name, motherAnimalId: motherAnimalId || null, motherName: motherName || null, gender, breed: breed || null, birthDate, birthWeight: birthWeight ? Number(birthWeight) : null, status, notes: notes || null, updatedAt: new Date() } }
+      { $set: { name, motherAnimalId: motherAnimalId || null, motherName: motherName || null, gender, breed: breed || null, birthDate, birthWeight: birthWeight ? Number(birthWeight) : null, status: nextStatus, notes: notes || null, updatedAt: new Date() } }
     )
     await logActivity(currentUser._id, "livestock.calf_updated", name)
     return NextResponse.json({ success: true })
@@ -132,6 +137,11 @@ export async function DELETE(req: NextRequest) {
     await db.collection("calves").deleteOne({ _id: new ObjectId(id) })
     await db.collection("calf_weights").deleteMany({ calfId: id })
     await db.collection("calf_expenses").deleteMany({ calfId: id })
+    // vaccination_records are deliberately NOT cascaded: a growth log or an expense
+    // line is only meaningful while the calf is on the books, but a vaccination is a
+    // health record, and deleting it would also silently rewrite the farm's P&L for a
+    // period already reported. Those rows keep the denormalized subjectName, so the
+    // vaccination history still reads correctly once the calf row is gone.
     await logActivity(currentUser._id, "livestock.calf_deleted", id)
     return NextResponse.json({ success: true })
   } catch {

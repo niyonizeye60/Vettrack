@@ -7,6 +7,7 @@ import { hashPassword } from "../password"
 import { getCurrentUser } from "./auth"
 import { logActivity, logSystemError as recordSystemError } from "../activity-log"
 import { isPresenceOnline, type PresenceDoc } from "../presence"
+import { normalizeMarketplaceAccess } from "../marketplace-access"
 
 // Every exported function in this file is a Next.js server action with its own
 // network-invocable endpoint, independent of which page renders it - so each one
@@ -81,6 +82,7 @@ export async function getAllUsers() {
       licenseNumber: user.licenseNumber || null,
       specialization: user.specialization || null,
       isTestAccount: user.isTestAccount || false,
+      marketplaceAccess: user.marketplaceAccess || null,
     }))
   } catch (error) {
     console.error("Error fetching users:", error)
@@ -759,6 +761,13 @@ export async function updateUser(userId: string, formData: FormData) {
         specialization: formData.get("specialization"),
       })
     }
+    if (updateData.role === "marketplace_admin") {
+      const marketplaceAccess = normalizeMarketplaceAccess(formData.getAll("marketplaceAccess"))
+      if (marketplaceAccess.length === 0) {
+        return { success: false, message: "Select at least one marketplace this account can access" }
+      }
+      Object.assign(updateData, { marketplaceAccess })
+    }
 
     const result = await db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
@@ -785,6 +794,11 @@ export async function updateUserPassword(userId: string, newPassword: string) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
+    const targetUser = await db.collection("users").findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { name: 1 } }
+    )
+
     const result = await db.collection("users").updateOne(
       { _id: new ObjectId(userId) },
       {
@@ -797,7 +811,7 @@ export async function updateUserPassword(userId: string, newPassword: string) {
 
     if (result.modifiedCount > 0) {
       revalidatePath("/superadmin/users")
-      await logAdminAction("admin.user.passwordReset", userId)
+      await logAdminAction("admin.user.passwordReset", targetUser?.name || userId)
       return { success: true, message: "Password updated successfully" }
     }
 
@@ -1073,6 +1087,8 @@ function describeAdminAction(action: string, details?: string): string | null {
     case 'admin.user.passwordReset': return `reset password for user: ${details}`
     case 'admin.vet.approved': return `approved veterinarian: ${details}`
     case 'admin.vet.rejected': return `rejected veterinarian application: ${details}`
+    case 'admin.farmer.approved': return `approved farmer: ${details}`
+    case 'admin.farmer.rejected': return `rejected farmer application: ${details}`
     case 'admin.export.users': return `exported user data (${details})`
     case 'admin.export.consultations': return `exported consultation data (${details})`
     case 'admin.export.systemLogs': return `exported system logs (${details})`
@@ -1191,10 +1207,18 @@ export async function generateSystemNotifications() {
 
     // Check for system issues (failed logins, etc.)
     const failedLogins = await db.collection("login_attempts")
-      .countDocuments({ 
-        success: false, 
-        createdAt: { $gte: last24Hours } 
+      .countDocuments({
+        success: false,
+        createdAt: { $gte: last24Hours }
       })
+
+    // Check for pending marketplace listing requests
+    const pendingListingRequests = await db.collection("listing_requests")
+      .countDocuments({ status: "pending" })
+
+    // Check for a spike in failed marketplace/order payments
+    const failedPayments = await db.collection("orders")
+      .countDocuments({ paymentStatus: "failed", updatedAt: { $gte: last24Hours } })
 
     const notifications = []
 
@@ -1229,6 +1253,28 @@ export async function generateSystemNotifications() {
       })
     }
 
+    if (pendingListingRequests > 5) {
+      notifications.push({
+        title: "High Pending Listing Requests",
+        message: `${pendingListingRequests} marketplace listing requests are pending review`,
+        type: "system",
+        priority: "high",
+        role: "superadmin",
+        actionUrl: "/marketplace/requests"
+      })
+    }
+
+    if (failedPayments > 5) {
+      notifications.push({
+        title: "Payment Failure Spike",
+        message: `${failedPayments} order payments failed in the last 24 hours`,
+        type: "system",
+        priority: "high",
+        role: "superadmin",
+        actionUrl: "/superadmin/analytics"
+      })
+    }
+
     // Insert notifications — only if not already created today
     if (notifications.length > 0) {
       const startOfDay = new Date(now)
@@ -1259,6 +1305,30 @@ export async function generateSystemNotifications() {
   }
 }
 
+/**
+ * Called from a cron route's catch block, not a superadmin session - so this
+ * can't gate on requireSuperAdmin the way the rest of this file does.
+ */
+export async function notifyCronFailure(jobName: string, error: unknown) {
+  try {
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+    await db.collection("notifications").insertOne({
+      title: "Scheduled job failed",
+      message: `${jobName} failed to run: ${error instanceof Error ? error.message : String(error)}`,
+      type: "system",
+      priority: "high",
+      role: "superadmin",
+      read: false,
+      deletedBy: [],
+      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      createdAt: new Date(),
+    })
+  } catch (notifyError) {
+    console.error("Failed to insert cron-failure notification:", notifyError)
+  }
+}
+
 // Get system settings
 export async function getSystemSettings() {
   try {
@@ -1272,7 +1342,7 @@ export async function getSystemSettings() {
     if (!settings) {
       const defaultSettings = {
         _id: "global",
-        siteName: "NTDM Animal Hospital",
+        siteName: "NTDM Vettrack",
         siteEmail: "admin@ntdm.com",
         siteDescription: "Professional veterinary services for animal health and care",
         autoApproveUsers: true,
@@ -1504,17 +1574,17 @@ export async function getUserRegistrationTrend(days = 30) {
     ]).toArray()
 
     // Build a zero-filled day-by-day series so the chart doesn't skip empty days
-    const byDate: Record<string, { date: string; farmer: number; doctor: number; admin: number; superadmin: number; total: number }> = {}
+    const byDate: Record<string, { date: string; farmer: number; doctor: number; admin: number; superadmin: number; marketplace_admin: number; finance_manager: number; total: number }> = {}
     for (let i = 0; i < days; i++) {
       const d = new Date(start)
       d.setUTCDate(d.getUTCDate() + i)
       const key = d.toISOString().slice(0, 10)
-      byDate[key] = { date: key, farmer: 0, doctor: 0, admin: 0, superadmin: 0, total: 0 }
+      byDate[key] = { date: key, farmer: 0, doctor: 0, admin: 0, superadmin: 0, marketplace_admin: 0, finance_manager: 0, total: 0 }
     }
 
     for (const row of rows) {
       const key = row._id.date
-      const role = row._id.role as "farmer" | "doctor" | "admin" | "superadmin"
+      const role = row._id.role as "farmer" | "doctor" | "admin" | "superadmin" | "marketplace_admin" | "finance_manager"
       if (byDate[key] && role in byDate[key]) {
         byDate[key][role] += row.count
         byDate[key].total += row.count
@@ -1832,12 +1902,14 @@ export async function getNotifications(userId: string) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    // Get system notifications and user-specific notifications
+    // Get notifications addressed to this user or explicitly tagged for superadmin.
+    // NOTE: deliberately does NOT match on `type: "system"` alone - sendBulkNotification
+    // sends per-user broadcasts (to farmers/vets) whose `type` can be "system" too, and
+    // matching on type would leak those into every superadmin's inbox.
     const notifications = await db.collection("notifications")
       .find({
         $or: [
           { userId: new ObjectId(userId) },
-          { type: "system" },
           { role: "superadmin" }
         ]
       })
@@ -1888,10 +1960,9 @@ export async function markAllNotificationsRead(userId: string) {
     const db = client.db("ntdm_animal_hospital")
 
     await db.collection("notifications").updateMany(
-      { 
+      {
         $or: [
           { userId: new ObjectId(userId) },
-          { type: "system" },
           { role: "superadmin" }
         ],
         read: false

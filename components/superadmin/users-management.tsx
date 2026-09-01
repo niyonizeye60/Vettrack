@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import { 
   Search, 
   MoreHorizontal, 
@@ -64,8 +65,16 @@ import { registerUser } from "@/lib/actions/auth"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import type { Role } from "@/lib/roles"
+import { MARKETPLACE_CATEGORIES, type MarketplaceCategory } from "@/lib/marketplace-access"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
+
+const MARKETPLACE_CATEGORY_LABEL_KEY: Record<MarketplaceCategory, string> = {
+  sales: "content.animalSales",
+  drugs: "content.pharmacy",
+  feeds: "content.feeds",
+}
 
 // Some legacy/seeded user documents may lack createdAt (or hold a malformed
 // value) - date-fns' format() throws on an Invalid Date, which would crash
@@ -92,6 +101,7 @@ interface User {
   licenseNumber?: string | null
   specialization?: string | null
   isTestAccount?: boolean
+  marketplaceAccess?: string[] | null
 }
 
 interface UsersManagementProps {
@@ -117,11 +127,12 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
     email: "",
     password: "",
     phone: "",
-    role: "farmer" as "farmer" | "doctor" | "admin" | "superadmin",
+    role: "farmer" as Role,
     licenseNumber: "",
     specialization: "",
     district: "",
-    sector: ""
+    sector: "",
+    marketplaceAccess: [] as MarketplaceCategory[]
   })
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid')
   const [roleFilter, setRoleFilter] = useState<string>('all')
@@ -222,6 +233,12 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (createUserData.role === "marketplace_admin" && createUserData.marketplaceAccess.length === 0) {
+      toast({ title: "Error", description: t('superadmin.marketplaceAccessRequired'), variant: "destructive" })
+      return
+    }
+
     setIsUpdating(true)
     try {
       const formData = new FormData()
@@ -238,6 +255,10 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
         formData.append("specialization", createUserData.specialization)
       }
 
+      if (createUserData.role === "marketplace_admin") {
+        createUserData.marketplaceAccess.forEach((category) => formData.append("marketplaceAccess", category))
+      }
+
       const result = await registerUser(formData)
       if (result.success) {
         setIsCreateDialogOpen(false)
@@ -250,7 +271,8 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
           licenseNumber: "",
           specialization: "",
           district: "",
-          sector: ""
+          sector: "",
+          marketplaceAccess: []
         })
         toast({ title: "User created", description: "The new user account has been created." })
         router.refresh()
@@ -288,6 +310,10 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
         return "bg-purple-100 text-purple-800"
       case "admin":
         return "bg-blue-100 text-blue-800"
+      case "marketplace_admin":
+        return "bg-amber-100 text-amber-800"
+      case "finance_manager":
+        return "bg-teal-100 text-teal-800"
       case "doctor":
         return "bg-green-100 text-green-800"
       case "farmer":
@@ -308,6 +334,8 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
       case 'doctor': return t('superadmin.veterinarian')
       case 'admin': return t('superadmin.admin')
       case 'superadmin': return t('superadmin.superAdmin')
+      case 'marketplace_admin': return t('superadmin.marketplaceAdmin')
+      case 'finance_manager': return t('superadmin.financeManager')
       default: return role
     }
   }
@@ -634,6 +662,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                             <DropdownMenuItem
                               onClick={() => {
                                 setSelectedUser(user)
+                                setEditRole(user.role)
                                 setIsEditDialogOpen(true)
                               }}
                             >
@@ -765,6 +794,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                       <SelectItem value="doctor">{t('superadmin.veterinarian')}</SelectItem>
                       <SelectItem value="admin">{t('superadmin.admin')}</SelectItem>
                       <SelectItem value="superadmin">{t('superadmin.superAdmin')}</SelectItem>
+                      <SelectItem value="marketplace_admin">{t('superadmin.marketplaceAdmin')}</SelectItem>
                     </SelectContent>
                   </Select>
                   {selectedUser._id === currentUserId && (
@@ -786,6 +816,27 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                     defaultChecked={selectedUser.isTestAccount || false}
                   />
                 </div>
+                {editRole === "marketplace_admin" && (
+                  <div>
+                    <Label>{t('superadmin.marketplaceAccess')}</Label>
+                    <p className="text-xs text-gray-500 mb-2">{t('superadmin.marketplaceAccessDesc')}</p>
+                    <div className="space-y-2">
+                      {MARKETPLACE_CATEGORIES.map((category) => (
+                        <div key={category} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-marketplace-access-${category}`}
+                            name="marketplaceAccess"
+                            value={category}
+                            defaultChecked={selectedUser.marketplaceAccess?.includes(category) || false}
+                          />
+                          <Label htmlFor={`edit-marketplace-access-${category}`} className="font-normal">
+                            {t(MARKETPLACE_CATEGORY_LABEL_KEY[category])}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {(editRole === "farmer" || editRole === "doctor") && (
                   <>
                     <div>
@@ -1053,6 +1104,14 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                     <RadioGroupItem value="superadmin" id="create-superadmin" />
                     <Label htmlFor="create-superadmin">{t('superadmin.superAdministrator')}</Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="marketplace_admin" id="create-marketplace-admin" />
+                    <Label htmlFor="create-marketplace-admin">{t('superadmin.marketplaceAdmin')}</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="finance_manager" id="create-finance-manager" />
+                    <Label htmlFor="create-finance-manager">{t('superadmin.financeManager')}</Label>
+                  </div>
                 </RadioGroup>
               </div>
               
@@ -1080,7 +1139,35 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                   </div>
                 </>
               )}
-              
+
+              {createUserData.role === "marketplace_admin" && (
+                <div>
+                  <Label>{t('superadmin.marketplaceAccess')}</Label>
+                  <p className="text-xs text-gray-500 mb-2">{t('superadmin.marketplaceAccessDesc')}</p>
+                  <div className="space-y-2">
+                    {MARKETPLACE_CATEGORIES.map((category) => (
+                      <div key={category} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`create-marketplace-access-${category}`}
+                          checked={createUserData.marketplaceAccess.includes(category)}
+                          onCheckedChange={(checked) =>
+                            setCreateUserData((prev) => ({
+                              ...prev,
+                              marketplaceAccess: checked
+                                ? [...prev.marketplaceAccess, category]
+                                : prev.marketplaceAccess.filter((c) => c !== category)
+                            }))
+                          }
+                        />
+                        <Label htmlFor={`create-marketplace-access-${category}`} className="font-normal">
+                          {t(MARKETPLACE_CATEGORY_LABEL_KEY[category])}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(createUserData.role === "farmer" || createUserData.role === "doctor") && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1122,7 +1209,8 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                     licenseNumber: "",
                     specialization: "",
                     district: "",
-                    sector: ""
+                    sector: "",
+                    marketplaceAccess: []
                   })
                 }}
                 className="w-full sm:w-auto"

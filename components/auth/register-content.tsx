@@ -11,7 +11,7 @@ export default function RegisterContent() {
     <div className="min-h-screen flex pt-20">
       <div className="hidden lg:block lg:w-1/2 relative">
         <Image
-          src="https://images.unsplash.com/photo-1605152276897-4f618f831968?w=1200&h=1600&fit=crop&crop=focalpoint&auto=format&q=80"
+          src="https://images.unsplash.com/photo-1760895071337-4aac90164c56?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDI1fHx8ZW58MHx8fHx8"
           alt="Veterinarian with animals"
           fill
           className="object-cover"

@@ -116,6 +116,19 @@ export async function POST(request: NextRequest) {
       createdAt: now,
     })
 
+    await db.collection("notifications").insertOne({
+      title: "New support ticket",
+      message: `${currentUser.name} opened: ${trimmedSubject}`,
+      type: "support_ticket",
+      priority: "normal",
+      role: "superadmin",
+      read: false,
+      deletedBy: [],
+      actionUrl: `/superadmin/support?ticketId=${result.insertedId.toString()}`,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      createdAt: now,
+    }).catch((err) => console.error("Error inserting new-ticket notification:", err))
+
     await logActivity(currentUser._id, "support.ticket_created", trimmedSubject)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch (error) {

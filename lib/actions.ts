@@ -900,60 +900,12 @@ export async function deleteConsultation(id: string, farmerId?: string) {
     return { success: false, error: "Failed to delete consultation" };
   }
 }
-export async function getUserConfig() {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return { success: false, error: "Unauthorized" }
-    }
+// getUserConfig/saveUserConfig lived here and read/wrote a `userConfigs` collection.
+// They were superseded by app/api/tracking-config, which stores the same ThingSpeak
+// device settings in `trackingConfigs` keyed on userId + role and is what the four
+// live tracking routes actually call. Nothing referenced the pair and nothing else
+// touched `userConfigs`, so they were removed rather than repaired.
 
-    const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital")
-
-    const config = await db.collection("userConfigs").findOne({ userId: user._id })
-    return { success: true, config }
-  } catch (error) {
-    console.error("Error fetching user config:", error)
-    return { success: false, error: "Failed to fetch user config" }
-  }
-}
-
-export async function saveUserConfig(deviceId: string, apiKey: string, results: number) {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return { success: false, error: "Unauthorized" }
-    }
-
-    const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital")
-
-    const updated = await db.collection("userConfigs").findOneAndUpdate(
-      { userId: user._id },
-      {
-        $set: {
-          userId: user._id,
-          deviceId,
-          apiKey,
-          results,
-          updatedAt: new Date(),
-        },
-        $setOnInsert: { createdAt: new Date() },
-      },
-      { upsert: true, returnDocument: "after" }
-    );
-
-    if (!updated || !updated.value) {
-      return { success: false, error: "Failed to save user config" };
-    }
-
-    return { success: true, config: updated.value };
-
-  } catch (error) {
-    console.error("Error saving user config:", error)
-    return { success: false, error: "Failed to save user config" }
-  }
-}
 // Logs a client-generated export (PDF/Excel/CSV built in-browser, no server round-trip
 // for the file itself) against whoever the session cookie says is currently logged in -
 // never trust a client-supplied userId for an audit-log entry.

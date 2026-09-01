@@ -30,7 +30,7 @@ export default function HeroSection() {
 
       <div className="container-custom relative z-10">
         <div className="max-w-2xl text-white">
-          <h1 className="text-5xl md:text-4xl lg:text-5xl font-extrabold mb-6 leading-tight">
+          <h1 className="text-5xl md:text-4xl lg:text-4xl font-extrabold mb-6 leading-tight">
             {t('home.hero.titleStart')}{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
               {t('home.hero.titleEnd')}

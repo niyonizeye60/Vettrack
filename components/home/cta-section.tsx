@@ -19,7 +19,7 @@ export default function CTASection() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           {[
-            { name: "Nyagatare Main Hospital", address: "EN 32 Ave street, Nyagatare City", phone: "+250 78 072 1800" },
+            { name: "Nyagatare HQ", address: "EN 32 Ave street, Nyagatare City", phone: "+250 78 072 1800" },
             { name: "Kigali Branch", address: "45 Veterinary Street, Kigali", phone: "+250 78 051 9960" },
             { name: "Kayonza Branch", address: "78 Livestock Avenue, Kayonza", phone: "+250 78 072 1800" },
           ].map((location, index) => (

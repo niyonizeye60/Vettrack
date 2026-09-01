@@ -40,3 +40,6 @@ SUPERADMIN_SETUP.md
 
 # temporary scratch repo used for parsing Rwanda geo data
 /tmp-rwanda-repo/
+
+# listing photos uploaded in local development (production uses Vercel Blob)
+/public/listings/

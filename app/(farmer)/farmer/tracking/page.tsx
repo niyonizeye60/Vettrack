@@ -289,30 +289,11 @@ export default function PetTrackingPage() {
       const jsPDF = (await import('jspdf')).default
       const doc = new jsPDF()
 
-      // Logo (if available)
-      try {
-        const logoImg = new Image()
-        logoImg.crossOrigin = 'anonymous'
-        logoImg.src = '/logo/Vet print.png'
-        await new Promise((resolve, reject) => {
-          logoImg.onload = resolve
-          logoImg.onerror = reject
-        })
-        doc.addImage(logoImg, 'PNG', 15, 8, 35, 24)
-      } catch (error) {
-        console.log('Logo not loaded:', error)
-      }
-
       // Header text
       doc.setTextColor(17, 24, 39) // gray-900
       doc.setFontSize(18)
       doc.setFont('helvetica', 'bold')
-      doc.text(t('farmer.animalHealthMonitoringReport'), 52, 20)
-
-      doc.setTextColor(75, 85, 99) // gray-600
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'normal')
-      doc.text('Vettrack', 52, 28)
+      doc.text(t('farmer.animalHealthMonitoringReport'), 15, 20)
 
       // Divider under header
       doc.setDrawColor(226, 232, 240)
@@ -415,7 +396,7 @@ export default function PetTrackingPage() {
       );
 
       doc.text(
-        `© ${new Date().getFullYear()} Vettrack. All rights reserved.`,
+        `© ${new Date().getFullYear()} NTDM Vettrack. All rights reserved`,
         centerX,
         baseY + lineHeight * 4,
         { align: 'center' }

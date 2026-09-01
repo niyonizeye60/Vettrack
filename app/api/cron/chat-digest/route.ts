@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import { sendMissedMessageDigests } from "@/lib/actions/chat-digest"
+import { notifyCronFailure } from "@/lib/actions/superadmin"
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization")
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error("Error running chat digest cron:", error)
+    await notifyCronFailure("chat-digest", error)
     return NextResponse.json({ error: "Failed to run chat digest" }, { status: 500 })
   }
 }

@@ -11,15 +11,18 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp } from "lucide-react"
+import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
-interface Animal { _id: string; name: string; type: string }
+interface Animal { _id: string; name: string; type: string; status?: string }
 interface Calf {
   _id: string; farmerId: string; name: string; motherAnimalId: string | null; motherName: string | null
   gender: "male" | "female"; breed: string | null; birthDate: string; birthWeight: number | null
-  status: "active" | "weaned" | "sold" | "deceased"; notes: string | null
+  status: "active" | "weaned" | "sold" | "deceased" | "graduated"; notes: string | null
+  /** Set once the calf has been promoted into the animals herd. */
+  graduatedToAnimalId?: string | null
 }
 interface WeightRecord {
   _id: string; farmerId: string; calfId: string; calfName: string | null; weight: number; date: string; notes: string | null
@@ -40,6 +43,13 @@ function formatAge(birthDate: string, t: (k: string) => string) {
   return `${Math.floor(days / 30)} ${t('farmer.months')}`
 }
 
+function animalStatusText(status: string | undefined, t: (k: string) => string) {
+  if (status === "Sick") return t('farmer.sick')
+  if (status === "Under Treatment") return t('farmer.underTreatment')
+  if (status === "Deceased") return t('farmer.deceased')
+  return t('farmer.healthy')
+}
+
 export default function CalvesPage() {
   const { t } = useLanguage()
   const [user, setUser] = useState<any>(null)
@@ -50,10 +60,24 @@ export default function CalvesPage() {
   const [calves, setCalves] = useState<Calf[]>([])
   const [weights, setWeights] = useState<WeightRecord[]>([])
   const [expenses, setExpenses] = useState<CalfExpense[]>([])
+  const [homeConsumptionBalance, setHomeConsumptionBalance] = useState(0)
 
   // Calf form
   const [editCalf, setEditCalf] = useState<Calf | null>(null)
   const [deleteCalfId, setDeleteCalfId] = useState<string | null>(null)
+
+  // Graduate-to-animals flow
+  const [graduateCalf, setGraduateCalf] = useState<Calf | null>(null)
+  const [graduating, setGraduating] = useState(false)
+  const [gradError, setGradError] = useState("")
+  const [gradResult, setGradResult] = useState<{ name: string; moved: number } | null>(null)
+  const [gradType, setGradType] = useState("cow")
+  const [gradClass, setGradClass] = useState("dairy")
+  const [gradBreed, setGradBreed] = useState("")
+  const [gradEarTag, setGradEarTag] = useState("")
+  const [gradInsurance, setGradInsurance] = useState("")
+  const [gradWeight, setGradWeight] = useState("")
+  const [gradPrice, setGradPrice] = useState("")
   const [calfName, setCalfName] = useState("")
   const [motherAnimalId, setMotherAnimalId] = useState("")
   const [gender, setGender] = useState("")
@@ -99,6 +123,7 @@ export default function CalvesPage() {
         fetchCalves(userData._id.toString()),
         fetchWeights(userData._id.toString()),
         fetchExpenses(userData._id.toString()),
+        fetchHomeConsumptionBalance(userData._id.toString()),
       ])
       setLoading(false)
     }
@@ -119,6 +144,11 @@ export default function CalvesPage() {
     const res = await fetch(`/api/calf-expenses?farmerId=${farmerId}`)
     const data = await res.json()
     setExpenses(Array.isArray(data) ? data : [])
+  }
+  const fetchHomeConsumptionBalance = async (farmerId: string) => {
+    const res = await fetch(`/api/milk/home-consumption?farmerId=${farmerId}`)
+    const data = await res.json()
+    setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
 
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
@@ -166,8 +196,53 @@ export default function CalvesPage() {
 
   const handleCalfDelete = async (id: string) => {
     await fetch(`/api/calves?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchCalves(user._id.toString()), fetchWeights(user._id.toString()), fetchExpenses(user._id.toString())])
+    await Promise.all([fetchCalves(user._id.toString()), fetchWeights(user._id.toString()), fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     setDeleteCalfId(null)
+  }
+
+  // ---- Graduate a calf into the animals herd ----
+  const openGraduate = (c: Calf) => {
+    setGraduateCalf(c)
+    setGradType("cow")
+    setGradClass("dairy")
+    setGradBreed(c.breed || "")
+    setGradEarTag(""); setGradInsurance(""); setGradWeight(""); setGradPrice("")
+    setGradError("")
+  }
+
+  const handleGraduate = async () => {
+    if (!graduateCalf) return
+    setGraduating(true)
+    setGradError("")
+    try {
+      const res = await fetch("/api/calves/graduate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          farmerId: user._id.toString(),
+          calfId: graduateCalf._id,
+          type: gradType,
+          animalClass: gradClass,
+          breed: gradBreed,
+          earTagId: gradEarTag,
+          insuranceId: gradInsurance,
+          weight: gradWeight,
+          price: gradPrice,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setGradError(data?.error || "Failed to move calf to animals")
+        return
+      }
+      setGradResult({ name: graduateCalf.name, moved: data.vaccinationRecordsMoved || 0 })
+      setGraduateCalf(null)
+      await fetchCalves(user._id.toString())
+    } catch {
+      setGradError("Failed to move calf to animals")
+    } finally {
+      setGraduating(false)
+    }
   }
 
   // ---- Weight CRUD ----
@@ -225,11 +300,19 @@ export default function CalvesPage() {
     setExpDate(today); setExpNotes(""); setExpErrors({}); setEditExpense(null)
   }
 
+  // When editing an existing milk entry, its own liters are already subtracted out of
+  // homeConsumptionBalance - add them back so the farmer can keep the same value.
+  const availableHomeConsumptionForForm = homeConsumptionBalance + (editExpense?.expenseType === "milk" ? (editExpense.milkLiters || 0) : 0)
+
   const validateExpense = () => {
     const e: Record<string, string> = {}
     if (!expCalfId) e.expCalfId = "Select a calf"
     if (!amount || Number(amount) <= 0) e.amount = "Enter a valid amount"
     if (!expDate) e.expDate = "Select a date"
+    if (expenseType === "milk") {
+      if (!milkLiters || Number(milkLiters) <= 0) e.milkLiters = "Enter how many liters the calf consumed"
+      else if (Number(milkLiters) > availableHomeConsumptionForForm) e.milkLiters = `Only ${availableHomeConsumptionForForm.toFixed(1)}L of home consumption milk is available`
+    }
     setExpErrors(e)
     return Object.keys(e).length === 0
   }
@@ -240,13 +323,18 @@ export default function CalvesPage() {
     const calf = calves.find(c => c._id === expCalfId)
     const body = { farmerId: user._id.toString(), calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }
 
-    if (editExpense) {
-      await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }) })
-    } else {
-      await fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = editExpense
+      ? await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }) })
+      : await fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({ error: "Failed to save expense" }))
+      setExpErrors({ [expenseType === "milk" ? "milkLiters" : "amount"]: error })
+      setSaving(false)
+      return
     }
 
-    await fetchExpenses(user._id.toString())
+    await Promise.all([fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     resetExpenseForm()
     setSaving(false)
   }
@@ -255,11 +343,12 @@ export default function CalvesPage() {
     setEditExpense(e); setExpCalfId(e.calfId); setExpenseType(e.expenseType)
     setMilkLiters(e.milkLiters ? String(e.milkLiters) : ""); setDescription(e.description || "")
     setAmount(String(e.amount)); setExpDate(e.date); setExpNotes(e.notes || "")
+    setExpErrors({})
   }
 
   const handleExpenseDelete = async (id: string) => {
     await fetch(`/api/calf-expenses?id=${id}`, { method: "DELETE" })
-    await fetchExpenses(user._id.toString())
+    await Promise.all([fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     setDeleteExpenseId(null)
   }
 
@@ -270,8 +359,8 @@ export default function CalvesPage() {
     return filtered
   }, [expenses, filterExpCalf, filterExpType])
 
-  const statusLabel = (s: string) => s === "active" ? t('farmer.active') : s === "weaned" ? t('farmer.weaned') : s === "sold" ? t('farmer.calfSold') : t('farmer.deceased')
-  const statusColor = (s: string) => s === "active" ? "bg-green-50 text-green-700 border-green-200" : s === "weaned" ? "bg-blue-50 text-blue-700 border-blue-200" : s === "sold" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-gray-50 text-gray-500 border-gray-200"
+  const statusLabel = (s: string) => s === "active" ? t('farmer.active') : s === "weaned" ? t('farmer.weaned') : s === "sold" ? t('farmer.calfSold') : s === "graduated" ? t('farmer.graduated') : t('farmer.deceased')
+  const statusColor = (s: string) => s === "active" ? "bg-green-50 text-green-700 border-green-200" : s === "weaned" ? "bg-blue-50 text-blue-700 border-blue-200" : s === "sold" ? "bg-amber-50 text-amber-700 border-amber-200" : s === "graduated" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-gray-50 text-gray-500 border-gray-200"
   const typeLabel = (ty: string) => ty === "milk" ? t('farmer.milk') : ty === "feed" ? t('farmer.feed') : ty === "veterinary" ? t('farmer.veterinary') : t('farmer.other')
   const typeColor = (ty: string) => ty === "milk" ? "bg-sky-50 text-sky-700 border-sky-200" : ty === "feed" ? "bg-orange-50 text-orange-700 border-orange-200" : ty === "veterinary" ? "bg-red-50 text-red-700 border-red-200" : "bg-gray-50 text-gray-600 border-gray-200"
 
@@ -281,8 +370,8 @@ export default function CalvesPage() {
         <div className="h-7 bg-gray-200 rounded w-40" />
         <div className="h-4 bg-gray-200 rounded w-64 mt-2" />
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[1, 2, 3, 4].map(i => (
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 space-y-3">
             <div className="h-4 bg-gray-200 rounded w-20" />
             <div className="h-8 bg-gray-200 rounded w-16" />
@@ -303,7 +392,7 @@ export default function CalvesPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-start justify-between">
@@ -329,6 +418,16 @@ export default function CalvesPage() {
               <Milk className="h-5 w-5 text-gray-400 flex-shrink-0" />
             </div>
             <h3 className="text-2xl font-bold text-sky-600 mt-2">{totalMilkGiven.toFixed(1)} L</h3>
+          </CardContent>
+        </Card>
+        <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between">
+              <p className="text-sm text-gray-500 font-medium">{t('farmer.homeConsumptionMilk')}</p>
+              <Milk className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            </div>
+            <h3 className="text-2xl font-bold text-orange-600 mt-2">{homeConsumptionBalance.toFixed(1)} L</h3>
+            <p className="text-xs text-gray-400 mt-1">{t('farmer.availableForCalves')}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
@@ -372,7 +471,12 @@ export default function CalvesPage() {
                     <SelectTrigger><SelectValue placeholder={t('farmer.selectMotherOptional')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">{t('common.optional')}</SelectItem>
-                      {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
+                      {animals.map(a => (
+                        <SelectItem key={a._id} value={a._id}>
+                          {a.name} ({a.type})
+                          <span className={a.status === "Deceased" ? "text-red-500" : "text-gray-400"}> — {animalStatusText(a.status, t)}</span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -466,6 +570,17 @@ export default function CalvesPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            {/* Only a calf still on the farm can grow into an animal. */}
+                            {(c.status === "active" || c.status === "weaned") && !c.graduatedToAnimalId && (
+                              <Button
+                                size="sm" variant="ghost"
+                                onClick={() => openGraduate(c)}
+                                className="h-8 w-8 p-0 hover:bg-purple-50"
+                                title={t('farmer.graduateToAnimals')}
+                              >
+                                <ArrowUpCircle className="h-3.5 w-3.5 text-purple-600" />
+                              </Button>
+                            )}
                             <Button size="sm" variant="ghost" onClick={() => handleCalfEdit(c)} className="h-8 w-8 p-0 hover:bg-green-50">
                               <Pencil className="h-3.5 w-3.5 text-green-600" />
                             </Button>
@@ -652,8 +767,13 @@ export default function CalvesPage() {
 
                     {expenseType === "milk" && (
                       <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-700">{t('farmer.milkLitersGiven')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                        <Input type="number" min="0" step="0.1" placeholder="e.g. 3" value={milkLiters} onChange={e => setMilkLiters(e.target.value)} />
+                        <label className="text-sm font-medium text-gray-700">{t('farmer.milkLitersGiven')} *</label>
+                        <Input type="number" min="0" step="0.1" max={availableHomeConsumptionForForm} placeholder="e.g. 3" value={milkLiters} onChange={e => setMilkLiters(e.target.value)} className={expErrors.milkLiters ? "border-red-500" : ""} />
+                        {expErrors.milkLiters ? (
+                          <p className="text-xs text-red-500">{expErrors.milkLiters}</p>
+                        ) : (
+                          <p className="text-xs text-gray-400">{t('farmer.homeConsumptionAvailable')}: {availableHomeConsumptionForForm.toFixed(1)}L</p>
+                        )}
                       </div>
                     )}
 
@@ -767,6 +887,102 @@ export default function CalvesPage() {
       </Tabs>
 
       {/* Delete dialogs */}
+      {/* Graduate to animals */}
+      <Dialog open={!!graduateCalf} onOpenChange={open => { if (!open) { setGraduateCalf(null); setGradError("") } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowUpCircle className="h-5 w-5 text-purple-600" />
+              {t('farmer.graduateToAnimals')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="p-3 bg-purple-50 rounded-xl border border-purple-100 text-sm text-purple-900">
+              <p>
+                <strong>{graduateCalf?.name}</strong> {t('farmer.graduateExplain')}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.animalType')} *</label>
+                <Select value={gradType} onValueChange={setGradType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cow">{t('farmer.cow')}</SelectItem>
+                    <SelectItem value="goat">{t('farmer.goat')}</SelectItem>
+                    <SelectItem value="sheep">{t('farmer.sheep')}</SelectItem>
+                    <SelectItem value="other">{t('farmer.other')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.class')}</label>
+                <Select value={gradClass} onValueChange={setGradClass}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dairy">{t('farmer.diary')}</SelectItem>
+                    <SelectItem value="meat">{t('farmer.meat')}</SelectItem>
+                    <SelectItem value="other">{t('farmer.other')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.breed')}</label>
+                <Input value={gradBreed} onChange={e => setGradBreed(e.target.value)} placeholder="e.g. Friesian" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')}</label>
+                <Input value={gradEarTag} onChange={e => setGradEarTag(e.target.value)} placeholder="e.g. RW-00125" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')}</label>
+                <Input value={gradInsurance} onChange={e => setGradInsurance(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.weight')} (kg)</label>
+                <Input type="number" min="0" step="0.1" value={gradWeight} onChange={e => setGradWeight(e.target.value)} />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.estimatedValue')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input type="number" min="0" value={gradPrice} onChange={e => setGradPrice(e.target.value)} placeholder="RWF" />
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500">{t('farmer.graduateKeepsRearing')}</p>
+            {gradError && <p className="text-sm text-red-600">{gradError}</p>}
+
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => setGraduateCalf(null)} className="rounded-lg">{t('farmer.cancel')}</Button>
+              <Button onClick={handleGraduate} disabled={graduating} className="rounded-lg bg-purple-600 hover:bg-purple-700 text-white">
+                {graduating ? t('farmer.savingRecord') : t('farmer.moveToAnimals')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Graduation result */}
+      <AlertDialog open={!!gradResult} onOpenChange={open => !open && setGradResult(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              {t('farmer.graduateDone')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{gradResult?.name}</strong> {t('farmer.graduateDoneDesc')}
+              {gradResult && gradResult.moved > 0
+                ? ` ${gradResult.moved} ${t('farmer.graduateRecordsMoved')}`
+                : ` ${t('farmer.graduateNoRecords')}`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setGradResult(null)}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!deleteCalfId} onOpenChange={open => !open && setDeleteCalfId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

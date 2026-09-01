@@ -4,8 +4,8 @@ import BlogBanner from "@/components/blog/blog-banner"
 import { getPublishedBlogPosts } from "@/lib/actions/blog"
 
 export const metadata: Metadata = {
-  title: "Blog - NTDM Animal Hospital",
-  description: "Read the latest articles on animal health, tracking, and care from NTDM Animal Hospital experts.",
+  title: "Blog - NTDM Vettrack",
+  description: "Read the latest articles on animal health, tracking, and care from NTDM Vettrack experts.",
 }
 
 export const dynamic = 'force-dynamic'

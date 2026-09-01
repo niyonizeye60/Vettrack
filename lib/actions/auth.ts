@@ -6,6 +6,8 @@ import { sendWelcomeEmail } from "../email" // Import the email function
 import { hashPassword, verifyPassword, isHashedPassword } from "../password"
 import { logActivity, logSystemError } from "../activity-log"
 import { checkRateLimit, getRateLimitKey } from "../rate-limit"
+import { isRole, isPrivilegedRole, homePathForRole } from "../roles"
+import { normalizeMarketplaceAccess } from "../marketplace-access"
 
 // Ensured once per warm process, not on every registration - createIndex is a
 // no-op after the first call, but there's no need to pay even that round trip
@@ -60,7 +62,7 @@ export async function registerUser(formData: FormData) {
     await ensureUsersEmailIndex(db)
 
     const roleInput = formData.get("role")
-    if (roleInput !== "farmer" && roleInput !== "doctor" && roleInput !== "admin" && roleInput !== "superadmin") {
+    if (!isRole(roleInput)) {
       return { success: false, message: "Invalid account type" }
     }
     const role = roleInput
@@ -68,7 +70,7 @@ export async function registerUser(formData: FormData) {
     // This action is reachable directly (it's a server action, not gated by
     // any UI), so admin/superadmin can only be created by an already
     // authenticated superadmin - never trust the client for privileged roles.
-    if (role === "admin" || role === "superadmin") {
+    if (isPrivilegedRole(role)) {
       const currentUser = await getCurrentUser()
       if (!currentUser || currentUser.role !== "superadmin") {
         return { success: false, message: "Not authorized to create this account type" }
@@ -107,6 +109,9 @@ export async function registerUser(formData: FormData) {
         consultations: [],
       })
     } else if (role === "farmer") {
+      // Farmer accounts also require admin verification before they can log
+      // in - see loginUser's status check below.
+      userData.status = "pending_verification"
       Object.assign(userData, {
         district: formData.get("district"),
         sector: formData.get("sector"),
@@ -117,6 +122,12 @@ export async function registerUser(formData: FormData) {
         permissions: ["manage_users", "view_consultations", "manage_system"],
         lastLoginAt: null,
       })
+    } else if (role === "marketplace_admin") {
+      const marketplaceAccess = normalizeMarketplaceAccess(formData.getAll("marketplaceAccess"))
+      if (marketplaceAccess.length === 0) {
+        return { success: false, message: "Select at least one marketplace this account can access" }
+      }
+      Object.assign(userData, { marketplaceAccess })
     }
 
     // Check if email already exists
@@ -136,6 +147,24 @@ export async function registerUser(formData: FormData) {
         return { success: false, message: "Email already in use" }
       }
       throw insertError
+    }
+
+    // Privileged accounts can only be created by an already-authenticated
+    // superadmin (checked above) - still worth an audit trail of who was granted
+    // elevated access and when.
+    if (isPrivilegedRole(role)) {
+      await db.collection("notifications").insertOne({
+        title: "Privileged account created",
+        message: `A new ${role} account was created for ${userData.email}.`,
+        type: "system",
+        priority: "high",
+        role: "superadmin",
+        read: false,
+        deletedBy: [],
+        actionUrl: "/superadmin/users",
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      }).catch((err) => console.error("Failed to insert privileged-account notification:", err))
     }
 
     // Send welcome email after successful registration
@@ -161,6 +190,8 @@ export async function registerUser(formData: FormData) {
       success: true,
       message: role === "doctor"
         ? "Application submitted! Your veterinarian account is pending verification by an Extension Officer - we'll notify you by email once it's approved."
+        : role === "farmer"
+        ? "Application submitted! Your farmer account is pending verification by an Administrator - we'll notify you by email once it's approved."
         : "User registered successfully! Welcome email sent to your inbox.",
       userId: result.insertedId.toString(),
     }
@@ -201,6 +232,17 @@ export async function loginUser(formData: FormData) {
       createdAt: { $gt: new Date(Date.now() - LOGIN_LOCKOUT_WINDOW_MS) },
     })
     if (recentFailures >= LOGIN_LOCKOUT_THRESHOLD) {
+      await db.collection("notifications").insertOne({
+        title: "Account locked out",
+        message: `${email} was locked out after ${recentFailures} failed login attempts.`,
+        type: "security",
+        priority: "high",
+        role: "superadmin",
+        read: false,
+        deletedBy: [],
+        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      }).catch((err) => console.error("Failed to insert lockout notification:", err))
       return { success: false, message: "Too many failed login attempts. Please try again in 15 minutes." }
     }
 
@@ -243,14 +285,24 @@ export async function loginUser(formData: FormData) {
       await db.collection("login_attempts").insertOne({
         email, success: false, reason: "pending_verification", createdAt: new Date(),
       })
-      return { success: false, message: "Your veterinarian account is pending verification by an Extension Officer. You'll be notified once it's approved." }
+      return {
+        success: false,
+        message: user.role === "doctor"
+          ? "Your veterinarian account is pending verification by an Extension Officer. You'll be notified once it's approved."
+          : "Your farmer account is pending verification by an Administrator. You'll be notified once it's approved.",
+      }
     }
 
     if (user.status === "rejected") {
       await db.collection("login_attempts").insertOne({
         email, success: false, reason: "application_rejected", createdAt: new Date(),
       })
-      return { success: false, message: "Your veterinarian account application was not approved. Please contact the administrator for details." }
+      return {
+        success: false,
+        message: user.role === "doctor"
+          ? "Your veterinarian account application was not approved. Please contact the administrator for details."
+          : "Your farmer account application was not approved. Please contact the administrator for details.",
+      }
     }
 
     // Set a session cookie
@@ -299,10 +351,7 @@ export async function loginUser(formData: FormData) {
     return {
       success: true,
       message: "Login successful",
-      redirectPath: user.role === "doctor" ? "/veterinary" : 
-                   user.role === "farmer" ? "/farmer" : 
-                   user.role === "superadmin" ? "/superadmin" : 
-                   user.role === "admin" ? "/admin" : "/"
+      redirectPath: homePathForRole(user.role)
     }
   } catch (error) {
     console.error("Error logging in:", error)

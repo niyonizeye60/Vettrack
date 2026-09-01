@@ -42,6 +42,8 @@ interface SuperAdminDashboardClientProps {
       doctor?: number
       admin?: number
       superadmin?: number
+      marketplace_admin?: number
+      finance_manager?: number
     }
     consultationStats: {
       pending?: number
@@ -74,6 +76,8 @@ interface SuperAdminDashboardClientProps {
       doctor?: number
       admin?: number
       superadmin?: number
+      marketplace_admin?: number
+      finance_manager?: number
     }
   }
   registrationTrend: Array<{
@@ -82,6 +86,8 @@ interface SuperAdminDashboardClientProps {
     doctor: number
     admin: number
     superadmin: number
+    marketplace_admin: number
+    finance_manager: number
     total: number
   }>
   activitySnapshot: {
@@ -252,10 +258,12 @@ export default function SuperAdminDashboardClient({
               </div>
               <h3 className="text-3xl font-bold text-gray-900 mt-2">{stats.totalUsers.toLocaleString()}</h3>
               <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-2 text-xs text-gray-400">
-                <span className="truncate">{t('superadmin.farmers')}: <span className="text-gray-600 font-medium">{stats.userStats.farmer || 0}</span></span>
-                <span className="truncate">{t('superadmin.doctors')}: <span className="text-gray-600 font-medium">{stats.userStats.doctor || 0}</span></span>
-                <span className="truncate">{t('superadmin.admin')}: <span className="text-gray-600 font-medium">{stats.userStats.admin || 0}</span></span>
-                <span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}: <span className="text-gray-600 font-medium">{stats.userStats.superadmin || 0}</span></span>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.farmers')}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.farmer || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.doctors')}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.doctor || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.admin')}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.admin || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.superadmin || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.marketplaceAdmin') || 'Marketplace'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.marketplace_admin || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.financeManager') || 'Finance'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.finance_manager || 0}</span></div>
               </div>
             </CardContent>
           </Card>
@@ -271,10 +279,12 @@ export default function SuperAdminDashboardClient({
               </div>
               <h3 className="text-3xl font-bold text-emerald-600 mt-2">{onlineUsers.total.toLocaleString()}</h3>
               <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-2 text-xs text-gray-400">
-                <span className="truncate">{t('superadmin.farmers')}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.farmer || 0}</span></span>
-                <span className="truncate">{t('superadmin.doctors')}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.doctor || 0}</span></span>
-                <span className="truncate">{t('superadmin.admin')}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.admin || 0}</span></span>
-                <span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}: <span className="text-gray-600 font-medium">{onlineUsers.byRole.superadmin || 0}</span></span>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.farmers')}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.farmer || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.doctors')}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.doctor || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.admin')}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.admin || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.superadmin || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.marketplaceAdmin') || 'Marketplace'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.marketplace_admin || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.financeManager') || 'Finance'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.finance_manager || 0}</span></div>
               </div>
             </CardContent>
           </Card>
@@ -338,7 +348,9 @@ export default function SuperAdminDashboardClient({
                 <Bar dataKey="farmer" name={t('superadmin.farmers') || 'Farmers'} stackId="reg" fill="#10B981" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="doctor" name={t('superadmin.doctors') || 'Doctors'} stackId="reg" fill="#3B82F6" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="admin" name={t('superadmin.admin') || 'Admin'} stackId="reg" fill="#F59E0B" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="superadmin" name={t('superadmin.superAdmin') || 'Super Admin'} stackId="reg" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="superadmin" name={t('superadmin.superAdmin') || 'Super Admin'} stackId="reg" fill="#8B5CF6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="marketplace_admin" name={t('superadmin.marketplaceAdmin') || 'Marketplace'} stackId="reg" fill="#EC4899" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="finance_manager" name={t('superadmin.financeManager') || 'Finance'} stackId="reg" fill="#14B8A6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

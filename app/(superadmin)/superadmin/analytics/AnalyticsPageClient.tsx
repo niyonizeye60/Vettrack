@@ -39,6 +39,8 @@ const ROLE_COLORS: Record<string, string> = {
   doctor: '#3B82F6',
   admin: '#F59E0B',
   superadmin: '#8B5CF6',
+  marketplace_admin: '#EC4899',
+  finance_manager: '#14B8A6',
 }
 
 export default function AnalyticsPageClient({
@@ -73,6 +75,8 @@ export default function AnalyticsPageClient({
     doctor: t('superadmin.doctors') || 'Doctors',
     admin: t('superadmin.admin') || 'Admin',
     superadmin: t('superadmin.superAdmin') || 'Super Admin',
+    marketplace_admin: t('superadmin.marketplaceAdmin') || 'Marketplace Admin',
+    finance_manager: t('superadmin.financeManager') || 'Finance Manager',
   }
   const roleDistributionData = Object.entries(systemStats.userStats)
     .filter(([, count]) => count > 0)

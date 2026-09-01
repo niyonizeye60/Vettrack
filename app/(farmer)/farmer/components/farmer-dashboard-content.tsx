@@ -17,7 +17,7 @@ import {
   MapPin, AlertTriangle,
 } from "lucide-react"
 import EpidemicRegisterDialog from "@/components/epidemics/epidemic-register-dialog"
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from "recharts"
 
 interface FarmerDashboardContentProps {
   currentUser: { _id: string; name: string; role: string }
@@ -60,6 +60,7 @@ export default function FarmerDashboardContent({
   const [milkTrend, setMilkTrend] = useState<MilkTrendPoint[] | null>(null)
   const [pnlTrend, setPnlTrend] = useState<PnlTrendPoint[] | null>(null)
   const [trackingSummary, setTrackingSummary] = useState<TrackingSummary | null>(null)
+  const [activeCalfCount, setActiveCalfCount] = useState<number | null>(null)
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null)
   const [epidemicOpen, setEpidemicOpen] = useState(false)
 
@@ -243,8 +244,30 @@ export default function FarmerDashboardContent({
     fetchTracking()
   }, [currentUser._id])
 
-  const totalAnimals = animals.length
+  useEffect(() => {
+    async function fetchCalfCount() {
+      try {
+        const res = await fetch(`/api/calves?farmerId=${currentUser._id}`)
+        if (!res.ok) return setActiveCalfCount(0)
+        const records = await res.json()
+        setActiveCalfCount(Array.isArray(records) ? records.filter((c: any) => c.status === "active").length : 0)
+      } catch {
+        setActiveCalfCount(0)
+      }
+    }
+    fetchCalfCount()
+  }, [currentUser._id])
+
+  const totalAnimals = animals.filter((a) => a.status !== "Deceased").length
   const healthyAnimals = animals.filter((a) => a.status === "Healthy").length
+  const cows = animals.filter((a) => (a.type || "").toLowerCase() === "cow" && a.gender === "female")
+  const lactatingCowCount = cows.filter((a) => a.lactationStatus === "lactating").length
+  const dryCowCount = cows.filter((a) => a.lactationStatus !== "lactating").length
+  const farmStatusData = [
+    { name: t("farmer.lactatingCows"), value: lactatingCowCount, color: "#2a78d6" },
+    { name: t("farmer.dryCows"), value: dryCowCount, color: "#eb6834" },
+    { name: t("farmer.calves"), value: activeCalfCount ?? 0, color: "#1baf7a" },
+  ]
   const pendingRequests = consultations.filter((c) => c.status === "pending")
   const acceptedConsultations = consultations.filter((c) => c.status === "accepted")
   const rejectedConsultations = consultations.filter((c) => c.status === "rejected")
@@ -334,6 +357,36 @@ export default function FarmerDashboardContent({
             </CardContent>
           </Card>
         </div>
+
+        {/* Farm status overview */}
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+              <Cow className="h-4 w-4 text-green-600" />
+              {t("farmer.farmStatusOverview")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {activeCalfCount === null ? (
+              <div className="h-[240px] rounded-lg bg-gray-100 animate-pulse" />
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={farmStatusData} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={30} />
+                  <Tooltip formatter={(v: any) => [v, t("farmer.count")]} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={90}>
+                    <LabelList dataKey="value" position="top" style={{ fontSize: 13, fontWeight: 600, fill: "#374151" }} />
+                    {farmStatusData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Health alerts */}
         {diseaseStats && (diseaseStats.active > 0 || diseaseStats.underTreatment > 0) && (
