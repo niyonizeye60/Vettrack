@@ -99,13 +99,21 @@ export async function GET(req: NextRequest) {
     const livestockPurchases = animalTransactions.filter(t => t.transactionType === "purchase").reduce((s, t) => s + (t.amount || 0), 0)
     const feedWaterCosts = milkRecords.reduce((s, r) => s + (r.foodCost || 0) + (r.saltCost || 0), 0)
     const calfRearingCosts = calfExpenses.reduce((s, e) => s + (e.amount || 0), 0)
-    const milkingSuppliesCosts = milkingExpenses.reduce((s, e) => s + (e.amount || 0), 0)
     // Feed/water/health/misc costs for animals outside the milking flow (dry cows,
     // males, etc.) - milking animals already get feed/water cost via feedWaterCosts.
     const animalExpenseCosts = animalExpenses.reduce((s, e) => s + (e.amount || 0), 0)
-    const totalExpenses = inseminationCosts + vaccinationCosts + veterinaryHealth + labourWages + livestockPurchases + feedWaterCosts + calfRearingCosts + milkingSuppliesCosts + animalExpenseCosts
+    const totalExpenses = inseminationCosts + vaccinationCosts + veterinaryHealth + labourWages + livestockPurchases + feedWaterCosts + calfRearingCosts + animalExpenseCosts
 
-    const netResult = totalIncome - totalExpenses
+    // ---- Expected Loss ----
+    // Milking supplies (washing drugs, milking oil) are consumable overhead spent
+    // regardless of output - tracked separately from operating "Expenses" so the
+    // P&L can show them as an anticipated, budgeted loss rather than a variable cost.
+    const washingDrugsCost = milkingExpenses.filter(e => e.expenseType === "washing_drugs").reduce((s, e) => s + (e.amount || 0), 0)
+    const milkingOilCost = milkingExpenses.filter(e => e.expenseType === "milking_oil").reduce((s, e) => s + (e.amount || 0), 0)
+    const milkingSuppliesCosts = washingDrugsCost + milkingOilCost
+    const totalExpectedLoss = milkingSuppliesCosts
+
+    const netResult = totalIncome - totalExpenses - totalExpectedLoss
 
     // ---- Ledgers ----
     const incomeLedger: LedgerEntry[] = []
@@ -142,16 +150,21 @@ export async function GET(req: NextRequest) {
     calfExpenses.forEach(e => expenseLedger.push({
       date: e.date, label: "Calf Rearing Costs", description: `${e.calfName || "Calf"}${e.expenseType === "milk" && e.milkLiters ? ` - ${e.milkLiters}L milk` : e.description ? ` - ${e.description}` : ""}`, amount: e.amount || 0
     }))
-    milkingExpenses.forEach(e => expenseLedger.push({
-      date: e.date, label: "Milking Supplies Costs", description: `${e.expenseType === "washing_drugs" ? "Washing Drugs" : "Milking Oil"} - ${e.quantity}${e.unit}`, amount: e.amount || 0
-    }))
     animalExpenses.forEach(e => expenseLedger.push({
       date: e.date, label: "Animal Expenses", description: `${e.animalName || "Animal"}${e.description ? ` - ${e.description}` : ""}`, amount: e.amount || 0
     }))
     expenseLedger.sort((a, b) => b.date.localeCompare(a.date))
 
+    const expectedLossLedger: LedgerEntry[] = []
+    milkingExpenses.forEach(e => expectedLossLedger.push({
+      date: e.date, label: "Milking Supplies Costs", description: `${e.expenseType === "washing_drugs" ? "Washing Drugs" : "Milking Oil"} - ${e.quantity}${e.unit}`, amount: e.amount || 0
+    }))
+    expectedLossLedger.sort((a, b) => b.date.localeCompare(a.date))
+
     // ---- Cash flow (weekly) ----
-    const cashFlow = buildWeeklyCashFlow(startDate, endDate, incomeLedger, expenseLedger)
+    // Expected-loss entries are still cash outflows, so they count toward the weekly expense bucket
+    // even though the P&L splits them into their own category.
+    const cashFlow = buildWeeklyCashFlow(startDate, endDate, incomeLedger, [...expenseLedger, ...expectedLossLedger])
 
     // ---- Feed & water sub-report ----
     const totalFeedKg = milkRecords.reduce((s, r) => s + (r.foodKg || 0), 0)
@@ -174,15 +187,45 @@ export async function GET(req: NextRequest) {
       foodTypesUsed,
     }
 
+    // ---- Milk supplies sub-report (Expected Loss detail) ----
+    const milkSupplies = {
+      washingDrugsCost, milkingOilCost, total: milkingSuppliesCosts,
+      records: milkingExpenses.map(e => ({
+        date: e.date, expenseType: e.expenseType, quantity: e.quantity, unit: e.unit,
+        pricePerUnit: e.pricePerUnit || null, amount: e.amount || 0,
+      })),
+    }
+
+    // ---- Dry animal expenses sub-report (feed/water/salt/other breakdown) ----
+    const dryAnimalFeedCost = animalExpenses.reduce((s, e) => s + (e.foodCost || 0), 0)
+    const dryAnimalWaterCost = animalExpenses.reduce((s, e) => s + (e.waterCost || 0) + (e.expenseType === "water" ? (e.amount || 0) : 0), 0)
+    const dryAnimalSaltCost = animalExpenses.reduce((s, e) => s + (e.saltCost || 0), 0)
+    const dryAnimalOtherCost = animalExpenses.filter(e => e.expenseType === "health" || e.expenseType === "other").reduce((s, e) => s + (e.amount || 0), 0)
+    const dryAnimalExpenses = {
+      feedCost: dryAnimalFeedCost, waterCost: dryAnimalWaterCost, saltCost: dryAnimalSaltCost, otherCost: dryAnimalOtherCost,
+      total: animalExpenseCosts,
+      records: animalExpenses.map(e => ({
+        date: e.date, animalName: e.animalName || null, expenseType: e.expenseType, time: e.time || null,
+        foodKg: e.foodKg || null, foodCost: e.foodCost || null,
+        waterLiters: e.waterLiters || null, waterCost: e.waterCost || null,
+        saltKg: e.saltKg || null, saltCost: e.saltCost || null,
+        description: e.description || null, amount: e.amount || 0,
+      })),
+    }
+
     return NextResponse.json({
       range: { startDate, endDate },
       income: { milkSales, livestockSales, byProductSales, total: totalIncome },
-      expenses: { inseminationCosts, vaccinationCosts, veterinaryHealth, labourWages, livestockPurchases, feedWaterCosts, calfRearingCosts, milkingSuppliesCosts, animalExpenseCosts, total: totalExpenses },
+      expectedLoss: { milkingSuppliesCosts, washingDrugsCost, milkingOilCost, total: totalExpectedLoss },
+      expenses: { inseminationCosts, vaccinationCosts, veterinaryHealth, labourWages, livestockPurchases, feedWaterCosts, calfRearingCosts, animalExpenseCosts, total: totalExpenses },
       netResult,
       incomeLedger,
       expenseLedger,
+      expectedLossLedger,
       cashFlow,
       feedWater,
+      milkSupplies,
+      dryAnimalExpenses,
     })
   } catch (error) {
     return NextResponse.json({ error: "Failed to generate report" }, { status: 500 })

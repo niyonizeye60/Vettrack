@@ -70,7 +70,7 @@ export default function FarmerDashboardContent({
         const end = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`
         const res = await fetch(`/api/reports/general?farmerId=${currentUser._id}&startDate=${start}&endDate=${end}`)
         const data = await res.json()
-        if (!data.error) setPnl({ income: data.income.total, expense: data.expenses.total, net: data.netResult })
+        if (!data.error) setPnl({ income: data.income.total, expense: data.expenses.total + (data.expectedLoss?.total || 0), net: data.netResult })
       } catch {
         setPnl(null)
       } finally {
@@ -190,7 +190,7 @@ export default function FarmerDashboardContent({
             const end = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(lastDay)}`
             const res = await fetch(`/api/reports/general?farmerId=${currentUser._id}&startDate=${start}&endDate=${end}`)
             const data = await res.json()
-            if (!data.error) return { month: label, income: data.income.total, expense: data.expenses.total }
+            if (!data.error) return { month: label, income: data.income.total, expense: data.expenses.total + (data.expectedLoss?.total || 0) }
           } catch { /* fall through to zeroed point */ }
           return { month: label, income: 0, expense: 0 }
         }))
