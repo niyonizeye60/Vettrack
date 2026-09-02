@@ -150,7 +150,7 @@ export default function AboutContent() {
               image: "/Software Engineer.png",
               name: "Munyarukina Abel",
               role: "Software Engineer",
-              tagline: "Designer & Developer of this platform",
+              tagline: "Designed & Developed this platform",
               link: "https://www.linkedin.com/in/munyarukina-abel-4041a1184",
             },
           ].map((member, index) => (
