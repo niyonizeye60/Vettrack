@@ -16,6 +16,7 @@ import { Milk, Plus, Pencil, Trash2, BarChart3, History, TrendingUp, DollarSign,
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
 
 interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null; status?: string | null }
 interface MilkRecord {
@@ -34,6 +35,7 @@ const today = new Date().toISOString().split("T")[0]
 
 export default function MilkProductionPage() {
   const { t } = useLanguage()
+  const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
   const [animals, setAnimals] = useState<Animal[]>([])
   const milkableAnimals = animals.filter(a => {
@@ -166,9 +168,16 @@ export default function MilkProductionPage() {
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: "Failed to save milk record" }))
       setErrors({ session: error })
+      toast({ title: t('common.error'), description: error || t('farmer.actionFailed'), variant: "destructive" })
       setSaving(false)
       return
     }
+
+    toast(
+      editRecord
+        ? { title: t('farmer.milkRecordUpdated'), description: t('farmer.milkRecordUpdatedDesc') }
+        : { title: t('farmer.milkRecordSaved'), description: t('farmer.milkRecordSavedDesc') }
+    )
 
     await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
     resetForm()

@@ -65,6 +65,7 @@ export default function CalvesPage() {
   // Calf form
   const [editCalf, setEditCalf] = useState<Calf | null>(null)
   const [deleteCalfId, setDeleteCalfId] = useState<string | null>(null)
+  const [calfFormUnlocked, setCalfFormUnlocked] = useState(false)
 
   // Graduate-to-animals flow
   const [graduateCalf, setGraduateCalf] = useState<Calf | null>(null)
@@ -159,6 +160,7 @@ export default function CalvesPage() {
   const resetCalfForm = () => {
     setCalfName(""); setMotherAnimalId(""); setGender(""); setBreed(""); setBirthDate(today)
     setBirthWeight(""); setStatus("active"); setCalfNotes(""); setCalfErrors({}); setEditCalf(null)
+    setCalfFormUnlocked(false)
   }
 
   const validateCalf = () => {
@@ -192,6 +194,7 @@ export default function CalvesPage() {
     setCalfName(c.name); setMotherAnimalId(c.motherAnimalId || ""); setGender(c.gender)
     setBreed(c.breed || ""); setBirthDate(c.birthDate); setBirthWeight(c.birthWeight ? String(c.birthWeight) : "")
     setStatus(c.status); setCalfNotes(c.notes || "")
+    setCalfFormUnlocked(true)
   }
 
   const handleCalfDelete = async (id: string) => {
@@ -451,13 +454,19 @@ export default function CalvesPage() {
         {/* CALVES TAB */}
         <TabsContent value="calves" className="space-y-6">
           <Card className="border border-gray-200 shadow-sm">
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="w-2 h-2 bg-green-500 rounded-full" />
                 {editCalf ? t('farmer.editCalf') : t('farmer.newCalf')}
               </CardTitle>
+              {!calfFormUnlocked && (
+                <Button onClick={() => setCalfFormUnlocked(true)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg">
+                  <Plus className="h-4 w-4 mr-1" />{t('farmer.registerCalf')}
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
+              <fieldset disabled={!calfFormUnlocked} className="contents">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.calfName')} *</label>
@@ -467,7 +476,7 @@ export default function CalvesPage() {
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.mother')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Select value={motherAnimalId || "none"} onValueChange={v => setMotherAnimalId(v === "none" ? "" : v)}>
+                  <Select value={motherAnimalId || "none"} onValueChange={v => setMotherAnimalId(v === "none" ? "" : v)} disabled={!calfFormUnlocked}>
                     <SelectTrigger><SelectValue placeholder={t('farmer.selectMotherOptional')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">{t('common.optional')}</SelectItem>
@@ -483,7 +492,7 @@ export default function CalvesPage() {
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.gender')} *</label>
-                  <Select value={gender} onValueChange={setGender}>
+                  <Select value={gender} onValueChange={setGender} disabled={!calfFormUnlocked}>
                     <SelectTrigger className={calfErrors.gender ? "border-red-500" : ""}><SelectValue placeholder={t('farmer.gender')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="male">{t('farmer.male')}</SelectItem>
@@ -511,7 +520,7 @@ export default function CalvesPage() {
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.status')}</label>
-                  <Select value={status} onValueChange={setStatus}>
+                  <Select value={status} onValueChange={setStatus} disabled={!calfFormUnlocked}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
@@ -525,14 +534,15 @@ export default function CalvesPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <Button onClick={handleCalfSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
-                  {saving ? t('farmer.savingCalf') : editCalf ? t('farmer.updateCalf') : t('farmer.saveCalf')}
-                </Button>
-                {editCalf && (
+              {calfFormUnlocked && (
+                <div className="flex gap-3 pt-2">
+                  <Button onClick={handleCalfSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
+                    {saving ? t('farmer.savingCalf') : editCalf ? t('farmer.updateCalf') : t('farmer.saveCalf')}
+                  </Button>
                   <Button variant="outline" onClick={resetCalfForm} className="rounded-lg">{t('farmer.cancel')}</Button>
-                )}
-              </div>
+                </div>
+              )}
+              </fieldset>
             </CardContent>
           </Card>
 
