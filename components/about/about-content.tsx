@@ -49,7 +49,7 @@ export default function AboutContent() {
           </div>
           <div className="relative h-[400px] rounded-lg overflow-hidden">
             <Image
-              src="https://cloudfront-ap-southeast-2.images.arcpublishing.com/nzme/OKYSEBUYDUS6HBUBAGI27T2QT4.jpg"
+              src="https://media.istockphoto.com/id/1490888015/photo/pack-cows-in-front-row-a-black-and-white-herd-group-together-happy-and-joyful-and-playful.jpg?s=1024x1024&w=is&k=20&c=mmF8P2zNNvxwD3nxaHQIXJ60gzjOU_tiBamZTa9Bevc="
               alt="NTDM Vettrack Team"
               fill
               className="object-cover"
