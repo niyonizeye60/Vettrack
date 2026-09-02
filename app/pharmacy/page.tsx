@@ -138,7 +138,7 @@ export default function PharmacyPage() {
   return (
     <>
       <ServicesBanner
-        backHref="/services"
+        backHref="/services?tab=drugs"
         title={categoryId && currentCategory ? currentCategory.name : t('pharmacy.title')}
         subtitle={categoryId && currentCategory ? currentCategory.description : t('pharmacy.subtitle')}
         image="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"

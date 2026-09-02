@@ -121,7 +121,7 @@ export default function AnimalDetailPage() {
   return (
     <>
       <ServicesBanner
-        backHref="/animal-sales"
+        backHref={animal.categoryId ? `/animal-sales?category=${animal.categoryId}` : "/animal-sales"}
         backLabel={`${t('common.backTo')} ${t('animals.title')}`}
         title={animal.name}
         subtitle={t('animals.subtitle')}

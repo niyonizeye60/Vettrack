@@ -143,7 +143,7 @@ export default function AnimalSalesPage() {
   return (
     <>
       <ServicesBanner
-        backHref="/services"
+        backHref="/services?tab=sales"
         title={categoryId && currentCategory ? currentCategory.name : t('animals.title')}
         subtitle={categoryId && currentCategory ? currentCategory.description : t('animals.subtitle')}
         image="https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"

@@ -104,7 +104,7 @@ export default function DrugDetailPage() {
   return (
     <>
       <ServicesBanner
-        backHref="/pharmacy"
+        backHref={drug.categoryId ? `/pharmacy?category=${drug.categoryId}` : "/pharmacy"}
         backLabel={`${t('common.backTo')} ${t('pharmacy.title')}`}
         title={drug.name}
         subtitle={t('pharmacy.subtitle')}
