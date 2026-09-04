@@ -711,7 +711,7 @@ const translations = {
     'farmer.purchase': 'Purchase',
     'farmer.selectAnimalOrOther': 'Select an animal or choose Other',
     'farmer.otherAnimalNotListed': 'Other / Not Listed',
-    'farmer.buyerName': 'Buyer Name',
+    'farmer.buyerName': 'Buyer / Seller Name',
     'farmer.sellerName': 'Seller Name',
     'farmer.enterName': 'Enter name',
     'farmer.party': 'Buyer / Seller',
