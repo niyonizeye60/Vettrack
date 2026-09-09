@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2 } from "lucide-react"
+import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -66,6 +66,7 @@ export default function CalvesPage() {
   const [editCalf, setEditCalf] = useState<Calf | null>(null)
   const [deleteCalfId, setDeleteCalfId] = useState<string | null>(null)
   const [calfFormUnlocked, setCalfFormUnlocked] = useState(false)
+  const [calfSearchTerm, setCalfSearchTerm] = useState("")
 
   // Graduate-to-animals flow
   const [graduateCalf, setGraduateCalf] = useState<Calf | null>(null)
@@ -153,6 +154,15 @@ export default function CalvesPage() {
   }
 
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
+  const filteredCalves = useMemo(() => {
+    const q = calfSearchTerm.trim().toLowerCase()
+    if (!q) return calves
+    return calves.filter(c =>
+      c.name?.toLowerCase().includes(q) ||
+      c.motherName?.toLowerCase().includes(q) ||
+      c.breed?.toLowerCase().includes(q)
+    )
+  }, [calves, calfSearchTerm])
   const totalMilkGiven = useMemo(() => expenses.filter(e => e.expenseType === "milk").reduce((s, e) => s + (e.milkLiters || 0), 0), [expenses])
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses])
 
@@ -453,157 +463,114 @@ export default function CalvesPage() {
 
         {/* CALVES TAB */}
         <TabsContent value="calves" className="space-y-6">
+          <div className="flex items-center justify-end">
+            <Button onClick={() => setCalfFormUnlocked(true)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg">
+              <Plus className="h-4 w-4 mr-1" />{t('farmer.registerCalf')}
+            </Button>
+          </div>
+
           <Card className="border border-gray-200 shadow-sm">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                {editCalf ? t('farmer.editCalf') : t('farmer.newCalf')}
-              </CardTitle>
-              {!calfFormUnlocked && (
-                <Button onClick={() => setCalfFormUnlocked(true)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg">
-                  <Plus className="h-4 w-4 mr-1" />{t('farmer.registerCalf')}
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <fieldset disabled={!calfFormUnlocked} className="contents">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.calfName')} *</label>
-                  <Input placeholder="e.g. Kalisa" value={calfName} onChange={e => setCalfName(e.target.value)} className={calfErrors.calfName ? "border-red-500" : ""} />
-                  {calfErrors.calfName && <p className="text-xs text-red-500">{calfErrors.calfName}</p>}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.mother')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Select value={motherAnimalId || "none"} onValueChange={v => setMotherAnimalId(v === "none" ? "" : v)} disabled={!calfFormUnlocked}>
-                    <SelectTrigger><SelectValue placeholder={t('farmer.selectMotherOptional')} /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">{t('common.optional')}</SelectItem>
-                      {animals.map(a => (
-                        <SelectItem key={a._id} value={a._id}>
-                          {a.name} ({a.type})
-                          <span className={a.status === "Deceased" ? "text-red-500" : "text-gray-400"}> — {animalStatusText(a.status, t)}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.gender')} *</label>
-                  <Select value={gender} onValueChange={setGender} disabled={!calfFormUnlocked}>
-                    <SelectTrigger className={calfErrors.gender ? "border-red-500" : ""}><SelectValue placeholder={t('farmer.gender')} /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">{t('farmer.male')}</SelectItem>
-                      <SelectItem value="female">{t('farmer.female')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {calfErrors.gender && <p className="text-xs text-red-500">{calfErrors.gender}</p>}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.breed')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input placeholder="e.g. Friesian" value={breed} onChange={e => setBreed(e.target.value)} />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.birthDate')} *</label>
-                  <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className={calfErrors.birthDate ? "border-red-500" : ""} />
-                  {calfErrors.birthDate && <p className="text-xs text-red-500">{calfErrors.birthDate}</p>}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.birthWeight')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input type="number" min="0" step="0.1" placeholder="e.g. 30" value={birthWeight} onChange={e => setBirthWeight(e.target.value)} />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.status')}</label>
-                  <Select value={status} onValueChange={setStatus} disabled={!calfFormUnlocked}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input placeholder={t('farmer.anyObservations')} value={calfNotes} onChange={e => setCalfNotes(e.target.value)} />
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <Baby className="h-5 w-5 text-green-600" />
+                  {t('farmer.tabCalves')}
+                </CardTitle>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder={t('farmer.searchAnimals') || "Search calves…"}
+                    className="pl-9 bg-white h-9"
+                    value={calfSearchTerm}
+                    onChange={(e) => setCalfSearchTerm(e.target.value)}
+                  />
                 </div>
               </div>
-
-              {calfFormUnlocked && (
-                <div className="flex gap-3 pt-2">
-                  <Button onClick={handleCalfSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
-                    {saving ? t('farmer.savingCalf') : editCalf ? t('farmer.updateCalf') : t('farmer.saveCalf')}
-                  </Button>
-                  <Button variant="outline" onClick={resetCalfForm} className="rounded-lg">{t('farmer.cancel')}</Button>
-                </div>
-              )}
-              </fieldset>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-gray-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                {t('farmer.tabCalves')}
-              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('farmer.name')}</TableHead>
-                      <TableHead>{t('farmer.mother')}</TableHead>
-                      <TableHead>{t('farmer.gender')}</TableHead>
-                      <TableHead>{t('farmer.age')}</TableHead>
-                      <TableHead>{t('farmer.status')}</TableHead>
-                      <TableHead>{t('farmer.actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {calves.length === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">{t('farmer.noCalvesYet')}</TableCell></TableRow>
-                    ) : calves.map(c => (
-                      <TableRow key={c._id}>
-                        <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell className="text-sm text-gray-500">{c.motherName || "—"}</TableCell>
-                        <TableCell className="text-sm text-gray-600">{c.gender === "male" ? t('farmer.male') : t('farmer.female')}</TableCell>
-                        <TableCell className="text-sm text-gray-600">{formatAge(c.birthDate, t)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={statusColor(c.status)}>{statusLabel(c.status)}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {/* Only a calf still on the farm can grow into an animal. */}
-                            {(c.status === "active" || c.status === "weaned") && !c.graduatedToAnimalId && (
+            <CardContent className="p-0">
+              {calves.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                    <Baby className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm font-medium">{t('farmer.noCalvesYet')}</p>
+                  <p className="mt-3">
+                    <Button variant="outline" size="sm" onClick={() => setCalfFormUnlocked(true)}>
+                      {t('farmer.registerCalf')}
+                    </Button>
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50 hover:bg-gray-50">
+                        <TableHead className="font-semibold text-gray-600">{t('farmer.name')}</TableHead>
+                        <TableHead className="font-semibold text-gray-600">{t('farmer.mother')}</TableHead>
+                        <TableHead className="font-semibold text-gray-600">{t('farmer.gender')}</TableHead>
+                        <TableHead className="font-semibold text-gray-600">{t('farmer.age')}</TableHead>
+                        <TableHead className="font-semibold text-gray-600">{t('farmer.status')}</TableHead>
+                        <TableHead className="font-semibold text-gray-600">{t('farmer.actions')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredCalves.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-12">
+                            <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                              <Baby className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <p className="text-gray-500 text-sm font-medium">{t('farmer.noResultsFound') || "No calves match your search"}</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredCalves.map(c => (
+                        <TableRow key={c._id} className="hover:bg-gray-50/80 transition-colors duration-150">
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="bg-green-100 p-1.5 rounded-lg flex-shrink-0">
+                                <Baby className="h-3.5 w-3.5 text-green-600" />
+                              </div>
+                              <span className="font-medium text-gray-800 text-sm">{c.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600">{c.motherName || <span className="text-gray-400">—</span>}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{c.gender === "male" ? t('farmer.male') : t('farmer.female')}</TableCell>
+                          <TableCell className="text-sm text-gray-600">{formatAge(c.birthDate, t)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={statusColor(c.status)}>{statusLabel(c.status)}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5 flex-nowrap">
+                              {/* Only a calf still on the farm can grow into an animal. */}
+                              {(c.status === "active" || c.status === "weaned") && !c.graduatedToAnimalId && (
+                                <Button
+                                  size="sm" variant="ghost"
+                                  onClick={() => openGraduate(c)}
+                                  className="h-8 w-8 p-0 hover:bg-purple-50 shrink-0"
+                                  title={t('farmer.graduateToAnimals')}
+                                >
+                                  <ArrowUpCircle className="h-3.5 w-3.5 text-purple-600" />
+                                </Button>
+                              )}
+                              <Button variant="outline" size="sm" className="shrink-0" onClick={() => handleCalfEdit(c)}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" />{t('farmer.edit')}
+                              </Button>
                               <Button
                                 size="sm" variant="ghost"
-                                onClick={() => openGraduate(c)}
-                                className="h-8 w-8 p-0 hover:bg-purple-50"
-                                title={t('farmer.graduateToAnimals')}
+                                onClick={() => setDeleteCalfId(c._id)}
+                                className="h-8 w-8 p-0 hover:bg-red-50 shrink-0"
+                                title={t('farmer.delete')}
                               >
-                                <ArrowUpCircle className="h-3.5 w-3.5 text-purple-600" />
+                                <Trash2 className="h-3.5 w-3.5 text-red-500" />
                               </Button>
-                            )}
-                            <Button size="sm" variant="ghost" onClick={() => handleCalfEdit(c)} className="h-8 w-8 p-0 hover:bg-green-50">
-                              <Pencil className="h-3.5 w-3.5 text-green-600" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setDeleteCalfId(c._id)} className="h-8 w-8 p-0 hover:bg-red-50">
-                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -895,6 +862,93 @@ export default function CalvesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* New / Edit Calf */}
+      <Dialog open={calfFormUnlocked} onOpenChange={open => !open && resetCalfForm()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Baby className="h-5 w-5 text-green-600" />
+              {editCalf ? t('farmer.editCalf') : t('farmer.newCalf')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.calfName')} *</label>
+                <Input placeholder="e.g. Kalisa" value={calfName} onChange={e => setCalfName(e.target.value)} className={calfErrors.calfName ? "border-red-500" : ""} />
+                {calfErrors.calfName && <p className="text-xs text-red-500">{calfErrors.calfName}</p>}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.mother')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Select value={motherAnimalId || "none"} onValueChange={v => setMotherAnimalId(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder={t('farmer.selectMotherOptional')} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">{t('common.optional')}</SelectItem>
+                    {animals.map(a => (
+                      <SelectItem key={a._id} value={a._id}>
+                        {a.name} ({a.type})
+                        <span className={a.status === "Deceased" ? "text-red-500" : "text-gray-400"}> — {animalStatusText(a.status, t)}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.gender')} *</label>
+                <Select value={gender} onValueChange={setGender}>
+                  <SelectTrigger className={calfErrors.gender ? "border-red-500" : ""}><SelectValue placeholder={t('farmer.gender')} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">{t('farmer.male')}</SelectItem>
+                    <SelectItem value="female">{t('farmer.female')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {calfErrors.gender && <p className="text-xs text-red-500">{calfErrors.gender}</p>}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.breed')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input placeholder="e.g. Friesian" value={breed} onChange={e => setBreed(e.target.value)} />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.birthDate')} *</label>
+                <Input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className={calfErrors.birthDate ? "border-red-500" : ""} />
+                {calfErrors.birthDate && <p className="text-xs text-red-500">{calfErrors.birthDate}</p>}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.birthWeight')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input type="number" min="0" step="0.1" placeholder="e.g. 30" value={birthWeight} onChange={e => setBirthWeight(e.target.value)} />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.status')}</label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input placeholder={t('farmer.anyObservations')} value={calfNotes} onChange={e => setCalfNotes(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button onClick={handleCalfSubmit} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
+                {saving ? t('farmer.savingCalf') : editCalf ? t('farmer.updateCalf') : t('farmer.saveCalf')}
+              </Button>
+              <Button variant="outline" onClick={resetCalfForm} className="rounded-lg">{t('farmer.cancel')}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete dialogs */}
       {/* Graduate to animals */}
