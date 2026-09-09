@@ -47,9 +47,9 @@ export default function Header() {
           <Link href="/" className="flex items-center space-x-2 transition-transform hover:scale-105">
             <div className="w-15 h-15  overflow-hidden">
               <Image
-                src="/Group 2.svg?height=40&width=40&text=NTDM"
-                alt="NTDM Vettrack Logo"
-                width={100}
+                src="/logo/10088121608.png"
+                alt="VetTrack Logo"
+                width={150}
                 height={100}
                 className=" object-cover"
                 style={{ boxShadow: "0 0 12px 2px white" }}
