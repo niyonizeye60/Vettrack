@@ -49,7 +49,7 @@ export default function Header() {
               <Image
                 src="/logo/10088121608.png"
                 alt="VetTrack Logo"
-                width={150}
+                width={130}
                 height={100}
                 className=" object-cover"
                 style={{ boxShadow: "0 0 12px 2px white" }}
