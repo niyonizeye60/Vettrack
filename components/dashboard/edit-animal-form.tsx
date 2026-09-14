@@ -10,6 +10,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { updateAnimal } from "@/lib/actions"
 import { rwandaData } from "@/lib/rwanda-data"
+import { getBreedOptionsForType, getClassOptionsForType } from "@/lib/animal-options"
 
 type Animal = {
   _id: string
@@ -58,6 +59,10 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
     insuranceId: animal.insuranceId || "",
     gender: animal.gender || "",
   })
+  const [breedChoice, setBreedChoice] = useState(() => {
+    const options = getBreedOptionsForType(animal.type)
+    return options.includes(animal.breed) ? animal.breed : (animal.breed ? "other" : "")
+  })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -67,8 +72,35 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
   const handleSelectChange = (name: string, value: string) => {
     if (name === "district") {
       setFormData((prev) => ({ ...prev, district: value, sector: "" }))
+    } else if (name === "type") {
+      const classOptions = getClassOptionsForType(value)
+      setFormData((prev) => ({
+        ...prev,
+        type: value,
+        breed: "",
+        class: classOptions.length === 1 ? classOptions[0] : "",
+      }))
+      setBreedChoice("")
+    } else if (name === "breed") {
+      if (value === "other") {
+        setBreedChoice("other")
+        setFormData((prev) => ({ ...prev, breed: "" }))
+      } else {
+        setBreedChoice(value)
+        setFormData((prev) => ({ ...prev, breed: value }))
+      }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }))
+    }
+  }
+
+  const classLabel = (value: string) => {
+    switch (value) {
+      case "dairy": return t('farmer.diary')
+      case "meat": return t('farmer.meat')
+      case "poultry": return t('farmer.poultry')
+      case "pet": return t('farmer.pet')
+      default: return t('farmer.other')
     }
   }
 
@@ -128,8 +160,21 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
         {/* Breed */}
         <div className="space-y-1.5">
           <Label htmlFor="edit-breed">{t('farmer.breed')}</Label>
-          <Input id="edit-breed" name="breed" value={formData.breed}
-            onChange={handleChange} placeholder={t('farmer.enterBreed')} required />
+          <Select value={breedChoice} onValueChange={(v) => handleSelectChange("breed", v)} required disabled={!formData.type}>
+            <SelectTrigger id="edit-breed">
+              <SelectValue placeholder={formData.type ? t('farmer.selectBreed') : t('farmer.selectAnimalTypeFirst')} />
+            </SelectTrigger>
+            <SelectContent>
+              {getBreedOptionsForType(formData.type).map((b) => (
+                <SelectItem key={b} value={b}>{b}</SelectItem>
+              ))}
+              <SelectItem value="other">{t('farmer.breedOther')}</SelectItem>
+            </SelectContent>
+          </Select>
+          {breedChoice === "other" && (
+            <Input className="mt-1.5" name="breed" value={formData.breed}
+              onChange={handleChange} placeholder={t('farmer.enterBreed')} required />
+          )}
         </div>
 
         {/* Gender */}
@@ -147,14 +192,14 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
         {/* Class */}
         <div className="space-y-1.5">
           <Label htmlFor="edit-class">{t('farmer.class')}</Label>
-          <Select value={formData.class} onValueChange={(v) => handleSelectChange("class", v)} required>
-            <SelectTrigger id="edit-class"><SelectValue placeholder={t('farmer.selectClass')} /></SelectTrigger>
+          <Select value={formData.class} onValueChange={(v) => handleSelectChange("class", v)} required disabled={!formData.type}>
+            <SelectTrigger id="edit-class">
+              <SelectValue placeholder={formData.type ? t('farmer.selectClass') : t('farmer.selectAnimalTypeFirst')} />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="dairy">{t('farmer.diary')}</SelectItem>
-              <SelectItem value="meat">{t('farmer.meat')}</SelectItem>
-              <SelectItem value="poultry">{t('farmer.poultry')}</SelectItem>
-              <SelectItem value="pet">{t('farmer.pet')}</SelectItem>
-              <SelectItem value="other">{t('farmer.other')}</SelectItem>
+              {getClassOptionsForType(formData.type).map((c) => (
+                <SelectItem key={c} value={c}>{classLabel(c)}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

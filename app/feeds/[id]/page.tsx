@@ -114,7 +114,7 @@ export default function FeedDetailPage() {
   return (
     <>
       <ServicesBanner
-        backHref="/feeds"
+        backHref={feed.categoryId ? `/feeds?category=${feed.categoryId}` : "/feeds"}
         backLabel={`${t('common.backTo')} ${t('feeds.title')}`}
         title={feed.name}
         subtitle={t('feeds.subtitle')}

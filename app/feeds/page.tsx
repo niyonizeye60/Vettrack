@@ -159,7 +159,7 @@ export default function FeedsPage() {
   return (
     <>
       <ServicesBanner
-        backHref="/services"
+        backHref="/services?tab=feeds"
         title={categoryId && currentCategory ? currentCategory.name : t('feeds.title')}
         subtitle={categoryId && currentCategory ? currentCategory.description : t('feeds.subtitle')}
         image="https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"

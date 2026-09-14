@@ -13,7 +13,7 @@ import SellerEarnings from "@/components/seller/seller-earnings"
 import {
   PlusCircle, Calendar, FileText, Activity,
   MilkIcon as Cow, CheckCircle, XCircle, AlertCircle, ArrowRight, FileBarChart,
-  ShieldAlert, Baby, Bell, MessageSquare, LifeBuoy, Droplets, Heart, Eye,
+  ShieldAlert, Baby, Bell, MessageSquare, LifeBuoy, Droplets, Heart, Eye, ClipboardList, Mail,
   MapPin, AlertTriangle,
 } from "lucide-react"
 import EpidemicRegisterDialog from "@/components/epidemics/epidemic-register-dialog"
@@ -37,6 +37,12 @@ interface TrackingSummary {
   latestTemp: number | null
   series: { time: string; bpm: number }[]
 }
+interface DailySummaryGroup {
+  category: string
+  count: number
+  items: { label: string; details: string; time: string }[]
+}
+interface DailySummary { totalCount: number; groups: DailySummaryGroup[] }
 
 function getBpmStatus(bpm: number | null, t: (key: string) => string) {
   if (bpm === null || bpm === 0) return { label: t("farmer.noData"), color: "#9CA3AF" }
@@ -62,7 +68,7 @@ export default function FarmerDashboardContent({
   const [trackingSummary, setTrackingSummary] = useState<TrackingSummary | null>(null)
   const [activeCalfCount, setActiveCalfCount] = useState<number | null>(null)
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null)
-  const [epidemicOpen, setEpidemicOpen] = useState(false)
+  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null)
 
   useEffect(() => {
     async function fetchPnl() {
@@ -74,7 +80,7 @@ export default function FarmerDashboardContent({
         const end = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`
         const res = await fetch(`/api/reports/general?farmerId=${currentUser._id}&startDate=${start}&endDate=${end}`)
         const data = await res.json()
-        if (!data.error) setPnl({ income: data.income.total, expense: data.expenses.total, net: data.netResult })
+        if (!data.error) setPnl({ income: data.income.total, expense: data.expenses.total + (data.expectedLoss?.total || 0), net: data.netResult })
       } catch {
         setPnl(null)
       } finally {
@@ -194,7 +200,7 @@ export default function FarmerDashboardContent({
             const end = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(lastDay)}`
             const res = await fetch(`/api/reports/general?farmerId=${currentUser._id}&startDate=${start}&endDate=${end}`)
             const data = await res.json()
-            if (!data.error) return { month: label, income: data.income.total, expense: data.expenses.total }
+            if (!data.error) return { month: label, income: data.income.total, expense: data.expenses.total + (data.expectedLoss?.total || 0) }
           } catch { /* fall through to zeroed point */ }
           return { month: label, income: 0, expense: 0 }
         }))
@@ -242,6 +248,20 @@ export default function FarmerDashboardContent({
       }
     }
     fetchTracking()
+  }, [currentUser._id])
+
+  useEffect(() => {
+    async function fetchDailySummary() {
+      try {
+        const res = await fetch(`/api/farmer/daily-summary`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (Array.isArray(data.groups)) setDailySummary({ totalCount: data.totalCount, groups: data.groups })
+      } catch {
+        setDailySummary({ totalCount: 0, groups: [] })
+      }
+    }
+    fetchDailySummary()
   }, [currentUser._id])
 
   useEffect(() => {
@@ -557,22 +577,14 @@ export default function FarmerDashboardContent({
             </div>
             <div className="flex items-center gap-2 sm:ml-auto flex-shrink-0">
               <Button
-                size="sm"
-                className="bg-white text-red-600 hover:bg-red-50 h-9 px-4"
-                onClick={() => setEpidemicOpen(true)}
-              >
-                <MapPin className="h-4 w-4 mr-1" />
-                {t("farmer.reportEpidemicCase")}
-              </Button>
-              <Button
                 asChild
                 size="sm"
                 variant="ghost"
-                className="text-white hover:bg-white/10 hover:text-white h-9 px-3"
+                className="bg-white text-red-600 hover:bg-red-50 h-9 px-4"
               >
                 <Link href="/farmer/epidemics">
+                  <MapPin className="h-4 w-4 mr-1" />
                   {t("farmer.viewEpidemicMap")}
-                  <ArrowRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
             </div>
@@ -620,6 +632,63 @@ export default function FarmerDashboardContent({
             </Link>
           </Button>
         </div>
+
+        {/* Today's activity summary */}
+        <Card className="border border-gray-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base font-semibold text-gray-900">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-green-600" />
+                {t("farmer.todaysSummary")}
+              </div>
+              {!!dailySummary?.totalCount && (
+                <Badge variant="secondary" className="text-xs">{dailySummary.totalCount} {t("farmer.actionsToday")}</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {dailySummary === null ? (
+              <div className="h-[100px] rounded-lg bg-gray-100 animate-pulse" />
+            ) : dailySummary.groups.length === 0 ? (
+              <div className="py-6 flex flex-col items-center text-center">
+                <ClipboardList className="h-9 w-9 text-gray-300 mb-3" />
+                <p className="text-sm font-medium text-gray-600">{t("farmer.noActivityToday")}</p>
+                <p className="text-xs text-gray-400 mt-1 max-w-sm">{t("farmer.activityTodayWillAppear")}</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+                {dailySummary.groups.map((group) => (
+                  <div key={group.category} className="rounded-lg border border-gray-100 p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-900">{group.category}</p>
+                      <Badge variant="outline" className="text-xs">{group.count}</Badge>
+                    </div>
+                    <div className="mt-2 space-y-1.5">
+                      {group.items.slice(0, 6).map((item, i) => (
+                        <div key={i} className="flex items-start justify-between gap-2 text-xs">
+                          <span className="text-gray-600">
+                            <span className="font-medium text-gray-800">{item.label}</span>
+                            {item.details ? `: ${item.details}` : ""}
+                          </span>
+                          <span className="text-gray-400 flex-shrink-0">
+                            {new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      ))}
+                      {group.items.length > 6 && (
+                        <p className="text-xs text-gray-400">+{group.items.length - 6} more</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <p className="flex items-center gap-1.5 text-xs text-gray-400 pt-1">
+                  <Mail className="h-3.5 w-3.5" />
+                  {t("farmer.emailedAt730")}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent activity + trend charts — uniform 2x2 grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -819,20 +888,12 @@ export default function FarmerDashboardContent({
           </Card>
         </div>
 
-        {/* Seller Earnings */}
-        <SellerEarnings />
+      {/* Seller Earnings */}
+      <SellerEarnings />
 
-      </div>
+    </div>
 
-      {/* Epidemic reporting dialog */}
-      <EpidemicRegisterDialog
-        open={epidemicOpen}
-        onOpenChange={setEpidemicOpen}
-        mode="farmer"
-        farmerId={currentUser._id.toString()}
-      />
-
-      {/* Activity details dialog */}
+    {/* Activity details dialog */}
       <Dialog open={!!selectedActivity} onOpenChange={(open) => !open && setSelectedActivity(null)}>
         <DialogContent className="sm:max-w-md">
           {selectedActivity?.type === "animal" ? (

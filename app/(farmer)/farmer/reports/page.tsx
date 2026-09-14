@@ -10,18 +10,22 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { FileBarChart, Download, FileText, Printer, TrendingUp, TrendingDown, Scale, Sparkles, Wheat } from "lucide-react"
+import { FileBarChart, Download, FileText, Printer, TrendingUp, TrendingDown, Scale, Sparkles, Wheat, Droplet, PawPrint } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 
 interface ReportData {
   range: { startDate: string; endDate: string }
   income: { milkSales: number; livestockSales: number; byProductSales: number; total: number }
-  expenses: { inseminationCosts: number; vaccinationCosts: number; veterinaryHealth: number; labourWages: number; livestockPurchases: number; feedWaterCosts: number; calfRearingCosts: number; milkingSuppliesCosts: number; animalExpenseCosts: number; total: number }
+  expectedLoss: { milkingSuppliesCosts: number; washingDrugsCost: number; milkingOilCost: number; total: number }
+  expenses: { inseminationCosts: number; vaccinationCosts: number; veterinaryHealth: number; labourWages: number; livestockPurchases: number; feedWaterCosts: number; calfRearingCosts: number; animalExpenseCosts: number; total: number }
   netResult: number
   incomeLedger: { date: string; label: string; description: string; amount: number }[]
   expenseLedger: { date: string; label: string; description: string; amount: number }[]
+  expectedLossLedger: { date: string; label: string; description: string; amount: number }[]
   cashFlow: { weekStart: string; weekEnd: string; income: number; expense: number; net: number }[]
   feedWater: { totalFeedKg: number; totalFeedCost: number; totalWaterLiters: number; totalSaltKg: number; totalSaltCost: number; totalCost: number; costPerAnimalPerDay: number; costPerLitreMilk: number; foodTypesUsed: string[] }
+  milkSupplies: { washingDrugsCost: number; milkingOilCost: number; total: number; records: { date: string; expenseType: string; quantity: number; unit: string; pricePerUnit: number | null; amount: number }[] }
+  dryAnimalExpenses: { feedCost: number; waterCost: number; saltCost: number; otherCost: number; total: number; records: { date: string; animalName: string | null; expenseType: string; time: string | null; foodKg: number | null; foodCost: number | null; waterLiters: number | null; waterCost: number | null; saltKg: number | null; saltCost: number | null; description: string | null; amount: number }[] }
 }
 
 type Preset = "weekly" | "monthly" | "quarterly" | "yearly" | "custom"
@@ -98,7 +102,7 @@ export default function GeneralReportPage() {
 
   const maxFlow = useMemo(() => {
     if (!report) return 1
-    return Math.max(report.income.total, report.expenses.total, 1)
+    return Math.max(report.income.total, report.expenses.total, report.expectedLoss.total, 1)
   }, [report])
 
   const exportToPDF = async () => {
@@ -165,6 +169,9 @@ export default function GeneralReportPage() {
         ["  Livestock Sales", fmt(report.income.livestockSales)],
         ["  By-product Sales", fmt(report.income.byProductSales)],
         ["TOTAL INCOME", fmt(report.income.total)],
+        ["EXPECTED LOSS", ""],
+        ["  Milking Supplies Costs", fmt(report.expectedLoss.total)],
+        ["TOTAL EXPECTED LOSS", fmt(report.expectedLoss.total)],
         ["EXPENSES", ""],
         ["  Insemination Costs", fmt(report.expenses.inseminationCosts)],
         ["  Vaccination Costs", fmt(report.expenses.vaccinationCosts)],
@@ -173,7 +180,6 @@ export default function GeneralReportPage() {
         ["  Livestock Purchases", fmt(report.expenses.livestockPurchases)],
         ["  Feed & Water Costs", fmt(report.expenses.feedWaterCosts)],
         ["  Calf Rearing Costs", fmt(report.expenses.calfRearingCosts)],
-        ["  Milking Supplies Costs", fmt(report.expenses.milkingSuppliesCosts)],
         ["  Animal Expenses", fmt(report.expenses.animalExpenseCosts)],
         ["TOTAL EXPENSES", fmt(report.expenses.total)],
       ]
@@ -229,6 +235,10 @@ export default function GeneralReportPage() {
         ["By-product Sales", report.income.byProductSales],
         ["TOTAL INCOME", report.income.total],
         [],
+        ["EXPECTED LOSS", ""],
+        ["Milking Supplies Costs", report.expectedLoss.total],
+        ["TOTAL EXPECTED LOSS", report.expectedLoss.total],
+        [],
         ["EXPENSES", ""],
         ["Insemination Costs", report.expenses.inseminationCosts],
         ["Vaccination Costs", report.expenses.vaccinationCosts],
@@ -237,7 +247,6 @@ export default function GeneralReportPage() {
         ["Livestock Purchases", report.expenses.livestockPurchases],
         ["Feed & Water Costs", report.expenses.feedWaterCosts],
         ["Calf Rearing Costs", report.expenses.calfRearingCosts],
-        ["Milking Supplies Costs", report.expenses.milkingSuppliesCosts],
         ["Animal Expenses", report.expenses.animalExpenseCosts],
         ["TOTAL EXPENSES", report.expenses.total],
         [],
@@ -247,6 +256,9 @@ export default function GeneralReportPage() {
 
       const incomeSheet = XLSX.utils.json_to_sheet(report.incomeLedger.map(e => ({ Date: e.date, Source: e.label, Description: e.description, "Amount (RWF)": e.amount })))
       XLSX.utils.book_append_sheet(wb, incomeSheet, "Income Ledger")
+
+      const expectedLossSheet = XLSX.utils.json_to_sheet(report.expectedLossLedger.map(e => ({ Date: e.date, Category: e.label, Description: e.description, "Amount (RWF)": e.amount })))
+      XLSX.utils.book_append_sheet(wb, expectedLossSheet, "Expected Loss Ledger")
 
       const expenseSheet = XLSX.utils.json_to_sheet(report.expenseLedger.map(e => ({ Date: e.date, Category: e.label, Description: e.description, "Amount (RWF)": e.amount })))
       XLSX.utils.book_append_sheet(wb, expenseSheet, "Expense Ledger")
@@ -378,6 +390,14 @@ export default function GeneralReportPage() {
                       <div className="h-full bg-red-500 rounded-full" style={{ width: `${(report.expenses.total / maxFlow) * 100}%` }} />
                     </div>
                   </div>
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>{t('farmer.totalExpectedLoss')}</span><span>{fmt(report.expectedLoss.total)}</span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-white overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(report.expectedLoss.total / maxFlow) * 100}%` }} />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -390,6 +410,8 @@ export default function GeneralReportPage() {
               <TabsTrigger value="expense" className="flex items-center gap-1"><TrendingDown className="h-4 w-4" /> {t('farmer.tabExpenseLedger')}</TabsTrigger>
               <TabsTrigger value="cashflow" className="flex items-center gap-1"><Scale className="h-4 w-4" /> {t('farmer.tabCashFlow')}</TabsTrigger>
               <TabsTrigger value="feedwater" className="flex items-center gap-1"><Wheat className="h-4 w-4" /> {t('farmer.tabFeedWater')}</TabsTrigger>
+              <TabsTrigger value="milksupplies" className="flex items-center gap-1"><Droplet className="h-4 w-4" /> {t('farmer.tabMilkSupplies')}</TabsTrigger>
+              <TabsTrigger value="dryanimal" className="flex items-center gap-1"><PawPrint className="h-4 w-4" /> {t('farmer.tabDryAnimalExpenses')}</TabsTrigger>
               <TabsTrigger value="herd" className="flex items-center gap-1"><Sparkles className="h-4 w-4" /> {t('farmer.tabHerdAssets')}</TabsTrigger>
             </TabsList>
 
@@ -432,6 +454,18 @@ export default function GeneralReportPage() {
                           <TableCell className="text-right font-bold text-green-700">{fmt(report.income.total)}</TableCell>
                         </TableRow>
 
+                        <TableRow className="bg-gray-50"><TableCell colSpan={3} className="font-bold text-gray-700 pt-4">{t('farmer.expectedLossHeader')}</TableCell></TableRow>
+                        <TableRow>
+                          <TableCell className="text-amber-700">{t('farmer.milkingSuppliesCosts')}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-gray-500">{t('farmer.milkingSuppliesCostsDesc')}</TableCell>
+                          <TableCell className="text-right text-amber-700 font-medium">{fmt(report.expectedLoss.total)}</TableCell>
+                        </TableRow>
+                        <TableRow className="border-t-2 border-gray-200">
+                          <TableCell className="font-bold">{t('farmer.totalExpectedLoss')}</TableCell>
+                          <TableCell className="hidden sm:table-cell" />
+                          <TableCell className="text-right font-bold text-amber-700">{fmt(report.expectedLoss.total)}</TableCell>
+                        </TableRow>
+
                         <TableRow className="bg-gray-50"><TableCell colSpan={3} className="font-bold text-gray-700 pt-4">{t('farmer.expensesHeader')}</TableCell></TableRow>
                         <TableRow>
                           <TableCell className="text-red-700">{t('farmer.inseminationCosts')}</TableCell>
@@ -467,11 +501,6 @@ export default function GeneralReportPage() {
                           <TableCell className="text-red-700">{t('farmer.calfRearingCosts')}</TableCell>
                           <TableCell className="hidden sm:table-cell text-sm text-gray-500">{t('farmer.calfRearingCostsDesc')}</TableCell>
                           <TableCell className="text-right text-red-700 font-medium">{fmt(report.expenses.calfRearingCosts)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="text-red-700">{t('farmer.milkingSuppliesCosts')}</TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm text-gray-500">{t('farmer.milkingSuppliesCostsDesc')}</TableCell>
-                          <TableCell className="text-right text-red-700 font-medium">{fmt(report.expenses.milkingSuppliesCosts)}</TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell className="text-red-700">{t('farmer.animalExpenseCosts')}</TableCell>
@@ -667,6 +696,132 @@ export default function GeneralReportPage() {
                         ))}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* MILK SUPPLIES (Expected Loss detail) */}
+            <TabsContent value="milksupplies">
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardContent className="p-4 sm:p-5">
+                      <p className="text-sm text-gray-500 font-medium">{t('farmer.totalWashingDrugsCost')}</p>
+                      <h3 className="text-2xl font-bold text-sky-600 mt-2">{fmt(report.milkSupplies.washingDrugsCost)}</h3>
+                    </CardContent>
+                  </Card>
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardContent className="p-4 sm:p-5">
+                      <p className="text-sm text-gray-500 font-medium">{t('farmer.totalMilkingOilCost')}</p>
+                      <h3 className="text-2xl font-bold text-amber-600 mt-2">{fmt(report.milkSupplies.milkingOilCost)}</h3>
+                    </CardContent>
+                  </Card>
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardContent className="p-4 sm:p-5">
+                      <p className="text-sm text-gray-500 font-medium">{t('farmer.totalExpectedLoss')}</p>
+                      <h3 className="text-2xl font-bold text-red-600 mt-2">{fmt(report.milkSupplies.total)}</h3>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Card className="border border-gray-200 shadow-sm">
+                  <CardHeader><CardTitle className="text-lg">{t('farmer.tabMilkSupplies')}</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t('farmer.date')}</TableHead>
+                            <TableHead>{t('farmer.expenseType')}</TableHead>
+                            <TableHead>{t('farmer.quantity')}</TableHead>
+                            <TableHead>{t('farmer.pricePerUnit')}</TableHead>
+                            <TableHead className="text-right">{t('farmer.amount')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {report.milkSupplies.records.length === 0 ? (
+                            <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">{t('farmer.noRecordsForPeriod')}</TableCell></TableRow>
+                          ) : report.milkSupplies.records.map((r, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="text-sm">{r.date}</TableCell>
+                              <TableCell><Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">{r.expenseType === "washing_drugs" ? "Washing Drugs" : "Milking Oil"}</Badge></TableCell>
+                              <TableCell className="text-sm text-gray-700">{r.quantity} {r.unit}</TableCell>
+                              <TableCell className="text-sm text-gray-700">{r.pricePerUnit ? `RWF ${r.pricePerUnit.toLocaleString()}` : "—"}</TableCell>
+                              <TableCell className="text-right font-medium text-amber-700">{fmt(r.amount)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* DRY ANIMAL EXPENSES detail */}
+            <TabsContent value="dryanimal">
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardContent className="p-4 sm:p-5">
+                      <p className="text-sm text-gray-500 font-medium">{t('farmer.foodCost')}</p>
+                      <h3 className="text-2xl font-bold text-orange-600 mt-2">{fmt(report.dryAnimalExpenses.feedCost)}</h3>
+                    </CardContent>
+                  </Card>
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardContent className="p-4 sm:p-5">
+                      <p className="text-sm text-gray-500 font-medium">{t('farmer.waterCost')}</p>
+                      <h3 className="text-2xl font-bold text-sky-600 mt-2">{fmt(report.dryAnimalExpenses.waterCost)}</h3>
+                    </CardContent>
+                  </Card>
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardContent className="p-4 sm:p-5">
+                      <p className="text-sm text-gray-500 font-medium">{t('farmer.saltCost')}</p>
+                      <h3 className="text-2xl font-bold text-gray-700 mt-2">{fmt(report.dryAnimalExpenses.saltCost)}</h3>
+                    </CardContent>
+                  </Card>
+                  <Card className="border border-gray-200 shadow-sm">
+                    <CardContent className="p-4 sm:p-5">
+                      <p className="text-sm text-gray-500 font-medium">{t('farmer.dryAnimalOtherCost')}</p>
+                      <h3 className="text-2xl font-bold text-red-600 mt-2">{fmt(report.dryAnimalExpenses.otherCost)}</h3>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Card className="border border-gray-200 shadow-sm">
+                  <CardHeader><CardTitle className="text-lg">{t('farmer.tabDryAnimalExpenses')}</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t('farmer.date')}</TableHead>
+                            <TableHead>{t('farmer.animal')}</TableHead>
+                            <TableHead>{t('farmer.expenseType')}</TableHead>
+                            <TableHead>{t('farmer.time')}</TableHead>
+                            <TableHead>{t('farmer.description')}</TableHead>
+                            <TableHead className="text-right">{t('farmer.amount')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {report.dryAnimalExpenses.records.length === 0 ? (
+                            <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">{t('farmer.noRecordsForPeriod')}</TableCell></TableRow>
+                          ) : report.dryAnimalExpenses.records.map((r, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="text-sm">{r.date}</TableCell>
+                              <TableCell className="text-sm text-gray-700">{r.animalName || "—"}</TableCell>
+                              <TableCell><Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">{r.expenseType}</Badge></TableCell>
+                              <TableCell className="text-sm text-gray-500">{r.time || "—"}</TableCell>
+                              <TableCell className="text-sm text-gray-600">
+                                {r.expenseType === "feed"
+                                  ? [r.foodCost ? `Feed RWF ${r.foodCost.toLocaleString()}` : null, r.waterCost ? `Water RWF ${r.waterCost.toLocaleString()}` : null, r.saltCost ? `Salt RWF ${r.saltCost.toLocaleString()}` : null].filter(Boolean).join(", ") || "—"
+                                  : (r.description || "—")}
+                              </TableCell>
+                              <TableCell className="text-right font-medium text-red-700">{fmt(r.amount)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </CardContent>
                 </Card>
               </div>

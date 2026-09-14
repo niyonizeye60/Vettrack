@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, expenseType, quantity, unit, amount, date, notes } = body
+    const { farmerId, expenseType, quantity, unit, pricePerUnit, amount, date, notes } = body
 
     if (!farmerId || !expenseType || !quantity || !unit || !amount || !date)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       farmerId, expenseType,
       quantity: Number(quantity),
       unit,
+      pricePerUnit: pricePerUnit ? Number(pricePerUnit) : null,
       amount: Number(amount),
       date, notes: notes || null,
       createdAt: new Date(),
@@ -93,7 +94,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, expenseType, quantity, unit, amount, date, notes } = body
+    const { id, expenseType, quantity, unit, pricePerUnit, amount, date, notes } = body
     if (!id) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
     if (expenseType && !EXPENSE_TYPES.includes(expenseType))
       return NextResponse.json({ error: "Invalid expense type" }, { status: 400 })
@@ -111,7 +112,7 @@ export async function PUT(req: NextRequest) {
 
     await db.collection("milking_expenses").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { expenseType, quantity: Number(quantity), unit, amount: Number(amount), date, notes: notes || null, updatedAt: new Date() } }
+      { $set: { expenseType, quantity: Number(quantity), unit, pricePerUnit: pricePerUnit ? Number(pricePerUnit) : null, amount: Number(amount), date, notes: notes || null, updatedAt: new Date() } }
     )
     await logActivity(currentUser._id, "livestock.milking_expense_updated", expenseType)
     return NextResponse.json({ success: true })

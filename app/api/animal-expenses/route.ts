@@ -56,12 +56,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, animalId, animalName, expenseType, description, amount, date, notes } = body
+    const {
+      farmerId, animalId, animalName, expenseType, description, amount, date, notes, time,
+      foodKg, foodCost, waterLiters, waterCost, saltKg, saltCost,
+    } = body
 
-    if (!farmerId || !animalId || !expenseType || !amount || !date)
+    const isFeedWaterSalt = expenseType === "feed"
+    const computedTotal = (Number(foodCost) || 0) + (Number(waterCost) || 0) + (Number(saltCost) || 0)
+    const finalAmount = isFeedWaterSalt ? computedTotal : Number(amount)
+
+    if (!farmerId || !animalId || !expenseType || !date)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     if (!EXPENSE_TYPES.includes(expenseType))
       return NextResponse.json({ error: "Invalid expense type" }, { status: 400 })
+    if (!finalAmount || finalAmount <= 0)
+      return NextResponse.json({ error: isFeedWaterSalt ? "Enter at least one of feed, water, or salt cost" : "Missing required fields" }, { status: 400 })
 
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
     if (!isStaff && farmerId !== currentUser._id) {
@@ -78,8 +87,15 @@ export async function POST(req: NextRequest) {
     const record = {
       farmerId, animalId, animalName: animalName || null, expenseType,
       description: description || null,
-      amount: Number(amount),
+      amount: finalAmount,
       date, notes: notes || null,
+      time: isFeedWaterSalt ? (time || null) : null,
+      foodKg: isFeedWaterSalt ? (Number(foodKg) || null) : null,
+      foodCost: isFeedWaterSalt ? (Number(foodCost) || null) : null,
+      waterLiters: isFeedWaterSalt ? (Number(waterLiters) || null) : null,
+      waterCost: isFeedWaterSalt ? (Number(waterCost) || null) : null,
+      saltKg: isFeedWaterSalt ? (Number(saltKg) || null) : null,
+      saltCost: isFeedWaterSalt ? (Number(saltCost) || null) : null,
       createdAt: new Date(),
     }
 
@@ -99,10 +115,19 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, expenseType, description, amount, date, notes } = body
+    const {
+      id, expenseType, description, amount, date, notes, time,
+      foodKg, foodCost, waterLiters, waterCost, saltKg, saltCost,
+    } = body
     if (!id) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
     if (expenseType && !EXPENSE_TYPES.includes(expenseType))
       return NextResponse.json({ error: "Invalid expense type" }, { status: 400 })
+
+    const isFeedWaterSalt = expenseType === "feed"
+    const computedTotal = (Number(foodCost) || 0) + (Number(waterCost) || 0) + (Number(saltCost) || 0)
+    const finalAmount = isFeedWaterSalt ? computedTotal : Number(amount)
+    if (!finalAmount || finalAmount <= 0)
+      return NextResponse.json({ error: isFeedWaterSalt ? "Enter at least one of feed, water, or salt cost" : "Missing required fields" }, { status: 400 })
 
     const client = await clientPromise
     const db = client.db(DB)
@@ -117,7 +142,17 @@ export async function PUT(req: NextRequest) {
 
     await db.collection("animal_expenses").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { expenseType, description: description || null, amount: Number(amount), date, notes: notes || null, updatedAt: new Date() } }
+      { $set: {
+        expenseType, description: description || null, amount: finalAmount, date, notes: notes || null,
+        time: isFeedWaterSalt ? (time || null) : null,
+        foodKg: isFeedWaterSalt ? (Number(foodKg) || null) : null,
+        foodCost: isFeedWaterSalt ? (Number(foodCost) || null) : null,
+        waterLiters: isFeedWaterSalt ? (Number(waterLiters) || null) : null,
+        waterCost: isFeedWaterSalt ? (Number(waterCost) || null) : null,
+        saltKg: isFeedWaterSalt ? (Number(saltKg) || null) : null,
+        saltCost: isFeedWaterSalt ? (Number(saltCost) || null) : null,
+        updatedAt: new Date(),
+      } }
     )
     await logActivity(currentUser._id, "livestock.animal_expense_updated", expenseType)
     return NextResponse.json({ success: true })

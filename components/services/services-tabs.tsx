@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ServiceCard from "@/components/services/service-card"
 import CategoryCard from "@/components/services/category-card"
 import { Activity, Video, ShieldAlert, ShoppingBag, Pill, Wheat, FileText, MapPin, Stethoscope, Shield, DollarSign, Brain } from "lucide-react"
+
+const TAB_VALUES = ["tracking", "consultations", "monitoring", "sales", "drugs", "feeds", "Ai"]
 
 // Service data
 const services = {
@@ -259,7 +262,12 @@ const services = {
 }
 
 export default function ServicesTabs() {
-  const [activeTab, setActiveTab] = useState("tracking")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  const initialTab = tabParam && TAB_VALUES.includes(tabParam) ? tabParam : "tracking"
+
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [categories, setCategories] = useState<{ sales: any[], drugs: any[], feeds: any[] }>({
     sales: [],
     drugs: [],
@@ -269,6 +277,11 @@ export default function ServicesTabs() {
   useEffect(() => {
     fetchCategories()
   }, [])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    router.replace(`/services?tab=${value}`, { scroll: false })
+  }
 
   const fetchCategories = async () => {
     try {
@@ -290,7 +303,7 @@ export default function ServicesTabs() {
 
   return (
     <>
-      <Tabs defaultValue="tracking" onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <div className="flex justify-center mb-8 overflow-x-auto px-4">
           <div className="relative">
             <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-white to-transparent pointer-events-none z-10 sm:hidden"></div>

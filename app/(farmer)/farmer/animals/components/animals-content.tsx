@@ -216,16 +216,16 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
                     <TableHead className="font-semibold text-gray-600">{t('farmer.name')}</TableHead>
-                    <TableHead className="font-semibold text-gray-600">{t('farmer.type')}</TableHead>
+                    {/* <TableHead className="font-semibold text-gray-600">{t('farmer.type')}</TableHead> */}
                     <TableHead className="font-semibold text-gray-600">{t('farmer.breed')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.insuranceId')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('animal.earTagId')}</TableHead>
-                    <TableHead className="font-semibold text-gray-600">{t('farmer.acquisitionType')}</TableHead>
-                    <TableHead className="font-semibold text-gray-600">{t('farmer.location')}</TableHead>
+                    {/* <TableHead className="font-semibold text-gray-600">{t('farmer.acquisitionType')}</TableHead> */}
+                    {/* <TableHead className="font-semibold text-gray-600">{t('farmer.location')}</TableHead> */}
                     <TableHead className="font-semibold text-gray-600">{t('farmer.status')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.milkStatus')}</TableHead>
                     <TableHead className="font-semibold text-gray-600">{t('farmer.gender')}</TableHead>
-                    <TableHead className="font-semibold text-gray-600">{t('farmer.price')}</TableHead>
+                    {/* <TableHead className="font-semibold text-gray-600">{t('farmer.price')}</TableHead> */}
                     <TableHead className="font-semibold text-gray-600">{t('farmer.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -249,12 +249,12 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                           <span className="font-medium text-gray-800 text-sm">{animal.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-gray-600">{animal.type}</TableCell>
+                      {/* <TableCell className="text-sm text-gray-600">{animal.type}</TableCell> */}
                       <TableCell className="text-sm text-gray-600">{animal.breed}</TableCell>
                       <TableCell className="text-sm text-gray-600">{animal.insuranceId || <span className="text-gray-400">—</span>}</TableCell>
                       <TableCell className="text-sm text-gray-600">{animal.earTagId || <span className="text-gray-400">—</span>}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{animal.acquisitionType || <span className="text-gray-400">—</span>}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{animal.district}, {animal.sector}</TableCell>
+                      {/* <TableCell className="text-sm text-gray-600">{animal.acquisitionType || <span className="text-gray-400">—</span>}</TableCell> */}
+                      {/* <TableCell className="text-sm text-gray-600">{animal.district}, {animal.sector}</TableCell> */}
                       <TableCell>
                         <Badge variant="outline" className={getStatusColor(animal.status)}>
                           {getStatusText(animal.status)}
@@ -287,7 +287,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">{animal.gender ? t(`farmer.${animal.gender}`) : t('farmer.undefined')}</TableCell>
-                      <TableCell className="text-sm text-gray-600">RWF {animal.price}</TableCell>
+                      {/* <TableCell className="text-sm text-gray-600">RWF {animal.price}</TableCell> */}
                       <TableCell>
                         <div className="flex items-center gap-1.5 flex-nowrap">
                           <Button
