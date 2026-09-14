@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import Image from "next/image"
 import { Loader2 } from "lucide-react"
 import OrderResult, { type SellerContact } from "@/components/checkout/order-result"
 import type { OrderPaymentStatus } from "@/lib/db-orders"
@@ -46,7 +47,18 @@ export default function CheckoutCallbackPage() {
   }, [searchParams])
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-32 pb-16">
+    <div className="relative min-h-screen pt-32 pb-16 overflow-hidden">
+      <div className="fixed inset-0 -z-10">
+        <Image
+          src="/variety-farm-animals-front-white-background_191971-14972.avif"
+          alt=""
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
+
       <div className="container-custom max-w-lg">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           {status === "loading" ? (
