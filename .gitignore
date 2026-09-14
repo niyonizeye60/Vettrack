@@ -38,5 +38,8 @@ SUPERADMIN_SETUP.md
 # calendar feature (not ready to ship)
 /app/(veterinary)/veterinary/calendar/
 
+# temporary scratch repo used for parsing Rwanda geo data
+/tmp-rwanda-repo/
+
 # listing photos uploaded in local development (production uses Vercel Blob)
 /public/listings/

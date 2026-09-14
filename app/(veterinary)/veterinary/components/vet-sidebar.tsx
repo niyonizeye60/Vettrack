@@ -15,6 +15,7 @@ import {
   Menu,
   PawPrint,
   LifeBuoy,
+  MapPin,
   Warehouse,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -50,6 +51,7 @@ export default function VetSidebar() {
     { href: "/veterinary/patients", label: t("vet.patients"), icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/farms", label: t("vet.farms"), icon: <Warehouse className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/tracking", label: t("vet.tracking"), icon: <Activity className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/veterinary/epidemics", label: t("vet.epidemics"), icon: <MapPin className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/messages", label: t("vet.messages"), icon: <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/support", label: t("vet.support"), icon: <LifeBuoy className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/veterinary/notifications", label: t("vet.notifications"), icon: <Bell className="h-4 w-4 sm:h-5 sm:w-5" /> },
