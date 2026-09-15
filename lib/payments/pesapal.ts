@@ -138,7 +138,10 @@ export interface PesapalInitiateResult {
   redirectUrl: string
 }
 
-export async function initiatePesapalPayment(order: Order): Promise<PesapalInitiateResult> {
+export async function initiatePesapalPayment(
+  order: Order,
+  callbackPath: string = "/checkout/callback"
+): Promise<PesapalInitiateResult> {
   const token = await getAccessToken()
   const notificationId = await getIpnId()
   const baseUrl = getAppBaseUrl()
@@ -156,7 +159,7 @@ export async function initiatePesapalPayment(order: Order): Promise<PesapalIniti
       currency: order.currency,
       amount: order.total,
       description: `NTDM order ${reference}`.slice(0, 100),
-      callback_url: `${baseUrl}/checkout/callback`,
+      callback_url: `${baseUrl}${callbackPath}`,
       notification_id: notificationId,
       billing_address: {
         email_address: order.buyer.email || "no-reply@vettrack.rw",
