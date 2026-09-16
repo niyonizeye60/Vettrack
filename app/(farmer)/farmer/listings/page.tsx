@@ -18,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, X, Loader2, ImagePlus, Info, Expand } from "lucide-react"
+import { Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair } from "lucide-react"
 import { ANIMAL_TYPES, ANIMAL_SEXES, MAX_LISTING_PHOTOS } from "@/lib/validations/listing-request"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
 
@@ -80,6 +80,8 @@ export default function FarmerListingsPage() {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null)
+  const [locating, setLocating] = useState(false)
   const [withdrawTarget, setWithdrawTarget] = useState<ListingRequest | null>(null)
   const [detailTarget, setDetailTarget] = useState<ListingRequest | null>(null)
   const [detailIndex, setDetailIndex] = useState(0)
@@ -158,6 +160,7 @@ export default function FarmerListingsPage() {
           ...form,
           sex: form.sex || undefined,
           photos,
+          ...(gps ? { latitude: gps.lat, longitude: gps.lng } : {}),
         }),
       })
       const data = await res.json()
@@ -433,6 +436,43 @@ export default function FarmerListingsPage() {
                 <Label htmlFor="village">{t("listing.village")}</Label>
                 <Input id="village" value={form.village} onChange={(e) => setForm({ ...form, village: e.target.value })} />
               </div>
+            </div>
+
+            {/* Exact spot: optional GPS pin, district/sector fallback otherwise */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={locating}
+                onClick={() => {
+                  if (!navigator.geolocation) return
+                  setLocating(true)
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                      setGps({ lat: +pos.coords.latitude.toFixed(6), lng: +pos.coords.longitude.toFixed(6) })
+                      setLocating(false)
+                    },
+                    () => setLocating(false),
+                    { enableHighAccuracy: true, timeout: 10000 }
+                  )
+                }}
+              >
+                {locating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Crosshair className="h-4 w-4 mr-2" />}
+                {locating ? t("common.loading") : t("listing.useLiveLocation")}
+              </Button>
+              {gps ? (
+                <>
+                  <span className="text-xs text-green-600">
+                    {t("listing.locationPinned")}: {gps.lat.toFixed(4)}, {gps.lng.toFixed(4)}
+                  </span>
+                  <button type="button" className="text-xs text-gray-400 hover:text-gray-600" onClick={() => setGps(null)}>
+                    {t("common.clear")}
+                  </button>
+                </>
+              ) : (
+                <span className="text-xs text-gray-400">{t("listing.liveLocationHint")}</span>
+              )}
             </div>
 
             {/* Photos */}

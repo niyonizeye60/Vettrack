@@ -15,7 +15,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Edit, Trash2, Search, Tag, Calendar, MapPin, DollarSign } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Tag, Calendar, MapPin, DollarSign, Crosshair, Loader2 } from "lucide-react"
 import AdminProductCard from "@/components/admin/admin-product-card"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { rwandaData } from "@/lib/rwanda-data"
@@ -63,6 +63,7 @@ const emptyForm = {
   animalType: "", breed: "", age: "", sex: "", district: "", sector: "", village: "",
   sellerPhone: "", sellerEmail: "", drugType: "", usageDescription: "",
   feedType: "", quality: "", targetAnimal: "",
+  latitude: "" as string | number, longitude: "" as string | number,
 }
 
 const CATEGORIES: Cat[] = [...MARKETPLACE_CATEGORIES]
@@ -99,6 +100,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   const [editCategoryTarget, setEditCategoryTarget] = useState<Category | null>(null)
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<Category | null>(null)
   const [busy, setBusy] = useState(false)
+  const [locating, setLocating] = useState(false)
 
   const loadAll = async () => {
     try {
@@ -119,7 +121,16 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   const saveService = async () => {
     setBusy(true)
     try {
-      const payload = { ...form, price: Number(form.price) || 0, category: activeCat }
+      // Explicit coordinates only travel when the seller pinned them; the API
+      // otherwise stamps district/sector-derived ones.
+      const { latitude, longitude, ...rest } = form
+      const hasCoords = latitude !== "" && longitude !== "" && latitude !== undefined && longitude !== undefined
+      const payload = {
+        ...rest,
+        price: Number(form.price) || 0,
+        category: activeCat,
+        ...(hasCoords ? { latitude: Number(latitude), longitude: Number(longitude) } : {}),
+      }
       const res = editTarget
         ? await fetch("/api/services", {
             method: "PUT",
@@ -166,6 +177,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
       sellerEmail: service.sellerEmail || "", drugType: service.drugType || "",
       usageDescription: service.usageDescription || "", feedType: service.feedType || "",
       quality: service.quality || "", targetAnimal: service.targetAnimal || "",
+      latitude: (service as any).latitude ?? "", longitude: (service as any).longitude ?? "",
     })
   }
 
@@ -214,6 +226,23 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   // --- category-specific form fields ------------------------------------------
 
   const set = (patch: Partial<typeof emptyForm>) => setForm({ ...form, ...patch })
+
+  /** Capture the device's GPS position into the form; beats district-center guesses. */
+  const captureLiveLocation = () => {
+    if (!navigator.geolocation) return
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        set({
+          latitude: +pos.coords.latitude.toFixed(6),
+          longitude: +pos.coords.longitude.toFixed(6),
+        })
+        setLocating(false)
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
 
   const specificFields = (cat: Cat) => {
     if (cat === "sales") {
@@ -275,6 +304,24 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
               <Label>{t("content.village")}</Label>
               <Input value={form.village} onChange={(e) => set({ village: e.target.value })} />
             </div>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={captureLiveLocation} disabled={locating}>
+              {locating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Crosshair className="h-4 w-4 mr-2" />}
+              {locating ? t("common.loading") : t("content.useLiveLocation")}
+            </Button>
+            {form.latitude && form.longitude ? (
+              <span className="text-xs text-green-600">
+                {t("content.pinnedAt")}: {Number(form.latitude).toFixed(4)}, {Number(form.longitude).toFixed(4)}
+              </span>
+            ) : (
+              <span className="text-xs text-gray-400">{t("content.liveLocationHint")}</span>
+            )}
+            {form.latitude && form.longitude ? (
+              <button type="button" className="text-xs text-gray-400 hover:text-gray-600" onClick={() => set({ latitude: "", longitude: "" })}>
+                {t("common.clear")}
+              </button>
+            ) : null}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

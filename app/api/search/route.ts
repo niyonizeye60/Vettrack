@@ -1,8 +1,17 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
+import { resolveLocation } from "@/lib/rwanda-geo"
 
 const DB_NAME = "ntdm_animal_hospital"
+
+function getServiceCoords(svc: any): { lat: number; lng: number } | null {
+  // Stored coordinates win, then district+sector (GADM-derived, aliases
+  // included), then the district center, then Kigali as a last resort.
+  if (svc.latitude && svc.longitude) return { lat: svc.latitude, lng: svc.longitude }
+  if (svc.district || svc.sector) return resolveLocation(svc.district, svc.sector)
+  return null
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,8 +58,9 @@ export async function GET(request: NextRequest) {
 
     for (const svc of services) {
       let distance: number | undefined
-      if (lat && lng && svc.latitude && svc.longitude) {
-        distance = calcDistance(lat, lng, svc.latitude, svc.longitude)
+      const coords = getServiceCoords(svc)
+      if (lat && lng && coords) {
+        distance = calcDistance(lat, lng, coords.lat, coords.lng)
         if (distance > maxDistance) continue
       }
 

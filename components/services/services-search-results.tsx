@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Navigation, MapPin, Loader2, Search } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { districtCenter, calcDistance } from "@/lib/rwanda-geo"
 
 interface ServiceResult {
   type: string
@@ -24,53 +25,6 @@ interface ServiceResult {
 
 interface Props {
   searchParams: { [key: string]: string | undefined }
-}
-
-const districtCenters: Record<string, { lat: number; lng: number }> = {
-  "Kigali": { lat: -1.9441, lng: 30.0619 },
-  "Musanze": { lat: -1.4996, lng: 29.6351 },
-  "Rubavu": { lat: -1.6781, lng: 29.2565 },
-  "Nyagatare": { lat: -1.2983, lng: 30.3257 },
-  "Huye": { lat: -2.5188, lng: 29.7455 },
-  "Rusizi": { lat: -2.4805, lng: 28.8965 },
-  "Gisenyi": { lat: -1.6781, lng: 29.2565 },
-  "Kayonza": { lat: -1.9167, lng: 30.5167 },
-  "Rwamagana": { lat: -1.9500, lng: 30.4333 },
-  "Bugesera": { lat: -2.2000, lng: 30.1000 },
-  "Gicumbi": { lat: -1.6333, lng: 29.9333 },
-  "Gasabo": { lat: -1.8833, lng: 30.1333 },
-  "Kicukiro": { lat: -1.9500, lng: 30.0833 },
-  "Nyarugenge": { lat: -1.9500, lng: 30.0500 },
-  "Gatsibo": { lat: -1.6333, lng: 30.4500 },
-  "Ngoma": { lat: -2.1500, lng: 30.5500 },
-  "Nyamagabe": { lat: -2.4500, lng: 29.5667 },
-  "Ruhango": { lat: -2.2000, lng: 29.7667 },
-  "Kamonyi": { lat: -1.8833, lng: 29.9000 },
-  "Muhanga": { lat: -2.0833, lng: 29.7500 },
-  "Nyanza": { lat: -2.3500, lng: 29.7333 },
-  "Gisagara": { lat: -2.6000, lng: 29.6833 },
-  "Nyaruguru": { lat: -2.6167, lng: 29.6500 },
-  "Karongi": { lat: -2.0500, lng: 29.3500 },
-  "Rutsiro": { lat: -1.9500, lng: 29.3167 },
-  "Nyabihu": { lat: -1.6333, lng: 29.4333 },
-  "Ngororero": { lat: -1.8500, lng: 29.6167 },
-  "Nyamasheke": { lat: -2.3500, lng: 29.2000 },
-  "Rulindo": { lat: -1.7333, lng: 29.9667 },
-  "Gakenke": { lat: -1.7000, lng: 29.6333 },
-  "Burera": { lat: -1.4333, lng: 29.8000 },
-  "Kirehe": { lat: -2.0167, lng: 30.6833 },
-}
-
-/** Haversine distance in km */
-function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLng = ((lng2 - lng1) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
 }
 
 function formatDistance(km: number): string {
@@ -96,18 +50,18 @@ export default function ServicesSearchResults({ searchParams }: Props) {
 
     if (latParam && lngParam) {
       setUserLocation({ lat: parseFloat(latParam), lng: parseFloat(lngParam) })
-    } else if (districtParam && districtCenters[districtParam]) {
-      setUserLocation(districtCenters[districtParam])
+    } else if (districtParam) {
+      setUserLocation(districtCenter(districtParam))
     } else {
       // Auto-detect
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => setUserLocation({ lat: -1.9403, lng: 29.8739 }), // Default to Rwanda center
+          () => setUserLocation({ lat: -1.9441, lng: 30.0619 }), // Default to Kigali
           { timeout: 5000 }
         )
       } else {
-        setUserLocation({ lat: -1.9403, lng: 29.8739 })
+        setUserLocation({ lat: -1.9441, lng: 30.0619 })
       }
     }
   }, [searchParams.lat, searchParams.lng, searchParams.district])

@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { can, canViewSellerContact } from '@/lib/roles'
 import { canAccessMarketplaceCategory } from '@/lib/marketplace-access'
 import { logActivity } from '@/lib/activity-log'
+import { resolveLocation } from '@/lib/rwanda-geo'
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 const forbidden = () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -76,17 +77,22 @@ export async function POST(request: NextRequest) {
     const client = await clientPromise
     const db = client.db('ntdm_animal_hospital')
 
-    const service = {
-      ...data,
-      image: data.image || null,
-      createdAt: new Date()
+    // Stamp coordinates: explicit lat/lng (e.g. live GPS or map pin) wins;
+    // otherwise resolve district+sector, then district center, then Kigali.
+    const serviceData = { ...data, image: data.image || null, createdAt: new Date() }
+    if (!serviceData.latitude && !serviceData.longitude) {
+      const coords = resolveLocation(serviceData.district, serviceData.sector)
+      if (coords) {
+        serviceData.latitude = coords.lat
+        serviceData.longitude = coords.lng
+      }
     }
 
-    const result = await db.collection('services').insertOne(service)
+    const result = await db.collection('services').insertOne(serviceData)
     await logActivity(currentUser!._id, 'marketplace.listing.created', `Created ${data.category || 'listing'}: ${data.name || ''}`)
 
     return NextResponse.json({
-      ...service,
+      ...serviceData,
       id: result.insertedId.toString()
     })
   } catch (error) {
@@ -126,15 +132,20 @@ export async function PUT(request: NextRequest) {
       return forbidden()
     }
 
+    // Re-stamp coordinates on update when none were supplied explicitly, so a
+    // district/sector edit is always reflected in location-sorted search.
+    const updateData = { ...data, image: data.image || null, updatedAt: new Date() }
+    if (updateData.latitude === undefined && updateData.longitude === undefined) {
+      const coords = resolveLocation(updateData.district, updateData.sector)
+      if (coords) {
+        updateData.latitude = coords.lat
+        updateData.longitude = coords.lng
+      }
+    }
+
     const result = await db.collection('services').updateOne(
       { _id: new ObjectId(id) },
-      {
-        $set: {
-          ...data,
-          image: data.image || null,
-          updatedAt: new Date()
-        }
-      }
+      { $set: updateData }
     )
 
     if (result.matchedCount === 0) {

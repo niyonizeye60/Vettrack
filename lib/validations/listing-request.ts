@@ -29,6 +29,9 @@ export const listingRequestSchema = z.object({
   sector: z.string().trim().max(80).optional().or(z.literal("")),
   village: z.string().trim().max(80).optional().or(z.literal("")),
   photos: z.array(z.string().min(1)).min(1, "Add at least one photo").max(MAX_LISTING_PHOTOS),
+  /** Optional exact spot from device GPS; district/sector center is used when absent. */
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
   /** Optional link back to the farmer's own herd record. */
   animalId: z.string().trim().optional().or(z.literal("")),
 })

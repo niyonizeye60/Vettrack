@@ -34,12 +34,15 @@ SUPERADMIN_SETUP.md
 /scripts/*
 !/scripts/fix-manifest.cjs
 !/scripts/mark-dynamic.mjs
+!/scripts/generate-rwanda-coordinates.mjs
+!/scripts/sync-rwanda-data.mjs
+!/scripts/verify-rwanda-geo.mjs
 
 # calendar feature (not ready to ship)
 /app/(veterinary)/veterinary/calendar/
 
-# temporary scratch repo used for parsing Rwanda geo data
-/tmp-rwanda-repo/
+# Rwanda geo source data (large JSON, re-downloadable from GADM)
+scripts/data/gadm41_RWA_3.json
 
 # listing photos uploaded in local development (production uses Vercel Blob)
 /public/listings/

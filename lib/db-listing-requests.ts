@@ -1,5 +1,6 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
+import { resolveLocation } from "@/lib/rwanda-geo"
 import type { ListingRequestInput, ListingRequestStatus } from "@/lib/validations/listing-request"
 
 const DB_NAME = "ntdm_animal_hospital"
@@ -29,6 +30,8 @@ export interface ListingRequest {
   district: string
   sector: string | null
   village: string | null
+  latitude: number | null
+  longitude: number | null
   photos: string[]
   status: ListingRequestStatus
   reviewedBy: ObjectId | null
@@ -127,6 +130,8 @@ export async function createListingRequest(
     district: input.district.trim(),
     sector: emptyToNull(input.sector),
     village: emptyToNull(input.village),
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
     photos: input.photos,
     status: "pending",
     reviewedBy: null,
@@ -225,6 +230,10 @@ export async function approveRequest(
     district: request.district,
     sector: request.sector ?? "",
     village: request.village ?? "",
+    // Prefer the farmer's own GPS pin; fall back to sector/district center so
+    // every published listing is location-searchable.
+    latitude: request.latitude ?? resolveLocation(request.district, request.sector)?.lat ?? null,
+    longitude: request.longitude ?? resolveLocation(request.district, request.sector)?.lng ?? null,
     // Seller contact rides along but is stripped from public API responses -
     // see canViewSellerContact in lib/roles.ts. It is what the connection fee buys.
     sellerPhone: request.sellerPhone,
@@ -327,6 +336,8 @@ export function serializeRequest(request: ListingRequest) {
     district: request.district,
     sector: request.sector,
     village: request.village,
+    latitude: request.latitude ?? null,
+    longitude: request.longitude ?? null,
     photos: request.photos,
     status: request.status,
     reviewNote: request.reviewNote,
