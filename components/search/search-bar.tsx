@@ -5,6 +5,9 @@ import { Search, MapPin, Loader2, Navigation, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { rwandaData } from "@/lib/rwanda-data"
+import { districtCenter } from "@/lib/rwanda-geo"
 
 interface SearchResult {
   type: string
@@ -39,31 +42,32 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
   const [userLat, setUserLat] = useState<number | null>(null)
   const [userLng, setUserLng] = useState<number | null>(null)
   const [locationDetected, setLocationDetected] = useState(false)
+  const [district, setDistrict] = useState("all")
   const inputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<NodeJS.Timeout>()
+  const searchSeqRef = useRef(0)
 
-  // Detect user location on mount
+  // Detect user location on mount; when it arrives, re-run the current query
+  // so results reflect the real position (fixes the race where the first
+  // keystroke fired before GPS resolved).
   useEffect(() => {
-    if (navigator.geolocation && !locationDetected) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLat(pos.coords.latitude)
-          setUserLng(pos.coords.longitude)
-          setLocationDetected(true)
-        },
-        () => {
-          // Silently fail — search works without location
-          setLocationDetected(true)
-        },
-        { timeout: 5000 }
-      )
-    } else {
-      setLocationDetected(true)
-    }
+    if (locationDetected || !navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLat(pos.coords.latitude)
+        setUserLng(pos.coords.longitude)
+        setLocationDetected(true)
+      },
+      () => {
+        // Silently fail — search works without location
+        setLocationDetected(true)
+      },
+      { timeout: 5000 }
+    )
   }, [locationDetected])
 
-  const doSearch = useCallback(async (q: string) => {
+  const doSearch = useCallback(async (q: string, d: string) => {
     if (!q.trim()) {
       setResults([])
       setShowResults(false)
@@ -71,28 +75,46 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
     }
 
     setLoading(true)
+    const seq = ++searchSeqRef.current
     try {
       const params = new URLSearchParams({ q: q.trim() })
-      if (userLat && userLng) {
+      // A chosen district anchors the search there; otherwise use live GPS.
+      if (d !== "all") {
+        const c = districtCenter(d)
+        params.set("lat", c.lat.toString())
+        params.set("lng", c.lng.toString())
+      } else if (userLat !== null && userLng !== null) {
         params.set("lat", userLat.toString())
         params.set("lng", userLng.toString())
-        params.set("maxDistance", "500")
       }
+      params.set("maxDistance", "500")
       const res = await fetch(`/api/search?${params}`)
       const data = await res.json()
+      // Ignore stale responses: a newer search (GPS re-run, district change,
+      // keystroke) must always win, even if an older request resolves last.
+      if (seq !== searchSeqRef.current) return
       setResults(data.results || [])
       setShowResults(true)
     } catch (err) {
       console.error("Search error:", err)
     } finally {
-      setLoading(false)
+      if (seq === searchSeqRef.current) setLoading(false)
     }
   }, [userLat, userLng])
+
+  // When GPS resolves (or a district changes), refresh the visible results so
+  // they reflect the new anchor.
+  useEffect(() => {
+    if (locationDetected && query.trim()) {
+      doSearch(query, district)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationDetected])
 
   const handleInput = (value: string) => {
     setQuery(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => doSearch(value), 300)
+    debounceRef.current = setTimeout(() => doSearch(value, district), 300)
   }
 
   // Close dropdown on click outside
@@ -107,6 +129,12 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
 
+  // Re-run the search when the district filter changes (query kept as-is).
+  const handleDistrictChange = (value: string) => {
+    setDistrict(value)
+    if (query.trim()) doSearch(query, value)
+  }
+
   const clearSearch = () => {
     setQuery("")
     setResults([])
@@ -115,10 +143,12 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
   }
 
   const isHero = variant === "hero"
+  const districts = Object.keys(rwandaData).sort()
 
   return (
-    <div className={`relative w-full mx-auto ${isHero ? "max-w-xl" : "max-w-md"}`}>
-      <div className="relative">
+    <div className={`relative w-full mx-auto ${isHero ? "max-w-2xl" : "max-w-md"}`}>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
         {isHero ? (
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/60" />
         ) : (
@@ -148,10 +178,34 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
             )}
           </button>
         )}
+        </div>
+
+        <div className="relative w-40 flex-shrink-0">
+          <Select value={district} onValueChange={handleDistrictChange}>
+            <SelectTrigger
+              className={`w-full h-14 text-sm rounded-full ${
+                isHero
+                  ? "bg-white/15 border-white/30 text-white [&>svg]:text-white/60"
+                  : "bg-white/90 border-gray-200"
+              } shadow-sm`}
+            >
+              <span className="flex items-center gap-1.5 min-w-0">
+                <MapPin className="h-4 w-4 flex-shrink-0 opacity-60" />
+                <SelectValue placeholder="District" />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All districts</SelectItem>
+              {districts.map((d) => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Results dropdown */}
-      {showResults && (
+      {showResults && query && (
         <div
           ref={dropdownRef}
           className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-xl z-[100] max-h-96 overflow-y-auto"
@@ -203,6 +257,16 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
                   + {results.length - 15} more results
                 </div>
               )}
+              {/* Jump to the full distance-sorted view on /services */}
+              <div className="px-4 py-2.5 border-t border-gray-100">
+                <Link
+                  href={`/services?q=${encodeURIComponent(query)}`}
+                  onClick={() => setShowResults(false)}
+                  className="block text-center text-sm font-medium text-primary hover:underline"
+                >
+                  See all results
+                </Link>
+              </div>
             </div>
           )}
         </div>

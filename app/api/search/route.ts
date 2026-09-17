@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         price: svc.price,
         category,
         image: svc.image || "",
-        distance: distance ? Math.round(distance * 10) / 10 : undefined,
+        distance: distance !== undefined ? Math.round(distance * 10) / 10 : undefined,
         latitude: svc.latitude,
         longitude: svc.longitude,
         href,

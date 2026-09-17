@@ -4,6 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
+import SearchBar from "@/components/search/search-bar"
 
 const reviewImages = [
   "/reviews/rev1.jpg",
@@ -53,6 +54,10 @@ export default function HeroSection() {
             >
               <Link href="/services">{t('common.learnMore')}</Link>
             </Button>
+          </div>
+
+          <div className="mt-10 max-w-2xl">
+            <SearchBar variant="hero" />
           </div>
 
           <div className="mt-12 flex items-center space-x-4">

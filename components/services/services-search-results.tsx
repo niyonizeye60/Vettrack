@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Navigation, MapPin, Loader2, Search } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { districtCenter, calcDistance } from "@/lib/rwanda-geo"
+import ServicesSearchInput from "@/components/services/services-search-input"
 
 interface ServiceResult {
   type: string
@@ -41,6 +42,7 @@ export default function ServicesSearchResults({ searchParams }: Props) {
   const [error, setError] = useState("")
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [sortBy, setSortBy] = useState<"distance" | "price" | "name">("distance")
+  const searchSeqRef = useRef(0)
 
   // Determine user location from params or detect
   useEffect(() => {
@@ -72,6 +74,7 @@ export default function ServicesSearchResults({ searchParams }: Props) {
 
     setLoading(true)
     setError("")
+    const seq = ++searchSeqRef.current
 
     try {
       const params = new URLSearchParams()
@@ -85,6 +88,10 @@ export default function ServicesSearchResults({ searchParams }: Props) {
 
       const res = await fetch(`/api/search?${params}`)
       const data = await res.json()
+
+      // Ignore stale responses from superseded searches (fast typing,
+      // location/district changes) so an older request can't overwrite.
+      if (seq !== searchSeqRef.current) return
 
       if (res.ok) {
         let items = (data.results || []) as ServiceResult[]
@@ -112,9 +119,9 @@ export default function ServicesSearchResults({ searchParams }: Props) {
         setError(data.error || "Failed to fetch services")
       }
     } catch {
-      setError("Failed to fetch services")
+      if (seq === searchSeqRef.current) setError("Failed to fetch services")
     } finally {
-      setLoading(false)
+      if (seq === searchSeqRef.current) setLoading(false)
     }
   }, [userLocation, searchParams.q, searchParams.district])
 
@@ -137,30 +144,51 @@ export default function ServicesSearchResults({ searchParams }: Props) {
 
   const hasLocation = userLocation !== null
 
+  const searchHeader = (
+    <div className="flex flex-col items-center gap-2">
+      <ServicesSearchInput defaultValue={searchParams.q ?? ""} />
+      <Link
+        href="/services"
+        className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors"
+      >
+        <Search className="h-3.5 w-3.5 rotate-90" />
+        Clear search & browse all services
+      </Link>
+    </div>
+  )
+
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-        <p className="text-gray-500">Searching nearby services...</p>
+      <div className="space-y-6">
+        {searchHeader}
+        <div className="flex flex-col items-center justify-center py-16">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+          <p className="text-gray-500">Searching nearby services...</p>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="text-center py-16">
-        <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-1">Could not load services</h3>
-        <p className="text-sm text-gray-500">{error}</p>
-        <Button variant="outline" onClick={fetchServices} className="mt-4">
-          Try Again
-        </Button>
+      <div className="space-y-6">
+        {searchHeader}
+        <div className="text-center py-16">
+          <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">Could not load services</h3>
+          <p className="text-sm text-gray-500">{error}</p>
+          <Button variant="outline" onClick={fetchServices} className="mt-4">
+            Try Again
+          </Button>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      {searchHeader}
+
       {/* Location Info Bar */}
       <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-100 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">

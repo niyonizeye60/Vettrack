@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
-import ServicesTabs from "@/components/services/services-tabs"
+import ServicesSearchSection from "@/components/services/services-search-section"
 import ServicesBanner from "@/components/services/services-banner"
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default function ServicesPage() {
       <div className="py-16">
         <div className="container-custom">
           <Suspense fallback={null}>
-            <ServicesTabs />
+            <ServicesSearchSection />
           </Suspense>
         </div>
       </div>
