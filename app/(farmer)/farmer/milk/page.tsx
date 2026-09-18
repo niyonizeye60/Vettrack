@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals, logPortalExport } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -27,6 +27,10 @@ interface MilkRecord {
   waterLiters: number | null; foodType: string | null
   foodKg: number | null; foodCost: number | null
   saltKg: number | null; saltCost: number | null
+}
+interface RoutineFields {
+  liters: string; homeConsumption: string; pricePerLiter: string; waterLiters: string
+  foodType: string; foodKg: string; foodCost: string; saltKg: string; saltCost: string
 }
 
 const SESSIONS = ["Morning", "Evening"]
@@ -74,6 +78,67 @@ export default function MilkProductionPage() {
   const [notes, setNotes] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Routine dialog state — one set of default values per session (Morning/Evening)
+  const emptyRoutineFields: RoutineFields = { liters: "", homeConsumption: "", pricePerLiter: "", waterLiters: "", foodType: "", foodKg: "", foodCost: "", saltKg: "", saltCost: "" }
+  const [routineOpen, setRoutineOpen] = useState(false)
+  const [routineTab, setRoutineTab] = useState<"Morning" | "Evening">("Morning")
+  const [routineData, setRoutineData] = useState<Record<"Morning" | "Evening", RoutineFields>>({ Morning: emptyRoutineFields, Evening: emptyRoutineFields })
+  const [routineDraft, setRoutineDraft] = useState<Record<"Morning" | "Evening", RoutineFields>>({ Morning: emptyRoutineFields, Evening: emptyRoutineFields })
+  const routineDataRef = useRef(routineData)
+  useEffect(() => { routineDataRef.current = routineData }, [routineData])
+
+  const routineStorageKey = (farmerId: string) => `vettrack_milk_routine_${farmerId}`
+
+  const openRoutineDialog = () => {
+    setRoutineDraft(routineData)
+    setRoutineTab(session === "Evening" ? "Evening" : "Morning")
+    setRoutineOpen(true)
+  }
+
+  const setRoutineDraftField = (field: keyof RoutineFields, value: string) => {
+    setRoutineDraft(prev => ({ ...prev, [routineTab]: { ...prev[routineTab], [field]: value } }))
+  }
+
+  const isRoutineSessionSet = (sess: "Morning" | "Evening") =>
+    Object.values(routineDraft[sess]).some(v => v !== "")
+
+  const clearRoutineTab = () => {
+    setRoutineDraft(prev => ({ ...prev, [routineTab]: emptyRoutineFields }))
+  }
+
+  const applyRoutineToForm = (sess: "Morning" | "Evening", data: Record<"Morning" | "Evening", RoutineFields>) => {
+    const r = data[sess]
+    if (!r) return
+    setLiters(r.liters)
+    setHomeConsumption(r.homeConsumption)
+    setPricePerLiter(r.pricePerLiter)
+    setWaterLiters(r.waterLiters)
+    setFoodType(r.foodType)
+    setFoodKg(r.foodKg)
+    setFoodCost(r.foodCost)
+    setSaltKg(r.saltKg)
+    setSaltCost(r.saltCost)
+  }
+
+  const saveRoutine = () => {
+    setRoutineData(routineDraft)
+    if (user?._id) {
+      try { localStorage.setItem(routineStorageKey(user._id.toString()), JSON.stringify(routineDraft)) } catch {}
+    }
+    if (!editRecord && (session === "Morning" || session === "Evening")) {
+      applyRoutineToForm(session, routineDraft)
+    }
+    setRoutineOpen(false)
+  }
+
+  // Auto-fill the form with the saved routine values when a session is selected (skip while editing an existing record)
+  useEffect(() => {
+    if (editRecord) return
+    if (session === "Morning" || session === "Evening") {
+      applyRoutineToForm(session, routineDataRef.current)
+    }
+  }, [session, editRecord])
+
   // Filter state
   const [filterCow, setFilterCow] = useState("")
   const [filterSession, setFilterSession] = useState("")
@@ -88,6 +153,13 @@ export default function MilkProductionPage() {
       setUser(userData)
       const animalsData = await getAnimals(userData._id.toString())
       setAnimals(animalsData)
+      try {
+        const stored = localStorage.getItem(routineStorageKey(userData._id.toString()))
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (parsed?.Morning && parsed?.Evening) setRoutineData(parsed)
+        }
+      } catch {}
       await Promise.all([fetchRecords(userData._id.toString()), fetchHomeConsumptionBalance(userData._id.toString())])
       setLoading(false)
     }
@@ -659,10 +731,16 @@ export default function MilkProductionPage() {
         <TabsContent value="record">
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                {editRecord ? t('farmer.editMilkRecord') : t('farmer.newMilkRecord')}
-              </CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  {editRecord ? t('farmer.editMilkRecord') : t('farmer.newMilkRecord')}
+                </CardTitle>
+                <Button type="button" size="sm" onClick={openRoutineDialog} className="rounded-lg gap-1.5 bg-orange-500 hover:bg-orange-600 text-white">
+                  <Milk className="h-3.5 w-3.5" />
+                  {t('farmer.routine')}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -693,6 +771,7 @@ export default function MilkProductionPage() {
                     </SelectContent>
                   </Select>
                   {errors.session && <p className="text-xs text-red-500">{errors.session}</p>}
+                  {!errors.session && !editRecord && <p className="text-xs text-gray-400">{t('farmer.routineHint')}</p>}
                 </div>
 
                 {/* Liters */}
@@ -804,7 +883,7 @@ export default function MilkProductionPage() {
                   {saving ? t('farmer.savingRecord') : editRecord ? t('farmer.updateRecord') : t('farmer.saveRecord')}
                 </Button>
                 {editRecord && (
-                  <Button variant="outline" onClick={resetForm} className="rounded-lg">Cancel</Button>
+                  <Button variant="outline" onClick={() => resetForm()} className="rounded-lg">Cancel</Button>
                 )}
               </div>
             </CardContent>
@@ -1430,6 +1509,109 @@ export default function MilkProductionPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Routine Entry Dialog */}
+      <Dialog open={routineOpen} onOpenChange={setRoutineOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Milk className="h-5 w-5 text-green-600" />
+              {t('farmer.routineDialogTitle')}
+            </DialogTitle>
+            <p className="text-sm text-gray-500">{t('farmer.routineDialogDesc')}</p>
+          </DialogHeader>
+
+          <Tabs value={routineTab} onValueChange={v => setRoutineTab(v as "Morning" | "Evening")}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <TabsList className="grid grid-cols-2 w-full max-w-xs">
+                <TabsTrigger value="Morning" className="gap-1.5">
+                  {t('farmer.morning')}
+                  {isRoutineSessionSet("Morning") && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
+                </TabsTrigger>
+                <TabsTrigger value="Evening" className="gap-1.5">
+                  {t('farmer.evening')}
+                  {isRoutineSessionSet("Evening") && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
+                </TabsTrigger>
+              </TabsList>
+              <Button type="button" variant="ghost" size="sm" onClick={clearRoutineTab} className="text-gray-500 hover:text-red-600 h-8 px-2">
+                {t('common.clear')}
+              </Button>
+            </div>
+
+            {(["Morning", "Evening"] as const).map(sess => (
+              <TabsContent key={sess} value={sess} className="space-y-5 pt-3">
+                {/* Milk & Sales */}
+                <div className="space-y-3">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <span className="w-2 h-2 bg-green-500 rounded-full" />
+                    {t('farmer.routineMilkSales')}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.milkQuantityLiters')}</label>
+                      <Input type="number" min="0" step="0.1" placeholder="e.g. 12.5" value={routineDraft[sess].liters} onChange={e => setRoutineDraftField("liters", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.homeConsumptionLiters')}</label>
+                      <Input type="number" min="0" step="0.1" placeholder="e.g. 2" value={routineDraft[sess].homeConsumption} onChange={e => setRoutineDraftField("homeConsumption", e.target.value)} />
+                      {routineDraft[sess].liters && routineDraft[sess].homeConsumption && (
+                        <p className="text-xs text-green-600">
+                          Sold: {Math.max(0, Number(routineDraft[sess].liters) - Number(routineDraft[sess].homeConsumption)).toFixed(1)}L
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.pricePerLiter')}</label>
+                      <Input type="number" min="0" placeholder="e.g. 500" value={routineDraft[sess].pricePerLiter} onChange={e => setRoutineDraftField("pricePerLiter", e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feeding & Water */}
+                <div className="space-y-3">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <span className="w-2 h-2 bg-sky-500 rounded-full" />
+                    {t('farmer.routineFeeding')}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.waterIntake')}</label>
+                      <Input type="number" min="0" step="0.5" placeholder="e.g. 40" value={routineDraft[sess].waterLiters} onChange={e => setRoutineDraftField("waterLiters", e.target.value)} />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.foodType')}</label>
+                      <Input placeholder="e.g. Hay, Silage, Grass, Concentrate" value={routineDraft[sess].foodType} onChange={e => setRoutineDraftField("foodType", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.foodEaten')}</label>
+                      <Input type="number" min="0" step="0.1" placeholder="e.g. 15" value={routineDraft[sess].foodKg} onChange={e => setRoutineDraftField("foodKg", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.foodCost')}</label>
+                      <Input type="number" min="0" step="0.01" placeholder="e.g. 3000" value={routineDraft[sess].foodCost} onChange={e => setRoutineDraftField("foodCost", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.saltConsumed')}</label>
+                      <Input type="number" min="0" step="0.1" placeholder="e.g. 0.5" value={routineDraft[sess].saltKg} onChange={e => setRoutineDraftField("saltKg", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.saltCost')}</label>
+                      <Input type="number" min="0" step="0.01" placeholder="e.g. 500" value={routineDraft[sess].saltCost} onChange={e => setRoutineDraftField("saltCost", e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
+
+          <div className="flex gap-3 pt-2">
+            <Button onClick={saveRoutine} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
+              {t('farmer.applyRoutine')}
+            </Button>
+            <Button variant="outline" onClick={() => setRoutineOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
