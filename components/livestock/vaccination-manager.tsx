@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ShieldPlus, Plus, Pencil, Trash2, History, BarChart3, CalendarClock, AlertCircle, Users, DollarSign, Download, FileText } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
 
 type SubjectType = "animal" | "calf"
 
@@ -158,6 +159,7 @@ function DueBadge({ dueDate }: { dueDate: string }) {
 
 export default function VaccinationManager({ farmerId, can, showHeader = true }: VaccinationManagerProps) {
   const { t } = useLanguage()
+  const { submitWithLocationGate, dialog: locationGateDialog } = useLocationGatedRequest()
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [vets, setVets] = useState<Vet[]>([])
   const [records, setRecords] = useState<VaccinationRecord[]>([])
@@ -365,9 +367,13 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
     }
 
     if (editRecord) {
-      await fetch("/api/vaccination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body }) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/vaccination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
+      )
     } else {
-      await fetch("/api/vaccination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/vaccination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+      )
     }
 
     await fetchRecords(farmerId)
@@ -401,7 +407,10 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
   }
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/vaccination?id=${id}`, { method: "DELETE" })
+    await submitWithLocationGate((loc) => {
+      const params = new URLSearchParams({ id, ...toQueryFields(loc) })
+      return fetch(`/api/vaccination?${params.toString()}`, { method: "DELETE" })
+    })
     await fetchRecords(farmerId)
     setDeleteId(null)
   }
@@ -1476,6 +1485,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {locationGateDialog}
     </div>
   )
 }

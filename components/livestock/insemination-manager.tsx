@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Syringe, Plus, Pencil, Trash2, History, ChevronDown, Baby, FlaskConical, BarChart3, Download, FileText } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
 
 interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null; status?: string | null }
 interface Vet { _id: string; name: string; specialization: string }
@@ -98,6 +99,7 @@ function BirthCountdown({ targetDate }: { targetDate: string }) {
 
 export default function InseminationManager({ farmerId, can, showHeader = true }: InseminationManagerProps) {
   const { t } = useLanguage()
+  const { submitWithLocationGate, dialog: locationGateDialog } = useLocationGatedRequest()
   const [animals, setAnimals] = useState<Animal[]>([])
   const [vets, setVets] = useState<Vet[]>([])
   // include females + animals with undefined/null gender (exclude confirmed males and deceased animals)
@@ -258,9 +260,13 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     }
 
     if (editRecord) {
-      await fetch("/api/insemination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body }) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/insemination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
+      )
     } else {
-      await fetch("/api/insemination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/insemination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+      )
     }
 
     await fetchRecords(farmerId)
@@ -271,19 +277,22 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   // Mark the previous attempt as a failed pregnancy (keeping it in history) and
   // pre-fill a fresh insemination record for the same animal.
   const handleReinseminate = async (r: InseminationRecord) => {
-    await fetch("/api/insemination", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: r._id,
-        animalId: r.animalId, animalName: r.animalName, semenTypes: r.semenTypes,
-        semenPrice: r.semenPrice, vetPrice: r.vetPrice, injectionTime: r.injectionTime,
-        expectedBirthDate: r.expectedBirthDate, deliveredBabies: r.deliveredBabies,
-        vetName: r.vetName, vetOrigin: r.vetOrigin, date: r.date, notes: r.notes,
-        previousRecordId: r.previousRecordId || null,
-        pregnancyFailed: true,
-      }),
-    })
+    await submitWithLocationGate((loc) =>
+      fetch("/api/insemination", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: r._id,
+          animalId: r.animalId, animalName: r.animalName, semenTypes: r.semenTypes,
+          semenPrice: r.semenPrice, vetPrice: r.vetPrice, injectionTime: r.injectionTime,
+          expectedBirthDate: r.expectedBirthDate, deliveredBabies: r.deliveredBabies,
+          vetName: r.vetName, vetOrigin: r.vetOrigin, date: r.date, notes: r.notes,
+          previousRecordId: r.previousRecordId || null,
+          pregnancyFailed: true,
+          ...loc,
+        }),
+      })
+    )
     await fetchRecords(farmerId)
 
     resetForm()
@@ -314,7 +323,10 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   }
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/insemination?id=${id}`, { method: "DELETE" })
+    await submitWithLocationGate((loc) => {
+      const params = new URLSearchParams({ id, ...toQueryFields(loc) })
+      return fetch(`/api/insemination?${params.toString()}`, { method: "DELETE" })
+    })
     await fetchRecords(farmerId)
     setDeleteId(null)
   }
@@ -1376,6 +1388,8 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {locationGateDialog}
     </div>
   )
 }

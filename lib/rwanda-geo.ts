@@ -40,6 +40,17 @@ export interface Coordinates {
   lng: number
 }
 
+/**
+ * GADM's name for an app-registered district/sector pair, applying the known
+ * spelling variants above. Null when either half is missing.
+ */
+export function gadmSectorName(district?: string | null, sector?: string | null): string | null {
+  const d = district?.trim()
+  const s = sector?.trim()
+  if (!d || !s) return null
+  return SECTOR_ALIASES[`${d}|${s}`] ?? s
+}
+
 /** Resolve a district/sector pair to coordinates, with layered fallbacks. */
 export function resolveLocation(
   district?: string | null,
@@ -49,8 +60,7 @@ export function resolveLocation(
   const s = sector?.trim()
 
   if (d && s) {
-    const aliasKey = `${d}|${s}`
-    const gadmName = SECTOR_ALIASES[aliasKey] ?? s
+    const gadmName = gadmSectorName(d, s) ?? s
     const hit = sectorCoordinates[d]?.[gadmName]
     if (hit) return hit
     // Sector names repeat across districts - try it anywhere, but only when

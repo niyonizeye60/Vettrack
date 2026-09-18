@@ -99,7 +99,11 @@ export default function FarmerSettingsPage() {
     setSaving(true)
     try {
       const name = [firstName, lastName].filter(Boolean).join(" ").trim() || firstName
-      const payload: Record<string, string> = { name, email, phone, district, sector, bio }
+      const payload: Record<string, string> = { name, email, phone, bio }
+      if (user?.isTestAccount) {
+        payload.district = district
+        payload.sector = sector
+      }
       if (password) {
         payload.password = password
         payload.currentPassword = currentPassword
@@ -230,21 +234,41 @@ export default function FarmerSettingsPage() {
             />
           </div>
 
-          {/* District + Sector */}
+          {/* District + Sector - read-only: this is the farm's registered location used to
+              gate insemination/disease/vaccination actions to on-site use, so it can't be
+              self-edited. Contact an admin to correct it. Test accounts (superadmin-flagged)
+              are exempt so QA can simulate different farm locations. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="district">
                 <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("farmer.district") || "District"}</span>
               </Label>
-              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="e.g., Kigali" />
+              <Input
+                id="district"
+                value={district}
+                disabled={!user?.isTestAccount}
+                onChange={(e) => setDistrict(e.target.value)}
+                placeholder="e.g., Kigali"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sector">
                 <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("farmer.sector") || "Sector"}</span>
               </Label>
-              <Input id="sector" value={sector} onChange={(e) => setSector(e.target.value)} placeholder="e.g., Nyarugenge" />
+              <Input
+                id="sector"
+                value={sector}
+                disabled={!user?.isTestAccount}
+                onChange={(e) => setSector(e.target.value)}
+                placeholder="e.g., Nyarugenge"
+              />
             </div>
           </div>
+          {!user?.isTestAccount && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              {t("farmer.districtSectorLocked") || "Your district and sector are locked to your farm's registered location. Contact an admin to change them."}
+            </p>
+          )}
 
           {/* Bio */}
           <div className="space-y-1.5">

@@ -7,6 +7,7 @@ import {
   type PermissionMap,
   type PermissionModule,
 } from "./permissions"
+import { checkSectorMatch, type ActorPosition, type NearestSector } from "./geofence"
 
 const DB = "ntdm_animal_hospital"
 const GRANTS = "farm_vet_grants"
@@ -121,6 +122,80 @@ export async function resolveFarmAccess(
   }
 
   return { allowed: true, via: "grant", grant }
+}
+
+export type LocationCheck =
+  | { allowed: true }
+  | { allowed: false; status: 403; reason: string; code: "SECTOR_MISMATCH" | "LOCATION_REQUIRED"; nearestSector: NearestSector | null }
+
+/**
+ * Gate a create/update/delete on the actor currently being in the farm's registered
+ * sector (see lib/geofence.ts). A farmer with no district/sector on file - which
+ * shouldn't happen since both are required at registration - fails OPEN rather than
+ * locking their account out of every write.
+ *
+ * This is a hard block: there is no override path. A rejected request must be retried
+ * from the right location, not pushed through anyway.
+ *
+ * `actingUserIsTestAccount` skips the check entirely - accounts a superadmin has
+ * flagged isTestAccount (same flag that already suppresses their activity log
+ * entries, see lib/activity-log.ts) are QA/demo accounts that need to exercise
+ * these operations without being physically on a farm.
+ */
+export async function verifyOnFarmLocation(
+  farmerId: string,
+  actor: ActorPosition | null,
+  actingUserIsTestAccount?: unknown
+): Promise<LocationCheck> {
+  if (actingUserIsTestAccount) {
+    return { allowed: true }
+  }
+
+  const client = await clientPromise
+  const db = client.db(DB)
+  const farmer = await withDbRetry(() =>
+    db.collection("users").findOne({ _id: new ObjectId(farmerId) }, { projection: { district: 1, sector: 1 } })
+  )
+
+  const result = checkSectorMatch(farmer?.district, farmer?.sector, actor)
+
+  if (result.status === "match" || result.status === "not_registered") {
+    return { allowed: true }
+  }
+
+  if (result.status === "unavailable") {
+    return {
+      allowed: false,
+      status: 403,
+      reason: "Location is required to do this - enable location access and try again",
+      code: "LOCATION_REQUIRED",
+      nearestSector: null,
+    }
+  }
+
+  return {
+    allowed: false,
+    status: 403,
+    reason: `This action can only be done in the ${farmer?.sector} sector`,
+    code: "SECTOR_MISMATCH",
+    nearestSector: result.nearestSector,
+  }
+}
+
+/**
+ * Pull the actor's reported position off a request payload. Shared by every route
+ * that calls verifyOnFarmLocation, since the four record routes (insemination,
+ * disease, vaccination, treatment-doses) all pass it through the same couple of
+ * fields on the JSON body (POST/PUT) or query string (DELETE).
+ */
+export function extractLocationFields(source: Record<string, any>): { actor: ActorPosition | null } {
+  const lat = Number(source.lat)
+  const lng = Number(source.lng)
+  const actor =
+    Number.isFinite(lat) && Number.isFinite(lng)
+      ? { lat, lng, accuracy: source.accuracy != null ? Number(source.accuracy) || null : null }
+      : null
+  return { actor }
 }
 
 export async function listGrantsForFarmer(farmerId: string) {

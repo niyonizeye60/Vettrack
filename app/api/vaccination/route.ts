@@ -4,7 +4,10 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
-import { resolveFarmAccess, logVetAction, diffRecord, provenanceFor, subjectBelongsToFarm, isRecordSubjectType } from "@/lib/farm-access"
+import {
+  resolveFarmAccess, logVetAction, diffRecord, provenanceFor, subjectBelongsToFarm, isRecordSubjectType,
+  verifyOnFarmLocation, extractLocationFields,
+} from "@/lib/farm-access"
 
 const DB = "ntdm_animal_hospital"
 const MODULE = "vaccination" as const
@@ -71,6 +74,12 @@ export async function POST(req: NextRequest) {
     }
     if (!(await subjectBelongsToFarm(subjectType, subjectId, farmerId))) {
       return NextResponse.json({ error: `That ${subjectType} is not on this farm` }, { status: 403 })
+    }
+
+    const { actor } = extractLocationFields(body)
+    const location = await verifyOnFarmLocation(farmerId, actor, currentUser.isTestAccount)
+    if (!location.allowed) {
+      return NextResponse.json({ error: location.reason, code: location.code }, { status: location.status })
     }
 
     const client = await clientPromise
@@ -167,6 +176,12 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    const { actor } = extractLocationFields(body)
+    const location = await verifyOnFarmLocation(existing.farmerId, actor, currentUser.isTestAccount)
+    if (!location.allowed) {
+      return NextResponse.json({ error: location.reason, code: location.code }, { status: location.status })
+    }
+
     const updated = {
       subjectType: nextSubjectType,
       subjectId: nextSubjectId,
@@ -239,6 +254,12 @@ export async function DELETE(req: NextRequest) {
     })
     if (!access.allowed) {
       return NextResponse.json({ error: access.reason }, { status: access.status })
+    }
+
+    const { actor } = extractLocationFields(Object.fromEntries(searchParams))
+    const location = await verifyOnFarmLocation(existing.farmerId, actor, currentUser.isTestAccount)
+    if (!location.allowed) {
+      return NextResponse.json({ error: location.reason, code: location.code }, { status: location.status })
     }
 
     await db.collection("vaccination_records").deleteOne({ _id: new ObjectId(id) })

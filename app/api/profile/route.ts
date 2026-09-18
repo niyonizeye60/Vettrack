@@ -5,7 +5,15 @@ import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { hashPassword, verifyPassword } from "@/lib/password"
 
-const ALLOWED_FIELDS = ["name", "email", "phone", "password", "licenseNumber", "specialization", "bio", "district", "sector"] as const
+// district/sector are deliberately excluded: they anchor the on-farm location
+// check in lib/farm-access.ts (verifyOnFarmLocation), so letting a farmer
+// self-edit them would let them "move" their farm to wherever they're
+// currently standing and defeat that check entirely. Changing them requires
+// an admin, via app/api/admin-users/[id]/route.ts (which is audit-logged) -
+// except for accounts a superadmin has flagged isTestAccount, who are exempt
+// so QA can simulate different farm locations without superadmin involvement.
+const ALLOWED_FIELDS = ["name", "email", "phone", "password", "licenseNumber", "specialization", "bio"] as const
+const TEST_ACCOUNT_ONLY_FIELDS = ["district", "sector"] as const
 
 export async function GET() {
   try {
@@ -28,7 +36,10 @@ async function updateProfile(request: NextRequest) {
 
     const body = await request.json()
     const updateData: Record<string, any> = {}
-    for (const field of ALLOWED_FIELDS) {
+    const fields: readonly string[] = currentUser.isTestAccount
+      ? [...ALLOWED_FIELDS, ...TEST_ACCOUNT_ONLY_FIELDS]
+      : ALLOWED_FIELDS
+    for (const field of fields) {
       if (typeof body[field] === "string" && body[field] !== "") {
         updateData[field] = body[field]
       }

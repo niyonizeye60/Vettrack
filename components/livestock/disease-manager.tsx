@@ -17,6 +17,7 @@ import { ShieldAlert, Plus, Pencil, Trash2, BarChart3, History, Activity, CheckC
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
 
 interface Animal { _id: string; name: string; type: string; insuranceId?: string | null; earTagId?: string | null }
 interface Doctor { _id: string; name: string; specialization: string }
@@ -73,6 +74,7 @@ const today = new Date().toISOString().split("T")[0]
 
 export default function DiseaseManager({ farmerId, can, showHeader = true }: DiseaseManagerProps) {
   const { t } = useLanguage()
+  const { submitWithLocationGate, dialog: locationGateDialog } = useLocationGatedRequest()
   const [animals, setAnimals] = useState<Animal[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [records, setRecords] = useState<DiseaseRecord[]>([])
@@ -253,9 +255,13 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       status, notes, veterinarianName, vetOrigin,
     }
     if (editRecord) {
-      await fetch("/api/diseases", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body }) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/diseases", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
+      )
     } else {
-      await fetch("/api/diseases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/diseases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+      )
     }
     await fetchRecords(farmerId)
     resetForm()
@@ -283,9 +289,13 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       vetCost, notes: doseNotes,
     }
     if (editDose) {
-      await fetch("/api/treatment-doses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editDose._id, ...body }) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/treatment-doses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editDose._id, ...body, ...loc }) })
+      )
     } else {
-      await fetch("/api/treatment-doses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      await submitWithLocationGate((loc) =>
+        fetch("/api/treatment-doses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+      )
     }
     await fetchDoses(farmerId)
     resetDoseForm()
@@ -323,13 +333,19 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
   }
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/diseases?id=${id}`, { method: "DELETE" })
+    await submitWithLocationGate((loc) => {
+      const params = new URLSearchParams({ id, ...toQueryFields(loc) })
+      return fetch(`/api/diseases?${params.toString()}`, { method: "DELETE" })
+    })
     await fetchRecords(farmerId)
     setDeleteId(null)
   }
 
   const handleDeleteDose = async (id: string) => {
-    await fetch(`/api/treatment-doses?id=${id}`, { method: "DELETE" })
+    await submitWithLocationGate((loc) => {
+      const params = new URLSearchParams({ id, ...toQueryFields(loc) })
+      return fetch(`/api/treatment-doses?${params.toString()}`, { method: "DELETE" })
+    })
     await fetchDoses(farmerId)
     setDeleteDoseId(null)
   }
@@ -1792,6 +1808,8 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {locationGateDialog}
     </div>
   )
 }
