@@ -95,7 +95,7 @@ export default function AboutContent() {
                 image: "/Charline Rutagengwa.jpg",
                 name: "Dr. Charline Rutagengwa",
                 role: "Co-founder & Sales and Marketing Officer",
-                specialty: "Small Animal Medicine",
+                specialty: "Veterinary consultancy, wildlife animal medicine or research",
               },
               {
                 image: "/Gerard Sano.jpg",
@@ -155,7 +155,7 @@ export default function AboutContent() {
           ))}
         </div>
 
-        <div className="mt-20">
+        {/* <div className="mt-20">
           <h2 className="heading-lg text-center mb-12">{t('about.techTeam')}</h2>
           {[
             {
@@ -183,7 +183,7 @@ export default function AboutContent() {
               </Link>
             </div>
           ))}
-        </div>
+        </div> */}
         <br />
 
         <div className="text-center">
