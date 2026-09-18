@@ -135,7 +135,15 @@ export default function MilkProductionPage() {
   useEffect(() => {
     if (editRecord) return
     if (session === "Morning" || session === "Evening") {
+      const sessionDefaults = routineDataRef.current[session]
+      const hasDefaults = Object.values(sessionDefaults).some(v => v !== "")
       applyRoutineToForm(session, routineDataRef.current)
+      if (hasDefaults) {
+        toast({
+          title: t('farmer.sessionDefaultsApplied'),
+          description: `${session === "Morning" ? t('farmer.morning') : t('farmer.evening')} — ${t('farmer.sessionDefaultsAppliedDesc')}`,
+        })
+      }
     }
   }, [session, editRecord])
 
