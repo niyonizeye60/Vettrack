@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     let bannerUrl: string
 
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID) {
       // Production: upload to Vercel Blob
       const { put } = await import("@vercel/blob")
       const blob = await put(`banners/${filename}`, file, { access: "public" })

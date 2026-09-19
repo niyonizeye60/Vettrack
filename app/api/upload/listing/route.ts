@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     let url: string
 
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID) {
       const { put } = await import("@vercel/blob")
       const blob = await put(`listings/${filename}`, file, { access: "public" })
       url = blob.url
