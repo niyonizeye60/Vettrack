@@ -1,7 +1,9 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { resolveLocation } from "@/lib/rwanda-geo"
-import type { ListingRequestInput, ListingRequestStatus } from "@/lib/validations/listing-request"
+import type { ListingRequestInput, ListingRequestStatus, RemovalStatus } from "@/lib/validations/listing-request"
+import { setListingHidden, type ListingVisibility } from "@/lib/db-listings"
+import { notifyFarmer, notifySuperadmin } from "@/lib/marketplace-notifications"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -37,9 +39,33 @@ export interface ListingRequest {
   reviewedBy: ObjectId | null
   reviewedAt: Date | null
   reviewNote: string | null
+  /**
+   * Every rejection this request has been through, oldest first. Resubmitting clears
+   * `reviewNote` (the request is pending again), so the reasons live on here for the
+   * reviewer to check the farmer actually addressed them. Absent on older documents.
+   */
+  reviewHistory?: ReviewHistoryEntry[]
+  resubmitCount?: number
   publishedServiceId: string | null
+  /** The farmer's request to have the published listing taken down. Absent until they ask. */
+  removal?: RemovalRequest | null
   createdAt: Date
   updatedAt: Date
+}
+
+export interface RemovalRequest {
+  status: RemovalStatus
+  reason: string | null
+  requestedAt: Date
+  reviewedBy: ObjectId | null
+  reviewedAt: Date | null
+  reviewNote: string | null
+}
+
+export interface ReviewHistoryEntry {
+  note: string
+  reviewedAt: Date | null
+  reviewedBy: ObjectId | null
 }
 
 export class ListingRequestError extends Error {}
@@ -57,54 +83,6 @@ async function getCollection() {
 function emptyToNull(value: string | undefined | null): string | null {
   const trimmed = (value ?? "").trim()
   return trimmed.length > 0 ? trimmed : null
-}
-
-/** Notify a farmer about their request. Mirrors the shape used elsewhere in the app. */
-async function notifyFarmer(
-  farmerId: string,
-  title: string,
-  message: string,
-  actionUrl: string
-) {
-  try {
-    const db = await getDb()
-    await db.collection("notifications").insertOne({
-      title,
-      message,
-      type: "marketplace",
-      priority: "normal",
-      read: false,
-      deletedBy: [],
-      userId: new ObjectId(farmerId),
-      actionUrl,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(),
-    })
-  } catch (error) {
-    // A missing notification must never fail the decision it accompanies.
-    console.error("Failed to insert marketplace notification:", error)
-  }
-}
-
-/** Tell superadmin a new request needs review - the queue otherwise has no push signal. */
-async function notifySuperadmin(title: string, message: string, actionUrl: string) {
-  try {
-    const db = await getDb()
-    await db.collection("notifications").insertOne({
-      title,
-      message,
-      type: "marketplace",
-      priority: "normal",
-      role: "superadmin",
-      read: false,
-      deletedBy: [],
-      actionUrl,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      createdAt: new Date(),
-    })
-  } catch (error) {
-    console.error("Failed to insert superadmin marketplace notification:", error)
-  }
 }
 
 export async function createListingRequest(
@@ -162,7 +140,10 @@ export async function listRequests(status?: ListingRequestStatus): Promise<Listi
   const collection = await getCollection()
   const filter = status ? { status } : {}
   // Oldest first while pending, so the queue is genuinely first-come-first-served.
-  const sort: Record<string, 1 | -1> = status === "pending" ? { createdAt: 1 } : { updatedAt: -1 }
+  // updatedAt is the time a request entered the queue: nothing touches a pending
+  // request except submitting or resubmitting it, so a resubmission rejoins at the
+  // back rather than jumping ahead on its original createdAt.
+  const sort: Record<string, 1 | -1> = status === "pending" ? { updatedAt: 1 } : { updatedAt: -1 }
   return collection.find(filter).sort(sort).toArray()
 }
 
@@ -302,9 +283,84 @@ export async function rejectRequest(
   await notifyFarmer(
     request.farmerId,
     "Your listing request was not approved",
-    `"${request.title}" was not published. ${note.trim()}`,
+    `"${request.title}" was not published. ${note.trim()} You can update it and send it again.`,
     "/farmer/listings"
   )
+}
+
+/**
+ * A farmer revising a rejected request and sending it back for another review.
+ *
+ * The same document goes back to "pending" rather than a new one being created, so
+ * the farmer's list stays one row per animal and the reviewer can see the history.
+ * The `status: "rejected"` + `farmerId` filter is the guard: only the owner can do
+ * it, only from a rejected state, and a double-click can't queue it twice.
+ */
+export async function resubmitRequest(
+  id: string,
+  farmer: { _id: string; name: string; phone?: string; email: string },
+  input: ListingRequestInput
+): Promise<ListingRequest> {
+  const collection = await getCollection()
+
+  const request = await getRequestById(id)
+  if (!request || request.farmerId !== farmer._id) throw new ListingRequestError("Request not found")
+  if (request.status !== "rejected") {
+    throw new ListingRequestError("Only a request that was not approved can be resubmitted")
+  }
+
+  const now = new Date()
+  const updated = await collection.findOneAndUpdate(
+    { _id: new ObjectId(id), farmerId: farmer._id, status: "rejected" },
+    {
+      $set: {
+        // Refreshed from the account, so a phone number fixed since the first attempt
+        // is the one that reaches buyers.
+        farmerName: farmer.name,
+        sellerPhone: (farmer.phone ?? "").trim(),
+        sellerEmail: farmer.email,
+        animalId: emptyToNull(input.animalId),
+        title: input.title.trim(),
+        animalType: input.animalType,
+        breed: emptyToNull(input.breed),
+        age: emptyToNull(input.age),
+        sex: input.sex ?? null,
+        proposedPrice: input.proposedPrice,
+        description: input.description.trim(),
+        district: input.district.trim(),
+        sector: emptyToNull(input.sector),
+        village: emptyToNull(input.village),
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        photos: input.photos,
+        status: "pending",
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewNote: null,
+        updatedAt: now,
+      },
+      $inc: { resubmitCount: 1 },
+      $push: {
+        reviewHistory: {
+          note: request.reviewNote ?? "",
+          reviewedAt: request.reviewedAt,
+          reviewedBy: request.reviewedBy,
+        },
+      },
+    },
+    { returnDocument: "after" }
+  )
+  if (!updated) {
+    throw new ListingRequestError("This request can no longer be resubmitted")
+  }
+
+  await notifySuperadmin(
+    "Listing request resubmitted",
+    `${farmer.name} revised "${updated.title}" and sent it back for review.`,
+    "/marketplace/requests"
+  )
+
+  return updated
 }
 
 /** A farmer pulling their own request back - only possible while it is still pending. */
@@ -319,9 +375,154 @@ export async function withdrawRequest(id: string, farmerId: string): Promise<voi
   }
 }
 
+/**
+ * A farmer asking for their published listing to come down (sold, no longer needed).
+ *
+ * The seller never hides a listing themselves - this only queues the ask, and staff
+ * decide. The `removal.status !== "pending"` filter keeps it to one open ask at a time,
+ * so a double-click can't queue it twice; a declined ask can be made again.
+ */
+export async function requestRemoval(
+  id: string,
+  farmer: { _id: string; name: string },
+  reason?: string
+): Promise<ListingRequest> {
+  const collection = await getCollection()
+  const db = await getDb()
+
+  const request = await getRequestById(id)
+  if (!request || request.farmerId !== farmer._id) throw new ListingRequestError("Request not found")
+  if (request.status !== "approved" || !request.publishedServiceId || !ObjectId.isValid(request.publishedServiceId)) {
+    throw new ListingRequestError("Only a published listing can be removed")
+  }
+
+  const listing = await db
+    .collection("services")
+    .findOne({ _id: new ObjectId(request.publishedServiceId) }, { projection: { hidden: 1 } })
+  if (!listing) throw new ListingRequestError("This listing is no longer on the marketplace")
+  if (listing.hidden === true) throw new ListingRequestError("This listing is already hidden")
+
+  const updated = await collection.findOneAndUpdate(
+    { _id: new ObjectId(id), farmerId: farmer._id, status: "approved", "removal.status": { $ne: "pending" } } as any,
+    {
+      $set: {
+        removal: {
+          status: "pending",
+          reason: emptyToNull(reason),
+          requestedAt: new Date(),
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewNote: null,
+        },
+      },
+    },
+    { returnDocument: "after" }
+  )
+  if (!updated) throw new ListingRequestError("A removal request is already waiting for review")
+
+  await notifySuperadmin(
+    "Listing removal requested",
+    `${farmer.name} asked to remove "${updated.title}" from the marketplace.`,
+    "/marketplace/requests"
+  )
+
+  return updated
+}
+
+/** Removal asks waiting for a decision, oldest first. */
+export async function listRemovalRequests(): Promise<ListingRequest[]> {
+  const collection = await getCollection()
+  return collection
+    .find({ "removal.status": "pending" } as any)
+    .sort({ "removal.requestedAt": 1 })
+    .toArray()
+}
+
+/**
+ * Staff answering a removal request.
+ *
+ * Approving hides the listing from the public pages rather than deleting it: the
+ * approved request, any orders and the listing itself stay intact, and staff can still
+ * delete it outright from the listings screen if that is what they want.
+ */
+export async function decideRemoval(
+  id: string,
+  reviewer: { _id: string },
+  decision: "approve" | "decline",
+  note?: string
+): Promise<void> {
+  const collection = await getCollection()
+  const db = await getDb()
+
+  const request = await getRequestById(id)
+  if (!request) throw new ListingRequestError("Request not found")
+  if (request.removal?.status !== "pending") {
+    throw new ListingRequestError("There is no removal request waiting on this listing")
+  }
+
+  // Claim the decision first, so two reviewers can't both act on the same ask.
+  const claim = await collection.updateOne(
+    { _id: new ObjectId(id), "removal.status": "pending" } as any,
+    {
+      $set: {
+        "removal.status": decision === "approve" ? "approved" : "declined",
+        "removal.reviewedBy": new ObjectId(reviewer._id),
+        "removal.reviewedAt": new Date(),
+        "removal.reviewNote": emptyToNull(note),
+      },
+    }
+  )
+  if (claim.matchedCount === 0) {
+    throw new ListingRequestError("This removal request has already been decided")
+  }
+
+  if (decision === "approve" && request.publishedServiceId && ObjectId.isValid(request.publishedServiceId)) {
+    const listing = await db
+      .collection("services")
+      .findOne({ _id: new ObjectId(request.publishedServiceId) }, { projection: { name: 1, sellerId: 1 } })
+    // A listing staff already deleted has nothing left to hide; the ask is still resolved.
+    if (listing) {
+      try {
+        await setListingHidden(
+          { _id: listing._id, name: listing.name, sellerId: listing.sellerId },
+          true,
+          "Removed at the seller's request",
+          { notify: false }
+        )
+      } catch (error) {
+        // Put the ask back in the queue rather than record it approved with the
+        // listing still live.
+        await collection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              "removal.status": "pending",
+              "removal.reviewedBy": null,
+              "removal.reviewedAt": null,
+              "removal.reviewNote": null,
+            },
+          }
+        )
+        throw error
+      }
+    }
+  }
+
+  await notifyFarmer(
+    request.farmerId,
+    decision === "approve" ? "Your listing was removed" : "Your removal request was declined",
+    decision === "approve"
+      ? `"${request.title}" was taken off the marketplace, as you asked.`
+      : `"${request.title}" stays on the marketplace. ${note?.trim() ?? ""}`.trim(),
+    "/farmer/listings"
+  )
+}
+
 /** Wire shape - ObjectIds stringified, nothing sensitive added. */
-export function serializeRequest(request: ListingRequest) {
+export function serializeRequest(request: ListingRequest, listing: ListingVisibility | null = null) {
   return {
+    /** Live state of the published listing; null while unpublished or if staff deleted it. */
+    listing,
     id: request._id.toString(),
     farmerId: request.farmerId,
     farmerName: request.farmerName,
@@ -341,7 +542,21 @@ export function serializeRequest(request: ListingRequest) {
     photos: request.photos,
     status: request.status,
     reviewNote: request.reviewNote,
+    resubmitCount: request.resubmitCount ?? 0,
+    reviewHistory: (request.reviewHistory ?? []).map((entry) => ({
+      note: entry.note,
+      reviewedAt: entry.reviewedAt,
+    })),
     publishedServiceId: request.publishedServiceId,
+    removal: request.removal
+      ? {
+          status: request.removal.status,
+          reason: request.removal.reason,
+          requestedAt: request.removal.requestedAt,
+          reviewedAt: request.removal.reviewedAt,
+          reviewNote: request.removal.reviewNote,
+        }
+      : null,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
   }

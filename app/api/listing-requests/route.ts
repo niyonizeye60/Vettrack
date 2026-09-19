@@ -6,15 +6,25 @@ import { canAccessMarketplaceCategory } from "@/lib/marketplace-access"
 import { logActivity } from "@/lib/activity-log"
 import {
   createListingRequest,
+  listRemovalRequests,
   listRequests,
   listRequestsForFarmer,
   serializeRequest,
+  type ListingRequest,
 } from "@/lib/db-listing-requests"
+import { getListingVisibility } from "@/lib/db-listings"
 import {
   listingRequestSchema,
   LISTING_REQUEST_STATUSES,
   type ListingRequestStatus,
 } from "@/lib/validations/listing-request"
+
+/** One extra query for the whole page, rather than one per approved request. */
+async function serializeWithVisibility(requests: ListingRequest[]) {
+  const publishedIds = requests.flatMap((r) => (r.publishedServiceId ? [r.publishedServiceId] : []))
+  const visibility = await getListingVisibility(publishedIds)
+  return requests.map((r) => serializeRequest(r, r.publishedServiceId ? visibility.get(r.publishedServiceId) ?? null : null))
+}
 
 /**
  * GET - a farmer sees their own requests; a reviewer sees the whole queue.
@@ -33,17 +43,20 @@ export async function GET(req: NextRequest) {
     // queue also requires "sales" access - otherwise a marketplace_admin scoped to
     // drugs/feeds only could still approve animal listings outside their grant.
     if (can(currentUser.role, "marketplace.requests.review") && canAccessMarketplaceCategory(currentUser, "sales")) {
+      // The removal queue: published listings whose seller has asked for them to come down.
+      if (req.nextUrl.searchParams.get("removal") === "pending") {
+        return NextResponse.json(await serializeWithVisibility(await listRemovalRequests()))
+      }
+
       const statusParam = req.nextUrl.searchParams.get("status")
       const status = LISTING_REQUEST_STATUSES.includes(statusParam as ListingRequestStatus)
         ? (statusParam as ListingRequestStatus)
         : undefined
-      const requests = await listRequests(status)
-      return NextResponse.json(requests.map(serializeRequest))
+      return NextResponse.json(await serializeWithVisibility(await listRequests(status)))
     }
 
     if (can(currentUser.role, "marketplace.listings.request")) {
-      const requests = await listRequestsForFarmer(currentUser._id)
-      return NextResponse.json(requests.map(serializeRequest))
+      return NextResponse.json(await serializeWithVisibility(await listRequestsForFarmer(currentUser._id)))
     }
 
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })

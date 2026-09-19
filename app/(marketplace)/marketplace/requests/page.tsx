@@ -31,13 +31,18 @@ interface ListingRequest {
   photos: string[]
   status: "pending" | "approved" | "rejected" | "withdrawn"
   reviewNote: string | null
+  resubmitCount: number
+  reviewHistory: { note: string; reviewedAt: string | null }[]
   publishedServiceId: string | null
+  removal: { status: "pending" | "approved" | "declined"; reason: string | null } | null
   createdAt: string
 }
 
 interface Category { id: string; name: string }
 
-const TABS = ["pending", "approved", "rejected"] as const
+// "removal" is not a request status: it lists published listings whose seller has
+// asked for them to be taken down, fetched from its own queue.
+const TABS = ["pending", "removal", "approved", "rejected"] as const
 type Tab = (typeof TABS)[number]
 
 export default function MarketplaceRequestsPage() {
@@ -49,6 +54,7 @@ export default function MarketplaceRequestsPage() {
 
   const [approveTarget, setApproveTarget] = useState<ListingRequest | null>(null)
   const [rejectTarget, setRejectTarget] = useState<ListingRequest | null>(null)
+  const [removalTarget, setRemovalTarget] = useState<{ request: ListingRequest; decision: "approve" | "decline" } | null>(null)
   const [lightbox, setLightbox] = useState<{ request: ListingRequest; index: number } | null>(null)
   const [categoryId, setCategoryId] = useState("")
   const [note, setNote] = useState("")
@@ -69,7 +75,9 @@ export default function MarketplaceRequestsPage() {
   const fetchRequests = async (status: Tab) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/listing-requests?status=${status}`)
+      const res = await fetch(
+        status === "removal" ? "/api/listing-requests?removal=pending" : `/api/listing-requests?status=${status}`
+      )
       if (res.ok) setRequests(await res.json())
     } catch {
       // Keep whatever is on screen rather than blanking the queue.
@@ -121,6 +129,18 @@ export default function MarketplaceRequestsPage() {
     }
   }
 
+  const confirmRemoval = async () => {
+    if (!removalTarget) return
+    const ok = await decide(
+      { action: "removal_decision", decision: removalTarget.decision, note },
+      removalTarget.request.id
+    )
+    if (ok) {
+      setRemovalTarget(null)
+      setNote("")
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -131,7 +151,9 @@ export default function MarketplaceRequestsPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           {TABS.map((value) => (
-            <TabsTrigger key={value} value={value}>{t(`listing.status.${value}`)}</TabsTrigger>
+            <TabsTrigger key={value} value={value}>
+              {value === "removal" ? t("marketplace.removalTab") : t(`listing.status.${value}`)}
+            </TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
@@ -191,6 +213,11 @@ export default function MarketplaceRequestsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-medium text-gray-900">{request.title}</h3>
                     <Badge variant="secondary">{request.animalType}</Badge>
+                    {request.resubmitCount > 0 && (
+                      <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+                        {t("marketplace.resubmitted")} · {request.resubmitCount}
+                      </Badge>
+                    )}
                     {request.photos.length > 2 && (
                       <button
                         type="button"
@@ -223,6 +250,19 @@ export default function MarketplaceRequestsPage() {
                       <span className="font-medium">{t("marketplace.note")}:</span> {request.reviewNote}
                     </p>
                   )}
+                  {tab === "removal" && (
+                    <p className="text-sm text-amber-800 pt-1">
+                      <span className="font-medium">{t("marketplace.removalReason")}:</span>{" "}
+                      {request.removal?.reason || t("marketplace.noReasonGiven")}
+                    </p>
+                  )}
+                  {/* What was asked of the farmer last time, so the reviewer can check it was done. */}
+                  {request.status === "pending" && request.reviewHistory.length > 0 && (
+                    <p className="text-sm text-amber-800 pt-1">
+                      <span className="font-medium">{t("marketplace.previousReason")}:</span>{" "}
+                      {request.reviewHistory[request.reviewHistory.length - 1].note}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2 lg:w-48 flex-shrink-0">
@@ -230,7 +270,35 @@ export default function MarketplaceRequestsPage() {
                     RWF {request.proposedPrice.toLocaleString()}
                   </p>
 
-                  {request.status === "pending" ? (
+                  {tab === "removal" ? (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => { setRemovalTarget({ request, decision: "approve" }); setNote(""); setError(null) }}
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        {t("marketplace.approveRemoval")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setRemovalTarget({ request, decision: "decline" }); setNote(""); setError(null) }}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        {t("marketplace.declineRemoval")}
+                      </Button>
+                      {request.publishedServiceId && (
+                        <Link
+                          href={`/animal-sales/${request.publishedServiceId}`}
+                          target="_blank"
+                          className="inline-flex items-center text-sm text-green-700 hover:text-green-800"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          {t("marketplace.viewListing")}
+                        </Link>
+                      )}
+                    </>
+                  ) : request.status === "pending" ? (
                     <>
                       <Button
                         size="sm"
@@ -323,6 +391,48 @@ export default function MarketplaceRequestsPage() {
             <Button variant="destructive" onClick={confirmReject} disabled={busy || note.trim().length < 3}>
               {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {t("marketplace.reject")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Removal request decision */}
+      <Dialog open={!!removalTarget} onOpenChange={(next) => !next && setRemovalTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {removalTarget?.decision === "approve" ? t("marketplace.approveRemovalTitle") : t("marketplace.declineRemovalTitle")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              {removalTarget?.decision === "approve" ? t("marketplace.approveRemovalDesc") : t("marketplace.declineRemovalDesc")}{" "}
+              <strong>{removalTarget?.request.title}</strong>
+            </p>
+            {removalTarget?.decision === "decline" && (
+              <div>
+                <Label htmlFor="removal-note">{t("marketplace.rejectReason")}</Label>
+                <Textarea
+                  id="removal-note"
+                  rows={3}
+                  maxLength={300}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">{t("marketplace.rejectReasonHint")}</p>
+              </div>
+            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemovalTarget(null)}>{t("common.cancel")}</Button>
+            <Button
+              variant={removalTarget?.decision === "decline" ? "destructive" : "default"}
+              onClick={confirmRemoval}
+              disabled={busy || (removalTarget?.decision === "decline" && note.trim().length < 3)}
+            >
+              {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {removalTarget?.decision === "approve" ? t("marketplace.approveRemoval") : t("marketplace.declineRemoval")}
             </Button>
           </DialogFooter>
         </DialogContent>

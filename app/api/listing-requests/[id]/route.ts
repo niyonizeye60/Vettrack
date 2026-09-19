@@ -7,13 +7,21 @@ import { canAccessMarketplaceCategory } from "@/lib/marketplace-access"
 import { logActivity } from "@/lib/activity-log"
 import {
   approveRequest,
+  decideRemoval,
   getRequestById,
   rejectRequest,
+  requestRemoval,
+  resubmitRequest,
   serializeRequest,
   withdrawRequest,
   ListingRequestError,
 } from "@/lib/db-listing-requests"
-import { reviewDecisionSchema } from "@/lib/validations/listing-request"
+import {
+  listingRequestSchema,
+  removalDecisionSchema,
+  removalRequestSchema,
+  reviewDecisionSchema,
+} from "@/lib/validations/listing-request"
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -45,9 +53,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 /**
  * PATCH - the two ways a pending request leaves the queue.
  *
- * A reviewer approves or rejects; the owning farmer withdraws. Both paths are
- * guarded inside the data layer by a `status: "pending"` filter, so two reviewers
- * racing on the same request cannot both publish the animal.
+ * A reviewer approves or rejects; the owning farmer withdraws a pending request,
+ * resubmits a rejected one, or asks for a published one to be removed (which a
+ * reviewer then approves or declines). Each transition is guarded inside the data layer by a
+ * status filter, so two reviewers racing on the same request cannot both publish
+ * the animal and a double-clicked resubmit cannot queue it twice.
  */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -70,6 +80,69 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       }
       await withdrawRequest(params.id, currentUser._id)
       await logActivity(currentUser._id, "marketplace.request.withdrawn", `Withdrew ${request.title}`)
+      return NextResponse.json({ success: true })
+    }
+
+    // Farmer revising a rejected request and sending it back for another review.
+    if (body?.action === "resubmit") {
+      if (request.farmerId !== currentUser._id || !can(currentUser.role, "marketplace.listings.request")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      const parsed = listingRequestSchema.safeParse(body)
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || "Invalid request" },
+          { status: 400 }
+        )
+      }
+      const resubmitted = await resubmitRequest(
+        params.id,
+        { _id: currentUser._id, name: currentUser.name, phone: currentUser.phone, email: currentUser.email },
+        parsed.data
+      )
+      await logActivity(
+        currentUser._id,
+        "marketplace.request.resubmitted",
+        `Resubmitted ${parsed.data.title} (attempt ${(resubmitted.resubmitCount ?? 0) + 1})`
+      )
+      return NextResponse.json(serializeRequest(resubmitted))
+    }
+
+    // Farmer asking for their published listing to be taken down. Staff decide.
+    if (body?.action === "request_removal") {
+      if (request.farmerId !== currentUser._id || !can(currentUser.role, "marketplace.listings.request")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      const parsed = removalRequestSchema.safeParse(body)
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || "Invalid request" },
+          { status: 400 }
+        )
+      }
+      await requestRemoval(params.id, { _id: currentUser._id, name: currentUser.name }, parsed.data.reason)
+      await logActivity(currentUser._id, "marketplace.removal.requested", `Asked to remove ${request.title}`)
+      return NextResponse.json({ success: true })
+    }
+
+    // Staff answering that ask.
+    if (body?.action === "removal_decision") {
+      if (!can(currentUser.role, "marketplace.requests.review") || !canAccessMarketplaceCategory(currentUser, "sales")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      const parsed = removalDecisionSchema.safeParse(body)
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || "Invalid decision" },
+          { status: 400 }
+        )
+      }
+      await decideRemoval(params.id, { _id: currentUser._id }, parsed.data.decision, parsed.data.note || undefined)
+      await logActivity(
+        currentUser._id,
+        parsed.data.decision === "approve" ? "marketplace.removal.approved" : "marketplace.removal.declined",
+        `${parsed.data.decision === "approve" ? "Approved" : "Declined"} removal of ${request.title} for ${request.farmerName}`
+      )
       return NextResponse.json({ success: true })
     }
 

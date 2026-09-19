@@ -48,6 +48,7 @@ interface Service {
   targetAnimal?: string
   sellerId?: string
   listingStatus?: string
+  hidden?: boolean
 }
 
 interface Category {
@@ -94,6 +95,8 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Service | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null)
+  const [hideTarget, setHideTarget] = useState<Service | null>(null)
+  const [hideReason, setHideReason] = useState("")
 
   const [categoryForm, setCategoryForm] = useState({ name: "", description: "", image: "" })
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false)
@@ -104,7 +107,9 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
 
   const loadAll = async () => {
     try {
-      const [sRes, cRes] = await Promise.all([fetch("/api/services"), fetch("/api/categories")])
+      // includeHidden: the public pages never see hidden listings, but the people who
+      // manage them have to, or they could never bring one back.
+      const [sRes, cRes] = await Promise.all([fetch("/api/services?includeHidden=1"), fetch("/api/categories")])
       if (sRes.ok) setServices(await sRes.json())
       if (cRes.ok) setCategories(await cRes.json())
     } catch (error) {
@@ -162,6 +167,23 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
     } finally {
       setBusy(false)
       setDeleteTarget(null)
+    }
+  }
+
+  /** Hide from / restore to the public pages. Unlike delete, nothing is lost. */
+  const setVisibility = async (service: Service, action: "hide" | "show", reason?: string) => {
+    setBusy(true)
+    try {
+      await fetch(`/api/listings/${service.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...(reason ? { reason } : {}) }),
+      })
+      await loadAll()
+    } finally {
+      setBusy(false)
+      setHideTarget(null)
+      setHideReason("")
     }
   }
 
@@ -543,6 +565,10 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
                     details={productDetails(service, cat)}
                     onEdit={() => openEdit(service)}
                     onDelete={() => setDeleteTarget(service)}
+                    hidden={service.hidden === true}
+                    onToggleHidden={() =>
+                      service.hidden ? setVisibility(service, "show") : setHideTarget(service)
+                    }
                   />
                 ))}
               </div>
@@ -677,6 +703,41 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             </Button>
             <Button onClick={saveCategory} disabled={busy || !categoryForm.name}>
               {editCategoryTarget ? t("content.updateCategory") : t("content.createCategory")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hide from the public pages */}
+      <Dialog open={!!hideTarget} onOpenChange={(next) => { if (!next) { setHideTarget(null); setHideReason("") } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("marketplace.hideTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              {t("marketplace.hideDesc")} <strong>{hideTarget?.name}</strong>
+            </p>
+            {hideTarget?.sellerId && (
+              <div>
+                <Label htmlFor="hide-reason">{t("marketplace.hideReason")}</Label>
+                <Textarea
+                  id="hide-reason"
+                  rows={3}
+                  maxLength={300}
+                  value={hideReason}
+                  onChange={(e) => setHideReason(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">{t("marketplace.hideReasonHint")}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setHideTarget(null); setHideReason("") }}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={() => hideTarget && setVisibility(hideTarget, "hide", hideReason.trim() || undefined)} disabled={busy}>
+              {t("marketplace.hide")}
             </Button>
           </DialogFooter>
         </DialogContent>

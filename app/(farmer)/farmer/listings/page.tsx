@@ -18,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair } from "lucide-react"
+import { Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair, Pencil, EyeOff, Trash2 } from "lucide-react"
 import { ANIMAL_TYPES, ANIMAL_SEXES, MAX_LISTING_PHOTOS } from "@/lib/validations/listing-request"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
 
@@ -37,8 +37,22 @@ interface ListingRequest {
   sector: string | null
   village: string | null
   photos: string[]
+  animalId: string | null
+  latitude: number | null
+  longitude: number | null
   status: "pending" | "approved" | "rejected" | "withdrawn"
   reviewNote: string | null
+  resubmitCount: number
+  reviewHistory: { note: string; reviewedAt: string | null }[]
+  publishedServiceId: string | null
+  /** Live state of the published listing; null when unpublished or staff deleted it. */
+  listing: { hidden: boolean; reason: string | null } | null
+  /** The farmer's ask for the published listing to be taken down; null until they ask. */
+  removal: {
+    status: "pending" | "approved" | "declined"
+    reason: string | null
+    reviewNote: string | null
+  } | null
   createdAt: string
 }
 
@@ -82,7 +96,13 @@ export default function FarmerListingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null)
   const [locating, setLocating] = useState(false)
+  // Set while revising a rejected request; null means the dialog is a fresh request.
+  const [revising, setRevising] = useState<ListingRequest | null>(null)
   const [withdrawTarget, setWithdrawTarget] = useState<ListingRequest | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<ListingRequest | null>(null)
+  const [removeReason, setRemoveReason] = useState("")
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState<string | null>(null)
   const [detailTarget, setDetailTarget] = useState<ListingRequest | null>(null)
   const [detailIndex, setDetailIndex] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -146,23 +166,59 @@ export default function FarmerListingsPage() {
   const resetForm = () => {
     setForm(emptyForm)
     setPhotos([])
+    setGps(null)
+    setRevising(null)
     setError(null)
+  }
+
+  /** Reopen a rejected request with everything the farmer sent, ready to fix and resend. */
+  const startRevising = (request: ListingRequest) => {
+    setDetailTarget(null)
+    setForm({
+      title: request.title,
+      animalType: request.animalType,
+      breed: request.breed ?? "",
+      age: request.age ?? "",
+      sex: request.sex ?? "",
+      proposedPrice: String(request.proposedPrice),
+      description: request.description,
+      district: request.district,
+      sector: request.sector ?? "",
+      village: request.village ?? "",
+      animalId: request.animalId ?? "",
+    })
+    setPhotos(request.photos)
+    setGps(
+      request.latitude != null && request.longitude != null
+        ? { lat: request.latitude, lng: request.longitude }
+        : null
+    )
+    setError(null)
+    setRevising(request)
+    setOpen(true)
   }
 
   const submit = async () => {
     setError(null)
     setSaving(true)
     try {
-      const res = await fetch("/api/listing-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          sex: form.sex || undefined,
-          photos,
-          ...(gps ? { latitude: gps.lat, longitude: gps.lng } : {}),
-        }),
-      })
+      const payload = {
+        ...form,
+        sex: form.sex || undefined,
+        photos,
+        ...(gps ? { latitude: gps.lat, longitude: gps.lng } : {}),
+      }
+      const res = revising
+        ? await fetch(`/api/listing-requests/${revising.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "resubmit", ...payload }),
+          })
+        : await fetch("/api/listing-requests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error || t("listing.submitFailed"))
@@ -191,6 +247,53 @@ export default function FarmerListingsPage() {
       setWithdrawTarget(null)
     }
   }
+
+  const closeRemoval = () => {
+    setRemoveTarget(null)
+    setRemoveReason("")
+    setRemoveError(null)
+  }
+
+  /** Ask Vettrack to take a published animal down. Only staff can actually hide it. */
+  const submitRemoval = async () => {
+    if (!removeTarget) return
+    setRemoveError(null)
+    setRemoving(true)
+    try {
+      const res = await fetch(`/api/listing-requests/${removeTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request_removal", reason: removeReason }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setRemoveError(data.error || t("listing.removalFailed"))
+        return
+      }
+      closeRemoval()
+      await fetchRequests()
+    } catch {
+      setRemoveError(t("listing.removalFailed"))
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  /** A published listing staff have taken off the public pages. */
+  const isHidden = (request: ListingRequest) => request.status === "approved" && request.listing?.hidden === true
+
+  /** One status for the seller to read: "Hidden" replaces "Published" while staff have it down. */
+  const statusBadge = (request: ListingRequest) =>
+    isHidden(request) ? (
+      <Badge className="bg-gray-200 text-gray-700" variant="secondary">
+        <EyeOff className="h-3 w-3 mr-1" />
+        {t("listing.hiddenBadge")}
+      </Badge>
+    ) : (
+      <Badge className={statusVariant(request.status)} variant="secondary">
+        {t(`listing.status.${request.status}`)}
+      </Badge>
+    )
 
   const sectors = form.district ? rwandaData[form.district] ?? [] : []
 
@@ -261,24 +364,56 @@ export default function FarmerListingsPage() {
                     >
                       {request.title}
                     </button>
-                    <Badge className={statusVariant(request.status)} variant="secondary">
-                      {t(`listing.status.${request.status}`)}
-                    </Badge>
+                    {statusBadge(request)}
+                    {request.status === "approved" && request.removal?.status === "pending" && (
+                      <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+                        {t("listing.removalRequested")}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-gray-600">
                     {[request.animalType, request.breed, request.age].filter(Boolean).join(" · ")}
                   </p>
+                  {isHidden(request) && (
+                    <p className="text-xs text-gray-500">
+                      {t("listing.hiddenNote")}
+                      {request.listing?.reason ? ` ${request.listing.reason}` : ""}
+                    </p>
+                  )}
+                  {request.status === "approved" && !isHidden(request) && request.removal?.status === "declined" && (
+                    <p className="text-xs text-red-700">
+                      {t("listing.removalDeclined")}
+                      {request.removal.reviewNote ? `: ${request.removal.reviewNote}` : ""}
+                    </p>
+                  )}
                   <p className="text-sm font-medium text-gray-900">
                     RWF {request.proposedPrice.toLocaleString()}
                   </p>
-                  {request.reviewNote && (
-                    <p className="text-sm text-gray-500 pt-1">
-                      <span className="font-medium">{t("listing.noteFromVettrack")}:</span> {request.reviewNote}
+                  {request.status === "pending" && request.resubmitCount > 0 && (
+                    <p className="text-xs text-amber-700 pt-1">
+                      {t("listing.resubmittedTimes")} {request.resubmitCount + 1}
                     </p>
+                  )}
+                  {request.reviewNote && (
+                    request.status === "rejected" ? (
+                      <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-2.5 text-sm text-red-900">
+                        <span className="font-medium">{t("listing.whatToChange")}:</span> {request.reviewNote}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 pt-1">
+                        <span className="font-medium">{t("listing.noteFromVettrack")}:</span> {request.reviewNote}
+                      </p>
+                    )
                   )}
                 </div>
 
                 <div className="flex sm:flex-col gap-2">
+                  {request.status === "rejected" && (
+                    <Button size="sm" onClick={() => startRevising(request)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      {t("listing.reviseResubmit")}
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => openDetails(request)}>
                     {t("listing.viewDetails")}
                   </Button>
@@ -287,6 +422,15 @@ export default function FarmerListingsPage() {
                       {t("listing.withdraw")}
                     </Button>
                   )}
+                  {request.status === "approved" &&
+                    request.listing &&
+                    !request.listing.hidden &&
+                    request.removal?.status !== "pending" && (
+                      <Button variant="outline" size="sm" onClick={() => setRemoveTarget(request)}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {t("listing.requestRemoval")}
+                      </Button>
+                    )}
                 </div>
               </CardContent>
             </Card>
@@ -298,10 +442,18 @@ export default function FarmerListingsPage() {
       <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) resetForm() }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t("listing.requestListing")}</DialogTitle>
+            <DialogTitle>{revising ? t("listing.reviseTitle") : t("listing.requestListing")}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Kept in view while editing, so the farmer can fix what was asked without going back. */}
+            {revising?.reviewNote && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+                <p className="font-medium">{t("listing.whatToChange")}</p>
+                <p className="mt-0.5">{revising.reviewNote}</p>
+              </div>
+            )}
+
             <div>
               <Label htmlFor="title">{t("listing.title")}</Label>
               <Input
@@ -524,7 +676,7 @@ export default function FarmerListingsPage() {
             </Button>
             <Button onClick={submit} disabled={saving || uploading}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {t("listing.submitRequest")}
+              {revising ? t("listing.resubmitRequest") : t("listing.submitRequest")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -542,6 +694,39 @@ export default function FarmerListingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Ask Vettrack to take a published listing down */}
+      <Dialog open={!!removeTarget} onOpenChange={(next) => { if (!next) closeRemoval() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("listing.removalTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              {t("listing.removalDesc")} <strong>{removeTarget?.title}</strong>
+            </p>
+            <div>
+              <Label htmlFor="removal-reason">{t("listing.removalReason")}</Label>
+              <Textarea
+                id="removal-reason"
+                rows={3}
+                maxLength={300}
+                value={removeReason}
+                onChange={(e) => setRemoveReason(e.target.value)}
+                placeholder={t("listing.removalReasonPlaceholder")}
+              />
+            </div>
+            {removeError && <p className="text-sm text-red-600">{removeError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeRemoval}>{t("common.cancel")}</Button>
+            <Button onClick={submitRemoval} disabled={removing}>
+              {removing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("listing.removalSend")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Listing details */}
       <Dialog open={!!detailTarget} onOpenChange={(next) => !next && setDetailTarget(null)}>
@@ -595,9 +780,7 @@ export default function FarmerListingsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Badge className={statusVariant(detailTarget.status)} variant="secondary">
-                  {t(`listing.status.${detailTarget.status}`)}
-                </Badge>
+                {statusBadge(detailTarget)}
                 <span className="text-lg font-semibold text-gray-900">
                   RWF {detailTarget.proposedPrice.toLocaleString()}
                 </span>
@@ -637,9 +820,36 @@ export default function FarmerListingsPage() {
                 </div>
               )}
 
+              {detailTarget.reviewHistory.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-900 mb-1">{t("listing.earlierFeedback")}</p>
+                  <ul className="space-y-1">
+                    {detailTarget.reviewHistory.map((entry, i) => (
+                      <li key={i} className="text-sm text-gray-600">
+                        {entry.reviewedAt && (
+                          <span className="text-xs text-gray-400 mr-2">
+                            {new Date(entry.reviewedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                        {entry.note}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <p className="text-xs text-gray-400">
                 {t("listing.submittedOn")} {new Date(detailTarget.createdAt).toLocaleDateString()}
               </p>
+
+              {detailTarget.status === "rejected" && (
+                <div className="flex justify-end">
+                  <Button onClick={() => startRevising(detailTarget)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    {t("listing.reviseResubmit")}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

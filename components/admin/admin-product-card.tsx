@@ -3,7 +3,7 @@
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, type LucideIcon } from "lucide-react"
+import { Edit, Eye, EyeOff, Trash2, type LucideIcon } from "lucide-react"
 
 interface ProductDetail {
   icon: LucideIcon
@@ -20,6 +20,9 @@ interface AdminProductCardProps {
   details?: ProductDetail[]
   onEdit: () => void
   onDelete: () => void
+  /** When provided, the card shows a hide/show toggle and a "Hidden" marker. */
+  hidden?: boolean
+  onToggleHidden?: () => void
 }
 
 export default function AdminProductCard({
@@ -32,6 +35,8 @@ export default function AdminProductCard({
   details,
   onEdit,
   onDelete,
+  hidden,
+  onToggleHidden,
 }: AdminProductCardProps) {
   return (
     <div className="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
@@ -40,11 +45,17 @@ export default function AdminProductCard({
           src={image || "/placeholder.jpg"}
           alt={name}
           fill
-          className="object-cover group-hover:scale-105 transition-transform duration-300"
+          className={`object-cover group-hover:scale-105 transition-transform duration-300 ${hidden ? "opacity-40 grayscale" : ""}`}
         />
         {categoryName && (
           <Badge className="absolute top-2 left-2 bg-white/90 text-gray-700 hover:bg-white/90 shadow-sm">
             {categoryName}
+          </Badge>
+        )}
+        {hidden && (
+          <Badge className="absolute top-2 right-2 bg-gray-800 text-white hover:bg-gray-800 shadow-sm">
+            <EyeOff className="h-3 w-3 mr-1" />
+            Hidden
           </Badge>
         )}
       </div>
@@ -79,6 +90,17 @@ export default function AdminProductCard({
             <Edit className="h-3.5 w-3.5 mr-1.5" />
             Edit
           </Button>
+          {onToggleHidden && (
+            <Button
+              variant="ghost"
+              size="sm"
+              title={hidden ? "Show on the public pages" : "Hide from the public pages"}
+              aria-label={hidden ? "Show on the public pages" : "Hide from the public pages"}
+              onClick={onToggleHidden}
+            >
+              {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

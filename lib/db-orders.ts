@@ -287,6 +287,9 @@ async function getServicesCollection() {
 function availableListingFilter(now: Date) {
   return {
     category: "sales",
+    // A listing hidden after a buyer opened it must not be claimable - this filter,
+    // not the earlier read, is what decides.
+    hidden: { $ne: true },
     $or: [
       { listingStatus: "active" },
       { listingStatus: { $exists: false } },
@@ -351,7 +354,7 @@ export async function createBrokerageOrder(
   if (!listing || listing.category !== "sales") {
     throw new OrderValidationError("Listing not found")
   }
-  if (listing.listingStatus === "sold" || listing.listingStatus === "withdrawn") {
+  if (listing.hidden === true || listing.listingStatus === "sold" || listing.listingStatus === "withdrawn") {
     throw new ListingUnavailableError("This animal is no longer available")
   }
 

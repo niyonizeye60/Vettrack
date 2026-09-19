@@ -30,7 +30,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       .collection("services")
       .findOne({ _id: new ObjectId(params.id) })
 
-    if (!listing || listing.category !== "sales") {
+    // Hidden listings are gone as far as the public is concerned, so a bookmarked
+    // link gets the same answer as one that never existed.
+    if (!listing || listing.category !== "sales" || listing.hidden === true) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 })
     }
 

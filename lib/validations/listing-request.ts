@@ -53,3 +53,25 @@ export const reviewDecisionSchema = z.discriminatedUnion("decision", [
 ])
 
 export type ReviewDecision = z.infer<typeof reviewDecisionSchema>
+
+/**
+ * A farmer asking marketplace staff to take their published listing down, e.g.
+ * because the animal is sold or no longer for sale. Nothing happens until staff decide.
+ */
+export const REMOVAL_STATUSES = ["pending", "approved", "declined"] as const
+export type RemovalStatus = (typeof REMOVAL_STATUSES)[number]
+
+export const removalRequestSchema = z.object({
+  reason: z.string().trim().max(300).optional().or(z.literal("")),
+})
+
+export const removalDecisionSchema = z.discriminatedUnion("decision", [
+  z.object({
+    decision: z.literal("approve"),
+    note: z.string().trim().max(300).optional().or(z.literal("")),
+  }),
+  z.object({
+    decision: z.literal("decline"),
+    note: z.string().trim().min(3, "Tell the farmer why").max(300),
+  }),
+])

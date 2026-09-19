@@ -37,15 +37,21 @@ export async function GET(request: NextRequest) {
     // getCurrentUser returns early when there's no session cookie.
     const viewer = await getCurrentUser()
 
+    // Hidden listings are off the public pages. Only the marketplace manager asks
+    // for them back (includeHidden), and only staff are ever given them - the flag
+    // alone does nothing for anyone else.
+    const showHidden = searchParams.get('includeHidden') === '1' && canManage(viewer?.role)
+    const visible = showHidden ? {} : { hidden: { $ne: true } }
+
     if (category) {
-      const services = await db.collection('services').find({ category }).toArray()
+      const services = await db.collection('services').find({ category, ...visible }).toArray()
       return NextResponse.json(services.map(s => serializeService(s, viewer)))
     }
 
     const [sales, drugs, feeds] = await Promise.all([
-      db.collection('services').find({ category: 'sales' }).toArray(),
-      db.collection('services').find({ category: 'drugs' }).toArray(),
-      db.collection('services').find({ category: 'feeds' }).toArray()
+      db.collection('services').find({ category: 'sales', ...visible }).toArray(),
+      db.collection('services').find({ category: 'drugs', ...visible }).toArray(),
+      db.collection('services').find({ category: 'feeds', ...visible }).toArray()
     ])
 
     const formatServices = (services: any[]) => services.map(s => serializeService(s, viewer))

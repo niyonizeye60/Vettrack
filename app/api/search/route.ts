@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const searchRegex = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null
 
     // 1. Search Services
-    const serviceFilter: Record<string, any> = {}
+    const serviceFilter: Record<string, any> = { hidden: { $ne: true } }
     if (searchRegex) {
       serviceFilter.$or = [
         { name: searchRegex },
