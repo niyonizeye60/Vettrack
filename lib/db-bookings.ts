@@ -4,13 +4,43 @@ import { ObjectId } from "mongodb"
 const DB_NAME = "ntdm_animal_hospital"
 
 /**
+ * IntouchPay's requestPayment doesn't accept our own booking id as a
+ * reference — it generates its own `requesttransactionid`. We store that id
+ * on the booking right after initiating payment (top-level field, mirroring
+ * how /api/bookings/pay writes it), then use this to correlate the async
+ * callback back to the right booking.
+ */
+export async function getBookingByIntouchRequestId(
+  requestTransactionId: string
+): Promise<{ _id: ObjectId; paymentStatus: string } | null> {
+  const client = await clientPromise
+  const db = client.db(DB_NAME)
+  return db
+    .collection<{ _id: ObjectId; paymentStatus: string }>("bookings")
+    .findOne(
+      { intouchRequestTransactionId: requestTransactionId },
+      { projection: { paymentStatus: 1 } }
+    )
+}
+
+/**
  * Update a booking's payment and booking status after a payment event.
- * Used by both the Pesapal IPN handler and the verify endpoint.
+ * Used by the Pesapal IPN handler, the verify endpoint, and the IntouchPay
+ * callback route.
  */
 export async function updateBookingPaymentStatus(
   bookingId: string,
   paymentStatus: "completed" | "failed" | "pending",
-  pesapalData?: { pesapalOrderTrackingId: string; pesapalMerchantReference: string }
+  paymentData?: {
+    // Pesapal IPN handler / verify endpoint
+    pesapalOrderTrackingId?: string
+    pesapalMerchantReference?: string
+    // IntouchPay callback route
+    intouchRequestTransactionId?: string
+    intouchTransactionId?: string
+    intouchReferenceNo?: string
+    intouchVerifiedVia?: "status-api" | "webhook-body"
+  }
 ) {
   const client = await clientPromise
   const db = client.db(DB_NAME)
@@ -24,9 +54,10 @@ export async function updateBookingPaymentStatus(
     updatedAt: new Date(),
   }
 
-  if (pesapalData) {
-    update.pesapalOrderTrackingId = pesapalData.pesapalOrderTrackingId
-    update.pesapalMerchantReference = pesapalData.pesapalMerchantReference
+  if (paymentData) {
+    for (const [key, value] of Object.entries(paymentData)) {
+      if (value !== undefined) update[key] = value
+    }
   }
 
   if (paymentStatus === "completed") {

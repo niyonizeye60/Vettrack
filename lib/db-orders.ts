@@ -40,6 +40,8 @@ export interface OrderPayment {
   intouchRequestTransactionId?: string
   intouchTransactionId?: string
   intouchReferenceNo?: string
+  /** How the payment status was confirmed: gateway status API or (during a status-API outage) the authenticated webhook body. */
+  intouchVerifiedVia?: "status-api" | "webhook-body"
 }
 
 /**

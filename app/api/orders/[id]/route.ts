@@ -14,7 +14,10 @@ const STALE_CHECK_MS = 5000
 
 function mapIntouchResponseCode(responsecode?: string): "completed" | "pending" | "failed" {
   if (responsecode === "01" || responsecode === "2001") return "completed"
-  if (responsecode === "1000") return "pending"
+  // 1000 is explicitly pending; 3100 ("transaction doesn't exist") also occurs
+  // right after initiate on the real gateway before its ledger materializes the
+  // transaction - failing the order there would kill legitimate payments.
+  if (responsecode === "1000" || responsecode === "3100") return "pending"
   return "failed"
 }
 

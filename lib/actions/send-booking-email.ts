@@ -2,7 +2,7 @@
 
 import { sendBookingNotificationEmail } from "@/lib/email"
 
-interface BookingData {
+export interface BookingData {
   name: string
   phone: string
   email?: string
@@ -12,33 +12,32 @@ interface BookingData {
   description?: string
   date: string
   timeSlot: string
-  whatsappConfirm: boolean
 }
 
 const getServiceLabel = (serviceValue: string): string => {
   const serviceCategories = [
     {
       options: [
-        { value: "basic-tracking", label: "Basic GPS Tracking - RWF 15,000" },
-        { value: "advanced-monitoring", label: "Advanced Health Monitoring - RWF 25,000" },
-        { value: "herd-management", label: "Herd Management System - RWF 100,000" },
-        { value: "pet-tracking", label: "Pet Tracking Collar - RWF 12,000" },
+        { value: "basic-tracking", label: "Basic GPS Tracking - RWF 100" },
+        { value: "advanced-monitoring", label: "Advanced Health Monitoring - RWF 100" },
+        { value: "herd-management", label: "Herd Management System - RWF 100" },
+        { value: "pet-tracking", label: "Pet Tracking Collar - RWF 100" },
       ],
     },
     {
       options: [
-        { value: "general-consultation", label: "General Veterinary Consultation - RWF 5,000" },
-        { value: "virtual-consultation", label: "Virtual Consultation - RWF 3,000" },
-        { value: "emergency-consultation", label: "Emergency Consultation - RWF 8,000" },
-        { value: "farm-visit", label: "Farm Visit - RWF 15,000" },
+        { value: "general-consultation", label: "General Veterinary Consultation - RWF 100" },
+        { value: "virtual-consultation", label: "Virtual Consultation - RWF 100" },
+        { value: "emergency-consultation", label: "Emergency Consultation - RWF 100" },
+        { value: "farm-visit", label: "Farm Visit - RWF 100" },
       ],
     },
     {
       options: [
-        { value: "disease-screening", label: "Disease Screening - RWF 7,000" },
-        { value: "vaccination-program", label: "Vaccination Program - RWF 10,000" },
-        { value: "parasite-control", label: "Parasite Control - RWF 6,000" },
-        { value: "reproductive-health", label: "Reproductive Health Monitoring - RWF 8,000" },
+        { value: "disease-screening", label: "Disease Screening - RWF 100" },
+        { value: "vaccination-program", label: "Vaccination Program - RWF 100" },
+        { value: "parasite-control", label: "Parasite Control - RWF 100" },
+        { value: "reproductive-health", label: "Reproductive Health Monitoring - RWF 100" },
       ],
     },
   ]
@@ -59,6 +58,15 @@ export async function sendBookingEmail(bookingData: BookingData) {
 
     if (!result.success) {
       const msg = result.error || "Failed to send booking email"
+      // The email is only a notification to staff - when SMTP isn't configured
+      // (e.g. local development) the booking itself is still valid, so treat it
+      // as accepted and log the details instead of failing the form.
+      if (msg === "Email service not configured") {
+        console.warn("Booking email skipped (SMTP not configured). Booking details:", bookingData)
+        return { success: true, message: "Booking request received! (Email notifications are not configured in this environment.)" }
+      }
+      // SMTP credentials are filled in but the send itself failed - that's a real
+      // failure and the admin should know the notification didn't go out.
       return { success: false, message: msg }
     }
 
