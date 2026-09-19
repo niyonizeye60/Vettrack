@@ -127,8 +127,10 @@ export async function GET(request: NextRequest) {
             booking = await db.collection("bookings").findOne({ _id: new ObjectId(bookingId) })
           }
         } catch (error) {
-          // Re-verification failed — keep pending, client can retry
-          console.error("IntouchPay stale-pending re-check failed:", error)
+          // Re-verification failed — keep pending, client can retry. Message
+          // only: this fires every poll interval during a gateway outage and
+          // a full stack per poll would flood the logs.
+          console.error("IntouchPay stale-pending re-check failed:", error instanceof Error ? error.message : error)
         }
       }
 
