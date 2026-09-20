@@ -260,7 +260,7 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
           </DialogHeader>
 
           {detailConsultation && (
-            <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto pr-2">
+            <div className="min-w-0 space-y-4 pt-2 max-h-[70vh] overflow-y-auto pr-2">
               {detailConsultation.feedback && (
                 <Alert variant={detailConsultation.status === "rejected" ? "destructive" : "default"}>
                   <MessageSquare className="h-4 w-4" />

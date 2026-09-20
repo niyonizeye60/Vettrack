@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { Download, FileText, Loader2, Paperclip, Trash2, Upload, X } from "lucide-react"
+import { Download, FileText, Loader2, Paperclip, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -28,6 +28,10 @@ interface ConsultationDocumentsProps {
   /** Called after an upload or removal so the parent can refetch. */
   onChange?: () => void
 }
+
+// File names are one long unbreakable string, so let them wrap anywhere rather than
+// stretching whatever dialog they sit in.
+const NAME_CLASS = "line-clamp-3 text-sm text-gray-800 [overflow-wrap:anywhere]"
 
 export default function ConsultationDocuments({
   consultationId,
@@ -114,41 +118,53 @@ export default function ConsultationDocuments({
   }
 
   return (
-    <div className="border-t border-gray-100 pt-3 space-y-2">
-      <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+    <div className="min-w-0 space-y-2 border-t border-gray-100 pt-3">
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
         <Paperclip className="h-3 w-3" />
         {t("consultationDocs.title")}
         {documents.length > 0 && <span className="font-normal text-gray-400">({documents.length})</span>}
       </p>
 
       {documents.length > 0 && (
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {documents.map((doc) => (
-            <li key={doc.id} className="flex items-center gap-2 rounded-md border border-gray-100 px-2.5 py-2">
+            <li key={doc.id} className="flex items-center gap-2.5 rounded-md border border-gray-100 px-2.5 py-2">
               <FileText className="h-4 w-4 shrink-0 text-gray-400" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-gray-800" title={doc.name}>{doc.name}</p>
+                <p className={NAME_CLASS} title={doc.name}>{doc.name}</p>
                 <p className="text-xs text-gray-400">
                   {formatFileSize(doc.size)} · {new Date(doc.createdAt).toLocaleDateString()}
                 </p>
               </div>
               {/* A plain link, not a fetch: the response is an attachment, and this is the
-                  most dependable way to save a file on a phone. */}
-              <Button asChild variant="outline" size="sm" className="h-7 shrink-0 px-2 text-xs">
-                <a href={`/api/consultations/${consultationId}/documents/${doc.id}`} download>
-                  <Download className="mr-1 h-3 w-3" />
-                  {t("consultationDocs.download")}
+                  most dependable way to save a file on a phone. Icon-only on a narrow
+                  screen so the file name keeps the room. */}
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="h-9 w-9 shrink-0 p-0 text-xs sm:h-7 sm:w-auto sm:px-2"
+              >
+                <a
+                  href={`/api/consultations/${consultationId}/documents/${doc.id}`}
+                  download
+                  title={t("consultationDocs.download")}
+                  aria-label={`${t("consultationDocs.download")}: ${doc.name}`}
+                >
+                  <Download className="h-4 w-4 sm:mr-1 sm:h-3 sm:w-3" />
+                  <span className="hidden sm:inline">{t("consultationDocs.download")}</span>
                 </a>
               </Button>
               {isVet && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 shrink-0 p-0 hover:bg-red-50"
+                  className="h-9 w-9 shrink-0 p-0 hover:bg-red-50 sm:h-7 sm:w-7"
                   title={t("consultationDocs.remove")}
+                  aria-label={`${t("consultationDocs.remove")}: ${doc.name}`}
                   onClick={() => setRemoving(doc)}
                 >
-                  <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                  <Trash2 className="h-4 w-4 text-red-500 sm:h-3.5 sm:w-3.5" />
                 </Button>
               )}
             </li>
@@ -164,35 +180,32 @@ export default function ConsultationDocuments({
             <p className="text-xs text-gray-500">{t("consultationDocs.limitReached")}</p>
           ) : staged ? (
             // The farmer is notified the moment this is sent, so the vet confirms the file first.
-            <div className="flex items-center gap-2 rounded-md border border-green-100 bg-green-50 px-2.5 py-2">
-              <FileText className="h-4 w-4 shrink-0 text-green-600" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-gray-800" title={staged.name}>{staged.name}</p>
-                <p className="text-xs text-gray-500">{formatFileSize(staged.size)}</p>
+            <div className="space-y-2.5 rounded-md border border-green-100 bg-green-50 p-2.5">
+              <div className="flex items-center gap-2.5">
+                <FileText className="h-4 w-4 shrink-0 text-green-600" />
+                <div className="min-w-0 flex-1">
+                  <p className={NAME_CLASS} title={staged.name}>{staged.name}</p>
+                  <p className="text-xs text-gray-500">{formatFileSize(staged.size)}</p>
+                </div>
               </div>
-              <Button
-                size="sm"
-                className="h-8 shrink-0 bg-green-600 text-white hover:bg-green-700"
-                onClick={handleUpload}
-                disabled={uploading}
-              >
-                {uploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}
-                {uploading ? t("consultationDocs.uploading") : t("consultationDocs.upload")}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 shrink-0 p-0"
-                title={t("common.cancel")}
-                onClick={() => setStaged(null)}
-                disabled={uploading}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 bg-green-600 text-white hover:bg-green-700"
+                  onClick={handleUpload}
+                  disabled={uploading}
+                >
+                  {uploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}
+                  {uploading ? t("consultationDocs.uploading") : t("consultationDocs.upload")}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setStaged(null)} disabled={uploading}>
+                  {t("common.cancel")}
+                </Button>
+              </div>
             </div>
           ) : (
             <>
-              <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => inputRef.current?.click()}>
                 <Paperclip className="mr-1.5 h-3.5 w-3.5" />
                 {t("consultationDocs.choose")}
               </Button>

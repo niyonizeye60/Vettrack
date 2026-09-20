@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -45,6 +45,17 @@ interface Consultation {
   followUpNeeded?: boolean
   followUpDate?: string | null
   documents?: ConsultationDocument[]
+}
+
+// One label/value pair in the details dialog. The value column is minmax(0, 1fr) and
+// wraps anywhere, so a long unbroken value stays inside the dialog on a phone.
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 text-sm">
+      <dt className="font-semibold text-gray-500">{label}</dt>
+      <dd className="text-gray-900 [overflow-wrap:anywhere]">{children}</dd>
+    </div>
+  )
 }
 
 export default function VeterinaryConsultations({ consultations }: { consultations: Consultation[] }) {
@@ -343,89 +354,86 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
 
       {/* Details Dialog */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] w-11/12 max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+        {/* Flex column, not the default grid: a grid column grows to fit an unbreakable
+            value (a long file name, a URL) and pushes the dialog wider than a phone
+            screen. Header and footer stay pinned; only the details scroll. */}
+        <DialogContent className="flex max-h-[85vh] w-11/12 flex-col gap-0 overflow-hidden rounded-lg p-0 sm:max-w-[500px]">
+          <DialogHeader className="border-b border-gray-100 px-4 py-4 pr-12 text-left sm:px-6 sm:pr-12">
             <DialogTitle>{t("vet.consultationDetails")}</DialogTitle>
             <DialogDescription>{t("vet.viewDetailsDesc")}</DialogDescription>
           </DialogHeader>
-          {selectedConsultation && (
-            <div className="space-y-3 py-3">
-              {[
-                { label: t("vet.farmer"),      value: selectedConsultation.fullName },
-                { label: t("vet.phoneNumber"), value: selectedConsultation.phoneNumber },
-                { label: t("vet.service"),      value: selectedConsultation.service },
-                { label: t("vet.consultType"), value: selectedConsultation.type },
-                { label: t("vet.date"),        value: `${selectedConsultation.date} ${selectedConsultation.time}` },
-              ].map(({ label, value }) => (
-                <div key={label} className="grid grid-cols-3 gap-4 text-sm">
-                  <p className="font-semibold text-gray-500">{label}</p>
-                  <p className="col-span-2 text-gray-900 break-words">{value}</p>
-                </div>
-              ))}
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <p className="font-semibold text-gray-500">{t("vet.status")}</p>
-                <div className="col-span-2">{statusBadge(selectedConsultation.status)}</div>
-              </div>
-              {selectedConsultation.animalId && (
-                <div className="grid grid-cols-3 gap-4 text-sm items-center">
-                  <p className="font-semibold text-gray-500">{t("vet.animal")}</p>
-                  <div className="col-span-2 flex items-center justify-between gap-2">
-                    <span className="text-gray-900 flex items-center gap-1.5 min-w-0">
-                      <PawPrint className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                      <span className="truncate">
-                        {selectedConsultation.animalName}
-                        {selectedConsultation.animalType ? ` (${selectedConsultation.animalType}${selectedConsultation.animalBreed ? ` · ${selectedConsultation.animalBreed}` : ""})` : ""}
-                      </span>
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs flex-shrink-0"
-                      onClick={() => setHistoryAnimalId(selectedConsultation.animalId!)}
-                    >
-                      <History className="h-3 w-3 mr-1" />{t("vet.viewHistory")}
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {(selectedConsultation.diagnosis || selectedConsultation.treatmentGiven || selectedConsultation.medicationDosage) && (
-                <div className="border-t border-gray-100 pt-3 space-y-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{t("vet.completionDetails")}</p>
-                  {[
-                    { label: t("vet.diagnosis"), value: selectedConsultation.diagnosis },
-                    { label: t("vet.symptomsObserved"), value: selectedConsultation.symptomsObserved },
-                    { label: t("vet.treatmentGiven"), value: selectedConsultation.treatmentGiven },
-                    { label: t("vet.medicationDosage"), value: selectedConsultation.medicationDosage },
-                  ].filter(row => row.value).map(({ label, value }) => (
-                    <div key={label} className="grid grid-cols-3 gap-4 text-sm">
-                      <p className="font-semibold text-gray-500">{label}</p>
-                      <p className="col-span-2 text-gray-900 break-words">{value}</p>
-                    </div>
-                  ))}
-                  {selectedConsultation.followUpNeeded && (
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <p className="font-semibold text-gray-500">{t("vet.followUpDate")}</p>
-                      <p className="col-span-2 text-gray-900">{selectedConsultation.followUpDate || "—"}</p>
-                    </div>
+
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+            {selectedConsultation && (
+              <>
+                <dl className="space-y-3">
+                  <DetailRow label={t("vet.farmer")}>{selectedConsultation.fullName}</DetailRow>
+                  <DetailRow label={t("vet.phoneNumber")}>{selectedConsultation.phoneNumber}</DetailRow>
+                  <DetailRow label={t("vet.service")}>{selectedConsultation.service}</DetailRow>
+                  <DetailRow label={t("vet.consultType")}>{selectedConsultation.type}</DetailRow>
+                  <DetailRow label={t("vet.date")}>{selectedConsultation.date} {selectedConsultation.time}</DetailRow>
+                  <DetailRow label={t("vet.status")}>{statusBadge(selectedConsultation.status)}</DetailRow>
+                  {selectedConsultation.animalId && (
+                    <DetailRow label={t("vet.animal")}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <PawPrint className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                          <span>
+                            {selectedConsultation.animalName}
+                            {selectedConsultation.animalType ? ` (${selectedConsultation.animalType}${selectedConsultation.animalBreed ? ` · ${selectedConsultation.animalBreed}` : ""})` : ""}
+                          </span>
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 flex-shrink-0 px-2.5 text-xs"
+                          onClick={() => setHistoryAnimalId(selectedConsultation.animalId!)}
+                        >
+                          <History className="mr-1 h-3 w-3" />{t("vet.viewHistory")}
+                        </Button>
+                      </div>
+                    </DetailRow>
                   )}
-                </div>
-              )}
-              {selectedConsultation.feedback && (
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <p className="font-semibold text-gray-500">{t("vet.feedback")}</p>
-                  <p className="col-span-2 text-gray-900 break-words">{selectedConsultation.feedback}</p>
-                </div>
-              )}
-              <ConsultationDocuments
-                consultationId={selectedConsultation._id}
-                documents={liveDocuments}
-                mode="vet"
-                canUpload={DOCUMENT_UPLOAD_STATUSES.includes(selectedConsultation.status)}
-                onChange={() => router.refresh()}
-              />
-            </div>
-          )}
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+                </dl>
+
+                {(selectedConsultation.diagnosis || selectedConsultation.treatmentGiven || selectedConsultation.medicationDosage) && (
+                  <div className="space-y-2 border-t border-gray-100 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{t("vet.completionDetails")}</p>
+                    <dl className="space-y-3">
+                      {[
+                        { label: t("vet.diagnosis"), value: selectedConsultation.diagnosis },
+                        { label: t("vet.symptomsObserved"), value: selectedConsultation.symptomsObserved },
+                        { label: t("vet.treatmentGiven"), value: selectedConsultation.treatmentGiven },
+                        { label: t("vet.medicationDosage"), value: selectedConsultation.medicationDosage },
+                      ].filter(row => row.value).map(({ label, value }) => (
+                        <DetailRow key={label} label={label}>{value}</DetailRow>
+                      ))}
+                      {selectedConsultation.followUpNeeded && (
+                        <DetailRow label={t("vet.followUpDate")}>{selectedConsultation.followUpDate || "—"}</DetailRow>
+                      )}
+                    </dl>
+                  </div>
+                )}
+
+                {selectedConsultation.feedback && (
+                  <dl className="border-t border-gray-100 pt-3">
+                    <DetailRow label={t("vet.feedback")}>{selectedConsultation.feedback}</DetailRow>
+                  </dl>
+                )}
+
+                <ConsultationDocuments
+                  consultationId={selectedConsultation._id}
+                  documents={liveDocuments}
+                  mode="vet"
+                  canUpload={DOCUMENT_UPLOAD_STATUSES.includes(selectedConsultation.status)}
+                  onChange={() => router.refresh()}
+                />
+              </>
+            )}
+          </div>
+
+          {/* Accept and Reject share a row on a phone; Close (and a lone Mark Complete) take the full width. */}
+          <DialogFooter className="grid grid-cols-2 gap-2 border-t border-gray-100 px-4 py-3 sm:flex sm:flex-row sm:justify-end sm:space-x-0 sm:px-6 sm:py-4">
             {selectedConsultation?.status === "pending" && (
               <>
                 <Button className="bg-green-600 hover:bg-green-700" onClick={() => initiateAction(selectedConsultation, "accept")}>
@@ -437,12 +445,12 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
               </>
             )}
             {selectedConsultation?.status === "accepted" && (
-              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => initiateAction(selectedConsultation, "complete")}>
+              <Button className="col-span-2 bg-emerald-600 hover:bg-emerald-700 sm:col-auto" onClick={() => initiateAction(selectedConsultation, "complete")}>
                 <CheckCircle className="h-4 w-4 mr-1.5" />{t("vet.markComplete")}
               </Button>
             )}
             <DialogClose asChild>
-              <Button variant="outline">{t("vet.close")}</Button>
+              <Button variant="outline" className="col-span-2 sm:col-auto">{t("vet.close")}</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
