@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Heart, Share2, MapPin, Calendar, Tag, Mail, Phone, Expand } from "lucide-react"
+import { Heart, Share2, MapPin, Calendar, Tag, Mail, Phone, Expand, SearchX } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useParams } from "next/navigation"
@@ -12,6 +12,9 @@ import ServicesBanner from "@/components/services/services-banner"
 import ProductDetailRows from "@/components/products/product-detail-rows"
 import ConnectCta from "@/components/marketplace/connect-cta"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
+
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"
 
 interface Animal {
   id: string
@@ -82,39 +85,62 @@ export default function AnimalDetailPage() {
     localStorage.setItem('animals-wishlist', JSON.stringify(newWishlist))
   }
 
+  // The site header is transparent with white text until the page scrolls, so every
+  // state of this page needs the hero banner under it - without one the nav links
+  // are white on the page's light background and the header looks broken.
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container-custom">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-300 rounded w-32 mb-8"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="h-96 bg-gray-300 rounded"></div>
-              <div className="space-y-4">
-                <div className="h-8 bg-gray-300 rounded"></div>
-                <div className="h-6 bg-gray-300 rounded w-24"></div>
-                <div className="h-20 bg-gray-300 rounded"></div>
+      <>
+        <ServicesBanner
+          backHref="/services?tab=sales"
+          title={t('animals.title')}
+          subtitle={t('animals.subtitle')}
+          image={HERO_IMAGE}
+        />
+
+        <div className="min-h-screen bg-gray-50 py-12">
+          <div className="container-custom">
+            <div className="animate-pulse">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="h-96 bg-gray-300 rounded"></div>
+                <div className="space-y-4">
+                  <div className="h-8 bg-gray-300 rounded"></div>
+                  <div className="h-6 bg-gray-300 rounded w-24"></div>
+                  <div className="h-20 bg-gray-300 rounded"></div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     )
   }
 
   if (!animal) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="container-custom">
-          <Link href="/animal-sales" className="inline-flex items-center text-primary hover:underline mb-8">
-            {t('common.backTo')} {t('animals.title')}
-          </Link>
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-600 mb-4">{t('animals.notFound')}</h2>
-            <p className="text-gray-500">{t('animals.notFoundDesc')}</p>
+      <>
+        <ServicesBanner
+          backHref="/services?tab=sales"
+          title={t('animals.title')}
+          subtitle={t('animals.subtitle')}
+          image={HERO_IMAGE}
+        />
+
+        <div className="min-h-[50vh] bg-gray-50 py-12">
+          <div className="container-custom">
+            <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+                <SearchX className="h-7 w-7 text-gray-400" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">{t('animals.notFound')}</h2>
+              <p className="text-sm text-gray-500">{t('animals.notFoundDesc')}</p>
+              <Button asChild className="mt-6">
+                <Link href="/animal-sales">{t('connect.backToAnimals')}</Link>
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -125,7 +151,7 @@ export default function AnimalDetailPage() {
         backLabel={`${t('common.backTo')} ${t('animals.title')}`}
         title={animal.name}
         subtitle={t('animals.subtitle')}
-        image="https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"
+        image={HERO_IMAGE}
       />
 
       <div className="min-h-screen bg-gray-50 py-12">
