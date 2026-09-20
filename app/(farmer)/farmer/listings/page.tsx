@@ -18,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair, Pencil, EyeOff, Trash2 } from "lucide-react"
+import { Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair, Pencil, EyeOff, Trash2, Ban } from "lucide-react"
 import { ANIMAL_TYPES, ANIMAL_SEXES, MAX_LISTING_PHOTOS } from "@/lib/validations/listing-request"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
 
@@ -46,7 +46,15 @@ interface ListingRequest {
   reviewHistory: { note: string; reviewedAt: string | null }[]
   publishedServiceId: string | null
   /** Live state of the published listing; null when unpublished or staff deleted it. */
-  listing: { hidden: boolean; reason: string | null } | null
+  listing: { hidden: boolean; reason: string | null; locked: boolean } | null
+  /**
+   * Decided by the server, which is also what enforces them: taken off the marketplace,
+   * open to editing, and safe to delete from the list.
+   */
+  removed: boolean
+  editable: boolean
+  deletable: boolean
+  editedAt: string | null
   /** The farmer's ask for the published listing to be taken down; null until they ask. */
   removal: {
     status: "pending" | "approved" | "declined"
@@ -98,7 +106,12 @@ export default function FarmerListingsPage() {
   const [locating, setLocating] = useState(false)
   // Set while revising a rejected request; null means the dialog is a fresh request.
   const [revising, setRevising] = useState<ListingRequest | null>(null)
+  // Set while editing a listing that is already live; the dialog then saves in place.
+  const [editing, setEditing] = useState<ListingRequest | null>(null)
   const [withdrawTarget, setWithdrawTarget] = useState<ListingRequest | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ListingRequest | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [removeTarget, setRemoveTarget] = useState<ListingRequest | null>(null)
   const [removeReason, setRemoveReason] = useState("")
   const [removing, setRemoving] = useState(false)
@@ -168,11 +181,12 @@ export default function FarmerListingsPage() {
     setPhotos([])
     setGps(null)
     setRevising(null)
+    setEditing(null)
     setError(null)
   }
 
-  /** Reopen a rejected request with everything the farmer sent, ready to fix and resend. */
-  const startRevising = (request: ListingRequest) => {
+  /** Load a request's details into the form, ready to change. */
+  const fillForm = (request: ListingRequest) => {
     setDetailTarget(null)
     setForm({
       title: request.title,
@@ -194,7 +208,21 @@ export default function FarmerListingsPage() {
         : null
     )
     setError(null)
+  }
+
+  /** Reopen a rejected request with everything the farmer sent, ready to fix and resend. */
+  const startRevising = (request: ListingRequest) => {
+    fillForm(request)
+    setEditing(null)
     setRevising(request)
+    setOpen(true)
+  }
+
+  /** Change a listing that is already live. Saved in place; the marketplace sees it was edited. */
+  const startEditing = (request: ListingRequest) => {
+    fillForm(request)
+    setRevising(null)
+    setEditing(request)
     setOpen(true)
   }
 
@@ -208,11 +236,12 @@ export default function FarmerListingsPage() {
         photos,
         ...(gps ? { latitude: gps.lat, longitude: gps.lng } : {}),
       }
-      const res = revising
-        ? await fetch(`/api/listing-requests/${revising.id}`, {
+      const existing = revising ?? editing
+      const res = existing
+        ? await fetch(`/api/listing-requests/${existing.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "resubmit", ...payload }),
+            body: JSON.stringify({ action: revising ? "resubmit" : "edit", ...payload }),
           })
         : await fetch("/api/listing-requests", {
             method: "POST",
@@ -221,16 +250,42 @@ export default function FarmerListingsPage() {
           })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || t("listing.submitFailed"))
+        setError(data.error || (editing ? t("listing.editFailed") : t("listing.submitFailed")))
         return
       }
       setOpen(false)
       resetForm()
       await fetchRequests()
     } catch {
-      setError(t("listing.submitFailed"))
+      setError(editing ? t("listing.editFailed") : t("listing.submitFailed"))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const closeDelete = () => {
+    setDeleteTarget(null)
+    setDeleteError(null)
+  }
+
+  /** Clear a removed or unpublished post from the list. The server refuses anything still live. */
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleteError(null)
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/listing-requests/${deleteTarget.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setDeleteError(data.error || t("listing.deleteFailed"))
+        return
+      }
+      closeDelete()
+      await fetchRequests()
+    } catch {
+      setDeleteError(t("listing.deleteFailed"))
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -279,12 +334,21 @@ export default function FarmerListingsPage() {
     }
   }
 
-  /** A published listing staff have taken off the public pages. */
-  const isHidden = (request: ListingRequest) => request.status === "approved" && request.listing?.hidden === true
+  /** A published listing staff have taken off the public pages but could bring back. */
+  const isHidden = (request: ListingRequest) =>
+    request.status === "approved" && !request.removed && request.listing?.hidden === true
 
-  /** One status for the seller to read: "Hidden" replaces "Published" while staff have it down. */
+  /**
+   * One status for the seller to read: "Removed" or "Hidden" replaces "Published" once
+   * the animal is off the marketplace, so a card never says Published while it is down.
+   */
   const statusBadge = (request: ListingRequest) =>
-    isHidden(request) ? (
+    request.removed ? (
+      <Badge className="bg-gray-200 text-gray-700" variant="secondary">
+        <Trash2 className="h-3 w-3 mr-1" />
+        {t("listing.removedBadge")}
+      </Badge>
+    ) : isHidden(request) ? (
       <Badge className="bg-gray-200 text-gray-700" variant="secondary">
         <EyeOff className="h-3 w-3 mr-1" />
         {t("listing.hiddenBadge")}
@@ -365,7 +429,7 @@ export default function FarmerListingsPage() {
                       {request.title}
                     </button>
                     {statusBadge(request)}
-                    {request.status === "approved" && request.removal?.status === "pending" && (
+                    {request.status === "approved" && !request.removed && request.removal?.status === "pending" && (
                       <Badge className="bg-amber-100 text-amber-800" variant="secondary">
                         {t("listing.removalRequested")}
                       </Badge>
@@ -374,13 +438,22 @@ export default function FarmerListingsPage() {
                   <p className="text-sm text-gray-600">
                     {[request.animalType, request.breed, request.age].filter(Boolean).join(" · ")}
                   </p>
+                  {request.removed && <p className="text-xs text-gray-500">{t("listing.removedNote")}</p>}
                   {isHidden(request) && (
                     <p className="text-xs text-gray-500">
                       {t("listing.hiddenNote")}
                       {request.listing?.reason ? ` ${request.listing.reason}` : ""}
                     </p>
                   )}
-                  {request.status === "approved" && !isHidden(request) && request.removal?.status === "declined" && (
+                  {request.status === "approved" && !request.removed && request.listing?.locked && (
+                    <p className="text-xs text-gray-500">{t("listing.lockedNote")}</p>
+                  )}
+                  {request.status === "approved" && request.editedAt && !request.removed && (
+                    <p className="text-xs text-gray-400">
+                      {t("listing.editedOn")} {new Date(request.editedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                  {request.status === "approved" && !isHidden(request) && !request.removed && request.removal?.status === "declined" && (
                     <p className="text-xs text-red-700">
                       {t("listing.removalDeclined")}
                       {request.removal.reviewNote ? `: ${request.removal.reviewNote}` : ""}
@@ -422,15 +495,32 @@ export default function FarmerListingsPage() {
                       {t("listing.withdraw")}
                     </Button>
                   )}
+                  {request.editable && (
+                    <Button variant="outline" size="sm" onClick={() => startEditing(request)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      {t("listing.editListing")}
+                    </Button>
+                  )}
                   {request.status === "approved" &&
                     request.listing &&
-                    !request.listing.hidden &&
+                    !request.removed &&
                     request.removal?.status !== "pending" && (
                       <Button variant="outline" size="sm" onClick={() => setRemoveTarget(request)}>
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Ban className="h-4 w-4 mr-2" />
                         {t("listing.requestRemoval")}
                       </Button>
                     )}
+                  {request.deletable && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => { setDeleteError(null); setDeleteTarget(request) }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      {t("listing.deletePost")}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -442,10 +532,19 @@ export default function FarmerListingsPage() {
       <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) resetForm() }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{revising ? t("listing.reviseTitle") : t("listing.requestListing")}</DialogTitle>
+            <DialogTitle>
+              {editing ? t("listing.editTitle") : revising ? t("listing.reviseTitle") : t("listing.requestListing")}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* A live listing is edited in place, so say so: nothing is re-reviewed, but Vettrack is told. */}
+            {editing && (
+              <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-900">
+                {t("listing.editNotice")}
+              </div>
+            )}
+
             {/* Kept in view while editing, so the farmer can fix what was asked without going back. */}
             {revising?.reviewNote && (
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">
@@ -676,11 +775,32 @@ export default function FarmerListingsPage() {
             </Button>
             <Button onClick={submit} disabled={saving || uploading}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {revising ? t("listing.resubmitRequest") : t("listing.submitRequest")}
+              {editing ? t("listing.saveChanges") : revising ? t("listing.resubmitRequest") : t("listing.submitRequest")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete a removed or unpublished post from the list */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(next) => !next && closeDelete()}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("listing.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("listing.deleteDesc")} <strong>{deleteTarget?.title}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>{t("common.cancel")}</AlertDialogCancel>
+            {/* Not AlertDialogAction: that closes the dialog itself, which would hide a failed delete's error. */}
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              {deleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("listing.deletePost")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!withdrawTarget} onOpenChange={(next) => !next && setWithdrawTarget(null)}>
         <AlertDialogContent>

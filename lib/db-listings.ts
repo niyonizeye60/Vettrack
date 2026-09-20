@@ -18,6 +18,11 @@ export interface ListingVisibility {
   hidden: boolean
   /** Staff's stated reason, shown to the seller. */
   reason: string | null
+  /**
+   * A buyer is arranging this animal, or it has been sold or withdrawn. The seller
+   * cannot edit the listing while this is true - see sellerEditableFilter.
+   */
+  locked: boolean
 }
 
 export class ListingVisibilityError extends Error {}
@@ -25,6 +30,32 @@ export class ListingVisibilityError extends Error {}
 async function getServices() {
   const client = await clientPromise
   return client.db(DB_NAME).collection("services")
+}
+
+/**
+ * Whether the animal is tied up in a deal: sold, withdrawn, or held by a buyer whose
+ * hold has not lapsed. Mirrors the availability rule in lib/db-orders.ts.
+ */
+export function isListingLocked(
+  doc: { listingStatus?: string | null; reservedUntil?: Date | string | null },
+  now: Date = new Date()
+): boolean {
+  if (doc.listingStatus === "sold" || doc.listingStatus === "withdrawn") return true
+  if (doc.listingStatus !== "reserved") return false
+  const until = doc.reservedUntil ? new Date(doc.reservedUntil) : null
+  return !until || until >= now
+}
+
+/**
+ * The same rule as a query filter, so the check and the write are one atomic step: a
+ * buyer claiming the animal between a seller opening the edit form and saving it
+ * cannot be overwritten.
+ */
+export function sellerEditableFilter(now: Date = new Date()) {
+  return {
+    listingStatus: { $nin: ["sold", "withdrawn"] },
+    $or: [{ listingStatus: { $ne: "reserved" } }, { reservedUntil: { $lt: now } }],
+  }
 }
 
 /** Batch lookup for the farmer's request list; ids of deleted listings are simply absent. */
@@ -35,13 +66,18 @@ export async function getListingVisibility(serviceIds: string[]): Promise<Map<st
 
   const services = await getServices()
   const docs = await services
-    .find({ _id: { $in: valid.map((id) => new ObjectId(id)) } }, { projection: { hidden: 1, hiddenReason: 1 } })
+    .find(
+      { _id: { $in: valid.map((id) => new ObjectId(id)) } },
+      { projection: { hidden: 1, hiddenReason: 1, listingStatus: 1, reservedUntil: 1 } }
+    )
     .toArray()
 
+  const now = new Date()
   for (const doc of docs) {
     result.set(doc._id.toString(), {
       hidden: doc.hidden === true,
       reason: doc.hidden === true ? doc.hiddenReason ?? null : null,
+      locked: isListingLocked({ listingStatus: doc.listingStatus, reservedUntil: doc.reservedUntil }, now),
     })
   }
   return result

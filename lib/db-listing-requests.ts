@@ -1,8 +1,13 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { resolveLocation } from "@/lib/rwanda-geo"
-import type { ListingRequestInput, ListingRequestStatus, RemovalStatus } from "@/lib/validations/listing-request"
-import { setListingHidden, type ListingVisibility } from "@/lib/db-listings"
+import type {
+  ListingChange,
+  ListingRequestInput,
+  ListingRequestStatus,
+  RemovalStatus,
+} from "@/lib/validations/listing-request"
+import { sellerEditableFilter, setListingHidden, type ListingVisibility } from "@/lib/db-listings"
 import { notifyFarmer, notifySuperadmin } from "@/lib/marketplace-notifications"
 
 const DB_NAME = "ntdm_animal_hospital"
@@ -49,9 +54,22 @@ export interface ListingRequest {
   publishedServiceId: string | null
   /** The farmer's request to have the published listing taken down. Absent until they ask. */
   removal?: RemovalRequest | null
+  /**
+   * The farmer editing a listing that is already published. Edits go live at once, so
+   * this is how the marketplace finds out: it is mirrored onto the service document,
+   * where the listings screen reads it. `editLog` keeps the last few edits.
+   */
+  editCount?: number
+  editedAt?: Date | null
+  editLog?: { at: Date; changes: ListingChange[] }[]
+  /** Set when the farmer deletes the request from their list. The document stays for the audit trail. */
+  farmerDeletedAt?: Date | null
   createdAt: Date
   updatedAt: Date
 }
+
+/** Edits kept per listing; older ones fall off so the document cannot grow without bound. */
+const EDIT_LOG_LIMIT = 10
 
 export interface RemovalRequest {
   status: RemovalStatus
@@ -85,15 +103,49 @@ function emptyToNull(value: string | undefined | null): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
-export async function createListingRequest(
-  farmer: { _id: string; name: string; phone?: string; email: string },
-  input: ListingRequestInput
-): Promise<ListingRequest> {
-  const collection = await getCollection()
+type SellerFields = Pick<
+  ListingRequest,
+  | "title" | "description" | "proposedPrice" | "photos" | "animalType" | "breed" | "age" | "sex"
+  | "district" | "sector" | "village" | "latitude" | "longitude" | "sellerPhone" | "sellerEmail"
+>
 
-  const now = new Date()
-  const doc: Omit<ListingRequest, "_id"> = {
-    farmerId: farmer._id,
+/**
+ * The fields of a service document that come from the farmer's request. Approving
+ * writes them once and a later edit writes them again, so both go through here and
+ * the storefront copy cannot drift from what the farmer entered.
+ */
+function publishedFields(source: SellerFields) {
+  const fallback = resolveLocation(source.district, source.sector)
+  return {
+    name: source.title,
+    description: source.description,
+    price: source.proposedPrice,
+    image: source.photos[0] ?? null,
+    images: source.photos,
+    animalType: source.animalType,
+    breed: source.breed ?? "",
+    age: source.age ?? "",
+    sex: source.sex ?? "",
+    district: source.district,
+    sector: source.sector ?? "",
+    village: source.village ?? "",
+    // Prefer the farmer's own GPS pin; fall back to sector/district center so
+    // every published listing is location-searchable.
+    latitude: source.latitude ?? fallback?.lat ?? null,
+    longitude: source.longitude ?? fallback?.lng ?? null,
+    // Seller contact rides along but is stripped from public API responses -
+    // see canViewSellerContact in lib/roles.ts. It is what the connection fee buys.
+    sellerPhone: source.sellerPhone,
+    sellerEmail: source.sellerEmail,
+  }
+}
+
+/** The request-side columns for a submitted form, shared by create, resubmit and edit. */
+function requestFieldsFromInput(
+  farmer: { name: string; phone?: string; email: string },
+  input: ListingRequestInput
+) {
+  return {
     farmerName: farmer.name,
     sellerPhone: (farmer.phone ?? "").trim(),
     sellerEmail: farmer.email,
@@ -111,6 +163,51 @@ export async function createListingRequest(
     latitude: input.latitude ?? null,
     longitude: input.longitude ?? null,
     photos: input.photos,
+  }
+}
+
+const clip = (value: string) => (value.length > 300 ? `${value.slice(0, 297)}...` : value)
+
+/** What the seller changed, field by field - the marketplace's view of an edit. */
+function diffListing(before: ListingRequest, after: ReturnType<typeof requestFieldsFromInput>): ListingChange[] {
+  const changes: ListingChange[] = []
+  // Compared in full and only clipped for storage, so a long description edited near
+  // its end still registers as changed.
+  const compare = (field: ListingChange["field"], from: string | number | null, to: string | number | null) => {
+    const a = String(from ?? "")
+    const b = String(to ?? "")
+    if (a !== b) changes.push({ field, from: clip(a), to: clip(b) })
+  }
+  const pin = (lat: number | null, lng: number | null) => (lat != null && lng != null ? `${lat}, ${lng}` : "")
+
+  compare("title", before.title, after.title)
+  compare("animalType", before.animalType, after.animalType)
+  compare("breed", before.breed, after.breed)
+  compare("age", before.age, after.age)
+  compare("sex", before.sex, after.sex)
+  compare("price", before.proposedPrice, after.proposedPrice)
+  compare("description", before.description, after.description)
+  compare("district", before.district, after.district)
+  compare("sector", before.sector, after.sector)
+  compare("village", before.village, after.village)
+  compare("gps", pin(before.latitude, before.longitude), pin(after.latitude, after.longitude))
+  // Photos compare by content and order (the first is the cover) but read out as counts.
+  if (before.photos.join("|") !== after.photos.join("|")) {
+    changes.push({ field: "photos", from: String(before.photos.length), to: String(after.photos.length) })
+  }
+  return changes
+}
+
+export async function createListingRequest(
+  farmer: { _id: string; name: string; phone?: string; email: string },
+  input: ListingRequestInput
+): Promise<ListingRequest> {
+  const collection = await getCollection()
+
+  const now = new Date()
+  const doc: Omit<ListingRequest, "_id"> = {
+    farmerId: farmer._id,
+    ...requestFieldsFromInput(farmer, input),
     status: "pending",
     reviewedBy: null,
     reviewedAt: null,
@@ -131,20 +228,23 @@ export async function createListingRequest(
   return { ...doc, _id: result.insertedId } as ListingRequest
 }
 
+// `farmerDeletedAt: null` matches a missing field too, so older documents still list.
 export async function listRequestsForFarmer(farmerId: string): Promise<ListingRequest[]> {
   const collection = await getCollection()
-  return collection.find({ farmerId }).sort({ createdAt: -1 }).toArray()
+  return collection.find({ farmerId, farmerDeletedAt: null } as any).sort({ createdAt: -1 }).toArray()
 }
 
 export async function listRequests(status?: ListingRequestStatus): Promise<ListingRequest[]> {
   const collection = await getCollection()
-  const filter = status ? { status } : {}
+  // A request the farmer deleted is off the queue for the marketplace too: only
+  // rejected, withdrawn or taken-down ones can be deleted, so nothing there needs action.
+  const filter: Record<string, unknown> = { farmerDeletedAt: null, ...(status ? { status } : {}) }
   // Oldest first while pending, so the queue is genuinely first-come-first-served.
   // updatedAt is the time a request entered the queue: nothing touches a pending
   // request except submitting or resubmitting it, so a resubmission rejoins at the
   // back rather than jumping ahead on its original createdAt.
   const sort: Record<string, 1 | -1> = status === "pending" ? { updatedAt: 1 } : { updatedAt: -1 }
-  return collection.find(filter).sort(sort).toArray()
+  return collection.find(filter as any).sort(sort).toArray()
 }
 
 export async function countPendingRequests(): Promise<number> {
@@ -196,29 +296,10 @@ export async function approveRequest(
   }
 
   const service = {
-    name: request.title,
-    description: request.description,
-    price: request.proposedPrice,
+    ...publishedFields(request),
     duration: "",
     category: "sales",
     categoryId,
-    image: request.photos[0] ?? null,
-    images: request.photos,
-    animalType: request.animalType,
-    breed: request.breed ?? "",
-    age: request.age ?? "",
-    sex: request.sex ?? "",
-    district: request.district,
-    sector: request.sector ?? "",
-    village: request.village ?? "",
-    // Prefer the farmer's own GPS pin; fall back to sector/district center so
-    // every published listing is location-searchable.
-    latitude: request.latitude ?? resolveLocation(request.district, request.sector)?.lat ?? null,
-    longitude: request.longitude ?? resolveLocation(request.district, request.sector)?.lng ?? null,
-    // Seller contact rides along but is stripped from public API responses -
-    // see canViewSellerContact in lib/roles.ts. It is what the connection fee buys.
-    sellerPhone: request.sellerPhone,
-    sellerEmail: request.sellerEmail,
     sellerId: request.farmerId,
     requestId: id,
     listingStatus: "active",
@@ -304,35 +385,21 @@ export async function resubmitRequest(
   const collection = await getCollection()
 
   const request = await getRequestById(id)
-  if (!request || request.farmerId !== farmer._id) throw new ListingRequestError("Request not found")
+  if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
+    throw new ListingRequestError("Request not found")
+  }
   if (request.status !== "rejected") {
     throw new ListingRequestError("Only a request that was not approved can be resubmitted")
   }
 
   const now = new Date()
   const updated = await collection.findOneAndUpdate(
-    { _id: new ObjectId(id), farmerId: farmer._id, status: "rejected" },
+    { _id: new ObjectId(id), farmerId: farmer._id, status: "rejected", farmerDeletedAt: null } as any,
     {
       $set: {
         // Refreshed from the account, so a phone number fixed since the first attempt
         // is the one that reaches buyers.
-        farmerName: farmer.name,
-        sellerPhone: (farmer.phone ?? "").trim(),
-        sellerEmail: farmer.email,
-        animalId: emptyToNull(input.animalId),
-        title: input.title.trim(),
-        animalType: input.animalType,
-        breed: emptyToNull(input.breed),
-        age: emptyToNull(input.age),
-        sex: input.sex ?? null,
-        proposedPrice: input.proposedPrice,
-        description: input.description.trim(),
-        district: input.district.trim(),
-        sector: emptyToNull(input.sector),
-        village: emptyToNull(input.village),
-        latitude: input.latitude ?? null,
-        longitude: input.longitude ?? null,
-        photos: input.photos,
+        ...requestFieldsFromInput(farmer, input),
         status: "pending",
         reviewedBy: null,
         reviewedAt: null,
@@ -391,16 +458,19 @@ export async function requestRemoval(
   const db = await getDb()
 
   const request = await getRequestById(id)
-  if (!request || request.farmerId !== farmer._id) throw new ListingRequestError("Request not found")
+  if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
+    throw new ListingRequestError("Request not found")
+  }
   if (request.status !== "approved" || !request.publishedServiceId || !ObjectId.isValid(request.publishedServiceId)) {
     throw new ListingRequestError("Only a published listing can be removed")
   }
 
+  // A listing staff have hidden can still be asked to come down: hidden is a marketplace
+  // decision, and without this the seller would have no way to get rid of it.
   const listing = await db
     .collection("services")
-    .findOne({ _id: new ObjectId(request.publishedServiceId) }, { projection: { hidden: 1 } })
+    .findOne({ _id: new ObjectId(request.publishedServiceId) }, { projection: { _id: 1 } })
   if (!listing) throw new ListingRequestError("This listing is no longer on the marketplace")
-  if (listing.hidden === true) throw new ListingRequestError("This listing is already hidden")
 
   const updated = await collection.findOneAndUpdate(
     { _id: new ObjectId(id), farmerId: farmer._id, status: "approved", "removal.status": { $ne: "pending" } } as any,
@@ -518,11 +588,168 @@ export async function decideRemoval(
   )
 }
 
+/**
+ * A published animal that is no longer on the marketplace: staff approved the seller's
+ * removal request (and have not restored it since), or deleted the listing outright.
+ * `listing` is null when the service document is gone.
+ */
+export function isListingRemoved(request: ListingRequest, listing: ListingVisibility | null): boolean {
+  if (request.status !== "approved" || !request.publishedServiceId) return false
+  if (!listing) return true
+  return request.removal?.status === "approved" && listing.hidden
+}
+
+/** A seller may edit a live listing unless it was taken down or is tied up in a deal. */
+export function canFarmerEdit(request: ListingRequest, listing: ListingVisibility | null): boolean {
+  return (
+    request.status === "approved" &&
+    !!request.publishedServiceId &&
+    !!listing &&
+    !listing.locked &&
+    !isListingRemoved(request, listing)
+  )
+}
+
+/** Only what is off the marketplace can go from the seller's list: never a live or pending post. */
+export function canFarmerDelete(request: ListingRequest, listing: ListingVisibility | null): boolean {
+  if (request.status === "rejected" || request.status === "withdrawn") return true
+  return isListingRemoved(request, listing)
+}
+
+/**
+ * The seller deleting a post from their list: a rejected or withdrawn request, or a
+ * published one that has been taken down.
+ *
+ * This is a soft delete - the request drops out of the seller's list and the
+ * marketplace queue, but the document stays, because a taken-down listing may still have
+ * orders that point at it. Staff can remove the listing itself from the listings screen.
+ */
+export async function deleteRequestForFarmer(id: string, farmerId: string): Promise<void> {
+  const collection = await getCollection()
+  const db = await getDb()
+
+  const request = await getRequestById(id)
+  if (!request || request.farmerId !== farmerId || request.farmerDeletedAt) {
+    throw new ListingRequestError("Request not found")
+  }
+
+  let listing: ListingVisibility | null = null
+  if (request.status === "approved" && request.publishedServiceId && ObjectId.isValid(request.publishedServiceId)) {
+    const doc = await db
+      .collection("services")
+      .findOne({ _id: new ObjectId(request.publishedServiceId) }, { projection: { hidden: 1 } })
+    listing = doc ? { hidden: doc.hidden === true, reason: null, locked: false } : null
+  }
+  if (!canFarmerDelete(request, listing)) {
+    throw new ListingRequestError("Only a post that is unpublished or has been removed can be deleted")
+  }
+
+  // Pinned to the status it was checked in: a request resubmitted in the meantime is
+  // pending again and must not be swept away by a stale click.
+  const result = await collection.updateOne(
+    { _id: new ObjectId(id), farmerId, status: request.status, farmerDeletedAt: null } as any,
+    { $set: { farmerDeletedAt: new Date() } }
+  )
+  if (result.matchedCount === 0) {
+    throw new ListingRequestError("This post can no longer be deleted")
+  }
+}
+
+/**
+ * A seller changing a listing that is already published.
+ *
+ * Edits go live at once rather than back through review - the farmer is fixing a price
+ * or adding a photo, and a re-review would take the animal off sale meanwhile. The
+ * marketplace is told instead: the change is logged on the request and on the service
+ * document (which the listings screen reads) and staff are notified.
+ *
+ * The service is updated first, under sellerEditableFilter, so an animal that a buyer
+ * has just claimed cannot have its details changed under them.
+ */
+export async function editPublishedListing(
+  id: string,
+  farmer: { _id: string; name: string; phone?: string; email: string },
+  input: ListingRequestInput
+): Promise<{ request: ListingRequest; changes: ListingChange[] }> {
+  const collection = await getCollection()
+  const db = await getDb()
+  const services = db.collection("services")
+
+  const request = await getRequestById(id)
+  if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
+    throw new ListingRequestError("Request not found")
+  }
+  if (request.status !== "approved" || !request.publishedServiceId || !ObjectId.isValid(request.publishedServiceId)) {
+    throw new ListingRequestError("Only a published listing can be edited")
+  }
+  if (request.removal?.status === "approved") {
+    throw new ListingRequestError("This listing was removed and can no longer be edited")
+  }
+
+  const next = requestFieldsFromInput(farmer, input)
+  const changes = diffListing(request, next)
+  if (changes.length === 0) {
+    throw new ListingRequestError("Nothing was changed")
+  }
+
+  const now = new Date()
+  const serviceId = new ObjectId(request.publishedServiceId)
+  const entry = { at: now, changes }
+  const logPush = { editLog: { $each: [entry], $slice: -EDIT_LOG_LIMIT } }
+
+  const published = await services.updateOne(
+    { _id: serviceId, sellerId: farmer._id, ...sellerEditableFilter(now) } as any,
+    {
+      $set: { ...publishedFields(next), editedAt: now, updatedAt: now },
+      $inc: { editCount: 1 },
+      $push: logPush,
+    } as any
+  )
+  if (published.matchedCount === 0) {
+    const current = await services.findOne({ _id: serviceId }, { projection: { listingStatus: 1 } })
+    if (!current) throw new ListingRequestError("This listing is no longer on the marketplace")
+    throw new ListingRequestError(
+      current.listingStatus === "sold" || current.listingStatus === "withdrawn"
+        ? "This animal has been sold or withdrawn, so it can't be edited"
+        : "A buyer is arranging this animal right now, so it can't be edited until that finishes"
+    )
+  }
+
+  const updated = await collection.findOneAndUpdate(
+    { _id: new ObjectId(id), farmerId: farmer._id, status: "approved" } as any,
+    {
+      $set: { ...next, editedAt: now, updatedAt: now },
+      $inc: { editCount: 1 },
+      $push: logPush,
+    } as any,
+    { returnDocument: "after" }
+  )
+  if (!updated) throw new ListingRequestError("This listing can no longer be edited")
+
+  await notifySuperadmin(
+    "Listing edited by the seller",
+    `${farmer.name} edited "${updated.title}". Changed: ${changes.map((c) => c.field).join(", ")}.`,
+    "/marketplace/listings"
+  )
+
+  return { request: updated, changes }
+}
+
 /** Wire shape - ObjectIds stringified, nothing sensitive added. */
-export function serializeRequest(request: ListingRequest, listing: ListingVisibility | null = null) {
+export function serializeRequest(request: ListingRequest, listing?: ListingVisibility | null) {
+  // `undefined` means the caller did not look the listing up (single-request reads), so
+  // nothing that depends on its live state can be claimed. `null` means it was looked up
+  // and staff have deleted it.
+  const looked = listing !== undefined
   return {
     /** Live state of the published listing; null while unpublished or if staff deleted it. */
-    listing,
+    listing: listing ?? null,
+    /** Derived here so the farmer's page and the API guards agree on what is allowed. */
+    removed: looked && isListingRemoved(request, listing ?? null),
+    editable: looked && canFarmerEdit(request, listing ?? null),
+    deletable: looked && canFarmerDelete(request, listing ?? null),
+    editCount: request.editCount ?? 0,
+    editedAt: request.editedAt ?? null,
     id: request._id.toString(),
     farmerId: request.farmerId,
     farmerName: request.farmerName,

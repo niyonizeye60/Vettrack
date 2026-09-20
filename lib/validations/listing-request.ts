@@ -38,6 +38,44 @@ export const listingRequestSchema = z.object({
 
 export type ListingRequestInput = z.infer<typeof listingRequestSchema>
 
+/**
+ * One field a seller changed on a published listing. Values are display strings so
+ * the marketplace can show "from → to" without knowing each field's type; `photos`
+ * carries counts and `gps` a "lat, lng" pair.
+ */
+export interface ListingChange {
+  field: ListingChangeField
+  from: string
+  to: string
+}
+
+export interface ListingEditLogEntry {
+  at: string
+  changes: ListingChange[]
+}
+
+export const LISTING_CHANGE_FIELDS = [
+  "title", "animalType", "breed", "age", "sex", "price", "description",
+  "district", "sector", "village", "photos", "gps",
+] as const
+export type ListingChangeField = (typeof LISTING_CHANGE_FIELDS)[number]
+
+/** Translation key for each changeable field, reusing the labels the request form already has. */
+export const LISTING_CHANGE_LABEL_KEYS: Record<ListingChangeField, string> = {
+  title: "listing.title",
+  animalType: "listing.animalType",
+  breed: "listing.breed",
+  age: "listing.age",
+  sex: "listing.sex",
+  price: "listing.askingPrice",
+  description: "listing.description",
+  district: "listing.district",
+  sector: "listing.sector",
+  village: "listing.village",
+  photos: "listing.photos",
+  gps: "listing.locationPinned",
+}
+
 /** Marketplace admin's decision on a pending request. */
 export const reviewDecisionSchema = z.discriminatedUnion("decision", [
   z.object({

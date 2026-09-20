@@ -7,6 +7,7 @@ import { can, canViewSellerContact } from '@/lib/roles'
 import { canAccessMarketplaceCategory } from '@/lib/marketplace-access'
 import { logActivity } from '@/lib/activity-log'
 import { resolveLocation } from '@/lib/rwanda-geo'
+import { notifyFarmer } from '@/lib/marketplace-notifications'
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 const forbidden = () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -19,8 +20,15 @@ const canManage = (role: unknown) => can(role, 'marketplace.listings.manage')
  * straight out of this payload.
  */
 function serializeService(service: any, viewer: { _id?: string; role?: string } | null) {
-  const { _id, sellerPhone, sellerEmail, ...rest } = service
-  const base = { ...rest, id: _id.toString() }
+  // The seller's edit history (old prices and descriptions) is for the marketplace
+  // only; the public and other sellers never see it.
+  const { _id, sellerPhone, sellerEmail, editLog, editedAt, editCount, ...rest } = service
+  const managing = canManage(viewer?.role)
+  const base = {
+    ...rest,
+    id: _id.toString(),
+    ...(managing ? { editLog, editedAt, editCount } : {}),
+  }
   return canViewSellerContact(viewer, service)
     ? { ...base, sellerPhone, sellerEmail }
     : base
@@ -184,7 +192,7 @@ export async function DELETE(request: NextRequest) {
 
     const existing = await db.collection('services').findOne(
       { _id: new ObjectId(id) },
-      { projection: { category: 1 } }
+      { projection: { category: 1, name: 1, sellerId: 1 } }
     )
     if (!existing) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404 })
@@ -200,6 +208,17 @@ export async function DELETE(request: NextRequest) {
     }
 
     await logActivity(currentUser!._id, 'marketplace.listing.deleted', `Deleted listing ${id}`)
+
+    // A seller finding their animal gone should hear it from us. Their request then
+    // reads as removed on their own page, where they can clear it from their list.
+    if (existing.sellerId && ObjectId.isValid(existing.sellerId)) {
+      await notifyFarmer(
+        existing.sellerId,
+        'Your listing was removed',
+        `"${existing.name ?? 'Your animal'}" was removed from the marketplace by Vettrack.`,
+        '/farmer/listings'
+      )
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

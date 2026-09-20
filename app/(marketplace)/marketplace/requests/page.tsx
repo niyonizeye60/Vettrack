@@ -35,6 +35,9 @@ interface ListingRequest {
   reviewHistory: { note: string; reviewedAt: string | null }[]
   publishedServiceId: string | null
   removal: { status: "pending" | "approved" | "declined"; reason: string | null } | null
+  /** Set when the seller changed the listing after it went live; the details are on the listings screen. */
+  editCount: number
+  editedAt: string | null
   createdAt: string
 }
 
@@ -216,6 +219,11 @@ export default function MarketplaceRequestsPage() {
                     {request.resubmitCount > 0 && (
                       <Badge className="bg-amber-100 text-amber-800" variant="secondary">
                         {t("marketplace.resubmitted")} · {request.resubmitCount}
+                      </Badge>
+                    )}
+                    {request.status === "approved" && request.editedAt && (
+                      <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+                        {t("marketplace.editedBadge")} · {new Date(request.editedAt).toLocaleDateString()}
                       </Badge>
                     )}
                     {request.photos.length > 2 && (

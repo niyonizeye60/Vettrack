@@ -15,11 +15,18 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Edit, Trash2, Search, Tag, Calendar, MapPin, DollarSign, Crosshair, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Tag, Calendar, MapPin, DollarSign, Crosshair, Loader2, Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
+import { Badge } from "@/components/ui/badge"
 import AdminProductCard from "@/components/admin/admin-product-card"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { rwandaData } from "@/lib/rwanda-data"
 import { MARKETPLACE_CATEGORIES, type MarketplaceCategory } from "@/lib/marketplace-access"
+import {
+  LISTING_CHANGE_LABEL_KEYS,
+  type ListingChange,
+  type ListingEditLogEntry,
+} from "@/lib/validations/listing-request"
 
 type Cat = MarketplaceCategory
 
@@ -48,7 +55,17 @@ interface Service {
   targetAnimal?: string
   sellerId?: string
   listingStatus?: string
+  reservedUntil?: string | null
   hidden?: boolean
+  hiddenReason?: string | null
+  images?: string[]
+  latitude?: number | null
+  longitude?: number | null
+  createdAt?: string
+  /** Set when the seller changed the listing after it went live. */
+  editedAt?: string
+  editCount?: number
+  editLog?: ListingEditLogEntry[]
 }
 
 interface Category {
@@ -97,6 +114,8 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null)
   const [hideTarget, setHideTarget] = useState<Service | null>(null)
   const [hideReason, setHideReason] = useState("")
+  const [viewTarget, setViewTarget] = useState<Service | null>(null)
+  const [viewIndex, setViewIndex] = useState(0)
 
   const [categoryForm, setCategoryForm] = useState({ name: "", description: "", image: "" })
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false)
@@ -202,6 +221,49 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
       latitude: (service as any).latitude ?? "", longitude: (service as any).longitude ?? "",
     })
   }
+
+  // --- details ----------------------------------------------------------------
+
+  const openView = (service: Service) => {
+    setViewTarget(service)
+    setViewIndex(0)
+  }
+
+  /** A hold that has lapsed no longer counts, the same as the reservation code treats it. */
+  const listingState = (service: Service) => {
+    const status = service.listingStatus || "active"
+    if (status === "reserved" && service.reservedUntil && new Date(service.reservedUntil) < new Date()) return "active"
+    return status
+  }
+
+  const detailRows = (service: Service): [string, string][] => {
+    const rows: [string, string | undefined][] =
+      service.category === "sales"
+        ? [
+            [t("content.animalType"), service.animalType],
+            [t("content.breed"), service.breed],
+            [t("content.age"), service.age],
+            [t("content.sex"), service.sex],
+            [t("common.location"), [service.village, service.sector, service.district].filter(Boolean).join(", ")],
+          ]
+        : service.category === "drugs"
+        ? [
+            [t("content.drugType"), service.drugType],
+            [t("content.usageDescription"), service.usageDescription],
+          ]
+        : [
+            [t("content.feedType"), service.feedType],
+            [t("content.quality"), service.quality],
+            [t("content.targetAnimal"), service.targetAnimal],
+          ]
+    return rows.filter((row): row is [string, string] => !!row[1])
+  }
+
+  /** "from → to" for a seller's edit; photos read out as counts, so a swap with the same count says so. */
+  const changeText = (change: ListingChange) =>
+    change.field === "photos" && change.from === change.to
+      ? t("listing.photosUpdated")
+      : `${change.from || "—"} → ${change.to || "—"}`
 
   // --- categories -------------------------------------------------------------
 
@@ -569,6 +631,13 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
                     onToggleHidden={() =>
                       service.hidden ? setVisibility(service, "show") : setHideTarget(service)
                     }
+                    onView={() => openView(service)}
+                    edited={!!service.editedAt}
+                    labels={{
+                      view: t("marketplace.viewDetails"),
+                      edited: t("marketplace.editedBadge"),
+                      hidden: t("listing.hiddenBadge"),
+                    }}
                   />
                 ))}
               </div>
@@ -743,15 +812,181 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
         </DialogContent>
       </Dialog>
 
+      {/* Listing details: everything on the listing, plus what the seller has changed since it went live */}
+      <Dialog open={!!viewTarget} onOpenChange={(next) => !next && setViewTarget(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewTarget?.name}</DialogTitle>
+          </DialogHeader>
+
+          {viewTarget && (() => {
+            const photos = viewTarget.images?.length ? viewTarget.images : viewTarget.image ? [viewTarget.image] : []
+            const state = listingState(viewTarget)
+            const rows = detailRows(viewTarget)
+            return (
+              <div className="space-y-4">
+                {photos.length > 0 && (
+                  <div>
+                    <div className="relative h-64 w-full rounded-lg overflow-hidden bg-gray-100">
+                      <Image
+                        src={photos[Math.min(viewIndex, photos.length - 1)]}
+                        alt={viewTarget.name}
+                        fill
+                        className={`object-cover ${viewTarget.hidden ? "opacity-50 grayscale" : ""}`}
+                      />
+                    </div>
+                    {photos.length > 1 && (
+                      <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                        {photos.map((url, i) => (
+                          <button
+                            key={url + i}
+                            type="button"
+                            onClick={() => setViewIndex(i)}
+                            className={`relative h-14 w-14 flex-shrink-0 rounded-md overflow-hidden border-2 transition-colors ${
+                              i === viewIndex ? "border-primary" : "border-transparent hover:border-gray-300"
+                            }`}
+                          >
+                            <Image src={url} alt={`${viewTarget.name} ${i + 1}`} fill className="object-cover" sizes="56px" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">{categoryName(viewTarget.categoryId, viewTarget.category as Cat)}</Badge>
+                    {viewTarget.category === "sales" && (
+                      <Badge variant="outline">
+                        {t("marketplace.listingStatus")}: {t(`marketplace.state.${state}`)}
+                      </Badge>
+                    )}
+                    {viewTarget.hidden && (
+                      <Badge className="bg-gray-800 text-white hover:bg-gray-800">
+                        <EyeOff className="h-3 w-3 mr-1" />
+                        {t("listing.hiddenBadge")}
+                      </Badge>
+                    )}
+                    {viewTarget.editedAt && (
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                        {t("marketplace.editedBadge")} · {new Date(viewTarget.editedAt).toLocaleDateString()}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-lg font-semibold text-gray-900">
+                    RWF {(viewTarget.price || 0).toLocaleString()}
+                    {viewTarget.duration ? <span className="text-xs font-normal text-gray-500"> / {viewTarget.duration}</span> : null}
+                  </span>
+                </div>
+
+                {viewTarget.hidden && (
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">{t("marketplace.hiddenState")}</span>
+                    {viewTarget.hiddenReason ? `: ${viewTarget.hiddenReason}` : ""}
+                  </p>
+                )}
+
+                {rows.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    {rows.map(([label, value]) => (
+                      <div key={label}><span className="text-gray-500">{label}:</span> {value}</div>
+                    ))}
+                  </div>
+                )}
+
+                {viewTarget.description && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 mb-1">{t("content.description")}</p>
+                    <p className="text-sm text-gray-600 whitespace-pre-line">{viewTarget.description}</p>
+                  </div>
+                )}
+
+                {(viewTarget.sellerPhone || viewTarget.sellerEmail) && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 mb-1">{t("marketplace.sellerContact")}</p>
+                    <p className="text-sm text-gray-600">
+                      {[viewTarget.sellerPhone, viewTarget.sellerEmail].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                )}
+
+                {viewTarget.editLog && viewTarget.editLog.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 mb-2">{t("marketplace.editHistory")}</p>
+                    <ul className="space-y-2">
+                      {[...viewTarget.editLog].reverse().map((entry, i) => (
+                        <li key={i} className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                          <p className="text-xs text-amber-800 mb-1">
+                            {t("marketplace.editedBySeller")} · {new Date(entry.at).toLocaleString()}
+                          </p>
+                          <ul className="space-y-0.5 text-gray-700">
+                            {entry.changes.map((change) => (
+                              <li key={change.field} className="break-words">
+                                <span className="font-medium">{t(LISTING_CHANGE_LABEL_KEYS[change.field])}:</span>{" "}
+                                {changeText(change)}
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {viewTarget.createdAt && (
+                  <p className="text-xs text-gray-400">
+                    {t("marketplace.postedOn")} {new Date(viewTarget.createdAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Acting from here closes this view first, so it is never left showing a stale listing. */}
+          {viewTarget && (
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => { const s = viewTarget; setViewTarget(null); openEdit(s) }}>
+                <Edit className="h-4 w-4 mr-2" />
+                {t("common.edit")}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => {
+                  const s = viewTarget
+                  setViewTarget(null)
+                  if (s.hidden) setVisibility(s, "show")
+                  else setHideTarget(s)
+                }}
+              >
+                {viewTarget.hidden ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+                {viewTarget.hidden ? t("marketplace.show") : t("marketplace.hide")}
+              </Button>
+              <Button
+                variant="outline"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => { const s = viewTarget; setViewTarget(null); setDeleteTarget(s) }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {t("common.delete")}
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!deleteTarget} onOpenChange={(next) => !next && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("content.deleteItemConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("content.deleteItemConfirmDesc")}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {t("content.deleteItemConfirmDesc").replace("{name}", deleteTarget?.name ?? "")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteService} disabled={busy}>{t("content.actions")}</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteService} disabled={busy}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
