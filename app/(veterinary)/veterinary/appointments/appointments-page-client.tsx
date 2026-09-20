@@ -15,9 +15,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import {
-  Calendar, CheckCircle, Clock, MessageSquare, PawPrint, Phone, User, Video, MapPin, AlertTriangle
+  Calendar, CheckCircle, Clock, MessageSquare, PawPrint, Phone, Video, MapPin, AlertTriangle
 } from "lucide-react"
 import Link from "next/link"
+import { PersonAvatar } from "@/components/ui/person-avatar"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { updateConsultationStatus } from "@/lib/actions"
@@ -26,6 +27,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 interface Appointment {
   _id: string
   fullName: string
+  farmerImage?: string | null
   phoneNumber: string
   service: string
   date: string
@@ -113,9 +115,7 @@ export default function AppointmentsPageClient({ upcoming, missed, completed }: 
                 {/* Farmer */}
                 <TableCell>
                   <div className="flex items-center gap-2.5">
-                    <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-                      <User className="h-3.5 w-3.5 text-amber-600" />
-                    </div>
+                    <PersonAvatar name={appt.fullName} image={appt.farmerImage} />
                     <div>
                       <p className="font-medium text-gray-800 text-sm">{appt.fullName}</p>
                       <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
@@ -204,9 +204,7 @@ export default function AppointmentsPageClient({ upcoming, missed, completed }: 
           <div key={appt._id} className="p-4 hover:bg-gray-50 transition-colors duration-150">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-                  <User className="h-3.5 w-3.5 text-amber-600" />
-                </div>
+                <PersonAvatar name={appt.fullName} image={appt.farmerImage} />
                 <div className="min-w-0">
                   <p className="font-medium text-gray-800 text-sm truncate">{appt.fullName}</p>
                   <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">

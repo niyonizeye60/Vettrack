@@ -10,7 +10,8 @@ import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { updateConsultationStatus } from "@/lib/actions"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Clock, CheckCircle, XCircle, ClipboardCheck, User, Phone, Check, X, PawPrint, History } from "lucide-react"
+import { Clock, CheckCircle, XCircle, ClipboardCheck, Phone, Check, X, PawPrint, History } from "lucide-react"
+import { PersonAvatar } from "@/components/ui/person-avatar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -21,6 +22,7 @@ import AnimalHistoryPanel from "@/components/dashboard/animal-history-panel"
 interface Consultation {
   _id: string
   fullName: string
+  farmerImage?: string | null
   phoneNumber: string
   service: string
   date: string
@@ -194,9 +196,7 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
     <div className="p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors duration-150 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-            <User className="h-3.5 w-3.5 text-amber-600" />
-          </div>
+          <PersonAvatar name={c.fullName} image={c.farmerImage} />
           <div className="min-w-0">
             <p className="font-medium text-gray-800 text-sm truncate">{c.fullName}</p>
             <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
@@ -244,9 +244,7 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
               {/* Farmer */}
               <TableCell className="w-[200px]">
                 <div className="flex items-center gap-2.5">
-                  <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-                    <User className="h-3.5 w-3.5 text-amber-600" />
-                  </div>
+                  <PersonAvatar name={c.fullName} image={c.farmerImage} />
                   <div>
                     <p className="font-medium text-gray-800 text-sm">{c.fullName}</p>
                     <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">

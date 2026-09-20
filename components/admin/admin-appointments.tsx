@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -41,6 +42,7 @@ interface Doctor {
   specialization: string
   phone: string
   status: string
+  image?: string | null
 }
 
 interface Farmer {
@@ -451,9 +453,12 @@ export default function AdminAppointments() {
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                              <User className="h-6 w-6 text-blue-600" />
-                            </div>
+                            <Avatar className="h-12 w-12">
+                              <AvatarImage src={doctor.image ?? undefined} alt={doctor.name} className="object-cover" />
+                              <AvatarFallback className="bg-blue-100">
+                                <User className="h-6 w-6 text-blue-600" />
+                              </AvatarFallback>
+                            </Avatar>
                             <div>
                               <h3 className="font-medium">{doctor.name}</h3>
                               <p className="text-sm text-gray-600">{doctor.specialization}</p>

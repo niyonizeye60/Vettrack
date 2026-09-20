@@ -71,7 +71,7 @@ export async function getRecentMessagesData() {
 
       const otherUser = await db.collection("users").findOne(
         { _id: otherParticipantId },
-        { projection: { name: 1 } }
+        { projection: { name: 1, image: 1 } }
       )
       if (!otherUser) continue
 
@@ -79,6 +79,7 @@ export async function getRecentMessagesData() {
         id: message._id.toString(),
         conversationId: conv._id.toString(),
         senderName: otherUser.name,
+        image: otherUser.image || null,
         content: decryptText(message.content),
         createdAt: message.createdAt,
         initials: otherUser.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),

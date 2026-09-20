@@ -19,10 +19,12 @@ import {
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
 import AnimalHistoryPanel from "@/components/dashboard/animal-history-panel"
+import { PersonAvatar } from "@/components/ui/person-avatar"
 
 interface Patient {
   id: string
   name: string
+  image?: string | null
   phone: string
   district: string
   sector: string
@@ -159,9 +161,7 @@ export default function PatientsPageClient({
               <div key={patient.id} className="p-4 hover:bg-gray-50 transition-colors duration-150">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-                      <User className="h-3.5 w-3.5 text-amber-600" />
-                    </div>
+                    <PersonAvatar name={patient.name} image={patient.image} />
                     <div className="min-w-0">
                       <p className="font-medium text-gray-800 text-sm truncate">{patient.name}</p>
                       <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
@@ -222,9 +222,7 @@ export default function PatientsPageClient({
                     {/* Farmer */}
                     <TableCell className="w-[200px]">
                       <div className="flex items-center gap-2.5">
-                        <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-                          <User className="h-3.5 w-3.5 text-amber-600" />
-                        </div>
+                        <PersonAvatar name={patient.name} image={patient.image} />
                         <div>
                           <p className="font-medium text-gray-800 text-sm">{patient.name}</p>
                           <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">

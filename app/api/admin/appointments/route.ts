@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
         specialization: d.specialization || "",
         phone: d.phone || "",
         status: d.status || "active",
+        image: d.image || null,
       })),
       farmers: farmers.map((f) => ({
         id: f._id.toString(),

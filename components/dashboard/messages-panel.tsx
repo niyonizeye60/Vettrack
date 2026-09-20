@@ -108,7 +108,7 @@ function buildTheme(variant: "default" | "vet") {
       otherTick:       "text-white/70",
       selectIcon:      "text-green-600",
       typingText:      "italic text-green-600",
-      convAvatar:      "vet",   // renders amber User icon pill instead of Avatar
+      convAvatar:      "vet",   // amber User icon pill when the other user has no photo
     } as const
   }
   return {
@@ -533,9 +533,9 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
     : false
   const isTyping = typingUsers.length > 0
 
-  // ─── Conversation avatar — farmer icon for vet variant ────────────────────
+  // ─── Conversation avatar — photo if set, else farmer icon for vet variant ──
   const ConvAvatar = ({ conv, size = "md" }: { conv: Conversation; size?: "sm" | "md" }) => {
-    if (th.convAvatar === "vet") {
+    if (th.convAvatar === "vet" && !conv.otherUser.image) {
       return (
         <div className="relative flex-shrink-0">
           <div className={`bg-amber-100 rounded-lg flex items-center justify-center ${size === "sm" ? "p-1.5" : "p-2"}`}>

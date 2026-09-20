@@ -18,6 +18,7 @@ interface AnimalDetail {
 interface Patient {
   id: string
   name: string
+  image: string | null
   phone: string
   district: string
   sector: string
@@ -49,6 +50,7 @@ export default async function VeterinaryPatientsPage() {
       patientMap.set(farmerId, {
         id: farmerId,
         name: consultation.fullName,
+        image: consultation.farmerImage,
         phone: consultation.phoneNumber,
         district: '',
         sector: '',

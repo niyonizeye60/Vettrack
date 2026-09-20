@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Combobox } from "@/components/ui/combobox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -36,6 +37,17 @@ interface Grant {
   grantedAt: string
   revokedAt: string | null
   vet: { _id: string; name: string; email: string; phone: string; specialization: string; image: string | null }
+}
+
+function VetAvatar({ vet }: { vet: Grant["vet"] }) {
+  return (
+    <Avatar className="h-10 w-10 flex-shrink-0">
+      <AvatarImage src={vet.image ?? undefined} alt={vet.name} className="object-cover" />
+      <AvatarFallback className="bg-emerald-100 text-emerald-700 font-medium">
+        {vet.name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "V"}
+      </AvatarFallback>
+    </Avatar>
+  )
 }
 interface AuditEntry {
   _id: string
@@ -450,11 +462,14 @@ export default function FarmerVeterinariansPage() {
                         className="border border-gray-200 rounded-xl bg-white p-4 hover:shadow-md transition-shadow duration-200 space-y-3"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{grant.vet.name}</p>
-                            <p className="text-xs text-gray-500 mt-0.5 truncate">
-                              {grant.vet.specialization || t("farmer.veterinarian")}
-                            </p>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <VetAvatar vet={grant.vet} />
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-900 truncate">{grant.vet.name}</p>
+                              <p className="text-xs text-gray-500 mt-0.5 truncate">
+                                {grant.vet.specialization || t("farmer.veterinarian")}
+                              </p>
+                            </div>
                           </div>
                           <div className="flex gap-1 flex-shrink-0">
                             <Button variant="ghost" size="icon" onClick={() => openEdit(grant)} aria-label={t("farmer.editAccess")}>
@@ -499,11 +514,16 @@ export default function FarmerVeterinariansPage() {
                       <TableRow key={grant._id}>
                         {/* Veterinarian */}
                         <TableCell>
-                          <p className="font-medium">{grant.vet.name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {grant.vet.specialization || t("farmer.veterinarian")}
-                          </p>
-                          {grant.note && <p className="text-xs text-gray-600 italic mt-0.5">{grant.note}</p>}
+                          <div className="flex items-center gap-3">
+                            <VetAvatar vet={grant.vet} />
+                            <div className="min-w-0">
+                              <p className="font-medium">{grant.vet.name}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {grant.vet.specialization || t("farmer.veterinarian")}
+                              </p>
+                              {grant.note && <p className="text-xs text-gray-600 italic mt-0.5">{grant.note}</p>}
+                            </div>
+                          </div>
                         </TableCell>
 
                         {/* Permissions */}

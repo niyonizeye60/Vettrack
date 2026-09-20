@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   Stethoscope, ClipboardCheck, Mail, Clock,
-  CheckCircle, ArrowRight, Check, X, User, Phone,
+  CheckCircle, ArrowRight, Check, X, Phone,
   Calendar, PawPrint, FileText, AlertTriangle
 } from "lucide-react"
 import Link from "next/link"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { PersonAvatar } from "@/components/ui/person-avatar"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { updateConsultationStatus } from "@/lib/actions"
@@ -196,9 +198,7 @@ export default function VeterinaryDashboardClient({
                       className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150 gap-2"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-                          <User className="h-3.5 w-3.5 text-amber-600" />
-                        </div>
+                        <PersonAvatar name={consultation.fullName} image={consultation.farmerImage} />
                         <div className="min-w-0">
                           <p className="font-medium text-gray-800 text-sm truncate">{consultation.fullName}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
@@ -279,9 +279,10 @@ export default function VeterinaryDashboardClient({
                       className="flex items-start gap-3 p-3 rounded-lg transition-colors duration-150 bg-green-50/60 hover:bg-green-50"
                     >
                       <div className="relative flex-shrink-0">
-                        <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
-                          <span className="text-xs font-bold text-green-700">{message.initials}</span>
-                        </div>
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={message.image ?? undefined} alt={message.senderName} className="object-cover" />
+                          <AvatarFallback className="bg-green-100 text-xs font-bold text-green-700">{message.initials}</AvatarFallback>
+                        </Avatar>
                         <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-orange-500 rounded-full border border-white" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -351,9 +352,7 @@ export default function VeterinaryDashboardClient({
                       className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150 gap-2"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="bg-amber-100 p-1.5 rounded-lg flex-shrink-0">
-                          <User className="h-3.5 w-3.5 text-amber-600" />
-                        </div>
+                        <PersonAvatar name={appt.fullName} image={appt.farmerImage} />
                         <div className="min-w-0">
                           <p className="font-medium text-gray-800 text-sm truncate">{appt.fullName}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">

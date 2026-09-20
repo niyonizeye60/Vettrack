@@ -694,6 +694,21 @@ export async function getConsultations(doctorId?: string, farmerId?: string) {
       doctorMap.set(doctor._id.toString(), doctor.name)
     })
 
+    // Vet-facing lists show the farmer's photo; one batched lookup, doctor view only.
+    const farmerImageMap = new Map<string, string>()
+    if (doctorId) {
+      const farmerIds = [...new Set(consultations.map((c) => c.farmerId).filter((id) => id && ObjectId.isValid(id)))]
+      if (farmerIds.length > 0) {
+        const farmers = await db
+          .collection("users")
+          .find({ _id: { $in: farmerIds.map((id) => new ObjectId(id)) } }, { projection: { image: 1 } })
+          .toArray()
+        farmers.forEach((f) => {
+          if (f.image) farmerImageMap.set(f._id.toString(), f.image)
+        })
+      }
+    }
+
     return consultations.map((c) => ({
       _id: c._id.toString(),
       fullName: c.fullName,
@@ -708,6 +723,7 @@ export async function getConsultations(doctorId?: string, farmerId?: string) {
       doctorId: c.doctor ? c.doctor.toString() : null,
       doctorName: doctorMap.get(c.doctor) || null,
       farmerId: c.farmerId || null,
+      farmerImage: c.farmerId ? farmerImageMap.get(c.farmerId.toString()) ?? null : null,
       feedback: c.feedback || null,
       animalId: c.animalId || null,
       animalName: c.animalName || null,
