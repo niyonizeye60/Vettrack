@@ -6,6 +6,7 @@ import { getCurrentUser } from "./auth"
 import { ObjectId } from "mongodb"
 import { sendConsultationRequestEmail } from "./email"
 import { logActivity, logSystemError } from "./activity-log"
+import { deleteDocumentsForConsultation, getDocumentsByConsultation } from "./consultation-documents"
 
 // Animal-related actions
 export async function registerAnimal(formData: FormData, ownerId: string) {
@@ -650,7 +651,13 @@ export async function getAnimalById(id: string) {
   }
 }
 
-export async function getConsultations(doctorId?: string, farmerId?: string) {
+// `withDocuments` is opt-in: only the two consultation screens show attachments, and
+// the other callers (dashboards, patient lists, search) shouldn't pay for the extra query.
+export async function getConsultations(
+  doctorId?: string,
+  farmerId?: string,
+  options?: { withDocuments?: boolean }
+) {
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
@@ -709,6 +716,10 @@ export async function getConsultations(doctorId?: string, farmerId?: string) {
       }
     }
 
+    const documentsByConsultation = options?.withDocuments
+      ? await getDocumentsByConsultation(db, consultations.map((c) => c._id))
+      : null
+
     return consultations.map((c) => ({
       _id: c._id.toString(),
       fullName: c.fullName,
@@ -719,6 +730,7 @@ export async function getConsultations(doctorId?: string, farmerId?: string) {
       type: c.type,
       status: c.status.toLowerCase(),
       createdAt: c.createdAt.toISOString(),
+      documents: documentsByConsultation?.get(c._id.toString()) ?? [],
       doctor: doctorMap.get(c.doctor) || c.doctor || "Unassigned",
       doctorId: c.doctor ? c.doctor.toString() : null,
       doctorName: doctorMap.get(c.doctor) || null,
@@ -794,6 +806,8 @@ export async function getConsultationById(id: string, farmerId?: string) {
       doctorName = doctor?.name ?? null;
     }
 
+    const documents = (await getDocumentsByConsultation(db, [consultation._id])).get(consultation._id.toString()) ?? [];
+
     return {
       _id: consultation._id.toString(),
       fullName: consultation.fullName,
@@ -804,6 +818,7 @@ export async function getConsultationById(id: string, farmerId?: string) {
       type: consultation.type,
       status: consultation.status.toLowerCase(),
       createdAt: consultation.createdAt.toISOString(),
+      documents,
       doctor: doctorName || doctorId || "Unassigned",
       doctorId,
       doctorName,
@@ -898,6 +913,15 @@ export async function deleteConsultation(id: string, farmerId?: string) {
     const result = await db.collection("consultations").deleteOne({
       _id: new ObjectId(id)
     });
+
+    // Attached documents would otherwise outlive the case they belong to.
+    if (result.deletedCount) {
+      try {
+        await deleteDocumentsForConsultation(db, new ObjectId(id));
+      } catch (cleanupError) {
+        console.error("Error removing consultation documents:", cleanupError);
+      }
+    }
 
     // Revalidate paths
     revalidatePath("/farmer/consultations");

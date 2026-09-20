@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import AnimalHistoryPanel from "@/components/dashboard/animal-history-panel"
+import ConsultationDocuments from "@/components/dashboard/consultation-documents"
+import { DOCUMENT_UPLOAD_STATUSES, type ConsultationDocument } from "@/lib/consultation-document-rules"
 
 interface Consultation {
   _id: string
@@ -42,6 +44,7 @@ interface Consultation {
   medicationDosage?: string | null
   followUpNeeded?: boolean
   followUpDate?: string | null
+  documents?: ConsultationDocument[]
 }
 
 export default function VeterinaryConsultations({ consultations }: { consultations: Consultation[] }) {
@@ -56,6 +59,11 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false)
   const [historyAnimalId, setHistoryAnimalId] = useState<string | null>(null)
+
+  // selectedConsultation is a snapshot taken when the dialog opened, so it goes stale
+  // once an upload or removal refreshes the list - read documents from the live row.
+  const liveDocuments =
+    consultations.find((c) => c._id === selectedConsultation?._id)?.documents ?? selectedConsultation?.documents ?? []
 
   // Structured clinical fields — only used/shown for the "complete" action
   const [diagnosis, setDiagnosis] = useState("")
@@ -335,7 +343,7 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
 
       {/* Details Dialog */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] w-11/12">
+        <DialogContent className="sm:max-w-[500px] w-11/12 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t("vet.consultationDetails")}</DialogTitle>
             <DialogDescription>{t("vet.viewDetailsDesc")}</DialogDescription>
@@ -408,6 +416,13 @@ export default function VeterinaryConsultations({ consultations }: { consultatio
                   <p className="col-span-2 text-gray-900 break-words">{selectedConsultation.feedback}</p>
                 </div>
               )}
+              <ConsultationDocuments
+                consultationId={selectedConsultation._id}
+                documents={liveDocuments}
+                mode="vet"
+                canUpload={DOCUMENT_UPLOAD_STATUSES.includes(selectedConsultation.status)}
+                onChange={() => router.refresh()}
+              />
             </div>
           )}
           <DialogFooter className="flex-col sm:flex-row gap-2">

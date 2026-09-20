@@ -20,7 +20,7 @@ export default async function ConsultationManagementPage() {
     redirect("/login")
   }
 
-  const consultations = await getConsultations(currentUser._id.toString())
+  const consultations = await getConsultations(currentUser._id.toString(), undefined, { withDocuments: true })
 
   return (
     <ClientWrapper>

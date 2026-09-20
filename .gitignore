@@ -52,6 +52,9 @@ scripts/data/gadm41_RWA_3.json
 # listing photos uploaded in local development (production uses Vercel Blob)
 /public/listings/
 
+# consultation documents uploaded in local development (production uses Vercel Blob)
+/.local-uploads/
+
 
 # local tunnel logs
 .tunnel*.log

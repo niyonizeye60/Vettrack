@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { deleteConsultation } from "@/lib/actions"
+import ConsultationDocuments from "@/components/dashboard/consultation-documents"
 
 interface ConsultationDetailContentProps {
   consultation: any
@@ -145,6 +146,16 @@ export default function ConsultationDetailContent({ consultation, doctorName, fa
                   </div>
                 )}
               </dl>
+            </div>
+          )}
+
+          {consultation.documents?.length > 0 && (
+            <div className="mb-6">
+              <ConsultationDocuments
+                consultationId={consultation._id}
+                documents={consultation.documents}
+                mode="farmer"
+              />
             </div>
           )}
 

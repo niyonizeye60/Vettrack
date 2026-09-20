@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast"
 import { deleteConsultation } from "@/lib/actions"
 import AddConsultationForm from "@/components/dashboard/add-consultation-form"
 import EditConsultationForm from "@/components/dashboard/edit-consultation-form"
+import ConsultationDocuments from "@/components/dashboard/consultation-documents"
+import ConsultationDocumentsDownload from "@/components/dashboard/consultation-documents-download"
 
 interface Doctor {
   _id: string
@@ -175,6 +177,10 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
                           >
                             {t('farmer.view')}
                           </Button>
+                          <ConsultationDocumentsDownload
+                            consultationId={consultation._id}
+                            documents={consultation.documents ?? []}
+                          />
                           {consultation.status === "pending" && (
                             <>
                               <Button
@@ -291,6 +297,12 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
                   value={new Date(detailConsultation.createdAt).toLocaleString()}
                 />
               </div>
+
+              <ConsultationDocuments
+                consultationId={detailConsultation._id}
+                documents={detailConsultation.documents ?? []}
+                mode="farmer"
+              />
             </div>
           )}
         </DialogContent>

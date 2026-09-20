@@ -24,7 +24,7 @@ export default async function FarmerConsultationsPage({
 
   const farmerId = currentUser._id.toString()
   const [consultations, doctors, allAnimals] = await Promise.all([
-    getConsultations(undefined, farmerId),
+    getConsultations(undefined, farmerId, { withDocuments: true }),
     getDoctorsList(),
     getAnimals(farmerId),
   ])
