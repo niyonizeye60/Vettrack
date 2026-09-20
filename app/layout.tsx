@@ -21,9 +21,6 @@ const inter = Inter({
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'),
   title: "NTDM Vettrack",
-  icons: {
-    icon: "/logo/NTDM.png",
-  },
   description:
     "Leading Vettrack in Rwanda offering tracking devices, veterinary consultations, disease monitoring, and animal sales.",
   keywords: "Vettrack, veterinary care, animal tracking, disease monitoring, pet care, livestock management",
