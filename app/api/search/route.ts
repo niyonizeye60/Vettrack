@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     }> = []
 
     // Build search regex
-    const searchRegex = q ? new RegExp(q.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&"), "i") : null
+    const searchRegex = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null
 
     // 1. Public listings — same availability rule as ordering: active, never
     //    statused (legacy rows), or an expired reservation. Sold, withdrawn
