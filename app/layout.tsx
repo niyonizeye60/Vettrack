@@ -28,7 +28,9 @@ export const metadata = {
     title: "NTDM Vettrack - Track, Consult, and Care",
     description:
       "Leading Vettrack in Rwanda offering tracking devices, veterinary consultations, disease monitoring, and animal sales.",
-    images: ["/images/og-image.jpg"],
+    siteName: "NTDM Vettrack",
+    // The share image comes from app/opengraph-image.jpg. Listing `images` here would
+    // take precedence over that file, so leave it out.
     type: "website",
     locale: "en_RW",
   },
