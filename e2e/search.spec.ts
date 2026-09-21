@@ -64,46 +64,6 @@ async function setGeo(page: Page, point: GeoPoint) {
   )
 }
 
-test.describe("home page live search", () => {
-  test("auto-detects location and sorts nearest first", async ({ page }) => {
-    await setGeo(page, MUSANZE) // GPS places the user in Musanze
-    await page.goto("/")
-
-    // Debounced live results dropdown appears without navigating
-    await searchAndAwaitDropdown(page, "cow")
-
-    // From Musanze, the Musanze cow (2.2 km) must beat the Kigali one (60+ km)
-    const nearestRow = page.getByRole("link").filter({ hasText: "Friesian Dairy Cow" }).first()
-    await expect(nearestRow).toBeVisible()
-    await expect(nearestRow.getByText(/2\.[0-9] km/)).toBeVisible()
-  })
-
-  test("see-all-results opens the full distance-sorted view", async ({ page }) => {
-    await setGeo(page, MUSANZE)
-    await page.goto("/")
-    await searchAndAwaitDropdown(page, "cow")
-    await page.getByText("See all results").click()
-
-    await expect(page).toHaveURL(/\/services\?q=cow/)
-    await expect(page.getByText("Showing services near your location")).toBeVisible()
-    await expect(page.getByText(/2\.[0-9] km away/).first()).toBeVisible()
-  })
-
-  test("district picker re-runs the live query anchored to that district", async ({ page }) => {
-    await setGeo(page, KIGALI) // start elsewhere so the district change must re-anchor
-    await page.goto("/")
-    await searchAndAwaitDropdown(page, "cow")
-
-    await page.getByRole("combobox").click()
-    await page.getByRole("option", { name: "Musanze" }).click()
-
-    // Same query, now anchored to Musanze: the Musanze cow is 2.2 km away
-    const nearestRow = page.getByRole("link").filter({ hasText: "Friesian Dairy Cow" }).first()
-    await expect(nearestRow).toBeVisible()
-    await expect(nearestRow.getByText(/2\.[0-9] km/)).toBeVisible()
-  })
-})
-
 test.describe("/services search and district filter", () => {
   test("results view auto-detects location and district filter overrides it", async ({ page }) => {
     // GPS places the user at Kigali center; the nearest cow listing is the

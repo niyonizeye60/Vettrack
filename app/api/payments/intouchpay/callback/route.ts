@@ -41,6 +41,13 @@ async function readWebhookBody(request: NextRequest): Promise<Record<string, unk
   return {}
 }
 
+function acknowledgeWebhook() {
+  return NextResponse.json(
+    { success: true, received: true },
+    { status: 200, headers: { "Cache-Control": "no-store" } },
+  )
+}
+
 /**
  * The documented webhook shape wraps the fields in `jsonpayload`. Depending on
  * transport it arrives either as a nested object or as a JSON string (form
@@ -112,6 +119,11 @@ async function settlePayment(
   try {
     const statusResponse = await checkIntouchPayStatus(refs.intouchRequestTransactionId)
     status = mapIntouchResponseCode(statusResponse.responsecode)
+    refs = {
+      ...refs,
+      intouchTransactionId: statusResponse.transactionid ?? refs.intouchTransactionId,
+      intouchReferenceNo: statusResponse.referenceno ?? refs.intouchReferenceNo,
+    }
   } catch (statusError) {
     // The SDK throws IntouchPayError when the gateway answers with a
     // definitive non-success code (1005 insufficient funds, 2400 duplicate,
@@ -121,6 +133,11 @@ async function settlePayment(
     // could complete a payment the gateway had actually declined.
     if (statusError instanceof IntouchPayError && statusError.response?.responsecode) {
       status = mapIntouchResponseCode(statusError.response.responsecode)
+      refs = {
+        ...refs,
+        intouchTransactionId: statusError.response.transactionid ?? refs.intouchTransactionId,
+        intouchReferenceNo: statusError.response.referenceno ?? refs.intouchReferenceNo,
+      }
       await applyStatus(target, status, { ...refs, intouchVerifiedVia: "status-api" })
       return { received: true, verified: true, note: "status-api-definitive" }
     }
@@ -185,12 +202,14 @@ export async function POST(request: NextRequest) {
     const webhook = await parseIntouchWebhook(body as any)
 
     if (!webhook.requesttransactionid) {
-      return NextResponse.json({ error: "Missing requesttransactionid" }, { status: 400 })
+      console.warn("Ignoring IntouchPay callback without requesttransactionid")
+      return acknowledgeWebhook()
     }
 
     const target = await resolveTarget(webhook.requesttransactionid)
     if (!target) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 })
+      console.warn("Ignoring IntouchPay callback for unknown requesttransactionid", webhook.requesttransactionid)
+      return acknowledgeWebhook()
     }
 
     // The gateway gives the callback only ~10s before marking delivery
@@ -215,14 +234,16 @@ export async function POST(request: NextRequest) {
       }).catch(() => {})
     })
 
-    return NextResponse.json({ received: true })
+    return acknowledgeWebhook()
   } catch (error) {
     console.error("Error processing IntouchPay callback:", error)
-    await logSystemError({
+    void logSystemError({
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       action: "payment.intouchpay.callback",
+    }).catch((loggingError) => {
+      console.error("Failed to log IntouchPay callback error:", loggingError)
     })
-    return NextResponse.json({ error: "Failed to process callback" }, { status: 500 })
+    return acknowledgeWebhook()
   }
 }

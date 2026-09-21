@@ -120,7 +120,12 @@ export async function GET(request: NextRequest) {
           const statusResponse = await checkIntouchPayStatus(booking.intouchRequestTransactionId)
           const mapped = mapIntouchResponseCode(statusResponse.responsecode)
           if (mapped !== "pending") {
-            await updateBookingPaymentStatus(bookingId, mapped)
+            await updateBookingPaymentStatus(bookingId, mapped, {
+              intouchRequestTransactionId: booking.intouchRequestTransactionId,
+              intouchTransactionId: statusResponse.transactionid,
+              intouchReferenceNo: statusResponse.referenceno,
+              intouchVerifiedVia: "status-api",
+            })
             // Re-fetch updated booking
             booking = await db.collection("bookings").findOne({ _id: new ObjectId(bookingId) })
           }
