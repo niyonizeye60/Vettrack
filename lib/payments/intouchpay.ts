@@ -65,6 +65,25 @@ function getClient() {
   })
 }
 
+/**
+ * Map an IntouchPay responsecode to our payment state. One mapper for every
+ * caller (callback settlement, order poller, booking poller) so a code can't
+ * mean "completed" in one route and "failed" in another.
+ *
+ *  01 / 2001  -> completed (transaction successful / deposit successful)
+ *  1000       -> pending  (explicitly pending)
+ *  3100       -> pending  ("transaction doesn't exist" also occurs right
+ *                after initiate on the real gateway before its ledger
+ *                materializes the transaction - failing there would kill
+ *                legitimate payments; the poller just tries again later)
+ *  anything else -> failed (definitive decline: 1005, 1002, 2108, ...)
+ */
+export function mapIntouchResponseCode(responsecode?: string): "completed" | "pending" | "failed" {
+  if (responsecode === "01" || responsecode === "2001") return "completed"
+  if (responsecode === "1000" || responsecode === "3100") return "pending"
+  return "failed"
+}
+
 export async function initiateIntouchPayment(amount: number, mobilePhone: string) {
   const callbackUrl = `${getCallbackBaseUrl()}/api/payments/intouchpay/callback`
 

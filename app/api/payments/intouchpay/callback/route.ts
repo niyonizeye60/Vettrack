@@ -1,20 +1,62 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
+import { IntouchPayError } from "@d-merci/intouchpay-client"
 import { getOrderByIntouchRequestId, updateOrderPaymentStatus } from "@/lib/db-orders"
 import {
   getBookingByIntouchRequestId,
   updateBookingPaymentStatus,
 } from "@/lib/db-bookings"
-import { parseIntouchWebhook, checkIntouchPayStatus } from "@/lib/payments/intouchpay"
+import { parseIntouchWebhook, checkIntouchPayStatus, mapIntouchResponseCode } from "@/lib/payments/intouchpay"
 import { logSystemError } from "@/lib/activity-log"
 
-function mapResponseCode(responsecode?: string): "completed" | "pending" | "failed" {
-  if (responsecode === "01" || responsecode === "2001") return "completed"
-  // 1000 is explicitly pending; 3100 ("transaction doesn't exist") also occurs
-  // right after initiate on the real gateway before its ledger materializes the
-  // transaction - failing the order there would kill legitimate payments.
-  if (responsecode === "1000" || responsecode === "3100") return "pending"
-  return "failed"
+type SettledStatus = "completed" | "pending" | "failed"
+
+async function readWebhookBody(request: NextRequest): Promise<Record<string, unknown>> {
+  const rawText = await request.text()
+  if (!rawText) return {}
+
+  try {
+    const parsed = JSON.parse(rawText)
+    if (parsed && typeof parsed === "object") {
+      unwrapJsonPayload(parsed)
+      return parsed as Record<string, unknown>
+    }
+  } catch {
+    // Fall through to form parsing for x-www-form-urlencoded webhooks.
+  }
+
+  const params = new URLSearchParams(rawText)
+  if (params.size > 0) {
+    const normalized: Record<string, string> = {}
+    for (const [key, value] of params.entries()) {
+      normalized[key] = value
+    }
+    // The real gateway posts x-www-form-urlencoded with jsonpayload=<json
+    // string>. Unwrap it here or the requesttransactionid stays buried in a
+    // string and the webhook is rejected as malformed.
+    unwrapJsonPayload(normalized)
+    return normalized
+  }
+
+  return {}
+}
+
+/**
+ * The documented webhook shape wraps the fields in `jsonpayload`. Depending on
+ * transport it arrives either as a nested object or as a JSON string (form
+ * posts / JSON bodies where the gateway stringified it). The SDK's
+ * parseWebhook only understands the object form, so normalize both here.
+ */
+function unwrapJsonPayload(parsed: Record<string, unknown>) {
+  const payload = parsed.jsonpayload
+  if (typeof payload === "string") {
+    try {
+      const inner = JSON.parse(payload)
+      if (inner && typeof inner === "object") parsed.jsonpayload = inner
+    } catch {
+      // Leave it as a plain string if the gateway sent a literal payload blob.
+    }
+  }
 }
 
 /**
@@ -64,26 +106,37 @@ async function settlePayment(
 
   // Don't trust the webhook body as the source of truth — re-fetch
   // authoritative status directly from IntouchPay.
-  let status: "completed" | "pending" | "failed"
+  let status: SettledStatus
   let verifiedVia: "status-api" | "webhook-body" = "status-api"
 
   try {
     const statusResponse = await checkIntouchPayStatus(refs.intouchRequestTransactionId)
-    status = mapResponseCode(statusResponse.responsecode)
+    status = mapIntouchResponseCode(statusResponse.responsecode)
   } catch (statusError) {
-    // Gateway status API outage (observed live: their gettransactionstatus
-    // returns HTML 500 after authenticating). Fall back to verifying the
-    // webhook body itself: the requesttransactionid is a server-generated
-    // UUID we only ever share with IntouchPay, so a webhook that names a
-    // *pending* record we initiated is authentic for practical purposes.
-    // The full raw body is logged for audit either way.
+    // The SDK throws IntouchPayError when the gateway answers with a
+    // definitive non-success code (1005 insufficient funds, 2400 duplicate,
+    // ...). That is an AUTHORITATIVE answer, not an outage — map it like a
+    // normal response. Treating it as an outage used to send us into
+    // webhook-body fallback, where a forged/wrong webhook body claiming "01"
+    // could complete a payment the gateway had actually declined.
+    if (statusError instanceof IntouchPayError && statusError.response?.responsecode) {
+      status = mapIntouchResponseCode(statusError.response.responsecode)
+      await applyStatus(target, status, { ...refs, intouchVerifiedVia: "status-api" })
+      return { received: true, verified: true, note: "status-api-definitive" }
+    }
+
+    // Genuinely unreachable status API (network error, 500 HTML, parse
+    // failure). Fall back to verifying the webhook body itself: the
+    // requesttransactionid is a server-generated UUID we only ever share with
+    // IntouchPay, so a webhook that names a *pending* record we initiated is
+    // authentic for practical purposes. The full raw body is logged for audit.
     console.warn(
       "IntouchPay status API unavailable, falling back to webhook-body verification:",
       statusError instanceof Error ? statusError.message : statusError,
     )
 
     if (isTerminal(target.paymentStatus)) {
-      if (target.paymentStatus === "completed" && mapResponseCode(refs.responsecode) === "completed") {
+      if (target.paymentStatus === "completed" && mapIntouchResponseCode(refs.responsecode) === "completed") {
         // Already paid (e.g. the polling re-check confirmed first) — merge the
         // gateway breadcrumbs so the webhook's MoMo transaction id is still
         // recorded, then acknowledge so the gateway stops retrying.
@@ -93,7 +146,7 @@ async function settlePayment(
       return { received: true, verified: false, note: "already terminal" }
     }
 
-    status = mapResponseCode(refs.responsecode)
+    status = mapIntouchResponseCode(refs.responsecode)
     if (status === "failed") {
       // Never fail a record on an unverifiable webhook — leave it pending
       // so the polling re-check can confirm later when the API recovers.
@@ -128,8 +181,8 @@ async function applyStatus(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const webhook = await parseIntouchWebhook(body)
+    const body = await readWebhookBody(request)
+    const webhook = await parseIntouchWebhook(body as any)
 
     if (!webhook.requesttransactionid) {
       return NextResponse.json({ error: "Missing requesttransactionid" }, { status: 400 })
