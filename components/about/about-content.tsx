@@ -95,7 +95,7 @@ export default function AboutContent() {
                 image: "/Charline Rutagengwa.jpg",
                 name: "Dr. Charline Rutagengwa",
                 role: "Co-founder & Sales and Marketing Officer",
-                specialty: "Veterinary consultancy, wildlife animal medicine or research",
+                specialty: "Veterinary consultancy, wildlife animal medicine and research",
               },
               {
                 image: "/Gerard Sano.jpg",
