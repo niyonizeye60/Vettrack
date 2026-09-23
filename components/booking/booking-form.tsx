@@ -625,12 +625,13 @@ export default function BookingForm() {
             type="submit"
             className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded-full shadow-md"
             disabled={!date || !selectedTimeSlot || !selectedService || !name || !phone || !mobileMoneyPhone || isSubmitting}
+            aria-busy={isSubmitting}
           >
             {isSubmitting ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <span className="flex items-center">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Processing Payment...
-              </div>
+              </span>
             ) : (
               "Pay RWF 100 & Book Consultation"
             )}
