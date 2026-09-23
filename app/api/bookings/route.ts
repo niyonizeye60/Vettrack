@@ -8,23 +8,6 @@ import { updateBookingPaymentStatus } from "@/lib/db-bookings"
 const DB_NAME = "ntdm_animal_hospital"
 const STALE_CHECK_MS = 5000
 
-// All booking services are a flat 100 RWF booking fee
-const BOOKING_FEE = 100
-const SERVICE_PRICES: Record<string, number> = {
-  "basic-tracking": BOOKING_FEE,
-  "advanced-monitoring": BOOKING_FEE,
-  "herd-management": BOOKING_FEE,
-  "pet-tracking": BOOKING_FEE,
-  "general-consultation": BOOKING_FEE,
-  "virtual-consultation": BOOKING_FEE,
-  "emergency-consultation": BOOKING_FEE,
-  "farm-visit": BOOKING_FEE,
-  "disease-screening": BOOKING_FEE,
-  "vaccination-program": BOOKING_FEE,
-  "parasite-control": BOOKING_FEE,
-  "reproductive-health": BOOKING_FEE,
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -40,12 +23,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payment method" }, { status: 400 })
     }
 
-    // Get service price
-    const price = SERVICE_PRICES[service]
-    if (!price) {
-      return NextResponse.json({ error: "Invalid service selected" }, { status: 400 })
-    }
-
     // Validate payment phone for mobile money
     if (paymentMethod === "intouchpay" && !mobileMoneyPhone) {
       return NextResponse.json({ error: "Mobile money phone number is required" }, { status: 400 })
@@ -53,6 +30,15 @@ export async function POST(request: NextRequest) {
 
     const client = await clientPromise
     const db = client.db(DB_NAME)
+
+    const serviceRecord = await db.collection("services").findOne({
+      category: { $nin: ["sales", "drugs", "feeds"] },
+      $or: [{ slug: service }, { id: service }, { name: service }],
+    })
+    const price = Number(serviceRecord?.price)
+    if (!serviceRecord || !Number.isFinite(price) || price <= 0) {
+      return NextResponse.json({ error: "Selected service is not available for booking" }, { status: 400 })
+    }
 
     // Create booking record
     const booking = {
@@ -91,9 +77,22 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const bookingId = searchParams.get("id")
+    const serviceName = searchParams.get("service")
 
     const client = await clientPromise
     const db = client.db(DB_NAME)
+
+    if (serviceName) {
+      const serviceRecord = await db.collection("services").findOne({
+        category: { $nin: ["sales", "drugs", "feeds"] },
+        $or: [{ slug: serviceName }, { id: serviceName }, { name: serviceName }],
+      }, { projection: { name: 1, price: 1 } })
+      const price = Number(serviceRecord?.price)
+      if (!serviceRecord || !Number.isFinite(price) || price <= 0) {
+        return NextResponse.json({ error: "Price is not available for this service" }, { status: 404 })
+      }
+      return NextResponse.json({ name: serviceRecord.name, price })
+    }
 
     // Fetching a specific booking by ID — no auth required (used for payment polling)
     if (bookingId) {

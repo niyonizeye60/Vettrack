@@ -12,9 +12,10 @@ const DB_NAME = "ntdm_animal_hospital"
  * We derive these fields from the booking so Pesapal can process it.
  */
 function bookingToPseudoOrder(booking: any) {
+  const total = Number(booking.servicePrice)
   return {
     _id: { toString: () => booking._id.toString() },
-    total: booking.servicePrice || 100,
+    total,
     buyer: {
       name: booking.name || "Booking Customer",
       phone: booking.phone || "",
@@ -46,6 +47,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Payment already completed" }, { status: 400 })
     }
 
+    if (!Number.isFinite(Number(booking.servicePrice)) || Number(booking.servicePrice) <= 0) {
+      return NextResponse.json({ error: "Booking price is unavailable" }, { status: 400 })
+    }
+
     // Build a pseudo-order that initiatePesapalPayment can work with
     const pseudoOrder = bookingToPseudoOrder(booking)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
@@ -70,7 +75,7 @@ export async function POST(request: NextRequest) {
     await logPaymentEvent("pesapal_initiated", {
       orderId: bookingId,
       paymentMethod: "pesapal",
-      amount: booking.servicePrice || 100,
+      amount: Number(booking.servicePrice),
       currency: "RWF",
       buyerName: booking.name || "",
       buyerPhone: booking.phone || "",

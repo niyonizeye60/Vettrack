@@ -19,6 +19,8 @@ interface SearchSuggestion {
   description: string
   type: string
   href: string
+  image?: string
+  price?: number
   distance?: number
 }
 
@@ -147,9 +149,8 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
   }
 
   const chooseSuggestion = (suggestion: SearchSuggestion) => {
-    setQuery(suggestion.name)
     setSuggestionsOpen(false)
-    navigate(suggestion.name, district)
+    router.push(suggestion.href)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -211,14 +212,27 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
                       index === activeSuggestion ? "bg-gray-100" : "hover:bg-gray-50"
                     }`}
                   >
-                    <Search className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                    {suggestion.image ? (
+                      <img
+                        src={suggestion.image}
+                        alt=""
+                        className="mt-0.5 h-10 w-10 shrink-0 rounded-md object-cover"
+                      />
+                    ) : (
+                      <Search className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                    )}
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-gray-900">{suggestion.name}</span>
+                      <span className="block truncate text-sm font-bold text-gray-900">{suggestion.name}</span>
                       <span className="block truncate text-xs text-gray-500">
                         {suggestion.type}
                         {suggestion.distance !== undefined && ` · ${formatDistance(suggestion.distance)} away`}
                         {suggestion.description && ` · ${suggestion.description}`}
                       </span>
+                      {suggestion.price !== undefined && (
+                        <span className="block text-xs font-semibold text-primary">
+                          RWF {suggestion.price.toLocaleString()}
+                        </span>
+                      )}
                     </span>
                   </button>
                 ))

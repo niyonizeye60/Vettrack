@@ -127,7 +127,7 @@ export default function FeedDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div className="relative">
               <div className="relative h-96 rounded-lg overflow-hidden">
-                <Image src={feed.image} alt={feed.name} fill className="object-cover" />
+                <Image src={feed.image || "/placeholder.svg"} alt={feed.name} fill className="object-cover" />
                 <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
                 {feed.quality && (
                   <Badge className={`absolute top-4 left-4 ${getQualityColor(feed.quality)} text-white`}>

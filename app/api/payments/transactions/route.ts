@@ -177,10 +177,10 @@ export async function GET(request: NextRequest) {
         {
           name: `Consultation: ${b.service ?? "service"}${b.animalType ? ` (${b.animalType})` : ""}`,
           quantity: 1,
-          lineTotal: b.servicePrice ?? 100,
+          lineTotal: Number(b.servicePrice) || 0,
         },
       ],
-      total: b.servicePrice ?? 100,
+      total: Number(b.servicePrice) || 0,
       currency: "RWF",
       paymentMethod: b.paymentMethod,
       paymentStatus: b.paymentStatus,

@@ -94,16 +94,23 @@ async function main() {
     })
   }
 
-  // Idempotent-ish: skip if a seeded listing of the same name already exists.
+  // Keep existing seeded listings in sync with this catalog, including prices.
   let inserted = 0, skipped = 0
   for (const doc of docs) {
     const exists = await services.findOne({ name: doc.name, seeded: true })
-    if (exists) { skipped++; continue }
-    await services.insertOne(doc)
-    inserted++
+    if (exists) {
+      await services.updateOne(
+        { _id: exists._id },
+        { $set: { price: doc.price, updatedAt: new Date() } },
+      )
+      skipped++
+    } else {
+      await services.insertOne(doc)
+      inserted++
+    }
   }
 
-  console.log(`Inserted ${inserted} listings, skipped ${skipped} (already seeded)`)
+  console.log(`Inserted ${inserted} listings, updated ${skipped} existing seeded listings`)
   const counts = await services.aggregate([{ $group: { _id: "$category", n: { $sum: 1 } } }]).toArray()
   console.log("services by category:", JSON.stringify(counts))
   const withCoords = await services.countDocuments({ latitude: { $exists: true } })

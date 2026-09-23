@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
       } else if (category === "feeds") {
         href = `/feeds/${svc._id}`
       } else {
-        href = `/services?category=${category}&id=${svc._id}`
+        href = `/booking?service=${encodeURIComponent(svc.name)}`
       }
 
       results.push({
