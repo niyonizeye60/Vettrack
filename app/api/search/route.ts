@@ -13,6 +13,17 @@ function getServiceCoords(svc: any): { lat: number; lng: number } | null {
   return null
 }
 
+/**
+ * Public search: marketplace listings (animal sales / pharmacy / feeds /
+ * services) and their categories only.
+ *
+ * Everything here is already visible to anonymous visitors on the public
+ * pages. Private records — farmers' animals, user accounts — are deliberately
+ * NOT searched, and seller contact details are never included in the payload,
+ * so nothing leaks through this endpoint that isn't public anyway. Sold and
+ * withdrawn listings stay hidden using the same availability rule as ordering
+ * (see availableListingFilter in lib/db-orders.ts).
+ */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -45,14 +56,31 @@ export async function GET(request: NextRequest) {
     // Build search regex
     const searchRegex = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null
 
-    // 1. Search Services
-    const serviceFilter: Record<string, any> = { hidden: { $ne: true } }
+    // 1. Public listings — same availability rule as ordering: active, never
+    //    statused (legacy rows), or an expired reservation. Sold, withdrawn
+    //    and marketplace-hidden listings never appear in search.
+    const now = new Date()
+    const serviceFilter: Record<string, any> = {
+      $and: [
+        { hidden: { $ne: true } },
+        {
+          $or: [
+            { listingStatus: "active" },
+            { listingStatus: { $exists: false } },
+            { listingStatus: null },
+            { listingStatus: "reserved", reservedUntil: { $lt: now } },
+          ],
+        },
+      ],
+    }
     if (searchRegex) {
-      serviceFilter.$or = [
-        { name: searchRegex },
-        { description: searchRegex },
-        { category: searchRegex },
-      ]
+      serviceFilter.$and.push({
+        $or: [
+          { name: searchRegex },
+          { description: searchRegex },
+          { category: searchRegex },
+        ],
+      })
     }
     const services = await db.collection("services").find(serviceFilter).limit(20).toArray()
 
@@ -78,7 +106,14 @@ export async function GET(request: NextRequest) {
       }
 
       results.push({
-        type: category === "sales" ? "Animal" : category === "drugs" ? "Drug" : "Feed",
+        type:
+          category === "sales"
+            ? "Animal"
+            : category === "drugs"
+              ? "Drug"
+              : category === "feeds"
+                ? "Feed"
+                : "Service",
         id: svc._id.toString(),
         name: svc.name,
         description: svc.description || "",
@@ -92,7 +127,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // 2. Search Categories
+    // 2. Categories — the marketplace's public taxonomy, linking to its
+    //    listing pages. No private data involved.
     if (searchRegex) {
       const categories = await db
         .collection("categories")
@@ -122,56 +158,6 @@ export async function GET(request: NextRequest) {
           description: cat.description || "",
           category: cat.type,
           href,
-        })
-      }
-    }
-
-    // 3. Search Animals (farmer's animals)
-    if (searchRegex) {
-      const animals = await db
-        .collection("animals")
-        .find({
-          $or: [
-            { name: searchRegex },
-            { type: searchRegex },
-            { breed: searchRegex },
-            { tagNumber: searchRegex },
-          ],
-        })
-        .limit(10)
-        .toArray()
-
-      for (const animal of animals) {
-        results.push({
-          type: "Animal Record",
-          id: animal._id.toString(),
-          name: animal.name,
-          description: `${animal.type} · ${animal.breed || ""} · ${animal.tagNumber || ""}`,
-          image: "",
-          href: "/farmer/animals",
-        })
-      }
-    }
-
-    // 4. Search Users (farmers, doctors)
-    if (searchRegex) {
-      const users = await db
-        .collection("users")
-        .find({
-          $or: [{ name: searchRegex }, { email: searchRegex }, { phone: searchRegex }],
-          role: { $in: ["farmer", "doctor"] },
-        })
-        .limit(10)
-        .toArray()
-
-      for (const user of users) {
-        results.push({
-          type: user.role === "doctor" ? "Veterinarian" : "Farmer",
-          id: user._id.toString(),
-          name: user.name,
-          description: `${user.email} · ${user.phone || ""}`,
-          image: "",
-          href: user.role === "doctor" ? "/veterinary" : "/farmer",
         })
       }
     }

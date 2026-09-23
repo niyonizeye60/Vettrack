@@ -170,6 +170,7 @@ export default function CheckoutPage() {
                   className="w-full mt-4"
                   onClick={placeOrder}
                   disabled={!paymentMethod || placingOrder}
+                  aria-busy={placingOrder}
                 >
                   {placingOrder && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {placingOrder ? t('checkout.processing') : t('checkout.placeOrder')}

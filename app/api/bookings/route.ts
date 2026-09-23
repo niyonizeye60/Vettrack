@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
-import { checkIntouchPayStatus } from "@/lib/payments/intouchpay"
+import { checkIntouchPayStatus, mapIntouchResponseCode } from "@/lib/payments/intouchpay"
 import { updateBookingPaymentStatus } from "@/lib/db-bookings"
 
 const DB_NAME = "ntdm_animal_hospital"
@@ -118,12 +118,15 @@ export async function GET(request: NextRequest) {
       if (isStalePendingIntouch) {
         try {
           const statusResponse = await checkIntouchPayStatus(booking.intouchRequestTransactionId)
-          if (statusResponse.responsecode === "01" || statusResponse.responsecode === "2001") {
-            await updateBookingPaymentStatus(bookingId, "completed")
+          const mapped = mapIntouchResponseCode(statusResponse.responsecode)
+          if (mapped !== "pending") {
+            await updateBookingPaymentStatus(bookingId, mapped, {
+              intouchRequestTransactionId: booking.intouchRequestTransactionId,
+              intouchTransactionId: statusResponse.transactionid,
+              intouchReferenceNo: statusResponse.referenceno,
+              intouchVerifiedVia: "status-api",
+            })
             // Re-fetch updated booking
-            booking = await db.collection("bookings").findOne({ _id: new ObjectId(bookingId) })
-          } else if (statusResponse.responsecode && statusResponse.responsecode !== "1000") {
-            await updateBookingPaymentStatus(bookingId, "failed")
             booking = await db.collection("bookings").findOne({ _id: new ObjectId(bookingId) })
           }
         } catch (error) {
