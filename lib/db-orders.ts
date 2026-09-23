@@ -133,7 +133,10 @@ export async function createOrder(
     }
 
     const boundedQuantity = Math.max(1, Math.floor(quantity))
-    const unitPrice = Number(service.price) || 0
+    const unitPrice = Number(service.price)
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw new OrderValidationError(`Price is not available for ${service.name}`)
+    }
 
     orderItems.push({
       serviceId,

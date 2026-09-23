@@ -117,7 +117,7 @@ export default function DrugDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             <div className="relative">
               <div className="relative h-96 rounded-lg overflow-hidden">
-                <Image src={drug.image} alt={drug.name} fill className="object-cover" />
+                <Image src={drug.image || "/placeholder.svg"} alt={drug.name} fill className="object-cover" />
                 <Badge className="absolute top-4 right-4 bg-blue-600">{t('common.inStock')}</Badge>
               </div>
             </div>

@@ -70,11 +70,13 @@ export default function AnimalDetailPage() {
 
   const photos = animal
     ? animal.images && animal.images.length > 0
-      ? animal.images
+      ? animal.images.filter(Boolean)
       : animal.image
         ? [animal.image]
         : []
     : []
+
+  const activePhoto = photos[activeIndex] || animal?.image || "/placeholder.svg"
 
   const toggleWishlist = () => {
     if (!animal) return
@@ -164,7 +166,7 @@ export default function AnimalDetailPage() {
                 onClick={() => setLightboxOpen(true)}
                 className="group relative block h-96 w-full rounded-lg overflow-hidden"
               >
-                <Image src={photos[activeIndex] || animal.image} alt={animal.name} fill className="object-cover" />
+                <Image src={activePhoto} alt={animal.name} fill className="object-cover" />
                 <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
                 <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                   <Expand className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />

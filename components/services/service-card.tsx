@@ -11,7 +11,7 @@ interface ServiceProps {
     id: string
     name: string
     description: string
-    price: number | string
+    price?: number | string
     duration: string
     image: string
     link?: string
@@ -47,7 +47,11 @@ export default function ServiceCard({ service }: ServiceProps) {
 
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center text-primary font-semibold">
-            <span>{typeof service.price === "number" ? `RWF ${service.price.toLocaleString()}` : service.price}</span>
+            {service.price ? (
+              <span>{typeof service.price === "number" ? `RWF ${service.price.toLocaleString()}` : service.price}</span>
+            ) : (
+              <span className="text-sm text-gray-500">Price from database</span>
+            )}
           </div>
 
           <div className="flex items-center text-gray-500 text-sm">

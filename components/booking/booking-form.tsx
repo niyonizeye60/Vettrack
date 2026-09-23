@@ -16,28 +16,28 @@ const serviceCategories = [
   {
     label: "Tracking Services",
     options: [
-      { value: "basic-tracking", label: "Basic GPS Tracking - RWF 100" },
-      { value: "advanced-monitoring", label: "Advanced Health Monitoring - RWF 100" },
-      { value: "herd-management", label: "Herd Management System - RWF 100" },
-      { value: "pet-tracking", label: "Pet Tracking Collar - RWF 100" },
+      { value: "Animal Health Tracking Device", label: "Animal Health Tracking Device" },
+      { value: "Advanced Health Monitoring", label: "Advanced Health Monitoring" },
+      { value: "Farm Management System", label: "Farm Management System" },
+      { value: "Pet Tracking Collar", label: "Pet Tracking Collar" },
     ],
   },
   {
     label: "Consultation Services",
     options: [
-      { value: "general-consultation", label: "General Veterinary Consultation - RWF 100" },
-      { value: "virtual-consultation", label: "Virtual Consultation - RWF 100" },
-      { value: "emergency-consultation", label: "Emergency Consultation - RWF 100" },
-      { value: "farm-visit", label: "Farm Visit - RWF 100" },
+      { value: "General Veterinary Consultation", label: "General Veterinary Consultation" },
+      { value: "Virtual Consultation", label: "Virtual Consultation" },
+      { value: "Emergency Consultation", label: "Emergency Consultation" },
+      { value: "Farm Visit", label: "Farm Visit" },
     ],
   },
   {
     label: "Monitoring Services",
     options: [
-      { value: "disease-screening", label: "Disease Screening - RWF 100" },
-      { value: "vaccination-program", label: "Vaccination Program - RWF 100" },
-      { value: "parasite-control", label: "Parasite Control - RWF 100" },
-      { value: "reproductive-health", label: "Reproductive Health Monitoring - RWF 100" },
+      { value: "Disease Screening", label: "Disease Screening" },
+      { value: "Vaccination Program", label: "Vaccination Program" },
+      { value: "Parasite Control", label: "Parasite Control" },
+      { value: "Reproductive Health Monitoring", label: "Reproductive Health Monitoring" },
     ],
   },
 ]
@@ -91,7 +91,8 @@ export default function BookingForm() {
   const [payError, setPayError] = useState("")
 
   const [bookingId, setBookingId] = useState<string | null>(null)
-  const [price, setPrice] = useState<number>(100)
+  const [price, setPrice] = useState<number | null>(null)
+  const [priceLoading, setPriceLoading] = useState(false)
   const bookingPayload = useRef<BookingData | null>(null)
 
   // Set initial service from URL query parameter
@@ -110,6 +111,26 @@ export default function BookingForm() {
       }
     }
   }, [searchParams])
+
+  useEffect(() => {
+    if (!selectedService) {
+      setPrice(null)
+      return
+    }
+    let active = true
+    setPriceLoading(true)
+    fetch(`/api/bookings?service=${encodeURIComponent(selectedService)}`)
+      .then(async (response) => {
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || "Price is not available")
+        if (active) setPrice(Number(data.price))
+      })
+      .catch(() => active && setPrice(null))
+      .finally(() => active && setPriceLoading(false))
+    return () => {
+      active = false
+    }
+  }, [selectedService])
 
   // Default the mobile money number to the contact phone until edited
   useEffect(() => {
@@ -244,7 +265,7 @@ export default function BookingForm() {
       // booking record already exists, so offer a payment retry rather than a
       // resubmit that would create a duplicate booking.
       setBookingId(data.bookingId)
-      setPrice(data.price ?? 100)
+      setPrice(Number(data.price))
       try {
         await initiatePayment(data.bookingId)
       } catch (payError) {
@@ -296,7 +317,7 @@ export default function BookingForm() {
             </div>
             <h3 className="text-2xl font-bold mb-4 text-green-800">Payment Successful! 🎉</h3>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 inline-block">
-              <p className="text-green-800 font-medium">✅ RWF {price.toLocaleString()} paid successfully</p>
+              <p className="text-green-800 font-medium">✅ RWF {price?.toLocaleString()} paid successfully</p>
               <p className="text-green-700 text-sm mt-1">Your booking has been confirmed.</p>
             </div>
             <div className="space-y-2 text-sm text-gray-600 mb-6">
@@ -325,7 +346,7 @@ export default function BookingForm() {
         <CardHeader className="bg-gradient-to-r from-primary to-primary/80 text-white rounded-t-lg">
           <CardTitle>Approve the payment on your phone</CardTitle>
           <CardDescription className="text-white/90">
-            We sent a mobile money request for RWF {price.toLocaleString()}.
+            We sent a mobile money request for RWF {price?.toLocaleString()}.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
@@ -600,7 +621,9 @@ export default function BookingForm() {
                   <Smartphone className="h-5 w-5 text-primary" />
                   <span className="text-sm font-medium text-gray-900">Mobile Money (MTN / Airtel)</span>
                 </div>
-                <span className="text-sm font-bold text-gray-900">RWF 100</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {priceLoading ? "Loading price..." : price ? `RWF ${price.toLocaleString()}` : "Price unavailable"}
+                </span>
               </div>
               <div>
                 <Label htmlFor="mobileMoneyPhone">Mobile Money Number</Label>
@@ -624,7 +647,7 @@ export default function BookingForm() {
           <Button
             type="submit"
             className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 rounded-full shadow-md"
-            disabled={!date || !selectedTimeSlot || !selectedService || !name || !phone || !mobileMoneyPhone || isSubmitting}
+            disabled={!date || !selectedTimeSlot || !selectedService || !price || !name || !phone || !mobileMoneyPhone || isSubmitting}
             aria-busy={isSubmitting}
           >
             {isSubmitting ? (
@@ -633,7 +656,7 @@ export default function BookingForm() {
                 Processing Payment...
               </span>
             ) : (
-              "Pay RWF 100 & Book Consultation"
+              price ? `Pay RWF ${price.toLocaleString()} & Book Consultation` : "Select a priced service to continue"
             )}
           </Button>
         </form>

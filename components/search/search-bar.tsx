@@ -223,6 +223,17 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
                   onClick={() => setShowResults(false)}
                   className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
                 >
+                  {result.image ? (
+                    <img
+                      src={result.image}
+                      alt=""
+                      className="h-12 w-12 flex-shrink-0 rounded-md object-cover"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 flex-shrink-0 rounded-md bg-gray-100 flex items-center justify-center">
+                      <Search className="h-4 w-4 text-gray-400" />
+                    </div>
+                  )}
                   <div className="flex-shrink-0 mt-0.5">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[result.type] || "text-gray-600 bg-gray-50"}`}
@@ -231,7 +242,7 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{result.name}</p>
+                    <p className="text-sm font-bold text-gray-900 truncate">{result.name}</p>
                     <p className="text-xs text-gray-500 truncate">{result.description}</p>
                     {result.price && (
                       <p className="text-xs font-semibold text-primary mt-0.5">RWF {result.price.toLocaleString()}</p>
