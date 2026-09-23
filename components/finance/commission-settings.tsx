@@ -25,8 +25,6 @@ interface HistoryRule extends Omit<ActiveRule, "configured"> {
   effectiveFrom: string
 }
 
-const SAMPLE_PRICES = [150_000, 500_000, 1_500_000]
-
 export default function CommissionSettings() {
   const { t } = useLanguage()
   const [active, setActive] = useState<ActiveRule | null>(null)
@@ -34,6 +32,7 @@ export default function CommissionSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [samplePrices, setSamplePrices] = useState<number[]>([])
 
   const [mode, setMode] = useState<"percent" | "flat">("percent")
   const [value, setValue] = useState("")
@@ -42,9 +41,17 @@ export default function CommissionSettings() {
 
   const load = async () => {
     try {
-      const res = await fetch("/api/commission-rules")
-      if (!res.ok) return
-      const data = await res.json()
+      const [rulesRes, servicesRes] = await Promise.all([
+        fetch("/api/commission-rules"),
+        fetch("/api/services?category=sales"),
+      ])
+      if (!rulesRes.ok) return
+      const data = await rulesRes.json()
+      const services = servicesRes.ok ? await servicesRes.json() : []
+      const prices = services
+        .map((service: { price?: number }) => service.price)
+        .filter((price: number | undefined): price is number => typeof price === "number" && price > 0)
+      setSamplePrices([...new Set<number>(prices)].slice(0, 3))
       setActive(data.active)
       setHistory(data.history)
       setMode(data.active.mode)
@@ -163,22 +170,23 @@ export default function CommissionSettings() {
           </div>
         )}
 
-        {/* What a buyer actually pays at a few realistic animal prices. */}
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-            {t("finance.feePreview")}
-          </p>
-          <div className="space-y-1">
-            {SAMPLE_PRICES.map((price) => (
-              <div key={price} className="flex justify-between text-sm tabular-nums">
-                <span className="text-gray-600">RWF {price.toLocaleString()}</span>
-                <span className="font-medium text-gray-900">
-                  RWF {computeFee(draft, price).toLocaleString()}
-                </span>
-              </div>
-            ))}
+        {samplePrices.length > 0 && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+              {t("finance.feePreview")}
+            </p>
+            <div className="space-y-1">
+              {samplePrices.map((price) => (
+                <div key={price} className="flex justify-between text-sm tabular-nums">
+                  <span className="text-gray-600">RWF {price.toLocaleString()}</span>
+                  <span className="font-medium text-gray-900">
+                    RWF {computeFee(draft, price).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex gap-3 rounded-lg bg-blue-50 border border-blue-200 p-3">
           <Info className="h-4 w-4 text-blue-700 flex-shrink-0 mt-0.5" />
