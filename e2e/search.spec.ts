@@ -65,6 +65,39 @@ async function setGeo(page: Page, point: GeoPoint) {
 }
 
 test.describe("/services search and district filter", () => {
+  test("search submits explicitly and shows the matching result", async ({ page }) => {
+    await setGeo(page, KIGALI)
+    await page.goto("/services")
+
+    const input = page.getByPlaceholder("Search services, products, or animals...")
+    await input.fill("cow")
+    await expect(page).toHaveURL(/\/services$/)
+
+    await page.getByRole("button", { name: "Search", exact: true }).click()
+    await expect(page).toHaveURL(/\/services\?q=cow/)
+    await expect(page.getByText(/away — View/).first()).toBeVisible()
+  })
+
+  test("partial characters show service suggestions", async ({ page }) => {
+    await setGeo(page, KIGALI)
+    await page.goto("/services")
+
+    const input = page.getByPlaceholder("Search services, products, or animals...")
+    await input.fill("co")
+    await expect(page.getByRole("button", { name: /cow/i }).first()).toBeVisible()
+    await expect(page.getByRole("button", { name: /[0-9].*(km|m) away/i }).first()).toBeVisible()
+    await expect(page).toHaveURL(/\/services$/)
+  })
+
+  test("built-in services appear in suggestions", async ({ page }) => {
+    await page.goto("/services")
+
+    const input = page.getByPlaceholder("Search services, products, or animals...")
+    await input.fill("consult")
+    await expect(page.getByRole("button", { name: /General Veterinary Consultation/i })).toBeVisible()
+    await expect(page.getByText(/Consultation/).first()).toBeVisible()
+  })
+
   test("results view auto-detects location and district filter overrides it", async ({ page }) => {
     // GPS places the user at Kigali center; the nearest cow listing is the
     // Kacyiru one at ~2.6 km

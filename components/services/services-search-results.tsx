@@ -157,13 +157,13 @@ export default function ServicesSearchResults({ searchParams }: Props) {
     </div>
   )
 
-  if (loading) {
+  if (loading && results.length === 0) {
     return (
       <div className="space-y-6">
         {searchHeader}
-        <div className="flex flex-col items-center justify-center py-16">
+        <div className="flex flex-col items-center justify-center py-16" role="status" aria-live="polite">
           <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-          <p className="text-gray-500">Searching nearby services...</p>
+          <p className="text-gray-500">Finding nearby services...</p>
         </div>
       </div>
     )
@@ -206,6 +206,7 @@ export default function ServicesSearchResults({ searchParams }: Props) {
             <p className="text-xs text-gray-500">
               {sortedResults.length} service{sortedResults.length !== 1 ? "s" : ""} found
               {searchParams.q && <> · searching &ldquo;{searchParams.q}&rdquo;</>}
+              {loading && <Loader2 className="inline-block ml-2 h-3 w-3 animate-spin text-primary align-[-2px]" aria-label="Updating results" />}
             </p>
           </div>
         </div>
