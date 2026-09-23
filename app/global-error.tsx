@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import * as Sentry from "@sentry/nextjs"
 import { reportClientError } from "@/lib/actions"
 
 // This only fires when the root layout itself throws (very rare) - Next.js requires it to
@@ -14,6 +15,7 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
+    Sentry.captureException(error)
     reportClientError(error.message, error.stack).catch(() => {})
   }, [error])
 

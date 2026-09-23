@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs/config"
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -46,4 +48,14 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+// Source maps are uploaded (so production stack traces are readable) only when SENTRY_AUTH_TOKEN
+// is set - a build-time secret that lives in Vercel only. Without it the build still succeeds.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+  webpack: { treeshake: { removeDebugLogging: true, removeTracing: true } },
+})

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { usePathname } from "next/navigation"
+import * as Sentry from "@sentry/nextjs"
 import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -20,6 +21,8 @@ export default function GlobalRouteError({
   const pathname = usePathname()
 
   useEffect(() => {
+    // Error boundaries swallow the error, so Sentry never sees it unless it is sent explicitly.
+    Sentry.captureException(error)
     reportClientError(error.message, error.stack).catch(() => {})
   }, [error])
 
