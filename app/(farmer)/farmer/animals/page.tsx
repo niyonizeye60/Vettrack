@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/actions/auth";
 import { redirect } from "next/navigation";
 import AnimalsContent from "./components/animals-content";
 
+const ANIMALS_PAGE_SIZE = 10
+
 export default async function AnimalsPage({
   searchParams,
 }: {
@@ -17,11 +19,11 @@ export default async function AnimalsPage({
   }
 
   const farmerId = currentUser._id.toString();
-  const animals = await getAnimals(farmerId);
+  const initialData = await getAnimals(farmerId, { page: 1, limit: ANIMALS_PAGE_SIZE, tab: "all" });
 
   return (
     <AnimalsContent
-      animals={animals}
+      initialData={initialData}
       farmerId={farmerId}
       openAdd={searchParams.action === "add"}
     />

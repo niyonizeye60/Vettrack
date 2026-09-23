@@ -562,17 +562,60 @@ export async function submitContactForm(formData: FormData) {
   }
 }
 
-export async function getAnimals(ownerId?: string) {
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function mapAnimalDoc(animal: any) {
+  return {
+    _id: animal._id.toString(),
+    name: animal.name,
+    type: animal.type,
+    breed: animal.breed,
+    district: animal.district,
+    sector: animal.sector,
+    class: animal.class,
+    ownerName: animal.ownerName,
+    phoneNumber: animal.phoneNumber,
+    price: animal.price,
+    weight: animal.weight ?? null,
+    acquisitionType: animal.acquisitionType || null,
+    earTagId: animal.earTagId || null,
+    insuranceId: animal.insuranceId || null,
+    gender: animal.gender || null,
+    lactationStatus: animal.type === "cow" && animal.gender === "female" ? (animal.lactationStatus || "dry") : null,
+    ownerId: animal.ownerId || null,
+    status: animal.status || "Healthy",
+    createdAt: animal.createdAt.toISOString()
+  }
+}
+
+// Overloaded so passing `page` narrows the return type to the paginated shape, while every
+// existing caller (which never passes `page`) keeps getting back a plain array.
+export async function getAnimals(ownerId?: string): Promise<any[]>
+export async function getAnimals(
+  ownerId: string | undefined,
+  options: { page: number; limit?: number; search?: string; tab?: "all" | "lactating" | "dry" }
+): Promise<{
+  animals: any[]
+  pagination: { page: number; pageSize: number; total: number; totalPages: number }
+  counts: { all: number; lactating: number; dry: number }
+}>
+export async function getAnimals(
+  ownerId?: string,
+  options?: { page?: number; limit?: number; search?: string; tab?: "all" | "lactating" | "dry" }
+): Promise<any> {
+  const paginate = options?.page != null
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     // Build query to handle both new and old animals (with different ownerId field names)
-    let query = {};
+    let baseQuery = {};
 
     if (ownerId) {
       // Handle both new and legacy ways animals might be associated with owners
-      query = {
+      baseQuery = {
         $or: [
           { ownerId },  // New way with explicit ownerId
           { 'owner._id': ownerId }, // Potential legacy way with embedded owner document
@@ -581,35 +624,53 @@ export async function getAnimals(ownerId?: string) {
       };
     }
 
-    console.log("Fetching animals with query:", query);
+    console.log("Fetching animals with query:", baseQuery);
 
-    const animals = await db.collection("animals").find(query).toArray()
+    if (!paginate) {
+      const animals = await db.collection("animals").find(baseQuery).toArray()
+      console.log(`Found ${animals.length} animals`);
+      return animals.map(mapAnimalDoc)
+    }
 
-    console.log(`Found ${animals.length} animals`);
+    const page = Math.max(1, options!.page!)
+    const limit = Math.max(1, options?.limit || 10)
 
-    return animals.map(animal => ({
-      _id: animal._id.toString(),
-      name: animal.name,
-      type: animal.type,
-      breed: animal.breed,
-      district: animal.district,
-      sector: animal.sector,
-      class: animal.class,
-      ownerName: animal.ownerName,
-      phoneNumber: animal.phoneNumber,
-      price: animal.price,
-      weight: animal.weight ?? null,
-      acquisitionType: animal.acquisitionType || null,
-      earTagId: animal.earTagId || null,
-      insuranceId: animal.insuranceId || null,
-      gender: animal.gender || null,
-      lactationStatus: animal.type === "cow" && animal.gender === "female" ? (animal.lactationStatus || "dry") : null,
-      ownerId: animal.ownerId || null,
-      status: animal.status || "Healthy",
-      createdAt: animal.createdAt.toISOString()
-    }))
+    const lactatingFilter = { type: "cow", gender: "female", lactationStatus: "lactating" }
+    const dryFilter = { type: "cow", gender: "female", lactationStatus: { $ne: "lactating" } }
+    const tabFilter = options?.tab === "lactating" ? lactatingFilter : options?.tab === "dry" ? dryFilter : null
+
+    const andClauses: any[] = [baseQuery]
+    if (tabFilter) andClauses.push(tabFilter)
+    if (options?.search?.trim()) {
+      const re = new RegExp(escapeRegex(options.search.trim()), "i")
+      andClauses.push({ $or: [{ name: re }, { type: re }, { breed: re }, { insuranceId: re }, { earTagId: re }] })
+    }
+    const finalQuery = andClauses.length > 1 ? { $and: andClauses } : andClauses[0]
+
+    const [total, animals, allCount, lactatingCount, dryCount] = await Promise.all([
+      db.collection("animals").countDocuments(finalQuery),
+      db.collection("animals").find(finalQuery).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
+      db.collection("animals").countDocuments(baseQuery),
+      db.collection("animals").countDocuments({ $and: [baseQuery, lactatingFilter] }),
+      db.collection("animals").countDocuments({ $and: [baseQuery, dryFilter] }),
+    ])
+
+    console.log(`Found ${animals.length} animals (page ${page} of ${Math.max(1, Math.ceil(total / limit))})`);
+
+    return {
+      animals: animals.map(mapAnimalDoc),
+      pagination: { page, pageSize: limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+      counts: { all: allCount, lactating: lactatingCount, dry: dryCount },
+    }
   } catch (error) {
     console.error("Error fetching animals:", error)
+    if (paginate) {
+      return {
+        animals: [],
+        pagination: { page: options?.page || 1, pageSize: options?.limit || 10, total: 0, totalPages: 1 },
+        counts: { all: 0, lactating: 0, dry: 0 },
+      }
+    }
     return []
   }
 }
@@ -653,21 +714,58 @@ export async function getAnimalById(id: string) {
 
 // `withDocuments` is opt-in: only the two consultation screens show attachments, and
 // the other callers (dashboards, patient lists, search) shouldn't pay for the extra query.
+// Overloaded so passing `page` narrows the return type to the paginated shape, while every
+// existing caller (which never passes `page`) keeps getting back a plain array.
 export async function getConsultations(
   doctorId?: string,
   farmerId?: string,
   options?: { withDocuments?: boolean }
-) {
+): Promise<any[]>
+export async function getConsultations(
+  doctorId: string | undefined,
+  farmerId: string | undefined,
+  options: {
+    withDocuments?: boolean
+    page: number
+    limit?: number
+    status?: string
+    animalId?: string
+    doctor?: string
+    startDate?: string
+    endDate?: string
+    month?: string
+    sortBy?: "date" | "status" | "createdAt"
+    sortOrder?: "asc" | "desc"
+  }
+): Promise<{ consultations: any[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>
+export async function getConsultations(
+  doctorId?: string,
+  farmerId?: string,
+  options?: {
+    withDocuments?: boolean
+    page?: number
+    limit?: number
+    status?: string
+    animalId?: string
+    doctor?: string
+    startDate?: string
+    endDate?: string
+    month?: string
+    sortBy?: "date" | "status" | "createdAt"
+    sortOrder?: "asc" | "desc"
+  }
+): Promise<any> {
+  const paginate = options?.page != null
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     // Build query based on user role
-    let query = {}
+    let query: any = {}
 
     if (doctorId) {
       // Handle both string and ObjectId references for doctor
-      query = { 
+      query = {
         $or: [
           { doctor: doctorId },
           { doctor: new ObjectId(doctorId) }
@@ -679,7 +777,52 @@ export async function getConsultations(
 
     console.log("Fetching consultations with query:", query)
 
-    const consultations = await db.collection("consultations").find(query).toArray()
+    let total = 0
+    let page = 1
+    let limit = 10
+    let consultations
+    if (paginate) {
+      page = Math.max(1, options!.page!)
+      limit = Math.max(1, options?.limit || 10)
+
+      const andClauses: any[] = [query]
+      if (options?.status && options.status !== "all") {
+        andClauses.push({ status: { $regex: `^${escapeRegex(options.status)}$`, $options: "i" } })
+      }
+      if (options?.animalId) {
+        andClauses.push({ animalId: options.animalId })
+      }
+      if (options?.doctor) {
+        const doctorOrClauses: any[] = [{ doctor: options.doctor }]
+        if (ObjectId.isValid(options.doctor)) doctorOrClauses.push({ doctor: new ObjectId(options.doctor) })
+        andClauses.push({ $or: doctorOrClauses })
+      }
+      if (options?.month) {
+        const [year, m] = options.month.split("-")
+        const start = new Date(Number(year), Number(m) - 1, 1).toISOString().split("T")[0]
+        const end = new Date(Number(year), Number(m), 1).toISOString().split("T")[0]
+        andClauses.push({ date: { $gte: start, $lt: end } })
+      } else if (options?.startDate || options?.endDate) {
+        const dateClause: any = {}
+        if (options.startDate) dateClause.$gte = options.startDate
+        if (options.endDate) dateClause.$lte = options.endDate
+        andClauses.push({ date: dateClause })
+      }
+      const finalQuery = andClauses.length > 1 ? { $and: andClauses } : andClauses[0]
+
+      const sortField = options?.sortBy === "date" ? "date" : options?.sortBy === "status" ? "status" : "createdAt"
+      const sortDir = options?.sortOrder === "asc" ? 1 : -1
+
+      total = await db.collection("consultations").countDocuments(finalQuery)
+      consultations = await db.collection("consultations")
+        .find(finalQuery)
+        .sort({ [sortField]: sortDir })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .toArray()
+    } else {
+      consultations = await db.collection("consultations").find(query).toArray()
+    }
 
     console.log(`Found ${consultations.length} consultations`)
 
@@ -720,7 +863,7 @@ export async function getConsultations(
       ? await getDocumentsByConsultation(db, consultations.map((c) => c._id))
       : null
 
-    return consultations.map((c) => ({
+    const mapped = consultations.map((c) => ({
       _id: c._id.toString(),
       fullName: c.fullName,
       phoneNumber: c.phoneNumber,
@@ -748,8 +891,16 @@ export async function getConsultations(
       followUpNeeded: c.followUpNeeded || false,
       followUpDate: c.followUpDate || null,
     }))
+
+    if (paginate) {
+      return { consultations: mapped, pagination: { page, pageSize: limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) } }
+    }
+    return mapped
   } catch (error) {
     console.error("Error fetching consultations:", error)
+    if (paginate) {
+      return { consultations: [], pagination: { page: options?.page || 1, pageSize: options?.limit || 10, total: 0, totalPages: 1 } }
+    }
     return []
   }
 }

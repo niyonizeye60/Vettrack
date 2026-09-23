@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")
     const month = searchParams.get("month")
+    const pageParam = searchParams.get("page")
 
     if (!farmerId) return NextResponse.json({ error: "farmerId required" }, { status: 400 })
 
@@ -45,6 +46,24 @@ export async function GET(req: NextRequest) {
       query.date = {}
       if (startDate) query.date.$gte = startDate
       if (endDate) query.date.$lte = endDate
+    }
+
+    if (pageParam) {
+      const page = Math.max(1, parseInt(pageParam, 10) || 1)
+      const pageSize = Math.max(1, parseInt(searchParams.get("limit") || "10", 10) || 10)
+
+      const total = await db.collection("milk_records").countDocuments(query)
+      const records = await db.collection("milk_records")
+        .find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray()
+
+      return NextResponse.json({
+        records: records.map(r => ({ ...r, _id: r._id.toString() })),
+        pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+      })
     }
 
     const records = await db.collection("milk_records").find(query).sort({ date: -1, createdAt: -1 }).toArray()

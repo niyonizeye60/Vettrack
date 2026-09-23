@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Milk, Plus, Pencil, Trash2, BarChart3, History, TrendingUp, DollarSign, Droplets, Download, FileText, Eye } from "lucide-react"
+import { Milk, Plus, Pencil, Trash2, BarChart3, History, TrendingUp, DollarSign, Droplets, Download, FileText, Eye, ChevronLeft, ChevronRight } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -154,6 +154,13 @@ export default function MilkProductionPage() {
   const [filterEnd, setFilterEnd] = useState("")
   const [filterMonth, setFilterMonth] = useState("")
 
+  // History tab pagination (backend-driven)
+  const HISTORY_PAGE_SIZE = 10
+  const [historyRecords, setHistoryRecords] = useState<MilkRecord[]>([])
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyPagination, setHistoryPagination] = useState({ page: 1, pageSize: HISTORY_PAGE_SIZE, total: 0, totalPages: 0 })
+
   useEffect(() => {
     async function init() {
       const userData = await getCurrentUser()
@@ -185,6 +192,36 @@ export default function MilkProductionPage() {
     const data = await res.json()
     setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
+
+  const fetchHistoryRecords = async (farmerId: string, page: number) => {
+    setHistoryLoading(true)
+    try {
+      const params = new URLSearchParams({ farmerId, page: String(page), limit: String(HISTORY_PAGE_SIZE) })
+      if (filterCow) params.set("cowId", filterCow)
+      if (filterSession) params.set("session", filterSession)
+      if (filterMonth) params.set("month", filterMonth)
+      else {
+        if (filterStart) params.set("startDate", filterStart)
+        if (filterEnd) params.set("endDate", filterEnd)
+      }
+      const res = await fetch(`/api/milk?${params.toString()}`)
+      const data = await res.json()
+      const pagination = data?.pagination || { page: 1, pageSize: HISTORY_PAGE_SIZE, total: 0, totalPages: 1 }
+      if (pagination.total > 0 && page > pagination.totalPages) {
+        setHistoryPage(pagination.totalPages)
+        return
+      }
+      setHistoryRecords(Array.isArray(data.records) ? data.records : [])
+      setHistoryPagination(pagination)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!user?._id) return
+    fetchHistoryRecords(user._id.toString(), historyPage)
+  }, [user, historyPage, filterCow, filterSession, filterStart, filterEnd, filterMonth])
 
   // Client-side filtered records
   const filteredRecords = useMemo(() => {
@@ -259,7 +296,15 @@ export default function MilkProductionPage() {
         : { title: t('farmer.milkRecordSaved'), description: t('farmer.milkRecordSavedDesc') }
     )
 
+    const wasEditing = !!editRecord
     await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
+    if (wasEditing) {
+      await fetchHistoryRecords(user._id.toString(), historyPage)
+    } else if (historyPage !== 1) {
+      setHistoryPage(1)
+    } else {
+      await fetchHistoryRecords(user._id.toString(), 1)
+    }
     resetForm()
     setSaving(false)
   }
@@ -284,12 +329,17 @@ export default function MilkProductionPage() {
 
   const handleDelete = async (id: string) => {
     await fetch(`/api/milk?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
+    await Promise.all([
+      fetchRecords(user._id.toString()),
+      fetchHomeConsumptionBalance(user._id.toString()),
+      fetchHistoryRecords(user._id.toString(), historyPage),
+    ])
     setDeleteId(null)
   }
 
   const clearFilters = () => {
     setFilterCow(""); setFilterSession(""); setFilterStart(""); setFilterEnd(""); setFilterMonth("")
+    setHistoryPage(1)
   }
 
   // Export state
@@ -912,7 +962,7 @@ export default function MilkProductionPage() {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 p-4 bg-gray-50 rounded-xl">
                 <Combobox
                   value={filterCow || "all"}
-                  onValueChange={v => setFilterCow(v === "all" ? "" : v)}
+                  onValueChange={v => { setFilterCow(v === "all" ? "" : v); setHistoryPage(1) }}
                   options={[
                     { value: "all", label: t('farmer.allCows') },
                     ...milkableAnimals.map(a => ({ value: a._id, label: a.name })),
@@ -921,18 +971,18 @@ export default function MilkProductionPage() {
                   searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
                   emptyText={t('farmer.noResultsFound') || "No animals found."}
                 />
-                <Select value={filterSession || "all"} onValueChange={v => setFilterSession(v === "all" ? "" : v)}>
+                <Select value={filterSession || "all"} onValueChange={v => { setFilterSession(v === "all" ? "" : v); setHistoryPage(1) }}>
                   <SelectTrigger><SelectValue placeholder={t('farmer.allSessions')} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t('farmer.allSessions')}</SelectItem>
                     {SESSIONS.map(s => <SelectItem key={s} value={s}>{s === 'Morning' ? t('farmer.morning') : t('farmer.evening')}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Input type="month" value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setFilterStart(""); setFilterEnd("") }} />
-                <Input type="date" value={filterStart} onChange={e => { setFilterStart(e.target.value); setFilterMonth("") }} placeholder="Start date" />
-                <Input type="date" value={filterEnd} onChange={e => { setFilterEnd(e.target.value); setFilterMonth("") }} placeholder="End date" />
+                <Input type="month" value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setFilterStart(""); setFilterEnd(""); setHistoryPage(1) }} />
+                <Input type="date" value={filterStart} onChange={e => { setFilterStart(e.target.value); setFilterMonth(""); setHistoryPage(1) }} placeholder="Start date" />
+                <Input type="date" value={filterEnd} onChange={e => { setFilterEnd(e.target.value); setFilterMonth(""); setHistoryPage(1) }} placeholder="End date" />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-3 lg:col-span-5">
-                  <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""} found</p>
+                  <p className="text-sm text-gray-500">{historyPagination.total} record{historyPagination.total !== 1 ? "s" : ""} found</p>
                   <Button variant="outline" onClick={clearFilters} className="rounded-lg ml-auto">{t('farmer.clearFilters')}</Button>
                 </div>
               </div>
@@ -960,9 +1010,11 @@ export default function MilkProductionPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRecords.length === 0 ? (
+                    {historyLoading ? (
+                      <TableRow><TableCell colSpan={15} className="text-center py-8 text-gray-400">{t('common.loading') || "Loading…"}</TableCell></TableRow>
+                    ) : historyRecords.length === 0 ? (
                       <TableRow><TableCell colSpan={15} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
-                    ) : filteredRecords.map(r => {
+                    ) : historyRecords.map(r => {
                       const sold = r.soldLiters ?? Math.max(0, r.liters - (r.homeConsumption || 0))
                       return (
                         <TableRow key={r._id}>
@@ -1007,6 +1059,54 @@ export default function MilkProductionPage() {
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Pagination */}
+              {historyPagination.totalPages > 1 && (
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <p className="text-sm text-gray-500">
+                    Showing{" "}
+                    <span className="font-medium">{(historyPagination.page - 1) * historyPagination.pageSize + 1}</span>
+                    {" - "}
+                    <span className="font-medium">{Math.min(historyPagination.page * historyPagination.pageSize, historyPagination.total)}</span>
+                    {" "}of{" "}
+                    <span className="font-medium">{historyPagination.total}</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                      disabled={historyPage <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    {Array.from({ length: Math.min(historyPagination.totalPages, 5) }, (_, i) => {
+                      const startPage = Math.max(1, historyPage - 2)
+                      const p = startPage + i
+                      if (p > historyPagination.totalPages) return null
+                      return (
+                        <Button
+                          key={p}
+                          variant={p === historyPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setHistoryPage(p)}
+                          className="min-w-[36px]"
+                        >
+                          {p}
+                        </Button>
+                      )
+                    })}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHistoryPage(p => Math.min(historyPagination.totalPages, p + 1))}
+                      disabled={historyPage >= historyPagination.totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

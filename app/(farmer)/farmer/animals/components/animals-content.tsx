@@ -1,7 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -14,15 +13,36 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bell, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets } from "lucide-react"
+import { Bell, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
-import { deleteAnimal, updateAnimalLactationStatus } from "@/lib/actions"
+import { deleteAnimal, updateAnimalLactationStatus, getAnimals } from "@/lib/actions"
 import AddAnimalForm from "@/components/dashboard/add-animal-form"
 import EditAnimalForm from "@/components/dashboard/edit-animal-form"
 
-interface AnimalsContentProps {
+const ANIMALS_PAGE_SIZE = 10
+
+interface AnimalsPagination {
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+interface AnimalsCounts {
+  all: number
+  lactating: number
+  dry: number
+}
+
+interface AnimalsData {
   animals: any[]
+  pagination: AnimalsPagination
+  counts: AnimalsCounts
+}
+
+interface AnimalsContentProps {
+  initialData: AnimalsData
   farmerId: string
   openAdd?: boolean
 }
@@ -36,10 +56,9 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsContentProps) {
+export default function AnimalsContent({ initialData, farmerId, openAdd }: AnimalsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
-  const router = useRouter()
 
   const [addOpen, setAddOpen] = useState(openAdd ?? false)
   const [editAnimal, setEditAnimal] = useState<any | null>(null)
@@ -48,9 +67,54 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
   const [deleting, setDeleting] = useState(false)
   const [inseminationRecords, setInseminationRecords] = useState<any[]>([])
   const [recordsLoaded, setRecordsLoaded] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState<"all" | "lactating" | "dry">("all")
   const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  // Backend-driven pagination (10 per page), with server-side search + tab filtering
+  const [data, setData] = useState<AnimalsData>(initialData)
+  const [page, setPage] = useState(initialData.pagination.page)
+  const [activeTab, setActiveTab] = useState<"all" | "lactating" | "dry">("all")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const [loading, setLoading] = useState(false)
+  const isFirstRun = useRef(true)
+
+  const fetchData = async (targetPage: number) => {
+    setLoading(true)
+    try {
+      const result = await getAnimals(farmerId, {
+        page: targetPage,
+        limit: ANIMALS_PAGE_SIZE,
+        tab: activeTab,
+        search: debouncedSearch || undefined,
+      })
+      if (result.pagination.total > 0 && targetPage > result.pagination.totalPages) {
+        await fetchData(result.pagination.totalPages)
+        return
+      }
+      setData(result)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(searchTerm), 300)
+    return () => clearTimeout(handle)
+  }, [searchTerm])
+
+  useEffect(() => {
+    if (isFirstRun.current) return
+    setPage(1)
+  }, [activeTab, debouncedSearch])
+
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false
+      return
+    }
+    fetchData(page)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, activeTab, debouncedSearch])
 
   useEffect(() => {
     let cancelled = false
@@ -101,7 +165,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
     try {
       const result = await deleteAnimal(deleteAnimalTarget._id, farmerId)
       if (result.success) {
-        router.refresh()
+        await fetchData(page)
       } else {
         toast({ title: t('farmer.actionFailed'), variant: "destructive" })
       }
@@ -116,17 +180,13 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
 
   const deletePregnancy = deleteAnimalTarget ? getPregnancy(deleteAnimalTarget._id) : null
 
-  const cows = animals.filter((a) => (a.type || "").toLowerCase() === "cow" && a.gender === "female")
-  const lactatingCows = cows.filter((a) => a.lactationStatus === "lactating")
-  const dryCows = cows.filter((a) => a.lactationStatus !== "lactating")
-
   const handleToggleLactation = async (animal: any) => {
     const next = animal.lactationStatus === "lactating" ? "dry" : "lactating"
     setTogglingId(animal._id)
     try {
       const result = await updateAnimalLactationStatus(animal._id, next, farmerId)
       if (result.success) {
-        router.refresh()
+        await fetchData(page)
       } else {
         toast({ title: t('farmer.actionFailed'), description: result.error, variant: "destructive" })
       }
@@ -138,19 +198,10 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
     }
   }
 
-  const tabAnimals = activeTab === "lactating" ? lactatingCows : activeTab === "dry" ? dryCows : animals
-
-  const filteredAnimals = tabAnimals.filter((a) => {
-    const q = searchTerm.trim().toLowerCase()
-    if (!q) return true
-    return (
-      a.name?.toLowerCase().includes(q) ||
-      a.type?.toLowerCase().includes(q) ||
-      a.breed?.toLowerCase().includes(q) ||
-      a.insuranceId?.toLowerCase().includes(q) ||
-      a.earTagId?.toLowerCase().includes(q)
-    )
-  })
+  const refreshAfterAdd = async () => {
+    if (page !== 1) setPage(1)
+    else await fetchData(1)
+  }
 
   return (
     <div className="space-y-6">
@@ -158,7 +209,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('farmer.myAnimals')}</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            {t('farmer.registeredAnimals')}: <span className="font-semibold">{animals.length}</span>
+            {t('farmer.registeredAnimals')}: <span className="font-semibold">{data.counts.all}</span>
           </p>
         </div>
         <Button size="sm" onClick={() => setAddOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
@@ -184,21 +235,21 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
               />
             </div>
           </div>
-          {cows.length > 0 && (
+          {(data.counts.lactating + data.counts.dry) > 0 && (
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "all" | "lactating" | "dry")} className="mt-4">
               <TabsList>
-                <TabsTrigger value="all">{t('farmer.allAnimals')} ({animals.length})</TabsTrigger>
+                <TabsTrigger value="all">{t('farmer.allAnimals')} ({data.counts.all})</TabsTrigger>
                 <TabsTrigger value="lactating" className="flex items-center gap-1.5">
                   <Droplets className="h-3.5 w-3.5" />
-                  {t('farmer.lactatingCows')} ({lactatingCows.length})
+                  {t('farmer.lactatingCows')} ({data.counts.lactating})
                 </TabsTrigger>
-                <TabsTrigger value="dry">{t('farmer.dryCows')} ({dryCows.length})</TabsTrigger>
+                <TabsTrigger value="dry">{t('farmer.dryCows')} ({data.counts.dry})</TabsTrigger>
               </TabsList>
             </Tabs>
           )}
         </CardHeader>
         <CardContent className="p-0">
-          {animals.length === 0 ? (
+          {data.counts.all === 0 ? (
             <div className="text-center py-12">
               <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
                 <PawPrint className="h-5 w-5 text-gray-400" />
@@ -230,7 +281,11 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAnimals.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={12} className="text-center py-12 text-gray-400">{t('common.loading')}</TableCell>
+                    </TableRow>
+                  ) : data.animals.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={12} className="text-center py-12">
                         <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
@@ -239,7 +294,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
                         <p className="text-gray-500 text-sm font-medium">{t('farmer.noResultsFound') || "No animals match your search"}</p>
                       </TableCell>
                     </TableRow>
-                  ) : filteredAnimals.map((animal) => (
+                  ) : data.animals.map((animal) => (
                     <TableRow key={animal._id} className="hover:bg-gray-50/80 transition-colors duration-150">
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -324,6 +379,55 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
               </Table>
             </div>
           )}
+
+          {/* Pagination */}
+          {data.pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-gray-100">
+              <p className="text-sm text-gray-500">
+                Showing{" "}
+                <span className="font-medium">{(data.pagination.page - 1) * data.pagination.pageSize + 1}</span>
+                {" - "}
+                <span className="font-medium">{Math.min(data.pagination.page * data.pagination.pageSize, data.pagination.total)}</span>
+                {" "}of{" "}
+                <span className="font-medium">{data.pagination.total}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: Math.min(data.pagination.totalPages, 5) }, (_, i) => {
+                  const startPage = Math.max(1, page - 2)
+                  const p = startPage + i
+                  if (p > data.pagination.totalPages) return null
+                  return (
+                    <Button
+                      key={p}
+                      variant={p === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPage(p)}
+                      disabled={loading}
+                      className="min-w-[36px]"
+                    >
+                      {p}
+                    </Button>
+                  )
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(data.pagination.totalPages, p + 1))}
+                  disabled={page >= data.pagination.totalPages || loading}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -335,7 +439,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
           </DialogHeader>
           <AddAnimalForm
             userId={farmerId}
-            onSuccess={() => { setAddOpen(false); router.refresh() }}
+            onSuccess={() => { setAddOpen(false); refreshAfterAdd() }}
             onCancel={() => setAddOpen(false)}
           />
         </DialogContent>
@@ -351,7 +455,7 @@ export default function AnimalsContent({ animals, farmerId, openAdd }: AnimalsCo
             <EditAnimalForm
               animal={editAnimal}
               farmerId={farmerId}
-              onSuccess={() => { setEditAnimal(null); router.refresh() }}
+              onSuccess={() => { setEditAnimal(null); fetchData(page) }}
               onCancel={() => setEditAnimal(null)}
             />
           )}

@@ -6,13 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox } from "@/components/ui/combobox"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup,
+  DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Bell, Eye, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
+import { ArrowUpDown, Bell, ChevronLeft, ChevronRight, Eye, MessageSquare, Pencil, Plus, Trash2 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
 import { deleteConsultation } from "@/lib/actions"
@@ -36,8 +43,37 @@ interface SickAnimal {
   breed: string
 }
 
+interface ConsultationsPagination {
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
+interface ConsultationsFilters {
+  status: string
+  animalId: string
+  doctor: string
+  month: string
+  startDate: string
+  endDate: string
+  sortBy: string
+  sortOrder: string
+}
+
+const SORT_OPTIONS = [
+  { value: "createdAt_desc", sortBy: "createdAt", sortOrder: "desc", label: "Newest booked" },
+  { value: "createdAt_asc", sortBy: "createdAt", sortOrder: "asc", label: "Oldest booked" },
+  { value: "date_desc", sortBy: "date", sortOrder: "desc", label: "Appointment date (latest)" },
+  { value: "date_asc", sortBy: "date", sortOrder: "asc", label: "Appointment date (earliest)" },
+  { value: "status_asc", sortBy: "status", sortOrder: "asc", label: "Status (A–Z)" },
+] as const
+
 interface ConsultationsContentProps {
   consultations: any[]
+  pagination: ConsultationsPagination
+  filters: ConsultationsFilters
+  animals: SickAnimal[]
   doctors: Doctor[]
   farmerId: string
   sickAnimals: SickAnimal[]
@@ -55,10 +91,40 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function ConsultationsContent({ consultations, doctors, farmerId, sickAnimals, openAdd, farmerName, farmerPhone }: ConsultationsContentProps) {
+export default function ConsultationsContent({ consultations, pagination, filters, animals, doctors, farmerId, sickAnimals, openAdd, farmerName, farmerPhone }: ConsultationsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
+
+  const buildUrl = (overrides: Partial<ConsultationsFilters & { page: number }>) => {
+    const merged = { ...filters, page: pagination.page, ...overrides }
+    const params = new URLSearchParams()
+    if (merged.status) params.set("status", merged.status)
+    if (merged.animalId) params.set("animalId", merged.animalId)
+    if (merged.doctor) params.set("doctor", merged.doctor)
+    if (merged.month) params.set("month", merged.month)
+    else {
+      if (merged.startDate) params.set("startDate", merged.startDate)
+      if (merged.endDate) params.set("endDate", merged.endDate)
+    }
+    if (merged.sortBy !== "createdAt") params.set("sortBy", merged.sortBy)
+    if (merged.sortOrder !== "desc") params.set("sortOrder", merged.sortOrder)
+    if (merged.page > 1) params.set("page", String(merged.page))
+    const qs = params.toString()
+    return `/farmer/consultations${qs ? `?${qs}` : ""}`
+  }
+
+  const goToPage = (p: number) => router.push(buildUrl({ page: p }))
+  const setFilter = (patch: Partial<ConsultationsFilters>) => router.push(buildUrl({ ...patch, page: 1 }))
+  const clearFilters = () => router.push("/farmer/consultations")
+
+  const currentSortValue = SORT_OPTIONS.find(o => o.sortBy === filters.sortBy && o.sortOrder === filters.sortOrder)?.value || "createdAt_desc"
+  const setSort = (value: string) => {
+    const opt = SORT_OPTIONS.find(o => o.value === value)
+    if (opt) router.push(buildUrl({ sortBy: opt.sortBy, sortOrder: opt.sortOrder, page: 1 }))
+  }
+
+  const hasActiveFilters = !!(filters.status || filters.animalId || filters.doctor || filters.month || filters.startDate || filters.endDate)
 
   const [addOpen, setAddOpen] = useState(openAdd ?? false)
   const [editConsultation, setEditConsultation] = useState<any | null>(null)
@@ -120,7 +186,100 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
           <CardTitle className="text-base font-semibold text-gray-900">{t('farmer.consultationHistory')}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {consultations.length === 0 ? (
+          {/* Filters */}
+          <div className="p-4 bg-gray-50 border-b border-gray-100 space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+              <Combobox
+                value={filters.animalId || "all"}
+                onValueChange={(v) => setFilter({ animalId: v === "all" ? "" : v })}
+                options={[
+                  { value: "all", label: t('farmer.allAnimals') || "All animals" },
+                  ...animals.map(a => ({ value: a._id, label: a.name })),
+                ]}
+                placeholder={t('farmer.animal')}
+                searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
+                emptyText={t('farmer.noResultsFound') || "No animals found."}
+              />
+              <Combobox
+                value={filters.doctor || "all"}
+                onValueChange={(v) => setFilter({ doctor: v === "all" ? "" : v })}
+                options={[
+                  { value: "all", label: t('farmer.doctor') },
+                  ...doctors.map(d => ({ value: d._id, label: d.name })),
+                ]}
+                placeholder={t('farmer.doctor')}
+                searchPlaceholder="Search doctors…"
+                emptyText="No doctors found."
+              />
+              <Select value={filters.status || "all"} onValueChange={(v) => setFilter({ status: v === "all" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder={t('farmer.status')} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('farmer.status')}</SelectItem>
+                  <SelectItem value="pending">{t('farmer.pending')}</SelectItem>
+                  <SelectItem value="accepted">{t('farmer.accepted')}</SelectItem>
+                  <SelectItem value="rejected">{t('farmer.rejected')}</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="month"
+                value={filters.month}
+                onChange={(e) => setFilter({ month: e.target.value, startDate: "", endDate: "" })}
+              />
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilter({ startDate: e.target.value, month: "" })}
+                placeholder="Start date"
+              />
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilter({ endDate: e.target.value, month: "" })}
+                placeholder="End date"
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-gray-500">{pagination.total} record{pagination.total !== 1 ? "s" : ""} found</p>
+              <div className="flex items-center gap-2 ml-auto">
+                {hasActiveFilters && (
+                  <Button variant="outline" size="sm" onClick={clearFilters} className="rounded-lg">{t('farmer.clearFilters')}</Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="rounded-lg gap-1.5 shrink-0" title="Sort">
+                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      Sort
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuRadioGroup value={currentSortValue} onValueChange={setSort}>
+                      {SORT_OPTIONS.map(o => (
+                        <DropdownMenuRadioItem key={o.value} value={o.value}>{o.label}</DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </div>
+
+          {pagination.total === 0 && hasActiveFilters ? (
+            <div className="text-center py-10 text-gray-500 px-6">
+              <div className="mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-gray-100">
+                <Bell className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-sm font-medium text-gray-600">{t('farmer.noResultsFound') || "No consultations match your filters"}</p>
+              <p className="mt-2">
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  {t('farmer.clearFilters')}
+                </Button>
+              </p>
+            </div>
+          ) : pagination.total === 0 ? (
             <div className="text-center py-10 text-gray-500 px-6">
               <div className="mx-auto mb-3 flex items-center justify-center h-12 w-12 rounded-full bg-gray-100">
                 <Bell className="h-6 w-6 text-gray-400" />
@@ -208,6 +367,54 @@ export default function ConsultationsContent({ consultations, doctors, farmerId,
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-gray-100">
+              <p className="text-sm text-gray-500">
+                Showing{" "}
+                <span className="font-medium">{(pagination.page - 1) * pagination.pageSize + 1}</span>
+                {" - "}
+                <span className="font-medium">{Math.min(pagination.page * pagination.pageSize, pagination.total)}</span>
+                {" "}of{" "}
+                <span className="font-medium">{pagination.total}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(pagination.page - 1)}
+                  disabled={pagination.page <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+                  const startPage = Math.max(1, pagination.page - 2)
+                  const p = startPage + i
+                  if (p > pagination.totalPages) return null
+                  return (
+                    <Button
+                      key={p}
+                      variant={p === pagination.page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => goToPage(p)}
+                      className="min-w-[36px]"
+                    >
+                      {p}
+                    </Button>
+                  )
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => goToPage(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
