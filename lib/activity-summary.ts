@@ -58,6 +58,11 @@ export function todayRwandaRange(): { start: Date; end: Date } {
   return { start: dayStart(today), end: dayEnd(today) }
 }
 
+/** Current hour in Kigali time (0-23), for time-of-day gates that don't need minute precision. */
+export function currentRwandaHour(): number {
+  return new Date(Date.now() + 2 * 60 * 60 * 1000).getUTCHours()
+}
+
 export function buildActivitySummaryGroups(logs: ActivityLogEntry[]): ActivitySummaryGroup[] {
   const byCategory = new Map<string, ActivitySummaryItem[]>()
   for (const log of logs) {
