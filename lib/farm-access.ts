@@ -35,6 +35,7 @@ interface ActorLike {
   _id: string
   role: string
   name?: string
+  status?: string
 }
 
 export type FarmAccess =
@@ -76,6 +77,23 @@ export async function getActiveGrant(vetId: string, farmerId: string): Promise<F
 }
 
 /**
+ * The farm owner's current account status, or null if the id doesn't resolve to a
+ * user. Used to freeze delegated vet access the moment a farmer's account is
+ * suspended - the grant document itself is untouched (revoking it is the farmer's
+ * own action, and a suspended farmer can't log in to do that), so this has to be
+ * checked live rather than inferred from the grant.
+ */
+async function getFarmOwnerStatus(farmerId: string): Promise<string | null> {
+  if (!ObjectId.isValid(farmerId)) return null
+  const client = await clientPromise
+  const db = client.db(DB)
+  const owner = await withDbRetry(() =>
+    db.collection("users").findOne({ _id: new ObjectId(farmerId) }, { projection: { status: 1 } })
+  )
+  return owner?.status ?? null
+}
+
+/**
  * Central authorization for farm-scoped records.
  *
  * Order: owner -> staff -> delegated grant -> deny. The veterinarian branch is a
@@ -94,6 +112,15 @@ export async function resolveFarmAccess(
   opts: { record?: { createdById?: string | null } | null } = {}
 ): Promise<FarmAccess> {
   if (!user) return { allowed: false, status: 401, reason: "Unauthorized" }
+
+  // A session created before suspension stays valid (and getCurrentUser keeps
+  // serving it) until it expires or the client-side status poll catches up - so
+  // without this check a suspended vet (or farmer/staff) could keep using an
+  // already-open tab to read or write farm records for up to a week.
+  if (user.status === "suspended" || user.status === "inactive") {
+    return { allowed: false, status: 403, reason: "Your account is no longer active. Contact an administrator for assistance." }
+  }
+
   if (!farmerId) return { allowed: false, status: 403, reason: "Forbidden" }
 
   if (user._id === farmerId) return { allowed: true, via: "owner" }
@@ -101,6 +128,11 @@ export async function resolveFarmAccess(
 
   if (user.role !== "doctor") {
     return { allowed: false, status: 403, reason: "Forbidden" }
+  }
+
+  const ownerStatus = await getFarmOwnerStatus(farmerId)
+  if (ownerStatus === "suspended" || ownerStatus === "inactive") {
+    return { allowed: false, status: 403, reason: "This farmer's account is no longer active" }
   }
 
   const grant = await getActiveGrant(user._id, farmerId)
