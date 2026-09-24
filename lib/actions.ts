@@ -905,6 +905,45 @@ export async function getConsultations(
   }
 }
 
+// Distinct animal/doctor options for the consultations History filters - scoped to
+// what actually appears in this farmer's consultations, not every animal or doctor
+// that exists (which is what getAnimals()/getDoctorsList() return, used for booking).
+export async function getConsultationFilterOptions(farmerId: string): Promise<{
+  animals: { _id: string; name: string }[]
+  doctors: { _id: string; name: string }[]
+}> {
+  try {
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    const [animalGroups, doctorIdsRaw] = await Promise.all([
+      db.collection("consultations").aggregate([
+        { $match: { farmerId, animalId: { $nin: [null, ""] } } },
+        { $group: { _id: "$animalId", name: { $first: "$animalName" } } },
+      ]).toArray(),
+      db.collection("consultations").distinct("doctor", { farmerId, doctor: { $nin: [null, ""] } }),
+    ])
+
+    const doctorIds = [...new Set(doctorIdsRaw.map((id: any) => id.toString()))]
+    const doctorObjectIds = doctorIds.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id))
+    const doctorDocs = doctorObjectIds.length > 0
+      ? await db.collection("users").find({ _id: { $in: doctorObjectIds }, role: "doctor" }).project({ name: 1 }).toArray()
+      : []
+
+    return {
+      animals: animalGroups
+        .map((g: any) => ({ _id: g._id as string, name: (g.name as string) || "Unknown animal" }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      doctors: doctorDocs
+        .map(d => ({ _id: d._id.toString(), name: d.name as string }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    }
+  } catch (error) {
+    console.error("Error fetching consultation filter options:", error)
+    return { animals: [], doctors: [] }
+  }
+}
+
 export async function getDoctorsList() {
   try {
     const client = await clientPromise

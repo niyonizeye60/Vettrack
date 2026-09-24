@@ -69,11 +69,16 @@ const SORT_OPTIONS = [
   { value: "status_asc", sortBy: "status", sortOrder: "asc", label: "Status (A–Z)" },
 ] as const
 
+interface FilterOption { _id: string; name: string }
+
 interface ConsultationsContentProps {
   consultations: any[]
   pagination: ConsultationsPagination
   filters: ConsultationsFilters
-  animals: SickAnimal[]
+  // Distinct animals/doctors that actually appear in this farmer's consultations -
+  // scoped for the History filters below, as opposed to `doctors`, which is every
+  // doctor on the roster and is used for booking a new consultation.
+  filterOptions: { animals: FilterOption[]; doctors: FilterOption[] }
   doctors: Doctor[]
   farmerId: string
   sickAnimals: SickAnimal[]
@@ -91,7 +96,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-export default function ConsultationsContent({ consultations, pagination, filters, animals, doctors, farmerId, sickAnimals, openAdd, farmerName, farmerPhone }: ConsultationsContentProps) {
+export default function ConsultationsContent({ consultations, pagination, filters, filterOptions, doctors, farmerId, sickAnimals, openAdd, farmerName, farmerPhone }: ConsultationsContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
@@ -194,7 +199,7 @@ export default function ConsultationsContent({ consultations, pagination, filter
                 onValueChange={(v) => setFilter({ animalId: v === "all" ? "" : v })}
                 options={[
                   { value: "all", label: t('farmer.allAnimals') || "All animals" },
-                  ...animals.map(a => ({ value: a._id, label: a.name })),
+                  ...filterOptions.animals.map(a => ({ value: a._id, label: a.name })),
                 ]}
                 placeholder={t('farmer.animal')}
                 searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
@@ -205,7 +210,7 @@ export default function ConsultationsContent({ consultations, pagination, filter
                 onValueChange={(v) => setFilter({ doctor: v === "all" ? "" : v })}
                 options={[
                   { value: "all", label: t('farmer.doctor') },
-                  ...doctors.map(d => ({ value: d._id, label: d.name })),
+                  ...filterOptions.doctors.map(d => ({ value: d._id, label: d.name })),
                 ]}
                 placeholder={t('farmer.doctor')}
                 searchPlaceholder="Search doctors…"

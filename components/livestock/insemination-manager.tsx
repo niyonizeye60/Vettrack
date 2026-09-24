@@ -1,9 +1,10 @@
 ﻿"use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { getDoctorsList, logPortalExport } from "@/lib/actions"
 import type { RecordCapabilities } from "@/components/livestock/capabilities"
 import { canModify } from "@/components/livestock/capabilities"
+import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Syringe, Plus, Pencil, Trash2, History, ChevronDown, Baby, FlaskConical, BarChart3, Download, FileText } from "lucide-react"
+import { Syringe, Plus, Pencil, Trash2, History, ChevronDown, Baby, FlaskConical, BarChart3, Download, FileText, ChevronLeft, ChevronRight } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
@@ -52,6 +53,45 @@ interface InseminationManagerProps {
 const SEMEN_TYPES = ["Sexed Freisian", "Sexed Jersey", "Ordinary Freisian", "Ordinary Jersey", "Fleckv", "Girolando"]
 
 const today = new Date().toISOString().split("T")[0]
+const PAGE_SIZE = 10
+
+interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
+const emptyPagination: Pagination = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 }
+interface CowSummaryRow { name: string; inseminations: number; failedAttempts: number; babies: number; totalCost: number; lastDate: string }
+
+function PaginationFooter({ pagination, page, setPage, loading, className }: { pagination: Pagination; page: number; setPage: (updater: (p: number) => number) => void; loading: boolean; className?: string }) {
+  if (pagination.totalPages <= 1) return null
+  return (
+    <div className={cn("flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-gray-100", className)}>
+      <p className="text-sm text-gray-500">
+        Showing{" "}
+        <span className="font-medium">{(pagination.page - 1) * pagination.pageSize + 1}</span>
+        {" - "}
+        <span className="font-medium">{Math.min(pagination.page * pagination.pageSize, pagination.total)}</span>
+        {" "}of{" "}
+        <span className="font-medium">{pagination.total}</span>
+      </p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+          const startPage = Math.max(1, page - 2)
+          const p = startPage + i
+          if (p > pagination.totalPages) return null
+          return (
+            <Button key={p} variant={p === page ? "default" : "outline"} size="sm" onClick={() => setPage(() => p)} disabled={loading} className="min-w-[36px]">
+              {p}
+            </Button>
+          )
+        })}
+        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages || loading}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function BirthCountdown({ targetDate }: { targetDate: string }) {
   const [now, setNow] = useState(() => Date.now())
@@ -190,6 +230,23 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   const [filterAnimal, setFilterAnimal] = useState("")
   const [filterMonth, setFilterMonth] = useState("")
 
+  // Backend-paginated History table (10 per page). The filters above now resolve
+  // server-side; filteredRecords (below) stays client-side and full-dataset, feeding
+  // only the "Total Cost" summary card and export, which must reflect everything.
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyRecords, setHistoryRecords] = useState<InseminationRecord[]>([])
+  const [historyPagination, setHistoryPagination] = useState<Pagination>(emptyPagination)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const isHistoryFirstRun = useRef(true)
+
+  // Backend-paginated Reports "Summary per Animal" table (10 per page). The bar
+  // charts below it still use the full, unpaginated cowSummary further down.
+  const [reportsPage, setReportsPage] = useState(1)
+  const [reportsSummary, setReportsSummary] = useState<CowSummaryRow[]>([])
+  const [reportsPagination, setReportsPagination] = useState<Pagination>(emptyPagination)
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const isReportsFirstRun = useRef(true)
+
   useEffect(() => {
     async function init() {
       // Animals come from the guarded endpoint rather than the getAnimals() server
@@ -201,7 +258,11 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       // vet avoids pulling every doctor's contact details into a portal that has no
       // use for them.
       if (!can.isDelegate) setVets(await getDoctorsList())
-      await fetchRecords(farmerId)
+      await Promise.all([
+        fetchRecords(farmerId),
+        fetchHistoryPage(farmerId, 1, "", ""),
+        fetchReportsPage(farmerId, 1),
+      ])
       setLoading(false)
     }
     init()
@@ -212,6 +273,61 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     const data = await res.json()
     setRecords(Array.isArray(data) ? data : [])
   }
+
+  const fetchHistoryPage = async (id: string, page: number, animalId: string, month: string) => {
+    setHistoryLoading(true)
+    try {
+      const params = new URLSearchParams({ farmerId: id, page: String(page), limit: String(PAGE_SIZE) })
+      if (animalId) params.set("animalId", animalId)
+      if (month) params.set("month", month)
+      const res = await fetch(`/api/insemination?${params.toString()}`)
+      const data = await res.json()
+      const pagination: Pagination = data?.pagination || emptyPagination
+      if (pagination.total > 0 && page > pagination.totalPages) {
+        await fetchHistoryPage(id, pagination.totalPages, animalId, month)
+        return
+      }
+      setHistoryRecords(Array.isArray(data?.records) ? data.records : [])
+      setHistoryPagination(pagination)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const fetchReportsPage = async (id: string, page: number) => {
+    setReportsLoading(true)
+    try {
+      const params = new URLSearchParams({ farmerId: id, page: String(page), limit: String(PAGE_SIZE), view: "summary" })
+      const res = await fetch(`/api/insemination?${params.toString()}`)
+      const data = await res.json()
+      const pagination: Pagination = data?.pagination || emptyPagination
+      if (pagination.total > 0 && page > pagination.totalPages) {
+        await fetchReportsPage(id, pagination.totalPages)
+        return
+      }
+      setReportsSummary(Array.isArray(data?.summary) ? data.summary : [])
+      setReportsPagination(pagination)
+    } finally {
+      setReportsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isHistoryFirstRun.current) return
+    setHistoryPage(1)
+  }, [filterAnimal, filterMonth])
+
+  useEffect(() => {
+    if (isHistoryFirstRun.current) { isHistoryFirstRun.current = false; return }
+    fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyPage, filterAnimal, filterMonth])
+
+  useEffect(() => {
+    if (isReportsFirstRun.current) { isReportsFirstRun.current = false; return }
+    fetchReportsPage(farmerId, reportsPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportsPage])
 
   const filteredRecords = useMemo(() => {
     let data = [...records]
@@ -246,6 +362,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       return
     }
     setSaving(true)
+    const wasAdd = !editRecord
     const animal = animals.find(a => a._id === animalId)
     const body = {
       farmerId,
@@ -270,6 +387,9 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     }
 
     await fetchRecords(farmerId)
+    if (wasAdd && historyPage !== 1) setHistoryPage(1)
+    else await fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth)
+    await fetchReportsPage(farmerId, reportsPage)
     resetForm()
     setSaving(false)
   }
@@ -294,6 +414,10 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       })
     )
     await fetchRecords(farmerId)
+    await Promise.all([
+      fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth),
+      fetchReportsPage(farmerId, reportsPage),
+    ])
 
     resetForm()
     setReinseminateFrom(r)
@@ -328,6 +452,10 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       return fetch(`/api/insemination?${params.toString()}`, { method: "DELETE" })
     })
     await fetchRecords(farmerId)
+    await Promise.all([
+      fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth),
+      fetchReportsPage(farmerId, reportsPage),
+    ])
     setDeleteId(null)
   }
 
@@ -1075,7 +1203,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                 />
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-1">
-                  <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}</p>
+                  <p className="text-sm text-gray-500">{historyPagination.total} record{historyPagination.total !== 1 ? "s" : ""}</p>
                   <Button variant="outline" onClick={() => { setFilterAnimal(""); setFilterMonth("") }} className="rounded-lg ml-auto text-xs">Clear</Button>
                 </div>
               </div>
@@ -1098,9 +1226,11 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRecords.length === 0 ? (
+                    {historyLoading ? (
+                      <TableRow><TableCell colSpan={11} className="text-center py-8 text-gray-400">{t('common.loading')}</TableCell></TableRow>
+                    ) : historyRecords.length === 0 ? (
                       <TableRow><TableCell colSpan={11} className="text-center py-8 text-gray-400">{t('farmer.noRecordsFound')}</TableCell></TableRow>
-                    ) : filteredRecords.map(r => (
+                    ) : historyRecords.map(r => (
                       <TableRow key={r._id}>
                         <TableCell className="text-sm">{r.date}</TableCell>
                         <TableCell className="text-sm">
@@ -1166,6 +1296,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                   </TableBody>
                 </Table>
               </div>
+              <PaginationFooter pagination={historyPagination} page={historyPage} setPage={setHistoryPage} loading={historyLoading} className="px-0 pb-0" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1206,9 +1337,11 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {cowSummary.length === 0 ? (
+                      {reportsLoading ? (
+                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-gray-400">{t('common.loading')}</TableCell></TableRow>
+                      ) : reportsSummary.length === 0 ? (
                         <TableRow><TableCell colSpan={6} className="text-center py-6 text-gray-400">{t('farmer.noDataAvailable')}</TableCell></TableRow>
-                      ) : cowSummary.map((c, i) => (
+                      ) : reportsSummary.map((c, i) => (
                         <TableRow key={i}>
                           <TableCell className="font-medium">{c.name}</TableCell>
                           <TableCell className="text-green-700 font-semibold">{c.inseminations}</TableCell>
@@ -1221,6 +1354,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                     </TableBody>
                   </Table>
                 </div>
+                <PaginationFooter pagination={reportsPagination} page={reportsPage} setPage={setReportsPage} loading={reportsLoading} className="px-0 pb-0" />
               </CardContent>
             </Card>
 

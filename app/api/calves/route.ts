@@ -7,6 +7,10 @@ import { logActivity } from "@/lib/activity-log"
 
 const DB = "ntdm_animal_hospital"
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 export async function GET(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -16,6 +20,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const farmerId = searchParams.get("farmerId")
+    const search = searchParams.get("search")
+    const pageParam = searchParams.get("page")
     if (!farmerId) return NextResponse.json({ error: "farmerId required" }, { status: 400 })
 
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
@@ -26,7 +32,31 @@ export async function GET(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
-    const calves = await db.collection("calves").find({ farmerId }).sort({ createdAt: -1 }).toArray()
+    const query: any = { farmerId }
+    if (search) {
+      const re = new RegExp(escapeRegex(search.trim()), "i")
+      query.$or = [{ name: re }, { motherName: re }, { breed: re }]
+    }
+
+    if (pageParam) {
+      const page = Math.max(1, parseInt(pageParam, 10) || 1)
+      const pageSize = Math.max(1, parseInt(searchParams.get("limit") || "10", 10) || 10)
+
+      const total = await db.collection("calves").countDocuments(query)
+      const calves = await db.collection("calves")
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray()
+
+      return NextResponse.json({
+        calves: calves.map(c => ({ ...c, _id: c._id.toString() })),
+        pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+      })
+    }
+
+    const calves = await db.collection("calves").find(query).sort({ createdAt: -1 }).toArray()
     return NextResponse.json(calves.map(c => ({ ...c, _id: c._id.toString() })))
   } catch {
     return NextResponse.json({ error: "Failed to fetch calves" }, { status: 500 })

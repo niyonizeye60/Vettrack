@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const farmerId = searchParams.get("farmerId")
     const calfId = searchParams.get("calfId")
+    const pageParam = searchParams.get("page")
     if (!farmerId) return NextResponse.json({ error: "farmerId required" }, { status: 400 })
 
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
@@ -29,6 +30,24 @@ export async function GET(req: NextRequest) {
 
     const query: any = { farmerId }
     if (calfId) query.calfId = calfId
+
+    if (pageParam) {
+      const page = Math.max(1, parseInt(pageParam, 10) || 1)
+      const pageSize = Math.max(1, parseInt(searchParams.get("limit") || "10", 10) || 10)
+
+      const total = await db.collection("calf_weights").countDocuments(query)
+      const weights = await db.collection("calf_weights")
+        .find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray()
+
+      return NextResponse.json({
+        weights: weights.map(w => ({ ...w, _id: w._id.toString() })),
+        pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+      })
+    }
 
     const weights = await db.collection("calf_weights").find(query).sort({ date: -1, createdAt: -1 }).toArray()
     return NextResponse.json(weights.map(w => ({ ...w, _id: w._id.toString() })))

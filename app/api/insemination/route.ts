@@ -12,6 +12,10 @@ import {
 const DB = "ntdm_animal_hospital"
 const MODULE = "insemination" as const
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 export async function GET(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -30,6 +34,78 @@ export async function GET(req: NextRequest) {
 
     const client = await clientPromise
     const db = client.db(DB)
+
+    const pageParam = searchParams.get("page")
+
+    if (pageParam) {
+      const page = Math.max(1, parseInt(pageParam, 10) || 1)
+      const pageSize = Math.max(1, parseInt(searchParams.get("limit") || "10", 10) || 10)
+
+      // Reports tab: a paginated per-animal summary, aggregated server-side rather
+      // than by fetching every record and reducing it in the browser.
+      if (searchParams.get("view") === "summary") {
+        const pipeline = [
+          { $match: { farmerId } },
+          // Sorting before $group lets $first pick the most recent animalName/date
+          // for each animal, matching the client's previous reduce-over-desc-sorted-records logic.
+          { $sort: { date: -1, createdAt: -1 } },
+          {
+            $group: {
+              _id: { $ifNull: ["$animalId", "general"] },
+              name: { $first: "$animalName" },
+              inseminations: { $sum: 1 },
+              failedAttempts: { $sum: { $cond: [{ $ifNull: ["$pregnancyFailed", false] }, 1, 0] } },
+              babies: { $sum: { $ifNull: ["$deliveredBabies", 0] } },
+              totalCost: { $sum: { $add: [{ $ifNull: ["$semenPrice", 0] }, { $ifNull: ["$vetPrice", 0] }] } },
+              lastDate: { $first: "$date" },
+            },
+          },
+          { $sort: { inseminations: -1 as const } },
+          {
+            $facet: {
+              data: [{ $skip: (page - 1) * pageSize }, { $limit: pageSize }],
+              totalCount: [{ $count: "count" }],
+            },
+          },
+        ]
+
+        const [result] = await db.collection("insemination_records").aggregate(pipeline).toArray()
+        const total = result?.totalCount?.[0]?.count || 0
+        const summary = (result?.data || []).map((g: any) => ({
+          name: g.name || "General",
+          inseminations: g.inseminations,
+          failedAttempts: g.failedAttempts,
+          babies: g.babies,
+          totalCost: g.totalCost,
+          lastDate: g.lastDate || "",
+        }))
+
+        return NextResponse.json({
+          summary,
+          pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+        })
+      }
+
+      // History tab: a paginated, filtered record list.
+      const query: any = { farmerId }
+      const animalIdFilter = searchParams.get("animalId")
+      const month = searchParams.get("month")
+      if (animalIdFilter) query.animalId = animalIdFilter
+      if (month) query.date = { $regex: "^" + escapeRegex(month) }
+
+      const total = await db.collection("insemination_records").countDocuments(query)
+      const records = await db.collection("insemination_records")
+        .find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .toArray()
+
+      return NextResponse.json({
+        records: records.map(r => ({ ...r, _id: r._id.toString() })),
+        pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+      })
+    }
 
     const records = await db.collection("insemination_records")
       .find({ farmerId })

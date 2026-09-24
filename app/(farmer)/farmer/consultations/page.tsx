@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next"
-import { getConsultations, getDoctorsList, getAnimals } from "@/lib/actions"
+import { getConsultations, getDoctorsList, getAnimals, getConsultationFilterOptions } from "@/lib/actions"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { redirect } from "next/navigation"
 import ConsultationsContent from "./components/consultations-content"
@@ -54,7 +54,7 @@ export default async function FarmerConsultationsPage({
     sortOrder: (validSortOrder as readonly string[]).includes(searchParams.sortOrder || "") ? searchParams.sortOrder! : "desc",
   }
 
-  const [consultationsResult, doctors, allAnimals] = await Promise.all([
+  const [consultationsResult, doctors, allAnimals, filterOptions] = await Promise.all([
     getConsultations(undefined, farmerId, {
       withDocuments: true,
       page: requestedPage,
@@ -70,6 +70,7 @@ export default async function FarmerConsultationsPage({
     }),
     getDoctorsList(),
     getAnimals(farmerId),
+    getConsultationFilterOptions(farmerId),
   ])
 
   const { consultations, pagination } = consultationsResult as {
@@ -98,7 +99,7 @@ export default async function FarmerConsultationsPage({
       consultations={consultations}
       pagination={pagination}
       filters={filters}
-      animals={allAnimals}
+      filterOptions={filterOptions}
       doctors={doctors}
       farmerId={farmerId}
       sickAnimals={sickAnimals}

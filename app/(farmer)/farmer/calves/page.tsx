@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals } from "@/lib/actions"
+import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search } from "lucide-react"
+import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -36,6 +37,44 @@ interface CalfExpense {
 const STATUSES = ["active", "weaned", "sold", "deceased"] as const
 const EXPENSE_TYPES = ["milk", "feed", "veterinary", "other"] as const
 const today = new Date().toISOString().split("T")[0]
+const PAGE_SIZE = 10
+
+interface Pagination { page: number; pageSize: number; total: number; totalPages: number }
+const emptyPagination: Pagination = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 }
+
+function PaginationFooter({ pagination, page, setPage, loading, className }: { pagination: Pagination; page: number; setPage: (updater: (p: number) => number) => void; loading: boolean; className?: string }) {
+  if (pagination.totalPages <= 1) return null
+  return (
+    <div className={cn("flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-gray-100", className)}>
+      <p className="text-sm text-gray-500">
+        Showing{" "}
+        <span className="font-medium">{(pagination.page - 1) * pagination.pageSize + 1}</span>
+        {" - "}
+        <span className="font-medium">{Math.min(pagination.page * pagination.pageSize, pagination.total)}</span>
+        {" "}of{" "}
+        <span className="font-medium">{pagination.total}</span>
+      </p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1 || loading}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+          const startPage = Math.max(1, page - 2)
+          const p = startPage + i
+          if (p > pagination.totalPages) return null
+          return (
+            <Button key={p} variant={p === page ? "default" : "outline"} size="sm" onClick={() => setPage(() => p)} disabled={loading} className="min-w-[36px]">
+              {p}
+            </Button>
+          )
+        })}
+        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page >= pagination.totalPages || loading}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function formatAge(birthDate: string, t: (k: string) => string) {
   const days = Math.max(0, Math.floor((Date.now() - new Date(birthDate).getTime()) / 86400000))
@@ -57,10 +96,32 @@ export default function CalvesPage() {
   const [saving, setSaving] = useState(false)
 
   const [animals, setAnimals] = useState<Animal[]>([])
+  // Full, unpaginated lists - kept for summary cards, dropdown options and the
+  // growth chart, which all need the entire dataset regardless of table page.
   const [calves, setCalves] = useState<Calf[]>([])
   const [weights, setWeights] = useState<WeightRecord[]>([])
   const [expenses, setExpenses] = useState<CalfExpense[]>([])
   const [homeConsumptionBalance, setHomeConsumptionBalance] = useState(0)
+
+  // Backend-paginated data shown in each tab's table (10 per page)
+  const [calvesPage, setCalvesPage] = useState(1)
+  const [calvesTableRows, setCalvesTableRows] = useState<Calf[]>([])
+  const [calvesPagination, setCalvesPagination] = useState<Pagination>(emptyPagination)
+  const [calvesTableLoading, setCalvesTableLoading] = useState(false)
+  const [debouncedCalfSearch, setDebouncedCalfSearch] = useState("")
+  const isCalvesFirstRun = useRef(true)
+
+  const [weightPage, setWeightPage] = useState(1)
+  const [weightsTableRows, setWeightsTableRows] = useState<WeightRecord[]>([])
+  const [weightsPagination, setWeightsPagination] = useState<Pagination>(emptyPagination)
+  const [weightsTableLoading, setWeightsTableLoading] = useState(false)
+  const isWeightsFirstRun = useRef(true)
+
+  const [expensePage, setExpensePage] = useState(1)
+  const [expensesTableRows, setExpensesTableRows] = useState<CalfExpense[]>([])
+  const [expensesPagination, setExpensesPagination] = useState<Pagination>(emptyPagination)
+  const [expensesTableLoading, setExpensesTableLoading] = useState(false)
+  const isExpensesFirstRun = useRef(true)
 
   // Calf form
   const [editCalf, setEditCalf] = useState<Calf | null>(null)
@@ -119,13 +180,17 @@ export default function CalvesPage() {
       const userData = await getCurrentUser()
       if (!userData) return
       setUser(userData)
-      const animalsData = await getAnimals(userData._id.toString())
+      const farmerId = userData._id.toString()
+      const animalsData = await getAnimals(farmerId)
       setAnimals(animalsData)
       await Promise.all([
-        fetchCalves(userData._id.toString()),
-        fetchWeights(userData._id.toString()),
-        fetchExpenses(userData._id.toString()),
-        fetchHomeConsumptionBalance(userData._id.toString()),
+        fetchCalves(farmerId),
+        fetchWeights(farmerId),
+        fetchExpenses(farmerId),
+        fetchHomeConsumptionBalance(farmerId),
+        fetchCalvesPage(farmerId, 1, ""),
+        fetchWeightsPage(farmerId, 1),
+        fetchExpensesPage(farmerId, 1, "", ""),
       ])
       setLoading(false)
     }
@@ -153,16 +218,101 @@ export default function CalvesPage() {
     setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
 
+  const fetchCalvesPage = async (farmerId: string, page: number, search: string) => {
+    setCalvesTableLoading(true)
+    try {
+      const params = new URLSearchParams({ farmerId, page: String(page), limit: String(PAGE_SIZE) })
+      if (search) params.set("search", search)
+      const res = await fetch(`/api/calves?${params.toString()}`)
+      const data = await res.json()
+      const pagination: Pagination = data?.pagination || emptyPagination
+      if (pagination.total > 0 && page > pagination.totalPages) {
+        await fetchCalvesPage(farmerId, pagination.totalPages, search)
+        return
+      }
+      setCalvesTableRows(Array.isArray(data?.calves) ? data.calves : [])
+      setCalvesPagination(pagination)
+    } finally {
+      setCalvesTableLoading(false)
+    }
+  }
+
+  const fetchWeightsPage = async (farmerId: string, page: number) => {
+    setWeightsTableLoading(true)
+    try {
+      const params = new URLSearchParams({ farmerId, page: String(page), limit: String(PAGE_SIZE) })
+      const res = await fetch(`/api/calf-weights?${params.toString()}`)
+      const data = await res.json()
+      const pagination: Pagination = data?.pagination || emptyPagination
+      if (pagination.total > 0 && page > pagination.totalPages) {
+        await fetchWeightsPage(farmerId, pagination.totalPages)
+        return
+      }
+      setWeightsTableRows(Array.isArray(data?.weights) ? data.weights : [])
+      setWeightsPagination(pagination)
+    } finally {
+      setWeightsTableLoading(false)
+    }
+  }
+
+  const fetchExpensesPage = async (farmerId: string, page: number, calfId: string, expType: string) => {
+    setExpensesTableLoading(true)
+    try {
+      const params = new URLSearchParams({ farmerId, page: String(page), limit: String(PAGE_SIZE) })
+      if (calfId) params.set("calfId", calfId)
+      if (expType) params.set("expenseType", expType)
+      const res = await fetch(`/api/calf-expenses?${params.toString()}`)
+      const data = await res.json()
+      const pagination: Pagination = data?.pagination || emptyPagination
+      if (pagination.total > 0 && page > pagination.totalPages) {
+        await fetchExpensesPage(farmerId, pagination.totalPages, calfId, expType)
+        return
+      }
+      setExpensesTableRows(Array.isArray(data?.expenses) ? data.expenses : [])
+      setExpensesPagination(pagination)
+    } finally {
+      setExpensesTableLoading(false)
+    }
+  }
+
+  // Debounce the calf search box (matches the pattern used on /farmer/animals)
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedCalfSearch(calfSearchTerm.trim()), 300)
+    return () => clearTimeout(handle)
+  }, [calfSearchTerm])
+
+  useEffect(() => {
+    if (isCalvesFirstRun.current || !user) return
+    setCalvesPage(1)
+  }, [debouncedCalfSearch])
+
+  useEffect(() => {
+    if (!user) return
+    if (isCalvesFirstRun.current) { isCalvesFirstRun.current = false; return }
+    fetchCalvesPage(user._id.toString(), calvesPage, debouncedCalfSearch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calvesPage, debouncedCalfSearch])
+
+  useEffect(() => {
+    if (!user) return
+    if (isWeightsFirstRun.current) { isWeightsFirstRun.current = false; return }
+    fetchWeightsPage(user._id.toString(), weightPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weightPage])
+
+  useEffect(() => {
+    if (isExpensesFirstRun.current || !user) return
+    setExpensePage(1)
+  }, [filterExpCalf, filterExpType])
+
+  useEffect(() => {
+    if (!user) return
+    if (isExpensesFirstRun.current) { isExpensesFirstRun.current = false; return }
+    fetchExpensesPage(user._id.toString(), expensePage, filterExpCalf, filterExpType)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expensePage, filterExpCalf, filterExpType])
+
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
-  const filteredCalves = useMemo(() => {
-    const q = calfSearchTerm.trim().toLowerCase()
-    if (!q) return calves
-    return calves.filter(c =>
-      c.name?.toLowerCase().includes(q) ||
-      c.motherName?.toLowerCase().includes(q) ||
-      c.breed?.toLowerCase().includes(q)
-    )
-  }, [calves, calfSearchTerm])
   const totalMilkGiven = useMemo(() => expenses.filter(e => e.expenseType === "milk").reduce((s, e) => s + (e.milkLiters || 0), 0), [expenses])
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses])
 
@@ -186,7 +336,9 @@ export default function CalvesPage() {
     if (!validateCalf()) return
     setSaving(true)
     const mother = animals.find(a => a._id === motherAnimalId)
-    const body = { farmerId: user._id.toString(), name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }
+    const farmerId = user._id.toString()
+    const wasAdd = !editCalf
+    const body = { farmerId, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }
 
     if (editCalf) {
       await fetch("/api/calves", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editCalf._id, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }) })
@@ -194,7 +346,9 @@ export default function CalvesPage() {
       await fetch("/api/calves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     }
 
-    await fetchCalves(user._id.toString())
+    await fetchCalves(farmerId)
+    if (wasAdd && calvesPage !== 1) setCalvesPage(1)
+    else await fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch)
     resetCalfForm()
     setSaving(false)
   }
@@ -208,8 +362,16 @@ export default function CalvesPage() {
   }
 
   const handleCalfDelete = async (id: string) => {
+    const farmerId = user._id.toString()
     await fetch(`/api/calves?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchCalves(user._id.toString()), fetchWeights(user._id.toString()), fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
+    // Deleting a calf cascades to its weight and expense records server-side, so
+    // both of those tables need refreshing too, not just the calves table.
+    await Promise.all([
+      fetchCalves(farmerId), fetchWeights(farmerId), fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId),
+      fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch),
+      fetchWeightsPage(farmerId, weightPage),
+      fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType),
+    ])
     setDeleteCalfId(null)
   }
 
@@ -250,7 +412,8 @@ export default function CalvesPage() {
       }
       setGradResult({ name: graduateCalf.name, moved: data.vaccinationRecordsMoved || 0 })
       setGraduateCalf(null)
-      await fetchCalves(user._id.toString())
+      const farmerId = user._id.toString()
+      await Promise.all([fetchCalves(farmerId), fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch)])
     } catch {
       setGradError("Failed to move calf to animals")
     } finally {
@@ -276,7 +439,9 @@ export default function CalvesPage() {
     if (!validateWeight()) return
     setSaving(true)
     const calf = calves.find(c => c._id === weightCalfId)
-    const body = { farmerId: user._id.toString(), calfId: weightCalfId, calfName: calf?.name, weight: weightValue, date: weightDate, notes: weightNotes }
+    const farmerId = user._id.toString()
+    const wasAdd = !editWeight
+    const body = { farmerId, calfId: weightCalfId, calfName: calf?.name, weight: weightValue, date: weightDate, notes: weightNotes }
 
     if (editWeight) {
       await fetch("/api/calf-weights", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editWeight._id, weight: weightValue, date: weightDate, notes: weightNotes }) })
@@ -284,7 +449,9 @@ export default function CalvesPage() {
       await fetch("/api/calf-weights", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     }
 
-    await fetchWeights(user._id.toString())
+    await fetchWeights(farmerId)
+    if (wasAdd && weightPage !== 1) setWeightPage(1)
+    else await fetchWeightsPage(farmerId, weightPage)
     resetWeightForm()
     setSaving(false)
   }
@@ -294,8 +461,9 @@ export default function CalvesPage() {
   }
 
   const handleWeightDelete = async (id: string) => {
+    const farmerId = user._id.toString()
     await fetch(`/api/calf-weights?id=${id}`, { method: "DELETE" })
-    await fetchWeights(user._id.toString())
+    await Promise.all([fetchWeights(farmerId), fetchWeightsPage(farmerId, weightPage)])
     setDeleteWeightId(null)
   }
 
@@ -334,7 +502,9 @@ export default function CalvesPage() {
     if (!validateExpense()) return
     setSaving(true)
     const calf = calves.find(c => c._id === expCalfId)
-    const body = { farmerId: user._id.toString(), calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }
+    const farmerId = user._id.toString()
+    const wasAdd = !editExpense
+    const body = { farmerId, calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }
 
     const res = editExpense
       ? await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }) })
@@ -347,7 +517,9 @@ export default function CalvesPage() {
       return
     }
 
-    await Promise.all([fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
+    await Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId)])
+    if (wasAdd && expensePage !== 1) setExpensePage(1)
+    else await fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType)
     resetExpenseForm()
     setSaving(false)
   }
@@ -360,17 +532,11 @@ export default function CalvesPage() {
   }
 
   const handleExpenseDelete = async (id: string) => {
+    const farmerId = user._id.toString()
     await fetch(`/api/calf-expenses?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchExpenses(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
+    await Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId), fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType)])
     setDeleteExpenseId(null)
   }
-
-  const filteredExpenses = useMemo(() => {
-    let filtered = [...expenses]
-    if (filterExpCalf) filtered = filtered.filter(e => e.calfId === filterExpCalf)
-    if (filterExpType) filtered = filtered.filter(e => e.expenseType === filterExpType)
-    return filtered
-  }, [expenses, filterExpCalf, filterExpType])
 
   const statusLabel = (s: string) => s === "active" ? t('farmer.active') : s === "weaned" ? t('farmer.weaned') : s === "sold" ? t('farmer.calfSold') : s === "graduated" ? t('farmer.graduated') : t('farmer.deceased')
   const statusColor = (s: string) => s === "active" ? "bg-green-50 text-green-700 border-green-200" : s === "weaned" ? "bg-blue-50 text-blue-700 border-blue-200" : s === "sold" ? "bg-amber-50 text-amber-700 border-amber-200" : s === "graduated" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-gray-50 text-gray-500 border-gray-200"
@@ -514,7 +680,11 @@ export default function CalvesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredCalves.length === 0 ? (
+                      {calvesTableLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-12 text-gray-400">{t('common.loading')}</TableCell>
+                        </TableRow>
+                      ) : calvesTableRows.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-12">
                             <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
@@ -523,7 +693,7 @@ export default function CalvesPage() {
                             <p className="text-gray-500 text-sm font-medium">{t('farmer.noResultsFound') || "No calves match your search"}</p>
                           </TableCell>
                         </TableRow>
-                      ) : filteredCalves.map(c => (
+                      ) : calvesTableRows.map(c => (
                         <TableRow key={c._id} className="hover:bg-gray-50/80 transition-colors duration-150">
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -571,6 +741,7 @@ export default function CalvesPage() {
                   </Table>
                 </div>
               )}
+              <PaginationFooter pagination={calvesPagination} page={calvesPage} setPage={setCalvesPage} loading={calvesTableLoading} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -679,9 +850,11 @@ export default function CalvesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {weights.length === 0 ? (
+                    {weightsTableLoading ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">{t('common.loading')}</TableCell></TableRow>
+                    ) : weightsTableRows.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">{t('farmer.noWeightRecordsYet')}</TableCell></TableRow>
-                    ) : weights.map(w => (
+                    ) : weightsTableRows.map(w => (
                       <TableRow key={w._id}>
                         <TableCell className="text-sm">{w.date}</TableCell>
                         <TableCell className="font-medium">{w.calfName}</TableCell>
@@ -702,6 +875,7 @@ export default function CalvesPage() {
                   </TableBody>
                 </Table>
               </div>
+              <PaginationFooter pagination={weightsPagination} page={weightPage} setPage={setWeightPage} loading={weightsTableLoading} className="px-0 pb-0" />
             </CardContent>
           </Card>
         </TabsContent>
@@ -816,7 +990,7 @@ export default function CalvesPage() {
                   </SelectContent>
                 </Select>
                 <div className="flex items-center gap-3">
-                  <p className="text-sm text-gray-500">{filteredExpenses.length}</p>
+                  <p className="text-sm text-gray-500">{expensesPagination.total}</p>
                   <Button variant="outline" onClick={() => { setFilterExpCalf(""); setFilterExpType("") }} className="rounded-lg ml-auto">{t('farmer.clearFilters')}</Button>
                 </div>
               </div>
@@ -834,9 +1008,11 @@ export default function CalvesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredExpenses.length === 0 ? (
+                    {expensesTableLoading ? (
+                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">{t('common.loading')}</TableCell></TableRow>
+                    ) : expensesTableRows.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">{t('farmer.noCalfExpensesYet')}</TableCell></TableRow>
-                    ) : filteredExpenses.map(e => (
+                    ) : expensesTableRows.map(e => (
                       <TableRow key={e._id}>
                         <TableCell className="text-sm">{e.date}</TableCell>
                         <TableCell className="font-medium">{e.calfName}</TableCell>
@@ -858,6 +1034,7 @@ export default function CalvesPage() {
                   </TableBody>
                 </Table>
               </div>
+              <PaginationFooter pagination={expensesPagination} page={expensePage} setPage={setExpensePage} loading={expensesTableLoading} className="px-0 pb-0" />
             </CardContent>
           </Card>
         </TabsContent>
