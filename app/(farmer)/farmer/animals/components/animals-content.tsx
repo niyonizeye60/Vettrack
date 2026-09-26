@@ -12,6 +12,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bell, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -282,9 +283,29 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={12} className="text-center py-12 text-gray-400">{t('common.loading')}</TableCell>
-                    </TableRow>
+                    Array.from({ length: data.animals.length || ANIMALS_PAGE_SIZE }).map((_, i) => (
+                      <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-6 w-6 rounded-lg flex-shrink-0" />
+                            <Skeleton className="h-4 w-24" />
+                          </div>
+                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Skeleton className="h-8 w-8" />
+                            <Skeleton className="h-8 w-8" />
+                            <Skeleton className="h-8 w-8" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   ) : data.animals.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={12} className="text-center py-12">
