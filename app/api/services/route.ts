@@ -7,7 +7,7 @@ import { can, canViewSellerContact } from '@/lib/roles'
 import { canAccessMarketplaceCategory } from '@/lib/marketplace-access'
 import { logActivity } from '@/lib/activity-log'
 import { resolveLocation } from '@/lib/rwanda-geo'
-import { notifyFarmer } from '@/lib/marketplace-notifications'
+import { notifyFarmer, sellerListingsPath } from '@/lib/marketplace-notifications'
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 const forbidden = () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -209,14 +209,14 @@ export async function DELETE(request: NextRequest) {
 
     await logActivity(currentUser!._id, 'marketplace.listing.deleted', `Deleted listing ${id}`)
 
-    // A seller finding their animal gone should hear it from us. Their request then
+    // A seller finding their listing gone should hear it from us. Their request then
     // reads as removed on their own page, where they can clear it from their list.
     if (existing.sellerId && ObjectId.isValid(existing.sellerId)) {
       await notifyFarmer(
         existing.sellerId,
         'Your listing was removed',
-        `"${existing.name ?? 'Your animal'}" was removed from the marketplace by Vettrack.`,
-        '/farmer/listings'
+        `"${existing.name ?? (existing.category === 'drugs' ? 'Your drug' : 'Your animal')}" was removed from the marketplace by Vettrack.`,
+        sellerListingsPath(existing.category)
       )
     }
 

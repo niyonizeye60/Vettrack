@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import RegisterContent from "@/components/auth/register-content"
 import { getCurrentUser } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { homePathForRole } from "@/lib/roles"
 
 export const metadata: Metadata = {
   title: "Register - NTDM Vettrack",
@@ -15,18 +16,7 @@ export default async function RegisterPage() {
 
   // If user is already authenticated, redirect to their dashboard
   if (user) {
-    if (user.role === "farmer") {
-      redirect("/farmer")
-    } else if (user.role === "doctor") {
-      redirect("/veterinary")
-    } else if(user.role === "admin") {
-      redirect("/admin")
-    }
-    else if (user.role === "superadmin") {
-      redirect("/superadmin")
-    } else {
-      redirect("/")
-    }
+    redirect(homePathForRole(user.role))
   }
   
   return <RegisterContent />

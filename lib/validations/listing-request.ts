@@ -1,11 +1,23 @@
 import { z } from "zod"
 
 /**
- * What a farmer submits when they ask Vettrack to sell an animal for them.
+ * What a seller submits when they ask Vettrack to put something on the marketplace.
  *
- * Only animals go through this flow. Feed and medicine are Vettrack's own stock and
- * are still created directly by staff - a farmer never requests those.
+ * Two kinds go through this flow: a farmer's animal (published to "sales") and a
+ * pharmacy's drug (published to "drugs"). Both share one queue, one review screen and
+ * one lifecycle; only the form fields differ. Feed is still Vettrack's own stock,
+ * created directly by staff, as are drugs Vettrack sells itself.
  */
+
+export const LISTING_KINDS = ["animal", "drug"] as const
+export type ListingKind = (typeof LISTING_KINDS)[number]
+
+export function isListingKind(value: unknown): value is ListingKind {
+  return typeof value === "string" && (LISTING_KINDS as readonly string[]).includes(value)
+}
+
+/** The storefront category each kind publishes into. */
+export const LISTING_KIND_CATEGORY = { animal: "sales", drug: "drugs" } as const satisfies Record<ListingKind, string>
 
 export const ANIMAL_TYPES = ["Cow", "Goat", "Sheep", "Pig", "Chicken", "Dog", "Cat"] as const
 export const ANIMAL_SEXES = ["Male", "Female"] as const
@@ -38,6 +50,43 @@ export const listingRequestSchema = z.object({
 
 export type ListingRequestInput = z.infer<typeof listingRequestSchema>
 
+/** The values staff already use for drugs they list themselves (components/marketplace/listings-manager.tsx). */
+export const DRUG_TYPES = ["Antibiotic", "Vaccine", "Dewormer", "Pain Relief", "Vitamins"] as const
+
+/** What a pharmacy submits when it asks for a drug to go on the pharmacy storefront. */
+export const drugRequestSchema = z.object({
+  title: z.string().trim().min(3, "Give the drug a name").max(120),
+  drugType: z.enum(DRUG_TYPES, { errorMap: () => ({ message: "Choose the type of drug" }) }),
+  usageDescription: z.string().trim().max(1000).optional().or(z.literal("")),
+  proposedPrice: z.coerce.number().int("Enter a whole number").positive("Enter a price above zero").max(100_000_000),
+  description: z.string().trim().min(10, "Describe the drug in a sentence or two").max(2000),
+  district: z.string().trim().min(1, "Choose a district"),
+  sector: z.string().trim().max(80).optional().or(z.literal("")),
+  village: z.string().trim().max(80).optional().or(z.literal("")),
+  photos: z.array(z.string().min(1)).min(1, "Add at least one photo").max(MAX_LISTING_PHOTOS),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+})
+
+export type DrugRequestInput = z.infer<typeof drugRequestSchema>
+
+/** A validated submission, tagged with its kind so the data layer knows which fields it carries. */
+export type SellerSubmission =
+  | { kind: "animal"; data: ListingRequestInput }
+  | { kind: "drug"; data: DrugRequestInput }
+
+/** Validate a request body against the form for `kind`. */
+export function parseSellerSubmission(
+  kind: ListingKind,
+  body: unknown
+): { success: true; submission: SellerSubmission } | { success: false; error: string } {
+  const parsed = kind === "drug" ? drugRequestSchema.safeParse(body) : listingRequestSchema.safeParse(body)
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Invalid request" }
+  }
+  return { success: true, submission: { kind, data: parsed.data } as SellerSubmission }
+}
+
 /**
  * One field a seller changed on a published listing. Values are display strings so
  * the marketplace can show "from → to" without knowing each field's type; `photos`
@@ -55,7 +104,7 @@ export interface ListingEditLogEntry {
 }
 
 export const LISTING_CHANGE_FIELDS = [
-  "title", "animalType", "breed", "age", "sex", "price", "description",
+  "title", "animalType", "breed", "age", "sex", "drugType", "usageDescription", "price", "description",
   "district", "sector", "village", "photos", "gps",
 ] as const
 export type ListingChangeField = (typeof LISTING_CHANGE_FIELDS)[number]
@@ -67,6 +116,8 @@ export const LISTING_CHANGE_LABEL_KEYS: Record<ListingChangeField, string> = {
   breed: "listing.breed",
   age: "listing.age",
   sex: "listing.sex",
+  drugType: "content.drugType",
+  usageDescription: "content.usageDescription",
   price: "listing.askingPrice",
   description: "listing.description",
   district: "listing.district",
@@ -86,7 +137,7 @@ export const reviewDecisionSchema = z.discriminatedUnion("decision", [
   }),
   z.object({
     decision: z.literal("reject"),
-    note: z.string().trim().min(3, "Tell the farmer why").max(500),
+    note: z.string().trim().min(3, "Tell the seller why").max(500),
   }),
 ])
 
@@ -110,6 +161,6 @@ export const removalDecisionSchema = z.discriminatedUnion("decision", [
   }),
   z.object({
     decision: z.literal("decline"),
-    note: z.string().trim().min(3, "Tell the farmer why").max(300),
+    note: z.string().trim().min(3, "Tell the seller why").max(300),
   }),
 ])

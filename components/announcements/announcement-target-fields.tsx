@@ -30,7 +30,7 @@ export default function AnnouncementTargetFields({
     if (value === "all") {
       setFormData({ ...formData, targetType: "all", targetRole: "", targetUserId: "", targetUserName: "" })
     } else if (value.startsWith("role:")) {
-      const role = value.split(":")[1] as "farmer" | "doctor" | "admin"
+      const role = value.split(":")[1] as "farmer" | "doctor" | "pharmacy" | "admin"
       setFormData({ ...formData, targetType: "role", targetRole: role, targetUserId: "", targetUserName: "" })
     } else {
       setFormData({ ...formData, targetType: "user", targetRole: "farmer", targetUserId: "", targetUserName: "" })
@@ -51,6 +51,7 @@ export default function AnnouncementTargetFields({
             <SelectItem value="all">{t("content.everyone")}</SelectItem>
             <SelectItem value="role:farmer">{t("content.allFarmers")}</SelectItem>
             <SelectItem value="role:doctor">{t("content.allVeterinarians")}</SelectItem>
+            <SelectItem value="role:pharmacy">{t("content.allPharmacies")}</SelectItem>
             {allowAdminTarget && <SelectItem value="role:admin">{t("content.allAdmins")}</SelectItem>}
             <SelectItem value="user">{t("content.specificUser")}</SelectItem>
           </SelectContent>
@@ -63,7 +64,7 @@ export default function AnnouncementTargetFields({
             <Label htmlFor={`${idPrefix}-recipientRole`}>{t("content.recipientRole")}</Label>
             <Select
               value={formData.targetRole || "farmer"}
-              onValueChange={(value: "farmer" | "doctor" | "admin") => setFormData({ ...formData, targetRole: value, targetUserId: "", targetUserName: "" })}
+              onValueChange={(value: "farmer" | "doctor" | "pharmacy" | "admin") => setFormData({ ...formData, targetRole: value, targetUserId: "", targetUserName: "" })}
             >
               <SelectTrigger id={`${idPrefix}-recipientRole`}>
                 <SelectValue />
@@ -71,6 +72,7 @@ export default function AnnouncementTargetFields({
               <SelectContent>
                 <SelectItem value="farmer">{t("admin.farmerName")}</SelectItem>
                 <SelectItem value="doctor">{t("content.veterinarian")}</SelectItem>
+                <SelectItem value="pharmacy">{t("superadmin.pharmacy")}</SelectItem>
                 {allowAdminTarget && <SelectItem value="admin">{t("superadmin.category.admin")}</SelectItem>}
               </SelectContent>
             </Select>

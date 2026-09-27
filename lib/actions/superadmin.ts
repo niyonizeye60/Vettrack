@@ -749,7 +749,7 @@ export async function updateUser(userId: string, formData: FormData) {
     // }
 
     // Add role-specific fields
-    if (updateData.role === "farmer" || updateData.role === "doctor") {
+    if (updateData.role === "farmer" || updateData.role === "doctor" || updateData.role === "pharmacy") {
       Object.assign(updateData, {
         district: formData.get("district"),
         sector: formData.get("sector"),

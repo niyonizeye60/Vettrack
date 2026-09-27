@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
 
     const allowed =
       can(currentUser.role, "marketplace.listings.request") ||
+      can(currentUser.role, "marketplace.drugs.request") ||
       can(currentUser.role, "marketplace.listings.manage")
     if (!allowed) {
       return NextResponse.json({ success: false, message: "Not allowed" }, { status: 403 })

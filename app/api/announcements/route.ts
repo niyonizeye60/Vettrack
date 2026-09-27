@@ -10,8 +10,8 @@ export async function GET() {
     const user = await getCurrentUser()
 
     // "Everyone" (and legacy announcements without a targetType) means every
-    // farmer and vet - never staff, so admins/superadmins don't see it in
-    // their own dashboard banner. Role- and user-targeted announcements only
+    // farmer, vet and pharmacy - never staff, so admins/superadmins don't see it
+    // in their own dashboard banner. Role- and user-targeted announcements only
     // show up for the matching viewer, which does let a staff-targeted
     // announcement reach an admin/superadmin.
     const isStaffViewer = !!user && ["admin", "superadmin"].includes(user.role)

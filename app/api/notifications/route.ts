@@ -2,24 +2,30 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
+import { getCurrentUser } from "@/lib/auth"
+import { audienceFilter, isReadBy } from "@/lib/notification-access"
+
+// Every handler here identifies the caller from their session. The userId/role query
+// parameters older clients still send are ignored: trusting them let anyone read,
+// hide or delete anyone else's notifications.
+
+const unauthorized = () => NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
+const forbidden = () => NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 })
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
+
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-    const userRole = searchParams.get('role')
-    const superadmin = searchParams.get('superadmin')
-
-    if (!userId || !userRole) {
-      return NextResponse.json({ success: false, message: "Missing parameters" })
-    }
-
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
     const now = new Date()
 
-    // Superadmin: fetch ALL notifications without any filters
-    if (superadmin === 'true') {
+    // Superadmin's management view: every notification, unfiltered.
+    if (searchParams.get('superadmin') === 'true') {
+      if (user.role !== "superadmin") return forbidden()
+
       const notifications = await db.collection("notifications")
         .find({})
         .sort({ createdAt: -1 })
@@ -43,21 +49,12 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Regular users: build query with expiry and soft-delete filters
-    let userObjectId: ObjectId | null = null
-    try { userObjectId = new ObjectId(userId) } catch {}
-
-    const orConditions: any[] = [
-      { targetRole: userRole },
-      { targetRole: "all" },
-    ]
-    if (userObjectId) orConditions.push({ userId: userObjectId })
-
+    // Everyone else: their own feed, minus expired and hidden items.
     const query: any = {
       $and: [
-        { $or: orConditions },
+        audienceFilter(user),
         { $or: [{ expiresAt: { $gt: now } }, { expiresAt: null }, { expiresAt: { $exists: false } }] },
-        { $or: [{ deletedBy: { $exists: false } }, { deletedBy: { $not: { $elemMatch: { $eq: userId } } } }] }
+        { $or: [{ deletedBy: { $exists: false } }, { deletedBy: { $not: { $elemMatch: { $eq: user._id } } } }] }
       ]
     }
 
@@ -75,10 +72,9 @@ export async function GET(request: NextRequest) {
         message: n.message,
         type: n.type,
         priority: n.priority || "normal",
-        read: n.read || false,
+        read: isReadBy(n, user._id),
         createdAt: n.createdAt,
         expiresAt: n.expiresAt || null,
-        deletedBy: n.deletedBy || [],
         actionUrl: n.actionUrl || null
       }))
     })
@@ -90,25 +86,34 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    const userId = searchParams.get('userId')
     const permanent = searchParams.get('permanent') === 'true'
 
-    if (!id) return NextResponse.json({ success: false, message: "Missing id" })
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ success: false, message: "Missing or invalid id" }, { status: 400 })
+    }
 
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     if (permanent) {
-      // Superadmin permanent delete
+      // Only superadmin removes a notification for everyone.
+      if (user.role !== "superadmin") return forbidden()
       await db.collection("notifications").deleteOne({ _id: new ObjectId(id) })
-    } else {
-      // Farmer soft delete — add userId to deletedBy array
-      await db.collection("notifications").updateOne(
-        { _id: new ObjectId(id) },
-        { $addToSet: { deletedBy: userId } }
-      )
+      return NextResponse.json({ success: true })
+    }
+
+    // Hiding it from your own feed - only a notification that is in your feed.
+    const result = await db.collection("notifications").updateOne(
+      { _id: new ObjectId(id), ...audienceFilter(user) },
+      { $addToSet: { deletedBy: user._id } }
+    )
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ success: false, message: "Notification not found" }, { status: 404 })
     }
 
     return NextResponse.json({ success: true })
@@ -120,8 +125,15 @@ export async function DELETE(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    if (!user) return unauthorized()
+    // Restoring hidden notifications is a superadmin tool.
+    if (user.role !== "superadmin") return forbidden()
+
     const { id } = await request.json()
-    if (!id) return NextResponse.json({ success: false, message: "Missing id" })
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ success: false, message: "Missing or invalid id" }, { status: 400 })
+    }
 
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")

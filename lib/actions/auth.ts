@@ -6,7 +6,7 @@ import { sendWelcomeEmail } from "../email" // Import the email function
 import { hashPassword, verifyPassword, isHashedPassword } from "../password"
 import { logActivity, logSystemError } from "../activity-log"
 import { checkRateLimit, getRateLimitKey } from "../rate-limit"
-import { isRole, isPrivilegedRole, homePathForRole } from "../roles"
+import { isRole, isPrivilegedRole, canSelfRegister, homePathForRole } from "../roles"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
 
 // Ensured once per warm process, not on every registration - createIndex is a
@@ -68,9 +68,9 @@ export async function registerUser(formData: FormData) {
     const role = roleInput
 
     // This action is reachable directly (it's a server action, not gated by
-    // any UI), so admin/superadmin can only be created by an already
-    // authenticated superadmin - never trust the client for privileged roles.
-    if (isPrivilegedRole(role)) {
+    // any UI), so anything beyond farmer/doctor can only be created by an already
+    // authenticated superadmin - never trust the client for the account type.
+    if (!canSelfRegister(role)) {
       const currentUser = await getCurrentUser()
       if (!currentUser || currentUser.role !== "superadmin") {
         return { success: false, message: "Not authorized to create this account type" }
@@ -121,6 +121,12 @@ export async function registerUser(formData: FormData) {
       Object.assign(userData, {
         permissions: ["manage_users", "view_consultations", "manage_system"],
         lastLoginAt: null,
+      })
+    } else if (role === "pharmacy") {
+      // Where the pharmacy trades from - the default location on its drug listings.
+      Object.assign(userData, {
+        district: formData.get("district"),
+        sector: formData.get("sector"),
       })
     } else if (role === "marketplace_admin") {
       const marketplaceAccess = normalizeMarketplaceAccess(formData.getAll("marketplaceAccess"))

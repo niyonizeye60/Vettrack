@@ -715,6 +715,7 @@ export default function NotificationsPageClient({
                     <SelectItem value="farmer">{t('superadmin.farmers') || 'Farmers'}</SelectItem>
                     <SelectItem value="doctor">{t('superadmin.doctors') || 'Doctors'}</SelectItem>
                     <SelectItem value="admin">{t('superadmin.admins') || 'Admins'}</SelectItem>
+                    <SelectItem value="pharmacy">{t('superadmin.pharmacies') || 'Pharmacies'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

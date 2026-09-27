@@ -9,6 +9,9 @@
  * before this field existed.
  */
 
+import { can } from "@/lib/roles"
+import type { ListingKind } from "@/lib/validations/listing-request"
+
 export const MARKETPLACE_CATEGORIES = ["sales", "drugs", "feeds"] as const
 
 export type MarketplaceCategory = (typeof MARKETPLACE_CATEGORIES)[number]
@@ -51,4 +54,15 @@ export function canAccessMarketplaceCategory(
   category: unknown
 ): boolean {
   return isMarketplaceCategory(category) && allowedMarketplaceCategories(user).includes(category)
+}
+
+/**
+ * Which kind of listing `role` submits as a seller: farmers sell animals, pharmacies
+ * sell drugs. Null for everyone else. Decided from the role, never from the request
+ * body, so a farmer cannot post into the pharmacy and vice versa.
+ */
+export function sellerListingKind(role: unknown): ListingKind | null {
+  if (can(role, "marketplace.listings.request")) return "animal"
+  if (can(role, "marketplace.drugs.request")) return "drug"
+  return null
 }

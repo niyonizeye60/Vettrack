@@ -1,31 +1,40 @@
 export const dynamic = "force-dynamic";
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
+import { getCurrentUser } from "@/lib/auth"
 
-export async function POST(request: NextRequest) {
+/**
+ * Mark everything in the caller's own feed as read.
+ *
+ * This used to take userId/role from the body and also matched every `type: "system"`
+ * notification, so any user pressing "mark all read" cleared superadmin's system
+ * alerts. It now touches only what the caller's feed shows.
+ */
+export async function POST() {
   try {
-    const { userId, role } = await request.json()
-
-    if (!userId || !role) {
-      return NextResponse.json({ success: false, message: "Missing parameters" })
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 })
     }
 
     const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital")
+    const notifications = client.db("ntdm_animal_hospital").collection("notifications")
+    const now = new Date()
 
-    await db.collection("notifications").updateMany(
-      { 
-        $or: [
-          { userId: new ObjectId(userId) },
-          { targetRole: role },
-          { targetRole: "all" },
-          { type: "system" }
-        ],
-        read: false
-      },
-      { $set: { read: true, readAt: new Date() } }
-    )
+    await Promise.all([
+      ObjectId.isValid(user._id)
+        ? notifications.updateMany(
+            { userId: new ObjectId(user._id), read: false },
+            { $set: { read: true, readAt: now } }
+          )
+        : Promise.resolve(),
+      // Broadcasts are read per user - see lib/notification-access.ts.
+      notifications.updateMany(
+        { userId: { $exists: false }, targetRole: { $in: [user.role, "all"] } },
+        { $addToSet: { readBy: user._id } }
+      ),
+    ])
 
     return NextResponse.json({ success: true })
   } catch (error) {

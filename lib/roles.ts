@@ -13,6 +13,7 @@ export const ROLES = [
   "superadmin",
   "marketplace_admin",
   "finance_manager",
+  "pharmacy",
 ] as const
 
 export type Role = (typeof ROLES)[number]
@@ -39,13 +40,26 @@ export function isStaffRole(role: unknown): role is StaffRole {
 }
 
 /**
- * Roles nobody can self-register into - creating one requires an authenticated
- * superadmin. Enforced in lib/actions/auth.ts.
+ * Roles that carry elevated access. Creating one is audited with a superadmin
+ * notification in lib/actions/auth.ts.
  */
 export const PRIVILEGED_ROLES = ["admin", "superadmin", "marketplace_admin", "finance_manager"] as const
 
 export function isPrivilegedRole(role: unknown): boolean {
   return typeof role === "string" && (PRIVILEGED_ROLES as readonly string[]).includes(role)
+}
+
+/**
+ * The only roles the public register form may create. Everything else - the
+ * privileged roles above, and pharmacy, whose drugs go on sale under Vettrack's name -
+ * requires an authenticated superadmin. An allowlist rather than a blocklist, so a
+ * new role is superadmin-only until someone decides otherwise. Enforced in
+ * lib/actions/auth.ts.
+ */
+export const SELF_REGISTRATION_ROLES = ["farmer", "doctor"] as const
+
+export function canSelfRegister(role: unknown): boolean {
+  return typeof role === "string" && (SELF_REGISTRATION_ROLES as readonly string[]).includes(role)
 }
 
 /**
@@ -60,6 +74,9 @@ export const CAPABILITIES = {
   "marketplace.requests.review": ["marketplace_admin", "superadmin"],
   "marketplace.listings.manage": ["marketplace_admin", "admin", "superadmin"],
   "marketplace.listings.request": ["farmer"],
+  // A pharmacy asks for its drugs to go on the pharmacy storefront; the marketplace
+  // reviews them in the same queue as farmers' animals.
+  "marketplace.drugs.request": ["pharmacy"],
   "finance.view": ["finance_manager", "superadmin"],
   "finance.export": ["finance_manager", "superadmin"],
   "finance.commission.configure": ["finance_manager", "superadmin"],
@@ -91,6 +108,9 @@ const ROLE_HOME_PATH: Record<Role, string> = {
   superadmin: "/superadmin",
   marketplace_admin: "/marketplace",
   finance_manager: "/finance",
+  // Not "/pharmacy": that is the public drug storefront, and a portal prefix makes
+  // the middleware demand a session for every path under it.
+  pharmacy: "/pharmacy-portal",
 }
 
 export function homePathForRole(role: unknown): string {

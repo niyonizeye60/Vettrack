@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const hidden = parsed.data.action === "hide"
     await setListingHidden(
-      { _id: listing._id, name: listing.name, sellerId: listing.sellerId },
+      { _id: listing._id, name: listing.name, sellerId: listing.sellerId, category: listing.category },
       hidden,
       parsed.data.reason
     )

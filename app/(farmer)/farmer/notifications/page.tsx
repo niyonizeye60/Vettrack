@@ -349,10 +349,17 @@ export default function FarmerNotificationsPage() {
                         </div>
                       </div>
 
-                      <div
-                        className="text-sm text-gray-600 mt-1 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_strong]:font-bold [&_em]:italic [&_a]:underline [&_a]:text-green-700 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-3 [&_blockquote]:opacity-80 [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_p]:mb-1"
-                        dangerouslySetInnerHTML={{ __html: n.message }}
-                      />
+                      {n.type === "announcement" ? (
+                        // Announcement bodies are rich text written by staff in the content editor.
+                        <div
+                          className="text-sm text-gray-600 mt-1 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_strong]:font-bold [&_em]:italic [&_a]:underline [&_a]:text-green-700 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-3 [&_blockquote]:opacity-80 [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_p]:mb-1"
+                          dangerouslySetInnerHTML={{ __html: n.message }}
+                        />
+                      ) : (
+                        // Plain text on purpose: a chat notification carries the start of the
+                        // other person's message, which must never be parsed as HTML.
+                        <p className="text-sm text-gray-600 mt-1 leading-relaxed whitespace-pre-line">{n.message}</p>
+                      )}
 
                       <div className="flex items-center gap-3 mt-2 text-xs text-gray-400 flex-wrap">
                         <span>{new Date(n.createdAt).toLocaleString()}</span>

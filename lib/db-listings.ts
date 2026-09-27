@@ -1,6 +1,6 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
-import { notifyFarmer } from "@/lib/marketplace-notifications"
+import { notifyFarmer, sellerListingsPath } from "@/lib/marketplace-notifications"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -91,7 +91,7 @@ export async function getListingVisibility(serviceIds: string[]): Promise<Map<st
  * of "your removal request was approved" would be two notifications for one event.
  */
 export async function setListingHidden(
-  listing: { _id: ObjectId; name?: string; sellerId?: string | null },
+  listing: { _id: ObjectId; name?: string; sellerId?: string | null; category?: string },
   hidden: boolean,
   reason?: string,
   options: { notify?: boolean } = {}
@@ -108,15 +108,16 @@ export async function setListingHidden(
     throw new ListingVisibilityError("Listing not found")
   }
 
-  // A seller finding their animal gone from the marketplace should hear why.
+  // A seller finding their listing gone from the marketplace should hear why.
   if (options.notify !== false && listing.sellerId && ObjectId.isValid(listing.sellerId)) {
+    const fallbackName = listing.category === "drugs" ? "Your drug" : "Your animal"
     await notifyFarmer(
       listing.sellerId,
       hidden ? "Your listing was hidden" : "Your listing is visible again",
       hidden
-        ? `"${listing.name ?? "Your animal"}" was hidden from the marketplace.${reason?.trim() ? ` ${reason.trim()}` : ""}`
-        : `"${listing.name ?? "Your animal"}" is back on the marketplace.`,
-      "/farmer/listings"
+        ? `"${listing.name ?? fallbackName}" was hidden from the marketplace.${reason?.trim() ? ` ${reason.trim()}` : ""}`
+        : `"${listing.name ?? fallbackName}" is back on the marketplace.`,
+      sellerListingsPath(listing.category)
     )
   }
 }

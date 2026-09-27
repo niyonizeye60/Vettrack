@@ -1,19 +1,26 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { resolveLocation } from "@/lib/rwanda-geo"
-import type {
-  ListingChange,
-  ListingRequestInput,
-  ListingRequestStatus,
-  RemovalStatus,
+import {
+  LISTING_KIND_CATEGORY,
+  type ListingChange,
+  type ListingKind,
+  type ListingRequestStatus,
+  type RemovalStatus,
+  type SellerSubmission,
 } from "@/lib/validations/listing-request"
 import { sellerEditableFilter, setListingHidden, type ListingVisibility } from "@/lib/db-listings"
-import { notifyFarmer, notifySuperadmin } from "@/lib/marketplace-notifications"
+import { notifyFarmer, notifySuperadmin, sellerListingsPath } from "@/lib/marketplace-notifications"
 
 const DB_NAME = "ntdm_animal_hospital"
 
 /**
- * A farmer's request to have an animal listed for sale.
+ * A seller's request to have something listed: a farmer's animal, or a pharmacy's
+ * drug (`kind`). Both kinds share this collection, the review queue and every
+ * transition below; only the fields they carry differ.
+ *
+ * `farmerId` / `farmerName` predate pharmacies and hold whichever seller submitted
+ * the request - renaming them would mean migrating every existing document.
  *
  * Nothing here writes to animal_transactions - that collection is the farmer's own
  * herd bookkeeping and has nothing to do with the marketplace, despite the similar
@@ -21,6 +28,8 @@ const DB_NAME = "ntdm_animal_hospital"
  */
 export interface ListingRequest {
   _id: ObjectId
+  /** Absent on documents from before pharmacies existed, which are all animals. */
+  kind?: ListingKind
   farmerId: string
   farmerName: string
   /** Copied from the farmer's account at submission, so approve doesn't have to re-read the user. */
@@ -28,10 +37,14 @@ export interface ListingRequest {
   sellerEmail: string
   animalId: string | null
   title: string
-  animalType: string
+  /** Animal fields: null on a drug request. */
+  animalType: string | null
   breed: string | null
   age: string | null
   sex: string | null
+  /** Drug fields: null or absent on an animal request. */
+  drugType?: string | null
+  usageDescription?: string | null
   proposedPrice: number
   description: string
   district: string
@@ -98,6 +111,20 @@ async function getCollection() {
   return db.collection<ListingRequest>("listing_requests")
 }
 
+export function listingKindOf(request: Pick<ListingRequest, "kind">): ListingKind {
+  return request.kind ?? "animal"
+}
+
+/** Matches one kind; animals also match the older documents that carry no `kind`. */
+function kindFilter(kind: ListingKind) {
+  return kind === "drug" ? { kind: "drug" } : { kind: { $ne: "drug" } }
+}
+
+/** For messages sellers read, so a pharmacy never hears about "this animal". */
+function noun(kind: ListingKind) {
+  return kind === "drug" ? "drug" : "animal"
+}
+
 function emptyToNull(value: string | undefined | null): string | null {
   const trimmed = (value ?? "").trim()
   return trimmed.length > 0 ? trimmed : null
@@ -106,26 +133,32 @@ function emptyToNull(value: string | undefined | null): string | null {
 type SellerFields = Pick<
   ListingRequest,
   | "title" | "description" | "proposedPrice" | "photos" | "animalType" | "breed" | "age" | "sex"
+  | "drugType" | "usageDescription"
   | "district" | "sector" | "village" | "latitude" | "longitude" | "sellerPhone" | "sellerEmail"
 >
 
 /**
- * The fields of a service document that come from the farmer's request. Approving
+ * The fields of a service document that come from the seller's request. Approving
  * writes them once and a later edit writes them again, so both go through here and
- * the storefront copy cannot drift from what the farmer entered.
+ * the storefront copy cannot drift from what the seller entered.
+ *
+ * Each kind writes the fields its storefront page reads: the animal sales page reads
+ * animalType/breed/age/sex, the pharmacy page drugType/usageDescription - the same
+ * fields staff fill in when they list a drug themselves.
  */
-function publishedFields(source: SellerFields) {
+function publishedFields(kind: ListingKind, source: SellerFields) {
   const fallback = resolveLocation(source.district, source.sector)
+  const kindFields =
+    kind === "drug"
+      ? { drugType: source.drugType ?? "", usageDescription: source.usageDescription ?? "" }
+      : { animalType: source.animalType ?? "", breed: source.breed ?? "", age: source.age ?? "", sex: source.sex ?? "" }
   return {
     name: source.title,
     description: source.description,
     price: source.proposedPrice,
     image: source.photos[0] ?? null,
     images: source.photos,
-    animalType: source.animalType,
-    breed: source.breed ?? "",
-    age: source.age ?? "",
-    sex: source.sex ?? "",
+    ...kindFields,
     district: source.district,
     sector: source.sector ?? "",
     village: source.village ?? "",
@@ -143,18 +176,37 @@ function publishedFields(source: SellerFields) {
 /** The request-side columns for a submitted form, shared by create, resubmit and edit. */
 function requestFieldsFromInput(
   farmer: { name: string; phone?: string; email: string },
-  input: ListingRequestInput
+  submission: SellerSubmission
 ) {
+  const input = submission.data
+  // Both kinds write every column - the other kind's as null - so a document's
+  // shape doesn't depend on which form produced it.
+  const kindFields =
+    submission.kind === "drug"
+      ? {
+          animalId: null,
+          animalType: null,
+          breed: null,
+          age: null,
+          sex: null,
+          drugType: submission.data.drugType,
+          usageDescription: emptyToNull(submission.data.usageDescription),
+        }
+      : {
+          animalId: emptyToNull(submission.data.animalId),
+          animalType: submission.data.animalType,
+          breed: emptyToNull(submission.data.breed),
+          age: emptyToNull(submission.data.age),
+          sex: submission.data.sex ?? null,
+          drugType: null,
+          usageDescription: null,
+        }
   return {
     farmerName: farmer.name,
     sellerPhone: (farmer.phone ?? "").trim(),
     sellerEmail: farmer.email,
-    animalId: emptyToNull(input.animalId),
     title: input.title.trim(),
-    animalType: input.animalType,
-    breed: emptyToNull(input.breed),
-    age: emptyToNull(input.age),
-    sex: input.sex ?? null,
+    ...kindFields,
     proposedPrice: input.proposedPrice,
     description: input.description.trim(),
     district: input.district.trim(),
@@ -185,6 +237,8 @@ function diffListing(before: ListingRequest, after: ReturnType<typeof requestFie
   compare("breed", before.breed, after.breed)
   compare("age", before.age, after.age)
   compare("sex", before.sex, after.sex)
+  compare("drugType", before.drugType ?? null, after.drugType)
+  compare("usageDescription", before.usageDescription ?? null, after.usageDescription)
   compare("price", before.proposedPrice, after.proposedPrice)
   compare("description", before.description, after.description)
   compare("district", before.district, after.district)
@@ -200,14 +254,15 @@ function diffListing(before: ListingRequest, after: ReturnType<typeof requestFie
 
 export async function createListingRequest(
   farmer: { _id: string; name: string; phone?: string; email: string },
-  input: ListingRequestInput
+  submission: SellerSubmission
 ): Promise<ListingRequest> {
   const collection = await getCollection()
 
   const now = new Date()
   const doc: Omit<ListingRequest, "_id"> = {
+    kind: submission.kind,
     farmerId: farmer._id,
-    ...requestFieldsFromInput(farmer, input),
+    ...requestFieldsFromInput(farmer, submission),
     status: "pending",
     reviewedBy: null,
     reviewedAt: null,
@@ -220,7 +275,7 @@ export async function createListingRequest(
   const result = await collection.insertOne(doc as ListingRequest)
 
   await notifySuperadmin(
-    "New listing request",
+    submission.kind === "drug" ? "New drug listing request" : "New listing request",
     `${farmer.name} submitted "${doc.title}" for review.`,
     "/marketplace/requests"
   )
@@ -234,11 +289,11 @@ export async function listRequestsForFarmer(farmerId: string): Promise<ListingRe
   return collection.find({ farmerId, farmerDeletedAt: null } as any).sort({ createdAt: -1 }).toArray()
 }
 
-export async function listRequests(status?: ListingRequestStatus): Promise<ListingRequest[]> {
+export async function listRequests(kind: ListingKind, status?: ListingRequestStatus): Promise<ListingRequest[]> {
   const collection = await getCollection()
-  // A request the farmer deleted is off the queue for the marketplace too: only
+  // A request the seller deleted is off the queue for the marketplace too: only
   // rejected, withdrawn or taken-down ones can be deleted, so nothing there needs action.
-  const filter: Record<string, unknown> = { farmerDeletedAt: null, ...(status ? { status } : {}) }
+  const filter: Record<string, unknown> = { farmerDeletedAt: null, ...kindFilter(kind), ...(status ? { status } : {}) }
   // Oldest first while pending, so the queue is genuinely first-come-first-served.
   // updatedAt is the time a request entered the queue: nothing touches a pending
   // request except submitting or resubmitting it, so a resubmission rejoins at the
@@ -247,9 +302,9 @@ export async function listRequests(status?: ListingRequestStatus): Promise<Listi
   return collection.find(filter as any).sort(sort).toArray()
 }
 
-export async function countPendingRequests(): Promise<number> {
+export async function countPendingRequests(kind: ListingKind): Promise<number> {
   const collection = await getCollection()
-  return collection.countDocuments({ status: "pending" })
+  return collection.countDocuments({ status: "pending", ...kindFilter(kind) } as any)
 }
 
 export async function getRequestById(id: string): Promise<ListingRequest | null> {
@@ -295,10 +350,11 @@ export async function approveRequest(
     throw new ListingRequestError("This request has already been reviewed")
   }
 
+  const kind = listingKindOf(request)
   const service = {
-    ...publishedFields(request),
+    ...publishedFields(kind, request),
     duration: "",
-    category: "sales",
+    category: LISTING_KIND_CATEGORY[kind],
     categoryId,
     sellerId: request.farmerId,
     requestId: id,
@@ -327,9 +383,11 @@ export async function approveRequest(
 
   await notifyFarmer(
     request.farmerId,
-    "Your animal is now listed",
-    `"${request.title}" is live on the marketplace. Buyers who want it will be put in touch with you through Vettrack.`,
-    "/farmer/listings"
+    kind === "drug" ? "Your drug is now listed" : "Your animal is now listed",
+    kind === "drug"
+      ? `"${request.title}" is live on the pharmacy page.`
+      : `"${request.title}" is live on the marketplace. Buyers who want it will be put in touch with you through Vettrack.`,
+    sellerListingsPath(LISTING_KIND_CATEGORY[kind])
   )
 
   return { serviceId }
@@ -365,7 +423,7 @@ export async function rejectRequest(
     request.farmerId,
     "Your listing request was not approved",
     `"${request.title}" was not published. ${note.trim()} You can update it and send it again.`,
-    "/farmer/listings"
+    sellerListingsPath(LISTING_KIND_CATEGORY[listingKindOf(request)])
   )
 }
 
@@ -380,12 +438,15 @@ export async function rejectRequest(
 export async function resubmitRequest(
   id: string,
   farmer: { _id: string; name: string; phone?: string; email: string },
-  input: ListingRequestInput
+  submission: SellerSubmission
 ): Promise<ListingRequest> {
   const collection = await getCollection()
 
   const request = await getRequestById(id)
   if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
+    throw new ListingRequestError("Request not found")
+  }
+  if (listingKindOf(request) !== submission.kind) {
     throw new ListingRequestError("Request not found")
   }
   if (request.status !== "rejected") {
@@ -399,7 +460,7 @@ export async function resubmitRequest(
       $set: {
         // Refreshed from the account, so a phone number fixed since the first attempt
         // is the one that reaches buyers.
-        ...requestFieldsFromInput(farmer, input),
+        ...requestFieldsFromInput(farmer, submission),
         status: "pending",
         reviewedBy: null,
         reviewedAt: null,
@@ -500,10 +561,10 @@ export async function requestRemoval(
 }
 
 /** Removal asks waiting for a decision, oldest first. */
-export async function listRemovalRequests(): Promise<ListingRequest[]> {
+export async function listRemovalRequests(kind: ListingKind): Promise<ListingRequest[]> {
   const collection = await getCollection()
   return collection
-    .find({ "removal.status": "pending" } as any)
+    .find({ "removal.status": "pending", ...kindFilter(kind) } as any)
     .sort({ "removal.requestedAt": 1 })
     .toArray()
 }
@@ -554,7 +615,12 @@ export async function decideRemoval(
     if (listing) {
       try {
         await setListingHidden(
-          { _id: listing._id, name: listing.name, sellerId: listing.sellerId },
+          {
+            _id: listing._id,
+            name: listing.name,
+            sellerId: listing.sellerId,
+            category: LISTING_KIND_CATEGORY[listingKindOf(request)],
+          },
           true,
           "Removed at the seller's request",
           { notify: false }
@@ -584,7 +650,7 @@ export async function decideRemoval(
     decision === "approve"
       ? `"${request.title}" was taken off the marketplace, as you asked.`
       : `"${request.title}" stays on the marketplace. ${note?.trim() ?? ""}`.trim(),
-    "/farmer/listings"
+    sellerListingsPath(LISTING_KIND_CATEGORY[listingKindOf(request)])
   )
 }
 
@@ -669,7 +735,7 @@ export async function deleteRequestForFarmer(id: string, farmerId: string): Prom
 export async function editPublishedListing(
   id: string,
   farmer: { _id: string; name: string; phone?: string; email: string },
-  input: ListingRequestInput
+  submission: SellerSubmission
 ): Promise<{ request: ListingRequest; changes: ListingChange[] }> {
   const collection = await getCollection()
   const db = await getDb()
@@ -679,6 +745,9 @@ export async function editPublishedListing(
   if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
     throw new ListingRequestError("Request not found")
   }
+  if (listingKindOf(request) !== submission.kind) {
+    throw new ListingRequestError("Request not found")
+  }
   if (request.status !== "approved" || !request.publishedServiceId || !ObjectId.isValid(request.publishedServiceId)) {
     throw new ListingRequestError("Only a published listing can be edited")
   }
@@ -686,7 +755,7 @@ export async function editPublishedListing(
     throw new ListingRequestError("This listing was removed and can no longer be edited")
   }
 
-  const next = requestFieldsFromInput(farmer, input)
+  const next = requestFieldsFromInput(farmer, submission)
   const changes = diffListing(request, next)
   if (changes.length === 0) {
     throw new ListingRequestError("Nothing was changed")
@@ -700,7 +769,7 @@ export async function editPublishedListing(
   const published = await services.updateOne(
     { _id: serviceId, sellerId: farmer._id, ...sellerEditableFilter(now) } as any,
     {
-      $set: { ...publishedFields(next), editedAt: now, updatedAt: now },
+      $set: { ...publishedFields(submission.kind, next), editedAt: now, updatedAt: now },
       $inc: { editCount: 1 },
       $push: logPush,
     } as any
@@ -710,8 +779,8 @@ export async function editPublishedListing(
     if (!current) throw new ListingRequestError("This listing is no longer on the marketplace")
     throw new ListingRequestError(
       current.listingStatus === "sold" || current.listingStatus === "withdrawn"
-        ? "This animal has been sold or withdrawn, so it can't be edited"
-        : "A buyer is arranging this animal right now, so it can't be edited until that finishes"
+        ? `This ${noun(submission.kind)} has been sold or withdrawn, so it can't be edited`
+        : `A buyer is arranging this ${noun(submission.kind)} right now, so it can't be edited until that finishes`
     )
   }
 
@@ -751,6 +820,7 @@ export function serializeRequest(request: ListingRequest, listing?: ListingVisib
     editCount: request.editCount ?? 0,
     editedAt: request.editedAt ?? null,
     id: request._id.toString(),
+    kind: listingKindOf(request),
     farmerId: request.farmerId,
     farmerName: request.farmerName,
     animalId: request.animalId,
@@ -759,6 +829,8 @@ export function serializeRequest(request: ListingRequest, listing?: ListingVisib
     breed: request.breed,
     age: request.age,
     sex: request.sex,
+    drugType: request.drugType ?? null,
+    usageDescription: request.usageDescription ?? null,
     proposedPrice: request.proposedPrice,
     description: request.description,
     district: request.district,

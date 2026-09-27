@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { can } from "@/lib/roles"
-import { canAccessMarketplaceCategory } from "@/lib/marketplace-access"
+import { canAccessMarketplaceCategory, sellerListingKind } from "@/lib/marketplace-access"
 import { logActivity } from "@/lib/activity-log"
 import {
   approveRequest,
@@ -11,19 +11,40 @@ import {
   deleteRequestForFarmer,
   editPublishedListing,
   getRequestById,
+  listingKindOf,
   rejectRequest,
   requestRemoval,
   resubmitRequest,
   serializeRequest,
   withdrawRequest,
   ListingRequestError,
+  type ListingRequest,
 } from "@/lib/db-listing-requests"
 import {
-  listingRequestSchema,
+  LISTING_KIND_CATEGORY,
+  parseSellerSubmission,
   removalDecisionSchema,
   removalRequestSchema,
   reviewDecisionSchema,
 } from "@/lib/validations/listing-request"
+
+type Viewer = { _id: string; role?: string; marketplaceAccess?: unknown }
+
+/**
+ * A reviewer for this request: holds the review capability and the category the
+ * request publishes into ("sales" for an animal, "drugs" for a drug).
+ */
+function canReview(user: Viewer, request: ListingRequest) {
+  return (
+    can(user.role, "marketplace.requests.review") &&
+    canAccessMarketplaceCategory(user, LISTING_KIND_CATEGORY[listingKindOf(request)])
+  )
+}
+
+/** The seller who owns this request, still holding the role that submits its kind. */
+function isOwningSeller(user: Viewer, request: ListingRequest) {
+  return request.farmerId === user._id && sellerListingKind(user.role) === listingKindOf(request)
+}
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -37,11 +58,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Request not found" }, { status: 404 })
     }
 
-    // Every listing request is for the "sales" category - see the same note in
-    // app/api/listing-requests/route.ts.
-    const isReviewer =
-      can(currentUser.role, "marketplace.requests.review") && canAccessMarketplaceCategory(currentUser, "sales")
-    if (!isReviewer && request.farmerId !== currentUser._id) {
+    if (!canReview(currentUser, request) && request.farmerId !== currentUser._id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -70,7 +87,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     if (!request || request.farmerId !== currentUser._id) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 })
     }
-    if (!can(currentUser.role, "marketplace.listings.request")) {
+    if (!isOwningSeller(currentUser, request)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -119,48 +136,42 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ success: true })
     }
 
-    // Farmer revising a rejected request and sending it back for another review.
+    // Seller revising a rejected request and sending it back for another review.
     if (body?.action === "resubmit") {
-      if (request.farmerId !== currentUser._id || !can(currentUser.role, "marketplace.listings.request")) {
+      if (!isOwningSeller(currentUser, request)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
-      const parsed = listingRequestSchema.safeParse(body)
+      const parsed = parseSellerSubmission(listingKindOf(request), body)
       if (!parsed.success) {
-        return NextResponse.json(
-          { error: parsed.error.issues[0]?.message || "Invalid request" },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: parsed.error }, { status: 400 })
       }
       const resubmitted = await resubmitRequest(
         params.id,
         { _id: currentUser._id, name: currentUser.name, phone: currentUser.phone, email: currentUser.email },
-        parsed.data
+        parsed.submission
       )
       await logActivity(
         currentUser._id,
         "marketplace.request.resubmitted",
-        `Resubmitted ${parsed.data.title} (attempt ${(resubmitted.resubmitCount ?? 0) + 1})`
+        `Resubmitted ${parsed.submission.data.title} (attempt ${(resubmitted.resubmitCount ?? 0) + 1})`
       )
       return NextResponse.json(serializeRequest(resubmitted))
     }
 
-    // Farmer changing a listing that is already live. It stays live; the marketplace is
+    // Seller changing a listing that is already live. It stays live; the marketplace is
     // told what changed.
     if (body?.action === "edit") {
-      if (request.farmerId !== currentUser._id || !can(currentUser.role, "marketplace.listings.request")) {
+      if (!isOwningSeller(currentUser, request)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
-      const parsed = listingRequestSchema.safeParse(body)
+      const parsed = parseSellerSubmission(listingKindOf(request), body)
       if (!parsed.success) {
-        return NextResponse.json(
-          { error: parsed.error.issues[0]?.message || "Invalid request" },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: parsed.error }, { status: 400 })
       }
       const { request: edited, changes } = await editPublishedListing(
         params.id,
         { _id: currentUser._id, name: currentUser.name, phone: currentUser.phone, email: currentUser.email },
-        parsed.data
+        parsed.submission
       )
       await logActivity(
         currentUser._id,
@@ -170,9 +181,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json(serializeRequest(edited))
     }
 
-    // Farmer asking for their published listing to be taken down. Staff decide.
+    // Seller asking for their published listing to be taken down. Staff decide.
     if (body?.action === "request_removal") {
-      if (request.farmerId !== currentUser._id || !can(currentUser.role, "marketplace.listings.request")) {
+      if (!isOwningSeller(currentUser, request)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
       const parsed = removalRequestSchema.safeParse(body)
@@ -189,7 +200,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     // Staff answering that ask.
     if (body?.action === "removal_decision") {
-      if (!can(currentUser.role, "marketplace.requests.review") || !canAccessMarketplaceCategory(currentUser, "sales")) {
+      if (!canReview(currentUser, request)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })
       }
       const parsed = removalDecisionSchema.safeParse(body)
@@ -209,7 +220,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     // Everything else is a review decision.
-    if (!can(currentUser.role, "marketplace.requests.review") || !canAccessMarketplaceCategory(currentUser, "sales")) {
+    if (!canReview(currentUser, request)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

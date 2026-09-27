@@ -25,7 +25,7 @@ export interface AnnouncementInput {
   active: boolean
   targetType: "all" | "role" | "user"
   // "admin" targeting is a superadmin-only capability; see assertTargetAllowed.
-  targetRole?: "farmer" | "doctor" | "admin" | ""
+  targetRole?: "farmer" | "doctor" | "pharmacy" | "admin" | ""
   targetUserId?: string
   targetUserName?: string
   // Only honored for superadmin-created announcements; see createAnnouncement.
@@ -77,7 +77,7 @@ export async function getTargetableUsers(): Promise<TargetableUser[]> {
     const user = await requireStaff()
     const client = await clientPromise
     const db = client.db(DB)
-    const roles = user.role === "superadmin" ? ["farmer", "doctor", "admin"] : ["farmer", "doctor"]
+    const roles = user.role === "superadmin" ? ["farmer", "doctor", "pharmacy", "admin"] : ["farmer", "doctor", "pharmacy"]
     const users = await db.collection("users")
       .find({ role: { $in: roles } }, { projection: { name: 1, email: 1, role: 1 } })
       .sort({ name: 1 })
@@ -94,18 +94,30 @@ export async function getTargetableUsers(): Promise<TargetableUser[]> {
   }
 }
 
+// The roles an announcement can be addressed to. Checked on the server because
+// targetRole arrives from the client: without it, a crafted request could address
+// roles no picker offers (superadmin, marketplace_admin, ...).
+const TARGETABLE_ROLES = ["farmer", "doctor", "pharmacy", "admin"]
+
+// Who "Everyone" reaches by email: every farmer, vet and pharmacy, never staff. Admins
+// may also pick any one of these users individually.
+const EVERYONE_ROLES = ["farmer", "doctor", "pharmacy"]
+
 // Only a superadmin may target admins, whether by role or by individual user -
 // this is enforced here (not just hidden in the UI) so a crafted request from
 // a regular admin session can't reach admin accounts.
 async function assertTargetAllowed(user: { role: string }, data: AnnouncementInput, db: any) {
+  if (data.targetType === "role" && !TARGETABLE_ROLES.includes(data.targetRole ?? "")) {
+    throw new Error("Choose who the announcement is for")
+  }
   if (user.role === "superadmin") return
   if (data.targetType === "role" && data.targetRole === "admin") {
     throw new Error("Only superadmins can target admins")
   }
   if (data.targetType === "user" && data.targetUserId && ObjectId.isValid(data.targetUserId)) {
     const target = await db.collection("users").findOne({ _id: new ObjectId(data.targetUserId) }, { projection: { role: 1 } })
-    if (target && !["farmer", "doctor"].includes(target.role)) {
-      throw new Error("Admins can only target farmers or veterinarians")
+    if (target && !EVERYONE_ROLES.includes(target.role)) {
+      throw new Error("Admins can only target farmers, veterinarians or pharmacies")
     }
   }
 }
@@ -120,10 +132,9 @@ async function resolveEmailRecipients(db: any, target: { targetType: string; tar
   } else if (target.targetType === "user" && target.targetUserId && ObjectId.isValid(target.targetUserId)) {
     query._id = new ObjectId(target.targetUserId)
   } else {
-    // "Everyone" means every farmer and vet - never admins/superadmins. To
-    // reach admins, a superadmin must explicitly target the "admin" role or
-    // an individual admin.
-    query.role = { $in: ["farmer", "doctor"] }
+    // "Everyone" never includes admins/superadmins. To reach admins, a
+    // superadmin must explicitly target the "admin" role or an individual admin.
+    query.role = { $in: EVERYONE_ROLES }
   }
   return db.collection("users").find(query).toArray()
 }

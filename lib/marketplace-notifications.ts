@@ -3,7 +3,18 @@ import { ObjectId } from "mongodb"
 
 const DB_NAME = "ntdm_animal_hospital"
 
-/** Notify a farmer about their request. Mirrors the shape used elsewhere in the app. */
+/**
+ * Where a seller manages the listing a notification is about. Drugs belong to a
+ * pharmacy; every other seller-owned listing is a farmer's animal.
+ */
+export function sellerListingsPath(category: unknown): string {
+  return category === "drugs" ? "/pharmacy-portal/listings" : "/farmer/listings"
+}
+
+/**
+ * Notify a seller (farmer or pharmacy) about their request. Mirrors the shape used
+ * elsewhere in the app.
+ */
 export async function notifyFarmer(
   farmerId: string,
   title: string,
