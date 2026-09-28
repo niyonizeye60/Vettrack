@@ -1,10 +1,13 @@
-import { getSystemSettings } from "@/lib/actions/superadmin"
+import { getSystemSettings, getFarmLocationRestriction } from "@/lib/actions/superadmin"
 import SettingsPageClient from "./SettingsPageClient"
 
 export const dynamic = 'force-dynamic'
 
 export default async function SettingsPage() {
-  const settings = await getSystemSettings()
+  const [settings, farmLocationRestriction] = await Promise.all([
+    getSystemSettings(),
+    getFarmLocationRestriction(),
+  ])
 
-  return <SettingsPageClient settings={settings} />
+  return <SettingsPageClient settings={settings} farmLocationRestriction={farmLocationRestriction} />
 }

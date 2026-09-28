@@ -8,6 +8,11 @@ import { getCurrentUser } from "./auth"
 import { logActivity, logSystemError as recordSystemError } from "../activity-log"
 import { isPresenceOnline, type PresenceDoc } from "../presence"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
+import {
+  FARM_LOCATION_RESTRICTION_FIELDS,
+  getFarmLocationRestrictionStatus,
+  type FarmLocationRestrictionDoc,
+} from "../farm-location-restriction"
 
 // Every exported function in this file is a Next.js server action with its own
 // network-invocable endpoint, independent of which page renders it - so each one
@@ -1093,6 +1098,8 @@ function describeAdminAction(action: string, details?: string): string | null {
     case 'admin.export.consultations': return `exported consultation data (${details})`
     case 'admin.export.systemLogs': return `exported system logs (${details})`
     case 'admin.export.systemReport': return 'generated a system report'
+    case 'admin.farm_location_restriction.enabled': return 'enabled the farm location restriction'
+    case 'admin.farm_location_restriction.disabled': return 'disabled the farm location restriction'
     case 'chat.report.resolved': return 'resolved a chat report'
     case 'chat.report.dismissed': return 'dismissed a chat report'
     case 'chat.user.suspended': return 'suspended a reported user'
@@ -1386,11 +1393,17 @@ export async function updateSystemSettings(settings: any) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
+    // The Settings form round-trips every field it loaded, including the farm location
+    // restriction - which has its own audited action below. Drop it so a stale form
+    // save can't silently revert a toggle made since the page was opened.
+    const safeSettings = { ...settings }
+    for (const field of FARM_LOCATION_RESTRICTION_FIELDS) delete safeSettings[field]
+
     const result = await db.collection<SystemSettingsDoc>("system_settings").updateOne(
       { _id: "global" },
       {
         $set: {
-          ...settings,
+          ...safeSettings,
           updatedAt: new Date()
         }
       },
@@ -1402,6 +1415,64 @@ export async function updateSystemSettings(settings: any) {
   } catch (error) {
     console.error("Error updating system settings:", error)
     return { success: false, message: "Failed to update settings" }
+  }
+}
+
+// Farm Location Restriction (see lib/farm-location-restriction.ts)
+export async function getFarmLocationRestriction() {
+  try {
+    await requireSuperAdmin()
+    return await getFarmLocationRestrictionStatus()
+  } catch (error) {
+    console.error("Error fetching farm location restriction:", error)
+    return null
+  }
+}
+
+// Separate from updateSystemSettings so the toggle applies immediately and every change
+// is audit-logged with its before/after value. The last change is also stamped on the
+// settings document itself, because logActivity skips accounts flagged isTestAccount.
+export async function setFarmLocationRestriction(enabled: boolean) {
+  try {
+    const currentUser = await requireSuperAdmin()
+    if (typeof enabled !== "boolean") {
+      return { success: false, message: "Invalid value" }
+    }
+
+    const previous = await getFarmLocationRestrictionStatus()
+    if (previous.enabled === enabled) {
+      return { success: true, message: `Farm location restriction is already ${enabled ? "enabled" : "disabled"}`, status: previous }
+    }
+
+    const client = await clientPromise
+    const db = client.db("ntdm_animal_hospital")
+
+    await db.collection<FarmLocationRestrictionDoc>("system_settings").updateOne(
+      { _id: "global" },
+      {
+        $set: {
+          farmLocationRestrictionEnabled: enabled,
+          farmLocationRestrictionUpdatedAt: new Date(),
+          farmLocationRestrictionUpdatedBy: { id: currentUser._id.toString(), name: currentUser.name || "" },
+        }
+      },
+      { upsert: true }
+    )
+
+    await logAdminAction(
+      enabled ? "admin.farm_location_restriction.enabled" : "admin.farm_location_restriction.disabled",
+      `Previous: ${previous.enabled ? "ON" : "OFF"} · New: ${enabled ? "ON" : "OFF"}`
+    )
+    revalidatePath("/superadmin/settings")
+
+    return {
+      success: true,
+      message: `Farm location restriction ${enabled ? "enabled" : "disabled"}`,
+      status: await getFarmLocationRestrictionStatus(),
+    }
+  } catch (error) {
+    console.error("Error updating farm location restriction:", error)
+    return { success: false, message: "Failed to update farm location restriction" }
   }
 }
 

@@ -31,19 +31,22 @@ import {
   Image,
   Upload,
   X,
+  MapPin,
   User as UserIcon
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useToast } from "@/hooks/use-toast"
-import { updateSystemSettings, performDatabaseAction } from "@/lib/actions/superadmin"
+import { updateSystemSettings, performDatabaseAction, setFarmLocationRestriction } from "@/lib/actions/superadmin"
+import type { FarmLocationRestrictionStatus } from "@/lib/farm-location-restriction"
 import { getCurrentUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 
 interface SettingsPageClientProps {
   settings: any
+  farmLocationRestriction: FarmLocationRestrictionStatus | null
 }
 
-export default function SettingsPageClient({ settings }: SettingsPageClientProps) {
+export default function SettingsPageClient({ settings, farmLocationRestriction }: SettingsPageClientProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
@@ -54,6 +57,13 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
   const bannerInputRef = useRef<HTMLInputElement>(null)
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false)
   const [removeBannerConfirmOpen, setRemoveBannerConfirmOpen] = useState(false)
+
+  // Farm Location Restriction applies immediately through its own audited action, not
+  // the Save Settings button - pendingRestriction holds the value awaiting confirmation.
+  const [restriction, setRestriction] = useState<FarmLocationRestrictionStatus | null>(farmLocationRestriction)
+  const [pendingRestriction, setPendingRestriction] = useState(false)
+  const [restrictionConfirmOpen, setRestrictionConfirmOpen] = useState(false)
+  const [restrictionSaving, setRestrictionSaving] = useState(false)
 
   // Profile (this superadmin's own account) - separate from the system-wide settings above
   const avatarInputRef = useRef<HTMLInputElement>(null)
@@ -185,6 +195,26 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
       toast({ title: "Success", description: result.message })
     } catch (error) {
       toast({ title: "Error", description: "Error performing action", variant: "destructive" })
+    }
+  }
+
+  const handleConfirmRestriction = async () => {
+    const next = pendingRestriction
+    setRestrictionConfirmOpen(false)
+    setRestrictionSaving(true)
+    try {
+      const result = await setFarmLocationRestriction(next)
+      if (result.success && result.status) {
+        setRestriction(result.status)
+        toast({ title: next ? "Restriction enabled" : "Restriction disabled", description: result.message })
+        router.refresh()
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to update farm location restriction", variant: "destructive" })
+    } finally {
+      setRestrictionSaving(false)
     }
   }
 
@@ -517,6 +547,65 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Farm Location Restriction - applies immediately, not via Save Settings below */}
+        <Card id="farm-location-restriction">
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5" />
+                <span>Farm Location Restriction</span>
+              </span>
+              {restriction && (
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    restriction.enabled ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${restriction.enabled ? "bg-green-500" : "bg-red-500"}`} />
+                  {restriction.enabled ? "Enabled" : "Disabled"}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {restriction ? (
+              <>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label htmlFor="farmLocationRestriction">Require users to be on the farm</Label>
+                    <p className="text-sm text-gray-500">
+                      {restriction.enabled
+                        ? "ON — Users must be within the farm's registered sector to record livestock activities."
+                        : "OFF — Users can record livestock activities without the sector-location restriction."}
+                    </p>
+                  </div>
+                  <Switch
+                    id="farmLocationRestriction"
+                    checked={restriction.enabled}
+                    disabled={restrictionSaving}
+                    onCheckedChange={(checked) => {
+                      setPendingRestriction(checked)
+                      setRestrictionConfirmOpen(true)
+                    }}
+                  />
+                </div>
+                <p className="text-sm text-gray-500">
+                  Applies to creating, editing and deleting insemination, disease, treatment and vaccination
+                  records, for farmers and vets. Test accounts are always exempt. Changes take effect immediately.
+                </p>
+                {restriction.updatedAt && (
+                  <p className="text-xs text-gray-400">
+                    Last changed{restriction.updatedByName ? ` by ${restriction.updatedByName}` : ""} on{" "}
+                    {new Date(restriction.updatedAt).toLocaleString()}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-red-600">Couldn't load the current status. Refresh the page to try again.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -875,6 +964,30 @@ export default function SettingsPageClient({ settings }: SettingsPageClientProps
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemoveBanner} className="bg-red-600 hover:bg-red-700 text-white">
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={restrictionConfirmOpen} onOpenChange={setRestrictionConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingRestriction ? "Enable the farm location restriction?" : "Disable the farm location restriction?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingRestriction
+                ? "Farmers and vets will again have to be within each farm's registered sector to create, edit or delete insemination, disease, treatment and vaccination records. Anyone recording from elsewhere will be blocked straight away."
+                : "Farmers and vets on every farm will be able to create, edit and delete insemination, disease, treatment and vaccination records from anywhere, without being in the farm's registered sector. This takes effect immediately."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRestriction}
+              className={pendingRestriction ? "" : "bg-red-600 hover:bg-red-700 text-white"}
+            >
+              {pendingRestriction ? "Enable restriction" : "Disable restriction"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

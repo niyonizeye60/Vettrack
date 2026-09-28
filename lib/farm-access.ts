@@ -8,6 +8,7 @@ import {
   type PermissionModule,
 } from "./permissions"
 import { checkSectorMatch, type ActorPosition, type NearestSector } from "./geofence"
+import { isFarmLocationRestrictionEnabled } from "./farm-location-restriction"
 
 const DB = "ntdm_animal_hospital"
 const GRANTS = "farm_vet_grants"
@@ -173,6 +174,10 @@ export type LocationCheck =
  * flagged isTestAccount (same flag that already suppresses their activity log
  * entries, see lib/activity-log.ts) are QA/demo accounts that need to exercise
  * these operations without being physically on a farm.
+ *
+ * The whole check can also be switched off system-wide by a superadmin (Settings >
+ * Farm Location Restriction, see lib/farm-location-restriction.ts). It is read here
+ * rather than in each route so every caller follows the switch the same way.
  */
 export async function verifyOnFarmLocation(
   farmerId: string,
@@ -180,6 +185,10 @@ export async function verifyOnFarmLocation(
   actingUserIsTestAccount?: unknown
 ): Promise<LocationCheck> {
   if (actingUserIsTestAccount) {
+    return { allowed: true }
+  }
+
+  if (!(await isFarmLocationRestrictionEnabled())) {
     return { allowed: true }
   }
 
