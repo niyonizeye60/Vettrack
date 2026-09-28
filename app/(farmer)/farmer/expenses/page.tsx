@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Receipt, Plus, Pencil, Trash2, History, Droplet, SprayCan, PawPrint, Download, FileText } from "lucide-react"
+import { Receipt, Plus, Pencil, Trash2, History, Droplet, SprayCan, PawPrint, Download, FileText, Wheat } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface MilkingExpense {
   _id: string; farmerId: string
@@ -33,6 +34,15 @@ interface AnimalExpense {
   waterLiters?: number | null; waterCost?: number | null
   saltKg?: number | null; saltCost?: number | null
 }
+// One usual ration per animal type (not per session as in Milk Production: dry animals
+// are fed the same whatever the time of day, but a cow and a goat eat very different amounts).
+interface FeedRoutine {
+  foodKg: string; foodCost: string; waterLiters: string; waterCost: string; saltKg: string; saltCost: string
+}
+
+const EMPTY_FEED_ROUTINE: FeedRoutine = { foodKg: "", foodCost: "", waterLiters: "", waterCost: "", saltKg: "", saltCost: "" }
+const hasFeedRoutine = (r?: FeedRoutine) => !!r && Object.values(r).some(v => v !== "")
+const animalTypeOf = (a?: Animal) => (a?.type || "other").toLowerCase()
 
 const EXPENSE_TYPES = ["washing_drugs", "milking_oil"] as const
 const EXPENSE_UNITS = ["litres", "ml", "kg", "units"]
@@ -43,6 +53,7 @@ const today = new Date().toISOString().split("T")[0]
 
 export default function ExpensesPage() {
   const { t } = useLanguage()
+  const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
   const [expenses, setExpenses] = useState<MilkingExpense[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,6 +114,18 @@ export default function ExpensesPage() {
   const [filterAAnimal, setFilterAAnimal] = useState("")
   const [filterAType, setFilterAType] = useState("")
 
+  // Feed defaults dialog state — one ration per animal type, keyed by lowercase type
+  const [feedRoutine, setFeedRoutine] = useState<Record<string, FeedRoutine>>({})
+  const [feedRoutineDraft, setFeedRoutineDraft] = useState<Record<string, FeedRoutine>>({})
+  const [feedRoutineOpen, setFeedRoutineOpen] = useState(false)
+  const [feedRoutineTab, setFeedRoutineTab] = useState("")
+  const feedRoutineRef = useRef(feedRoutine)
+  useEffect(() => { feedRoutineRef.current = feedRoutine }, [feedRoutine])
+  // The type whose ration is currently in the feed fields, or null when the farmer typed them
+  const feedFilledFromType = useRef<string | null>(null)
+
+  const feedRoutineStorageKey = (farmerId: string) => `vettrack_animal_expense_routine_${farmerId}`
+
   // Animal Expenses report export
   const [aeExportOpen, setAeExportOpen] = useState(false)
   const [aeExportType, setAeExportType] = useState<"daily" | "monthly" | "total" | "custom">("total")
@@ -120,6 +143,17 @@ export default function ExpensesPage() {
       setUser(userData)
       const animalsData = await getAnimals(userData._id.toString())
       setAnimals(animalsData)
+      try {
+        const stored = localStorage.getItem(feedRoutineStorageKey(userData._id.toString()))
+        const parsed = stored ? JSON.parse(stored) : null
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          setFeedRoutine(Object.fromEntries(
+            Object.entries(parsed)
+              .filter(([, r]) => r && typeof r === "object")
+              .map(([type, r]) => [type, { ...EMPTY_FEED_ROUTINE, ...(r as Partial<FeedRoutine>) }])
+          ))
+        }
+      } catch {}
       await Promise.all([
         fetchExpenses(userData._id.toString()),
         fetchAnimalExpenses(userData._id.toString()),
@@ -442,10 +476,81 @@ export default function ExpensesPage() {
   const isFeedWaterSalt = aExpenseType === "feed"
   const aComputedTotal = useMemo(() => (Number(aFoodCost) || 0) + (Number(aWaterCost) || 0) + (Number(aSaltCost) || 0), [aFoodCost, aWaterCost, aSaltCost])
 
+  // ---- Feed defaults: the usual ration per animal type, filled in when an animal is picked ----
+  const dryAnimalTypes = useMemo(() => Array.from(new Set(dryAnimals.map(a => animalTypeOf(a)))).sort(), [dryAnimals])
+  const aSelectedAnimal = animals.find(a => a._id === aAnimalId)
+  const aSelectedType = aSelectedAnimal ? animalTypeOf(aSelectedAnimal) : ""
+
+  const animalTypeLabel = (type: string) => {
+    const label = t(`farmer.${type}`)
+    return label === `farmer.${type}` ? type.charAt(0).toUpperCase() + type.slice(1) : label
+  }
+
+  const setFeedFields = (r: FeedRoutine) => {
+    setAFoodKg(r.foodKg); setAFoodCost(r.foodCost)
+    setAWaterLiters(r.waterLiters); setAWaterCost(r.waterCost)
+    setASaltKg(r.saltKg); setASaltCost(r.saltCost)
+  }
+
+  // Fills the feed fields with the ration saved for `type`. If that type has none, a ration an
+  // earlier pick filled in is cleared instead, so a cow's ration never stays on a goat.
+  // Returns whether a ration was applied.
+  const applyFeedRoutine = (type: string, routines: Record<string, FeedRoutine>) => {
+    if (hasFeedRoutine(routines[type])) {
+      setFeedFields(routines[type])
+      feedFilledFromType.current = type
+      return true
+    }
+    if (feedFilledFromType.current) {
+      setFeedFields(EMPTY_FEED_ROUTINE)
+      feedFilledFromType.current = null
+    }
+    return false
+  }
+
+  // Auto-fill when an animal is picked for a feed expense (skip while editing an existing record)
+  useEffect(() => {
+    if (editAExpense || aExpenseType !== "feed" || !aSelectedType) return
+    if (applyFeedRoutine(aSelectedType, feedRoutineRef.current)) {
+      toast({
+        title: t('farmer.sessionDefaultsApplied'),
+        description: `${animalTypeLabel(aSelectedType)} — ${t('farmer.feedDefaultsAppliedDesc')}`,
+      })
+    }
+  }, [aAnimalId, aExpenseType, editAExpense])
+
+  const openFeedRoutineDialog = () => {
+    setFeedRoutineDraft(feedRoutine)
+    setFeedRoutineTab(aSelectedType && dryAnimalTypes.includes(aSelectedType) ? aSelectedType : dryAnimalTypes[0] || "")
+    setFeedRoutineOpen(true)
+  }
+
+  const setFeedRoutineDraftField = (field: keyof FeedRoutine, value: string) => {
+    setFeedRoutineDraft(prev => ({ ...prev, [feedRoutineTab]: { ...(prev[feedRoutineTab] ?? EMPTY_FEED_ROUTINE), [field]: value } }))
+  }
+
+  const clearFeedRoutineTab = () => {
+    setFeedRoutineDraft(prev => ({ ...prev, [feedRoutineTab]: EMPTY_FEED_ROUTINE }))
+  }
+
+  const saveFeedRoutine = () => {
+    // Types with every field blank are dropped rather than stored as empty rations
+    const saved = Object.fromEntries(Object.entries(feedRoutineDraft).filter(([, r]) => hasFeedRoutine(r)))
+    setFeedRoutine(saved)
+    if (user?._id) {
+      try { localStorage.setItem(feedRoutineStorageKey(user._id.toString()), JSON.stringify(saved)) } catch {}
+    }
+    if (!editAExpense && aExpenseType === "feed" && aSelectedType) {
+      applyFeedRoutine(aSelectedType, saved)
+    }
+    setFeedRoutineOpen(false)
+  }
+
   const resetAForm = () => {
     setAAnimalId(""); setAExpenseType("feed"); setADescription(""); setAAmount("")
     setADate(today); setATime(""); setAFoodKg(""); setAFoodCost(""); setAWaterLiters(""); setAWaterCost(""); setASaltKg(""); setASaltCost("")
     setANotes(""); setAErrors({}); setEditAExpense(null)
+    feedFilledFromType.current = null
   }
 
   const validateAExpense = () => {
@@ -754,10 +859,18 @@ export default function ExpensesPage() {
             <TabsContent value="record">
               <Card className="border border-gray-200 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="w-2 h-2 bg-green-500 rounded-full" />
-                    {editAExpense ? t('farmer.editExpense') : t('farmer.recordExpense')}
-                  </CardTitle>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      {editAExpense ? t('farmer.editExpense') : t('farmer.recordExpense')}
+                    </CardTitle>
+                    {dryAnimalTypes.length > 0 && (
+                      <Button type="button" size="sm" onClick={openFeedRoutineDialog} className="rounded-lg gap-1.5 bg-orange-500 hover:bg-orange-600 text-white">
+                        <Wheat className="h-3.5 w-3.5" />
+                        {t('farmer.feedDefaults')}
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {animals.length === 0 ? (
@@ -780,6 +893,7 @@ export default function ExpensesPage() {
                             className={aErrors.aAnimalId ? "border-red-500" : ""}
                           />
                           {aErrors.aAnimalId && <p className="text-xs text-red-500">{aErrors.aAnimalId}</p>}
+                          {!aErrors.aAnimalId && !editAExpense && isFeedWaterSalt && <p className="text-xs text-gray-400">{t('farmer.feedDefaultsHint')}</p>}
                         </div>
 
                         <div className="space-y-1">
@@ -1168,6 +1282,81 @@ export default function ExpensesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Feed Defaults Dialog */}
+      <Dialog open={feedRoutineOpen} onOpenChange={setFeedRoutineOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wheat className="h-5 w-5 text-green-600" />
+              {t('farmer.feedDefaults')}
+            </DialogTitle>
+            <p className="text-sm text-gray-500">{t('farmer.feedDefaultsDialogDesc')}</p>
+          </DialogHeader>
+
+          <Tabs value={feedRoutineTab} onValueChange={setFeedRoutineTab}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <TabsList className="h-auto flex-wrap justify-start">
+                {dryAnimalTypes.map(type => (
+                  <TabsTrigger key={type} value={type} className="gap-1.5">
+                    {animalTypeLabel(type)}
+                    {hasFeedRoutine(feedRoutineDraft[type]) && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <Button type="button" variant="ghost" size="sm" onClick={clearFeedRoutineTab} className="text-gray-500 hover:text-red-600 h-8 px-2">
+                {t('common.clear')}
+              </Button>
+            </div>
+
+            {dryAnimalTypes.map(type => {
+              const r = feedRoutineDraft[type] ?? EMPTY_FEED_ROUTINE
+              const total = (Number(r.foodCost) || 0) + (Number(r.waterCost) || 0) + (Number(r.saltCost) || 0)
+              return (
+                <TabsContent key={type} value={type} className="pt-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.foodEaten')}</label>
+                      <Input type="number" min="0" step="0.1" placeholder="e.g. 15" value={r.foodKg} onChange={e => setFeedRoutineDraftField("foodKg", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.foodCost')}</label>
+                      <Input type="number" min="0" step="0.01" placeholder="e.g. 3000" value={r.foodCost} onChange={e => setFeedRoutineDraftField("foodCost", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.waterIntake')}</label>
+                      <Input type="number" min="0" step="0.5" placeholder="e.g. 40" value={r.waterLiters} onChange={e => setFeedRoutineDraftField("waterLiters", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.waterCost')}</label>
+                      <Input type="number" min="0" step="0.01" placeholder="e.g. 1000" value={r.waterCost} onChange={e => setFeedRoutineDraftField("waterCost", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.saltConsumed')}</label>
+                      <Input type="number" min="0" step="0.1" placeholder="e.g. 0.5" value={r.saltKg} onChange={e => setFeedRoutineDraftField("saltKg", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium text-gray-700">{t('farmer.saltCost')}</label>
+                      <Input type="number" min="0" step="0.01" placeholder="e.g. 500" value={r.saltCost} onChange={e => setFeedRoutineDraftField("saltCost", e.target.value)} />
+                    </div>
+                    <div className="md:col-span-2 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+                      <span className="text-sm font-medium text-orange-800">{t('farmer.totalCost')}</span>
+                      <span className="text-lg font-bold text-orange-700">RWF {total.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </TabsContent>
+              )
+            })}
+          </Tabs>
+
+          <div className="flex gap-3 pt-2">
+            <Button onClick={saveFeedRoutine} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
+              {t('farmer.applyRoutine')}
+            </Button>
+            <Button variant="outline" onClick={() => setFeedRoutineOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
