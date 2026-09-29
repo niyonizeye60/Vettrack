@@ -9,6 +9,24 @@ import { getHomeConsumptionBalance } from "@/lib/home-consumption"
 
 const DB = "ntdm_animal_hospital"
 
+// Feed expenses can optionally record the water the calf drank and its cost.
+// The water cost is folded into `amount`, so every total/report that sums
+// `amount` already includes it; waterCost is kept separately for display.
+function validateWater(expenseType: string, waterLiters: unknown, waterCost: unknown): string | null {
+  if (expenseType !== "feed") return null
+  if (waterLiters && !(Number(waterLiters) >= 0)) return "Enter a valid number of liters of water"
+  if (waterCost && !(Number(waterCost) >= 0)) return "Enter a valid water cost"
+  return null
+}
+
+function waterFields(expenseType: string, waterLiters: unknown, waterCost: unknown) {
+  const isFeed = expenseType === "feed"
+  return {
+    waterLiters: isFeed ? (Number(waterLiters) || null) : null,
+    waterCost: isFeed ? (Number(waterCost) || null) : null,
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -75,12 +93,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, calfId, calfName, expenseType, milkLiters, description, amount, date, notes } = body
+    const { farmerId, calfId, calfName, expenseType, milkLiters, waterLiters, waterCost, description, amount, date, notes } = body
 
     if (!farmerId || !calfId || !expenseType || !amount || !date)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     if (!["milk", "feed", "veterinary", "other"].includes(expenseType))
       return NextResponse.json({ error: "Invalid expense type" }, { status: 400 })
+    const waterError = validateWater(expenseType, waterLiters, waterCost)
+    if (waterError) return NextResponse.json({ error: waterError }, { status: 400 })
 
     const isStaff = ["admin", "superadmin"].includes(currentUser.role)
     if (!isStaff && farmerId !== currentUser._id) {
@@ -105,11 +125,13 @@ export async function POST(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    const water = waterFields(expenseType, waterLiters, waterCost)
     const record = {
       farmerId, calfId, calfName: calfName || null, expenseType,
       milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null,
+      ...water,
       description: description || null,
-      amount: Number(amount),
+      amount: Number(amount) + (water.waterCost || 0),
       date, notes: notes || null,
       createdAt: new Date(),
     }
@@ -130,8 +152,10 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, expenseType, milkLiters, description, amount, date, notes } = body
+    const { id, expenseType, milkLiters, waterLiters, waterCost, description, amount, date, notes } = body
     if (!id) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
+    const waterError = validateWater(expenseType, waterLiters, waterCost)
+    if (waterError) return NextResponse.json({ error: waterError }, { status: 400 })
 
     const client = await clientPromise
     const db = client.db(DB)
@@ -157,9 +181,10 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    const water = waterFields(expenseType, waterLiters, waterCost)
     await db.collection("calf_expenses").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { expenseType, milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null, description: description || null, amount: Number(amount), date, notes: notes || null, updatedAt: new Date() } }
+      { $set: { expenseType, milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null, ...water, description: description || null, amount: Number(amount) + (water.waterCost || 0), date, notes: notes || null, updatedAt: new Date() } }
     )
     await logActivity(currentUser._id, "livestock.calf_expense_updated", expenseType)
     return NextResponse.json({ success: true })

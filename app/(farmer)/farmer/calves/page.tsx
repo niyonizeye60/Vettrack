@@ -31,6 +31,8 @@ interface WeightRecord {
 interface CalfExpense {
   _id: string; farmerId: string; calfId: string; calfName: string | null
   expenseType: "milk" | "feed" | "veterinary" | "other"; milkLiters: number | null
+  /** Water the calf drank and what it cost - only recorded on feed expenses. `amount` already includes waterCost. */
+  waterLiters?: number | null; waterCost?: number | null
   description: string | null; amount: number; date: string; notes: string | null
 }
 
@@ -167,6 +169,8 @@ export default function CalvesPage() {
   const [expCalfId, setExpCalfId] = useState("")
   const [expenseType, setExpenseType] = useState("milk")
   const [milkLiters, setMilkLiters] = useState("")
+  const [waterLiters, setWaterLiters] = useState("")
+  const [waterCost, setWaterCost] = useState("")
   const [description, setDescription] = useState("")
   const [amount, setAmount] = useState("")
   const [expDate, setExpDate] = useState(today)
@@ -477,7 +481,7 @@ export default function CalvesPage() {
 
   // ---- Expense CRUD ----
   const resetExpenseForm = () => {
-    setExpCalfId(""); setExpenseType("milk"); setMilkLiters(""); setDescription(""); setAmount("")
+    setExpCalfId(""); setExpenseType("milk"); setMilkLiters(""); setWaterLiters(""); setWaterCost(""); setDescription(""); setAmount("")
     setExpDate(today); setExpNotes(""); setExpErrors({}); setEditExpense(null)
   }
 
@@ -494,6 +498,8 @@ export default function CalvesPage() {
       if (!milkLiters || Number(milkLiters) <= 0) e.milkLiters = "Enter how many liters the calf consumed"
       else if (Number(milkLiters) > availableHomeConsumptionForForm) e.milkLiters = `Only ${availableHomeConsumptionForForm.toFixed(1)}L of home consumption milk is available`
     }
+    if (expenseType === "feed" && waterLiters && !(Number(waterLiters) >= 0)) e.waterLiters = "Enter a valid number of liters"
+    if (expenseType === "feed" && waterCost && !(Number(waterCost) >= 0)) e.waterCost = "Enter a valid water cost"
     setExpErrors(e)
     return Object.keys(e).length === 0
   }
@@ -504,10 +510,10 @@ export default function CalvesPage() {
     const calf = calves.find(c => c._id === expCalfId)
     const farmerId = user._id.toString()
     const wasAdd = !editExpense
-    const body = { farmerId, calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }
+    const body = { farmerId, calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }
 
     const res = editExpense
-      ? await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, description, amount, date: expDate, notes: expNotes }) })
+      ? await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }) })
       : await fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
 
     if (!res.ok) {
@@ -526,8 +532,10 @@ export default function CalvesPage() {
 
   const handleExpenseEdit = (e: CalfExpense) => {
     setEditExpense(e); setExpCalfId(e.calfId); setExpenseType(e.expenseType)
-    setMilkLiters(e.milkLiters ? String(e.milkLiters) : ""); setDescription(e.description || "")
-    setAmount(String(e.amount)); setExpDate(e.date); setExpNotes(e.notes || "")
+    setMilkLiters(e.milkLiters ? String(e.milkLiters) : ""); setWaterLiters(e.waterLiters ? String(e.waterLiters) : "")
+    setWaterCost(e.waterCost ? String(e.waterCost) : ""); setDescription(e.description || "")
+    // The stored amount includes the water cost - the Amount field only holds the feed part.
+    setAmount(String(e.amount - (e.waterCost || 0))); setExpDate(e.date); setExpNotes(e.notes || "")
     setExpErrors({})
   }
 
@@ -542,6 +550,11 @@ export default function CalvesPage() {
   const statusColor = (s: string) => s === "active" ? "bg-green-50 text-green-700 border-green-200" : s === "weaned" ? "bg-blue-50 text-blue-700 border-blue-200" : s === "sold" ? "bg-amber-50 text-amber-700 border-amber-200" : s === "graduated" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-gray-50 text-gray-500 border-gray-200"
   const typeLabel = (ty: string) => ty === "milk" ? t('farmer.milk') : ty === "feed" ? t('farmer.feed') : ty === "veterinary" ? t('farmer.veterinary') : t('farmer.other')
   const typeColor = (ty: string) => ty === "milk" ? "bg-sky-50 text-sky-700 border-sky-200" : ty === "feed" ? "bg-orange-50 text-orange-700 border-orange-200" : ty === "veterinary" ? "bg-red-50 text-red-700 border-red-200" : "bg-gray-50 text-gray-600 border-gray-200"
+  const expenseDetail = (e: CalfExpense) => {
+    if (e.expenseType === "milk") return e.milkLiters ? `${e.milkLiters} L` : "—"
+    const water = [e.waterLiters ? `${e.waterLiters} L` : null, e.waterCost ? `RWF ${e.waterCost.toLocaleString()}` : null].filter(Boolean).join(", ")
+    return [e.description, water && `${t('farmer.water')}: ${water}`].filter(Boolean).join(" · ") || "—"
+  }
 
   if (loading) return (
     <div className="space-y-6 animate-pulse">
@@ -936,10 +949,25 @@ export default function CalvesPage() {
                     )}
 
                     <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">{t('farmer.amount')} *</label>
+                      <label className="text-sm font-medium text-gray-700">{expenseType === "feed" ? t('farmer.foodCost') : t('farmer.amount')} *</label>
                       <Input type="number" min="0" placeholder="e.g. 1500" value={amount} onChange={e => setAmount(e.target.value)} className={expErrors.amount ? "border-red-500" : ""} />
                       {expErrors.amount && <p className="text-xs text-red-500">{expErrors.amount}</p>}
                     </div>
+
+                    {expenseType === "feed" && (
+                      <>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-gray-700">{t('farmer.waterIntake')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                          <Input type="number" min="0" step="0.5" placeholder="e.g. 10" value={waterLiters} onChange={e => setWaterLiters(e.target.value)} className={expErrors.waterLiters ? "border-red-500" : ""} />
+                          {expErrors.waterLiters && <p className="text-xs text-red-500">{expErrors.waterLiters}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-gray-700">{t('farmer.waterCost')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                          <Input type="number" min="0" step="0.01" placeholder="e.g. 200" value={waterCost} onChange={e => setWaterCost(e.target.value)} className={expErrors.waterCost ? "border-red-500" : ""} />
+                          {expErrors.waterCost && <p className="text-xs text-red-500">{expErrors.waterCost}</p>}
+                        </div>
+                      </>
+                    )}
 
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-gray-700">{t('farmer.date')} *</label>
@@ -951,6 +979,13 @@ export default function CalvesPage() {
                       <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                       <Input placeholder={t('farmer.anyObservations')} value={expNotes} onChange={e => setExpNotes(e.target.value)} />
                     </div>
+
+                    {expenseType === "feed" && Number(waterCost) > 0 && (
+                      <div className="md:col-span-2 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+                        <span className="text-sm font-medium text-orange-800">{t('farmer.totalCost')}</span>
+                        <span className="text-lg font-bold text-orange-700">RWF {((Number(amount) || 0) + Number(waterCost)).toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-3 pt-2">
@@ -1017,7 +1052,7 @@ export default function CalvesPage() {
                         <TableCell className="text-sm">{e.date}</TableCell>
                         <TableCell className="font-medium">{e.calfName}</TableCell>
                         <TableCell><Badge variant="outline" className={typeColor(e.expenseType)}>{typeLabel(e.expenseType)}</Badge></TableCell>
-                        <TableCell className="text-sm text-gray-500">{e.expenseType === "milk" ? (e.milkLiters ? `${e.milkLiters} L` : "—") : (e.description || "—")}</TableCell>
+                        <TableCell className="text-sm text-gray-500">{expenseDetail(e)}</TableCell>
                         <TableCell className="font-semibold text-red-700">RWF {e.amount.toLocaleString()}</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
