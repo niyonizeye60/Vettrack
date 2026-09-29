@@ -5,10 +5,12 @@ import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals } from "@/lib/actions"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { ageInMonths, isReadyToGraduate, CALF_GRADUATION_AGE_MONTHS } from "@/lib/calf-age"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -81,7 +83,8 @@ function PaginationFooter({ pagination, page, setPage, loading, className }: { p
 function formatAge(birthDate: string, t: (k: string) => string) {
   const days = Math.max(0, Math.floor((Date.now() - new Date(birthDate).getTime()) / 86400000))
   if (days < 60) return `${days} ${t('farmer.days')}`
-  return `${Math.floor(days / 30)} ${t('farmer.months')}`
+  // Calendar months, so the age shown agrees with when the "Ready to move" prompt appears.
+  return `${ageInMonths(birthDate)} ${t('farmer.months')}`
 }
 
 function animalStatusText(status: string | undefined, t: (k: string) => string) {
@@ -317,6 +320,8 @@ export default function CalvesPage() {
   }, [expensePage, filterExpCalf, filterExpType])
 
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
+  // Old enough to move into the animals herd - the move itself stays a farmer decision.
+  const readyCalves = useMemo(() => calves.filter(c => isReadyToGraduate(c)), [calves])
   const totalMilkGiven = useMemo(() => expenses.filter(e => e.expenseType === "milk").reduce((s, e) => s + (e.milkLiters || 0), 0), [expenses])
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses])
 
@@ -385,7 +390,9 @@ export default function CalvesPage() {
     setGradType("cow")
     setGradClass("dairy")
     setGradBreed(c.breed || "")
-    setGradEarTag(""); setGradInsurance(""); setGradWeight(""); setGradPrice("")
+    // Start from the calf's latest weigh-in, if it has one.
+    const latestWeight = weights.filter(w => w.calfId === c._id).sort((a, b) => b.date.localeCompare(a.date))[0]
+    setGradEarTag(""); setGradInsurance(""); setGradWeight(latestWeight ? String(latestWeight.weight) : ""); setGradPrice("")
     setGradError("")
   }
 
@@ -557,21 +564,41 @@ export default function CalvesPage() {
   }
 
   if (loading) return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6">
       <div>
-        <div className="h-7 bg-gray-200 rounded w-40" />
-        <div className="h-4 bg-gray-200 rounded w-64 mt-2" />
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-4 w-64 max-w-full mt-2" />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         {[1, 2, 3, 4, 5].map(i => (
           <div key={i} className="border border-gray-200 rounded-xl bg-white p-4 sm:p-5 space-y-3">
-            <div className="h-4 bg-gray-200 rounded w-20" />
-            <div className="h-8 bg-gray-200 rounded w-16" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-8 w-16" />
           </div>
         ))}
       </div>
-      <div className="h-10 bg-gray-200 rounded w-full max-w-md" />
-      <div className="h-64 bg-gray-200 rounded-xl" />
+      <Skeleton className="h-10 w-full max-w-md" />
+      <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-9 w-full sm:w-64" />
+        </div>
+        <div className="divide-y divide-gray-100">
+          {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+            <div key={i} className="flex items-center gap-6 px-4 py-3">
+              <div className="flex items-center gap-2 w-40 shrink-0">
+                <Skeleton className="h-6 w-6 rounded-lg flex-shrink-0" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-14" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-8 w-24 ml-auto" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 
@@ -648,6 +675,33 @@ export default function CalvesPage() {
             </Button>
           </div>
 
+          {readyCalves.length > 0 && (
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl space-y-3">
+              <div className="flex items-start gap-3">
+                <ArrowUpCircle className="h-5 w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-purple-900">
+                    <strong>{readyCalves.length}</strong>{" "}
+                    {t(readyCalves.length === 1 ? 'farmer.calfReadyOne' : 'farmer.calvesReadyMany').replace('{months}', String(CALF_GRADUATION_AGE_MONTHS))}
+                  </p>
+                  <p className="text-xs text-purple-700 mt-0.5">{t('farmer.calvesReadyHint')}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 pl-8">
+                {readyCalves.map(c => (
+                  <Button
+                    key={c._id} size="sm" variant="outline"
+                    onClick={() => openGraduate(c)}
+                    className="rounded-lg bg-white border-purple-200 text-purple-800 hover:bg-purple-100"
+                  >
+                    {c.name}
+                    <span className="ml-1.5 text-xs text-purple-500">{ageInMonths(c.birthDate)} {t('farmer.months')}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader className="pb-4 border-b border-gray-100">
               <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -694,9 +748,27 @@ export default function CalvesPage() {
                     </TableHeader>
                     <TableBody>
                       {calvesTableLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-12 text-gray-400">{t('common.loading')}</TableCell>
-                        </TableRow>
+                        Array.from({ length: calvesTableRows.length || PAGE_SIZE }).map((_, i) => (
+                          <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Skeleton className="h-6 w-6 rounded-lg flex-shrink-0" />
+                                <Skeleton className="h-4 w-24" />
+                              </div>
+                            </TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-14" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <Skeleton className="h-8 w-8" />
+                                <Skeleton className="h-8 w-16" />
+                                <Skeleton className="h-8 w-8" />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
                       ) : calvesTableRows.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-12">
@@ -720,7 +792,16 @@ export default function CalvesPage() {
                           <TableCell className="text-sm text-gray-600">{c.gender === "male" ? t('farmer.male') : t('farmer.female')}</TableCell>
                           <TableCell className="text-sm text-gray-600">{formatAge(c.birthDate, t)}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={statusColor(c.status)}>{statusLabel(c.status)}</Badge>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge variant="outline" className={statusColor(c.status)}>{statusLabel(c.status)}</Badge>
+                              {isReadyToGraduate(c) && (
+                                <button type="button" onClick={() => openGraduate(c)} title={t('farmer.graduateToAnimals')}>
+                                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer">
+                                    <ArrowUpCircle className="h-3 w-3 mr-1" />{t('farmer.readyToMove')}
+                                  </Badge>
+                                </button>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1.5 flex-nowrap">
@@ -864,7 +945,20 @@ export default function CalvesPage() {
                   </TableHeader>
                   <TableBody>
                     {weightsTableLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">{t('common.loading')}</TableCell></TableRow>
+                      Array.from({ length: weightsTableRows.length || PAGE_SIZE }).map((_, i) => (
+                        <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-14" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Skeleton className="h-8 w-8" />
+                              <Skeleton className="h-8 w-8" />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     ) : weightsTableRows.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-400">{t('farmer.noWeightRecordsYet')}</TableCell></TableRow>
                     ) : weightsTableRows.map(w => (
@@ -1044,7 +1138,21 @@ export default function CalvesPage() {
                   </TableHeader>
                   <TableBody>
                     {expensesTableLoading ? (
-                      <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">{t('common.loading')}</TableCell></TableRow>
+                      Array.from({ length: expensesTableRows.length || PAGE_SIZE }).map((_, i) => (
+                        <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Skeleton className="h-8 w-8" />
+                              <Skeleton className="h-8 w-8" />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     ) : expensesTableRows.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-400">{t('farmer.noCalfExpensesYet')}</TableCell></TableRow>
                     ) : expensesTableRows.map(e => (
