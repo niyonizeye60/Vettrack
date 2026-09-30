@@ -13,7 +13,7 @@ import {
   isWithinSellBy,
   releaseStock,
 } from "@/lib/stock"
-import { notifyFarmer, notifyFinance } from "@/lib/marketplace-notifications"
+import { notifyFarmer, notifyFinance, sellerSalesPath } from "@/lib/marketplace-notifications"
 import { alertLowStock, alertOutOfStock } from "@/lib/product-alerts"
 import { getCommissionPercentage, getSellByDays } from "@/lib/db-settings"
 import { attachPrescription, detachPrescription, getPrescription } from "@/lib/db-prescriptions"
@@ -36,8 +36,9 @@ export interface OrderItem {
   quantity: number
   lineTotal: number
   /**
-   * The seller who listed it - a pharmacy, for its drugs. Null for Vettrack's own
-   * stock, and absent on orders from before sellers could list drugs.
+   * The seller who listed it - a pharmacy for its drugs, a feed supplier for its feed.
+   * Null for Vettrack's own stock, and absent on orders from before sellers could list
+   * products.
    */
   sellerId?: string | null
   /**
@@ -684,7 +685,7 @@ async function commitStockForOrder(order: Order): Promise<void> {
     const item = itemFor(serviceId)
     if (shortfall) shortServiceIds.add(serviceId)
     if (!item || remaining === null) continue
-    // Whoever looks after it hears: the pharmacy, or marketplace staff for Vettrack's own.
+    // Whoever looks after it hears: the seller, or marketplace staff for Vettrack's own.
     if (remaining === 0) {
       await alertOutOfStock(item)
     } else if (remaining <= lowStockAt && (await claimLowStockWarning(serviceId))) {
@@ -701,7 +702,8 @@ async function commitStockForOrder(order: Order): Promise<void> {
     )
   }
 
-  // Only a pharmacy's drugs carry a seller on a cart order - animals are brokered.
+  // Only a pharmacy's drugs and a feed supplier's feed carry a seller on a cart order -
+  // animals are brokered.
   const bySeller = new Map<string, OrderItem[]>()
   for (const item of sellerItems) {
     bySeller.set(item.sellerId!, [...(bySeller.get(item.sellerId!) ?? []), item])
@@ -717,7 +719,7 @@ async function commitStockForOrder(order: Order): Promise<void> {
       `Order ${ref}: ${summary} for ${order.buyer.name}. Vettrack collected RWF ${amount.toLocaleString()}; ` +
         `your share is RWF ${share.toLocaleString()}. Open Sales for the buyer's contact and delivery details.` +
         (short ? " Your stock was short for part of this order - Vettrack will contact you." : ""),
-      "/pharmacy-portal/sales"
+      sellerSalesPath(items[0].category)
     )
   }
 }

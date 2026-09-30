@@ -122,8 +122,8 @@ export async function registerUser(formData: FormData) {
         permissions: ["manage_users", "view_consultations", "manage_system"],
         lastLoginAt: null,
       })
-    } else if (role === "pharmacy") {
-      // Where the pharmacy trades from - the default location on its drug listings.
+    } else if (role === "pharmacy" || role === "feed_supplier") {
+      // Where the seller trades from - the default location on its listings.
       Object.assign(userData, {
         district: formData.get("district"),
         sector: formData.get("sector"),

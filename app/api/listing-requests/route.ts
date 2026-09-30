@@ -30,8 +30,8 @@ async function serializeWithVisibility(requests: ListingRequest[]) {
 }
 
 /**
- * GET - a seller (farmer or pharmacy) sees their own requests; a reviewer sees the
- * queue for one kind (`?kind=animal|drug`, animals by default).
+ * GET - a seller (farmer, pharmacy or feed supplier) sees their own requests; a
+ * reviewer sees the queue for one kind (`?kind=animal|drug|feed`, animals by default).
  *
  * Which list you get is decided by capability, never by a query parameter, so a
  * seller cannot ask for someone else's requests.
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (sellerListingKind(currentUser.role)) {
-      // A pharmacy checking its drugs is when an expiry warning is most useful.
+      // A seller checking its products is when an expiry warning is most useful.
       await sweepExpiryAlerts()
       return NextResponse.json(await serializeWithVisibility(await listRequestsForFarmer(currentUser._id)))
     }
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST - a farmer asks Vettrack to sell an animal, or a pharmacy to list a drug. */
+/** POST - a farmer asks Vettrack to sell an animal, a pharmacy to list a drug, a feed supplier to list feed. */
 export async function POST(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()

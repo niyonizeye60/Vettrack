@@ -4,16 +4,37 @@ import { ObjectId } from "mongodb"
 const DB_NAME = "ntdm_animal_hospital"
 
 /**
- * Where a seller manages the listing a notification is about. Drugs belong to a
- * pharmacy; every other seller-owned listing is a farmer's animal.
+ * The portal of the seller who owns a listing in each storefront category: drugs
+ * belong to a pharmacy, feed to a feed supplier. Every other seller-owned listing is a
+ * farmer's animal. Vettrack's own drugs and feed carry no seller and never get here.
  */
+const SELLER_PORTAL_BY_CATEGORY: Record<string, string> = {
+  drugs: "/pharmacy-portal",
+  feeds: "/feed-supplier",
+}
+
+/** What a seller's listing is called when its own name is missing. */
+export function sellerListingFallbackName(category: unknown): string {
+  return category === "drugs" ? "Your drug" : category === "feeds" ? "Your feed" : "Your animal"
+}
+
+/** Where a seller manages the listing a notification is about. */
 export function sellerListingsPath(category: unknown): string {
-  return category === "drugs" ? "/pharmacy-portal/listings" : "/farmer/listings"
+  return `${SELLER_PORTAL_BY_CATEGORY[category as string] ?? "/farmer"}/listings`
 }
 
 /**
- * Notify a seller (farmer or pharmacy) about their request. Mirrors the shape used
- * elsewhere in the app.
+ * Where a seller sees the sale a notification is about. Only products sold through the
+ * cart have one - animals are brokered - so a category without a seller portal falls
+ * back to the pharmacy's, which is where every such sale went before feed suppliers.
+ */
+export function sellerSalesPath(category: unknown): string {
+  return `${SELLER_PORTAL_BY_CATEGORY[category as string] ?? "/pharmacy-portal"}/sales`
+}
+
+/**
+ * Notify a seller (farmer, pharmacy or feed supplier) about their request. Mirrors the
+ * shape used elsewhere in the app.
  */
 export async function notifyFarmer(
   farmerId: string,

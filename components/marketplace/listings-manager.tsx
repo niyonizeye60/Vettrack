@@ -581,6 +581,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             <SelectContent>
               <SelectItem value="Cattle">{t("content.cattle")}</SelectItem>
               <SelectItem value="Goats">{t("content.goats")}</SelectItem>
+              <SelectItem value="Sheep">{t("content.sheep")}</SelectItem>
               <SelectItem value="Poultry">{t("content.poultry")}</SelectItem>
               <SelectItem value="Pigs">{t("content.pigs")}</SelectItem>
             </SelectContent>

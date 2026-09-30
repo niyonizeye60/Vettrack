@@ -58,11 +58,12 @@ export function canAccessMarketplaceCategory(
 
 /**
  * Which kind of listing `role` submits as a seller: farmers sell animals, pharmacies
- * sell drugs. Null for everyone else. Decided from the role, never from the request
- * body, so a farmer cannot post into the pharmacy and vice versa.
+ * sell drugs, feed suppliers sell feed. Null for everyone else. Decided from the role,
+ * never from the request body, so a farmer cannot post into the pharmacy and vice versa.
  */
 export function sellerListingKind(role: unknown): ListingKind | null {
   if (can(role, "marketplace.listings.request")) return "animal"
   if (can(role, "marketplace.drugs.request")) return "drug"
+  if (can(role, "marketplace.feeds.request")) return "feed"
   return null
 }

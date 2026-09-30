@@ -66,7 +66,7 @@ interface Announcement {
   priority: "low" | "normal" | "high" | "critical"
   active: boolean
   targetType: "all" | "role" | "user"
-  targetRole: "farmer" | "doctor" | "pharmacy" | "admin" | null
+  targetRole: "farmer" | "doctor" | "pharmacy" | "feed_supplier" | "admin" | null
   targetUserId: string | null
   targetUserName: string | null
   createdAt: string | Date

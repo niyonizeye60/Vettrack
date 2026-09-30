@@ -4,8 +4,9 @@ import { CATEGORY_TO_SOURCE, getOrderById, sellerLedgerId, type Order, type Orde
 import { recordIncome } from "@/lib/db-income"
 import { applyRefundToPayout } from "@/lib/db-payouts"
 import { returnStock } from "@/lib/stock"
-import { notifyFarmer, notifyFinance } from "@/lib/marketplace-notifications"
+import { notifyFarmer, notifyFinance, sellerSalesPath } from "@/lib/marketplace-notifications"
 import { sendRefundEmail } from "@/lib/email"
+import { can } from "@/lib/roles"
 import {
   type RefundDecision,
   type RefundMethod,
@@ -19,7 +20,7 @@ const DB_NAME = "ntdm_animal_hospital"
 /**
  * Paying a buyer back for some or all of a paid order.
  *
- * A request (from the pharmacy whose items they are, or from finance) waits in
+ * A request (from the seller whose items they are, or from finance) waits in
  * "requested" until finance records that the money went back - Vettrack refunds
  * through its own channels, the app does not move money. Completing it then unwinds
  * the sale for those units: a negative ledger entry in the refund's month, the
@@ -100,7 +101,7 @@ export async function refundableQuantities(order: Order): Promise<Record<string,
 
 /**
  * Ask for a refund. `sellerId` limits the request to that seller's own lines - a
- * pharmacy can't ask to refund someone else's items.
+ * pharmacy or feed supplier can't ask to refund someone else's items.
  */
 export async function createRefundRequest(
   input: RefundRequestInput,
@@ -262,7 +263,7 @@ export async function completeRefund(
         (note.clawback > 0
           ? `You had already been paid RWF ${note.clawback.toLocaleString()} for them - Vettrack will contact you to settle it.`
           : `Your share of RWF ${share.toLocaleString()} is no longer due.`),
-      "/pharmacy-portal/sales"
+      sellerSalesPath(note.lines[0].category)
     )
   }
 
@@ -342,12 +343,13 @@ export async function declineRefund(id: string, decider: Actor, note: string): P
   )
   if (!refund) throw new RefundError("This refund has already been decided")
 
-  if (refund.requestedBy.role === "pharmacy") {
+  // A seller asked for it; finance opening one on its own needs no reply.
+  if (can(refund.requestedBy.role, "marketplace.sales.own")) {
     await notifyFarmer(
       refund.requestedBy.id,
       "Refund request declined",
       `Your refund request on order ${refund.reference} was declined. ${note.trim()}`,
-      "/pharmacy-portal/sales"
+      sellerSalesPath(refund.lines[0]?.category)
     )
   }
   return refund

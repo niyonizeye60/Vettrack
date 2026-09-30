@@ -6,7 +6,8 @@ import type { Order, OrderBuyer } from "@/lib/db-orders"
 const DB_NAME = "ntdm_animal_hospital"
 
 /**
- * A seller's record of what sold through the cart - today, a pharmacy's drugs - with
+ * A seller's record of what sold through the cart - a pharmacy's drugs, a feed
+ * supplier's feed - with
  * what it needs to hand each order over: who bought it, how to reach them, where they
  * are, and how they paid.
  *

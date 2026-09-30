@@ -1,6 +1,6 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
-import { notifyFarmer, sellerListingsPath } from "@/lib/marketplace-notifications"
+import { notifyFarmer, sellerListingFallbackName, sellerListingsPath } from "@/lib/marketplace-notifications"
 import { heldUnits, isStockTracked } from "@/lib/stock"
 
 const DB_NAME = "ntdm_animal_hospital"
@@ -123,7 +123,7 @@ export async function setListingHidden(
 
   // A seller finding their listing gone from the marketplace should hear why.
   if (options.notify !== false && listing.sellerId && ObjectId.isValid(listing.sellerId)) {
-    const fallbackName = listing.category === "drugs" ? "Your drug" : "Your animal"
+    const fallbackName = sellerListingFallbackName(listing.category)
     await notifyFarmer(
       listing.sellerId,
       hidden ? "Your listing was hidden" : "Your listing is visible again",

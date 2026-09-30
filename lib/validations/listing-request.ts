@@ -4,13 +4,13 @@ import { isDateString } from "@/lib/product-rules"
 /**
  * What a seller submits when they ask Vettrack to put something on the marketplace.
  *
- * Two kinds go through this flow: a farmer's animal (published to "sales") and a
- * pharmacy's drug (published to "drugs"). Both share one queue, one review screen and
- * one lifecycle; only the form fields differ. Feed is still Vettrack's own stock,
- * created directly by staff, as are drugs Vettrack sells itself.
+ * Three kinds go through this flow: a farmer's animal (published to "sales"), a
+ * pharmacy's drug (published to "drugs") and a feed supplier's feed (published to
+ * "feeds"). All share one queue, one review screen and one lifecycle; only the form
+ * fields differ. Drugs and feed Vettrack sells itself are created directly by staff.
  */
 
-export const LISTING_KINDS = ["animal", "drug"] as const
+export const LISTING_KINDS = ["animal", "drug", "feed"] as const
 export type ListingKind = (typeof LISTING_KINDS)[number]
 
 export function isListingKind(value: unknown): value is ListingKind {
@@ -18,7 +18,7 @@ export function isListingKind(value: unknown): value is ListingKind {
 }
 
 /** The storefront category each kind publishes into. */
-export const LISTING_KIND_CATEGORY = { animal: "sales", drug: "drugs" } as const satisfies Record<ListingKind, string>
+export const LISTING_KIND_CATEGORY = { animal: "sales", drug: "drugs", feed: "feeds" } as const satisfies Record<ListingKind, string>
 
 export const ANIMAL_TYPES = ["Cow", "Goat", "Sheep", "Pig", "Chicken", "Dog", "Cat"] as const
 export const ANIMAL_SEXES = ["Male", "Female"] as const
@@ -97,10 +97,46 @@ export const drugRequestSchema = z.object({
 
 export type DrugRequestInput = z.infer<typeof drugRequestSchema>
 
+/** The values staff already use for feed they list themselves, and the feeds page filters on. */
+export const FEED_TYPES = ["Hay", "Concentrates", "Minerals", "Supplements"] as const
+export const FEED_QUALITIES = ["High", "Medium", "Low"] as const
+export const FEED_TARGET_ANIMALS = ["Cattle", "Goats", "Sheep", "Poultry", "Pigs"] as const
+
+/** What a feed supplier submits when it asks for a feed to go on the feeds storefront. */
+export const feedRequestSchema = z.object({
+  title: z.string().trim().min(3, "Give the feed a name").max(120),
+  feedType: z.enum(FEED_TYPES, { errorMap: () => ({ message: "Choose the type of feed" }) }),
+  // "" is "not stated": one enum rather than a union, so a bad value gets a readable message.
+  quality: z.enum(["", ...FEED_QUALITIES], { errorMap: () => ({ message: "Choose the quality from the list" }) }).optional(),
+  targetAnimal: z
+    .enum(["", ...FEED_TARGET_ANIMALS], { errorMap: () => ({ message: "Choose the animal from the list" }) })
+    .optional(),
+  /** What one unit is - "50 kg bag", "bale". The price is per unit, so it is required. */
+  unit: z.string().trim().min(1, "Say what one unit is, e.g. a 50 kg bag").max(40),
+  proposedPrice: z.coerce.number().int("Enter a whole number").positive("Enter a price above zero").max(100_000_000),
+  /** Units to sell; handled exactly like a drug's stock (see drugRequestSchema). */
+  stock: z.coerce.number().int("Enter a whole number").min(1, "Enter how many you have in stock").max(MAX_STOCK),
+  /**
+   * Optional: hay and minerals often carry no date. When given, the same sell-by rules
+   * as a drug apply - see assertListableExpiry in lib/db-listing-requests.ts.
+   */
+  expiryDate: expiryDateSchema.optional().or(z.literal("")),
+  batchNumber: z.string().trim().max(60).optional().or(z.literal("")),
+  description: z.string().trim().min(10, "Describe the feed in a sentence or two").max(2000),
+  district: z.string().trim().min(1, "Choose a district"),
+  sector: z.string().trim().max(80).optional().or(z.literal("")),
+  village: z.string().trim().max(80).optional().or(z.literal("")),
+  photos: z.array(z.string().min(1)).min(1, "Add at least one photo").max(MAX_LISTING_PHOTOS),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+})
+
+export type FeedRequestInput = z.infer<typeof feedRequestSchema>
+
 /**
- * A pharmacy correcting how many units of a published drug it has - after restocking,
- * or after selling some in its own shop. Zero is allowed: it takes the drug off the
- * pharmacy page until there is stock again. Goes live at once, without review.
+ * A seller correcting how many units of a published product it has - after restocking,
+ * or after selling some in its own shop. Zero is allowed: it takes the product off its
+ * storefront until there is stock again. Goes live at once, without review.
  */
 export const stockUpdateSchema = z.object({
   stock: z.coerce.number().int("Enter a whole number").min(0, "Stock can't be below zero").max(MAX_STOCK),
@@ -112,13 +148,20 @@ export const stockUpdateSchema = z.object({
 export type SellerSubmission =
   | { kind: "animal"; data: ListingRequestInput }
   | { kind: "drug"; data: DrugRequestInput }
+  | { kind: "feed"; data: FeedRequestInput }
+
+const SUBMISSION_SCHEMAS = {
+  animal: listingRequestSchema,
+  drug: drugRequestSchema,
+  feed: feedRequestSchema,
+} as const satisfies Record<ListingKind, z.ZodTypeAny>
 
 /** Validate a request body against the form for `kind`. */
 export function parseSellerSubmission(
   kind: ListingKind,
   body: unknown
 ): { success: true; submission: SellerSubmission } | { success: false; error: string } {
-  const parsed = kind === "drug" ? drugRequestSchema.safeParse(body) : listingRequestSchema.safeParse(body)
+  const parsed = SUBMISSION_SCHEMAS[kind].safeParse(body)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message || "Invalid request" }
   }
@@ -145,6 +188,7 @@ export const LISTING_CHANGE_FIELDS = [
   "title", "animalType", "breed", "age", "sex", "drugType", "usageDescription", "price", "description",
   "district", "sector", "village", "photos", "gps",
   "expiryDate", "batchNumber", "registrationNumber", "prescriptionRequired",
+  "feedType", "quality", "targetAnimal", "unit",
 ] as const
 export type ListingChangeField = (typeof LISTING_CHANGE_FIELDS)[number]
 
@@ -168,6 +212,10 @@ export const LISTING_CHANGE_LABEL_KEYS: Record<ListingChangeField, string> = {
   batchNumber: "pharmacy.batchNumber",
   registrationNumber: "pharmacy.registrationNumber",
   prescriptionRequired: "pharmacy.prescriptionRequired",
+  feedType: "content.feedType",
+  quality: "content.quality",
+  targetAnimal: "content.targetAnimal",
+  unit: "feedSupplier.unit",
 }
 
 /** Marketplace admin's decision on a pending request. */

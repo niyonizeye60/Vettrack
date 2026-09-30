@@ -18,9 +18,9 @@ import { earliestAcceptableExpiry, MIN_DAYS_ON_SALE } from "@/lib/product-rules"
 const DB_NAME = "ntdm_animal_hospital"
 
 /**
- * A seller's request to have something listed: a farmer's animal, or a pharmacy's
- * drug (`kind`). Both kinds share this collection, the review queue and every
- * transition below; only the fields they carry differ.
+ * A seller's request to have something listed: a farmer's animal, a pharmacy's drug
+ * or a feed supplier's feed (`kind`). All kinds share this collection, the review
+ * queue and every transition below; only the fields they carry differ.
  *
  * `farmerId` / `farmerName` predate pharmacies and hold whichever seller submitted
  * the request - renaming them would mean migrating every existing document.
@@ -49,18 +49,27 @@ export interface ListingRequest {
   drugType?: string | null
   usageDescription?: string | null
   /**
-   * Units the pharmacy had when it asked (drugs only). Copied onto the listing at
+   * Units the seller had when it asked (drugs and feed). Copied onto the listing at
    * approval; from then on the live count is the listing's `stock`, which the
-   * pharmacy updates directly - see updateListingStock.
+   * seller updates directly - see updateListingStock.
    */
   stock?: number | null
-  /** Drugs only: expiry date on the pack, YYYY-MM-DD. Published as the listing's `expiresOn`. */
+  /**
+   * Expiry date on the pack, YYYY-MM-DD: required on a drug, optional on feed. Published
+   * as the listing's `expiresOn`.
+   */
   expiryDate?: string | null
   batchNumber?: string | null
   /** Rwanda FDA registration number. */
   registrationNumber?: string | null
   /** Sold only against a vet's prescription uploaded at checkout. */
   prescriptionRequired?: boolean
+  /** Feed fields: null or absent on the other kinds. */
+  feedType?: string | null
+  quality?: string | null
+  targetAnimal?: string | null
+  /** What one unit is ("50 kg bag"). Published as the listing's `duration`, which the storefront shows beside the price. */
+  unit?: string | null
   proposedPrice: number
   description: string
   district: string
@@ -133,12 +142,19 @@ export function listingKindOf(request: Pick<ListingRequest, "kind">): ListingKin
 
 /** Matches one kind; animals also match the older documents that carry no `kind`. */
 function kindFilter(kind: ListingKind) {
-  return kind === "drug" ? { kind: "drug" } : { kind: { $ne: "drug" } }
+  return kind === "animal" ? { kind: { $nin: ["drug", "feed"] } } : { kind }
 }
 
 /** For messages sellers read, so a pharmacy never hears about "this animal". */
 function noun(kind: ListingKind) {
-  return kind === "drug" ? "drug" : "animal"
+  return kind
+}
+
+/** The public page each kind goes live on, as sellers are told. */
+const STOREFRONT_NAME: Record<ListingKind, string> = {
+  animal: "the marketplace",
+  drug: "the pharmacy page",
+  feed: "the feeds page",
 }
 
 function emptyToNull(value: string | undefined | null): string | null {
@@ -150,6 +166,7 @@ type SellerFields = Pick<
   ListingRequest,
   | "title" | "description" | "proposedPrice" | "photos" | "animalType" | "breed" | "age" | "sex"
   | "drugType" | "usageDescription" | "expiryDate" | "batchNumber" | "registrationNumber" | "prescriptionRequired"
+  | "feedType" | "quality" | "targetAnimal" | "unit"
   | "district" | "sector" | "village" | "latitude" | "longitude" | "sellerPhone" | "sellerEmail"
 >
 
@@ -159,8 +176,9 @@ type SellerFields = Pick<
  * the storefront copy cannot drift from what the seller entered.
  *
  * Each kind writes the fields its storefront page reads: the animal sales page reads
- * animalType/breed/age/sex, the pharmacy page drugType/usageDescription - the same
- * fields staff fill in when they list a drug themselves.
+ * animalType/breed/age/sex, the pharmacy page drugType/usageDescription, the feeds
+ * page feedType/quality/targetAnimal - the same fields staff fill in when they list a
+ * drug or feed themselves.
  */
 function publishedFields(kind: ListingKind, source: SellerFields) {
   const fallback = resolveLocation(source.district, source.sector)
@@ -175,7 +193,18 @@ function publishedFields(kind: ListingKind, source: SellerFields) {
           registrationNumber: source.registrationNumber ?? "",
           prescriptionRequired: source.prescriptionRequired === true,
         }
-      : { animalType: source.animalType ?? "", breed: source.breed ?? "", age: source.age ?? "", sex: source.sex ?? "" }
+      : kind === "feed"
+        ? {
+            feedType: source.feedType ?? "",
+            quality: source.quality ?? "",
+            targetAnimal: source.targetAnimal ?? "",
+            // Shown beside the price on the feeds page ("RWF 25,000 / 50 kg bag").
+            duration: source.unit ?? "",
+            // Null when the feed has no date, which the public filter lets through.
+            expiresOn: source.expiryDate ?? null,
+            batchNumber: source.batchNumber ?? "",
+          }
+        : { animalType: source.animalType ?? "", breed: source.breed ?? "", age: source.age ?? "", sex: source.sex ?? "" }
   return {
     name: source.title,
     description: source.description,
@@ -203,16 +232,30 @@ function requestFieldsFromInput(
   submission: SellerSubmission
 ) {
   const input = submission.data
-  // Both kinds write every column - the other kind's as null - so a document's
+  // Every kind writes every column - the other kinds' as null - so a document's
   // shape doesn't depend on which form produced it.
+  const none = {
+    animalId: null,
+    animalType: null,
+    breed: null,
+    age: null,
+    sex: null,
+    drugType: null,
+    usageDescription: null,
+    stock: null,
+    expiryDate: null,
+    batchNumber: null,
+    registrationNumber: null,
+    prescriptionRequired: false,
+    feedType: null,
+    quality: null,
+    targetAnimal: null,
+    unit: null,
+  }
   const kindFields =
     submission.kind === "drug"
       ? {
-          animalId: null,
-          animalType: null,
-          breed: null,
-          age: null,
-          sex: null,
+          ...none,
           drugType: submission.data.drugType,
           usageDescription: emptyToNull(submission.data.usageDescription),
           stock: submission.data.stock,
@@ -221,20 +264,25 @@ function requestFieldsFromInput(
           registrationNumber: emptyToNull(submission.data.registrationNumber),
           prescriptionRequired: submission.data.prescriptionRequired,
         }
-      : {
-          animalId: emptyToNull(submission.data.animalId),
-          animalType: submission.data.animalType,
-          breed: emptyToNull(submission.data.breed),
-          age: emptyToNull(submission.data.age),
-          sex: submission.data.sex ?? null,
-          drugType: null,
-          usageDescription: null,
-          stock: null,
-          expiryDate: null,
-          batchNumber: null,
-          registrationNumber: null,
-          prescriptionRequired: false,
-        }
+      : submission.kind === "feed"
+        ? {
+            ...none,
+            feedType: submission.data.feedType,
+            quality: emptyToNull(submission.data.quality),
+            targetAnimal: emptyToNull(submission.data.targetAnimal),
+            unit: submission.data.unit.trim(),
+            stock: submission.data.stock,
+            expiryDate: emptyToNull(submission.data.expiryDate),
+            batchNumber: emptyToNull(submission.data.batchNumber),
+          }
+        : {
+            ...none,
+            animalId: emptyToNull(submission.data.animalId),
+            animalType: submission.data.animalType,
+            breed: emptyToNull(submission.data.breed),
+            age: emptyToNull(submission.data.age),
+            sex: submission.data.sex ?? null,
+          }
   return {
     farmerName: farmer.name,
     sellerPhone: (farmer.phone ?? "").trim(),
@@ -252,15 +300,14 @@ function requestFieldsFromInput(
   }
 }
 
-/** A form's kind, read from which columns it filled. */
-function listingKindOfFields(fields: ReturnType<typeof requestFieldsFromInput>): ListingKind {
-  return fields.drugType ? "drug" : "animal"
-}
-
 const clip = (value: string) => (value.length > 300 ? `${value.slice(0, 297)}...` : value)
 
 /** What the seller changed, field by field - the marketplace's view of an edit. */
-function diffListing(before: ListingRequest, after: ReturnType<typeof requestFieldsFromInput>): ListingChange[] {
+function diffListing(
+  kind: ListingKind,
+  before: ListingRequest,
+  after: ReturnType<typeof requestFieldsFromInput>
+): ListingChange[] {
   const changes: ListingChange[] = []
   // Compared in full and only clipped for storage, so a long description edited near
   // its end still registers as changed.
@@ -281,10 +328,14 @@ function diffListing(before: ListingRequest, after: ReturnType<typeof requestFie
   compare("expiryDate", before.expiryDate ?? null, after.expiryDate)
   compare("batchNumber", before.batchNumber ?? null, after.batchNumber)
   compare("registrationNumber", before.registrationNumber ?? null, after.registrationNumber)
-  if (listingKindOfFields(after) === "drug") {
+  if (kind === "drug") {
     const yesNo = (value: boolean | undefined) => (value ? "Yes" : "No")
     compare("prescriptionRequired", yesNo(before.prescriptionRequired), yesNo(after.prescriptionRequired))
   }
+  compare("feedType", before.feedType ?? null, after.feedType)
+  compare("quality", before.quality ?? null, after.quality)
+  compare("targetAnimal", before.targetAnimal ?? null, after.targetAnimal)
+  compare("unit", before.unit ?? null, after.unit)
   compare("price", before.proposedPrice, after.proposedPrice)
   compare("description", before.description, after.description)
   compare("district", before.district, after.district)
@@ -299,16 +350,16 @@ function diffListing(before: ListingRequest, after: ReturnType<typeof requestFie
 }
 
 /**
- * A drug must stay on sale for at least MIN_DAYS_ON_SALE after it is listed, under the
- * sell-by cutoff in force now. Checked here rather than in the form schema because the
- * cutoff is a superadmin setting.
+ * A drug - or feed that has an expiry date - must stay on sale for at least
+ * MIN_DAYS_ON_SALE after it is listed, under the sell-by cutoff in force now. Checked
+ * here rather than in the form schema because the cutoff is a superadmin setting.
  */
 async function assertListableExpiry(submission: SellerSubmission): Promise<void> {
-  if (submission.kind !== "drug") return
+  if (submission.kind === "animal" || !submission.data.expiryDate) return
   const earliest = earliestAcceptableExpiry(await getSellByDays())
   if (submission.data.expiryDate < earliest) {
     throw new ListingRequestError(
-      `This drug expires too soon to list: it must stay on sale for at least ${MIN_DAYS_ON_SALE} days. ` +
+      `This ${noun(submission.kind)} expires too soon to list: it must stay on sale for at least ${MIN_DAYS_ON_SALE} days. ` +
         `Choose an expiry date on or after ${earliest}.`
     )
   }
@@ -338,7 +389,7 @@ export async function createListingRequest(
   const result = await collection.insertOne(doc as ListingRequest)
 
   await notifySuperadmin(
-    submission.kind === "drug" ? "New drug listing request" : "New listing request",
+    submission.kind === "animal" ? "New listing request" : `New ${noun(submission.kind)} listing request`,
     `${farmer.name} submitted "${doc.title}" for review.`,
     "/marketplace/requests"
   )
@@ -415,11 +466,12 @@ export async function approveRequest(
 
   const kind = listingKindOf(request)
   const service = {
-    ...publishedFields(kind, request),
-    // A drug counts its units from here on (lib/pharmacy-stock.ts). Not part of
-    // publishedFields: an edit of the live listing must not reset the count.
-    ...(kind === "drug" && typeof request.stock === "number" ? { stock: request.stock, stockHolds: [] } : {}),
+    // Before the seller's fields, so feed's unit (published as `duration`) wins.
     duration: "",
+    ...publishedFields(kind, request),
+    // Drugs and feed count their units from here on (lib/stock.ts). Not part of
+    // publishedFields: an edit of the live listing must not reset the count.
+    ...(kind !== "animal" && typeof request.stock === "number" ? { stock: request.stock, stockHolds: [] } : {}),
     category: LISTING_KIND_CATEGORY[kind],
     categoryId,
     sellerId: request.farmerId,
@@ -449,10 +501,10 @@ export async function approveRequest(
 
   await notifyFarmer(
     request.farmerId,
-    kind === "drug" ? "Your drug is now listed" : "Your animal is now listed",
-    kind === "drug"
-      ? `"${request.title}" is live on the pharmacy page.`
-      : `"${request.title}" is live on the marketplace. Buyers who want it will be put in touch with you through Vettrack.`,
+    `Your ${noun(kind)} is now listed`,
+    kind === "animal"
+      ? `"${request.title}" is live on the marketplace. Buyers who want it will be put in touch with you through Vettrack.`
+      : `"${request.title}" is live on ${STOREFRONT_NAME[kind]}.`,
     sellerListingsPath(LISTING_KIND_CATEGORY[kind])
   )
 
@@ -823,9 +875,9 @@ export async function editPublishedListing(
   }
 
   const fields = requestFieldsFromInput(farmer, submission)
-  const changes = diffListing(request, fields)
+  const changes = diffListing(submission.kind, request, fields)
   // Only a new expiry date is held to the listing rule: an unrelated edit (a price)
-  // must still work on a drug whose date is getting close.
+  // must still work on a product whose date is getting close.
   if (changes.some((change) => change.field === "expiryDate")) await assertListableExpiry(submission)
   // The stock on the form is what was asked for at submission; the live count is
   // changed with updateListingStock, so an edit keeps the original on the request.
@@ -881,10 +933,10 @@ export async function editPublishedListing(
 }
 
 /**
- * A pharmacy setting how many units of a published drug it has. Goes live at once
- * and without review - it is a count, not a change to what is being sold - so
- * nobody is notified. Setting 0 takes the drug off the pharmacy page; anything above
- * brings it back.
+ * A pharmacy or feed supplier setting how many units of a published product it has.
+ * Goes live at once and without review - it is a count, not a change to what is being
+ * sold - so nobody is notified. Setting 0 takes the product off its storefront;
+ * anything above brings it back.
  */
 export async function updateListingStock(
   id: string,
@@ -893,17 +945,18 @@ export async function updateListingStock(
   lowStockAt?: number
 ): Promise<void> {
   const request = await getRequestById(id)
-  if (!request || request.farmerId !== seller._id || request.farmerDeletedAt || listingKindOf(request) !== "drug") {
+  const kind = request ? listingKindOf(request) : null
+  if (!request || !kind || request.farmerId !== seller._id || request.farmerDeletedAt || kind === "animal") {
     throw new ListingRequestError("Request not found")
   }
   if (request.status !== "approved" || !request.publishedServiceId) {
-    throw new ListingRequestError("Only a published drug has stock to update")
+    throw new ListingRequestError(`Only a published ${noun(kind)} has stock to update`)
   }
   if (request.removal?.status === "approved") {
-    throw new ListingRequestError("This drug was removed from the pharmacy page")
+    throw new ListingRequestError(`This ${noun(kind)} was removed from ${STOREFRONT_NAME[kind]}`)
   }
   if (!(await setStock(request.publishedServiceId, stock, { sellerId: seller._id, lowStockAt }))) {
-    throw new ListingRequestError("This drug is no longer on the pharmacy page")
+    throw new ListingRequestError(`This ${noun(kind)} is no longer on ${STOREFRONT_NAME[kind]}`)
   }
 }
 
@@ -939,6 +992,10 @@ export function serializeRequest(request: ListingRequest, listing?: ListingVisib
     batchNumber: request.batchNumber ?? null,
     registrationNumber: request.registrationNumber ?? null,
     prescriptionRequired: request.prescriptionRequired === true,
+    feedType: request.feedType ?? null,
+    quality: request.quality ?? null,
+    targetAnimal: request.targetAnimal ?? null,
+    unit: request.unit ?? null,
     proposedPrice: request.proposedPrice,
     description: request.description,
     district: request.district,

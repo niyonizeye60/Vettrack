@@ -13,25 +13,30 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Loader2, Check, X, MapPin, Phone, ExternalLink, Expand, Package, CalendarClock, FileCheck } from "lucide-react"
+import { Loader2, Check, X, MapPin, Phone, ExternalLink, Expand, Package, CalendarClock, FileCheck, Tag } from "lucide-react"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
 import { LISTING_KIND_CATEGORY, type ListingKind } from "@/lib/validations/listing-request"
 
 interface ListingRequest {
   id: string
   kind: ListingKind
-  /** The seller - a farmer for an animal, a pharmacy for a drug. */
+  /** The seller - a farmer for an animal, a pharmacy for a drug, a feed supplier for feed. */
   farmerName: string
   title: string
   animalType: string | null
   drugType: string | null
   usageDescription: string | null
-  /** Units the pharmacy says it has (drugs only). */
+  /** Units the seller says it has (drugs and feed). */
   stock: number | null
   expiryDate: string | null
   batchNumber: string | null
   registrationNumber: string | null
   prescriptionRequired: boolean
+  feedType: string | null
+  quality: string | null
+  targetAnimal: string | null
+  /** What one unit of feed is, e.g. "50 kg bag". */
+  unit: string | null
   breed: string | null
   age: string | null
   sex: string | null
@@ -55,7 +60,19 @@ interface ListingRequest {
 interface Category { id: string; name: string }
 
 /** Where a published listing of each kind lives on the public site. */
-const LISTING_PAGE: Record<ListingKind, string> = { animal: "/animal-sales", drug: "/pharmacy" }
+const LISTING_PAGE: Record<ListingKind, string> = { animal: "/animal-sales", drug: "/pharmacy", feed: "/feeds" }
+
+const KIND_TAB_LABEL_KEYS: Record<ListingKind, string> = {
+  animal: "marketplace.kindAnimals",
+  drug: "marketplace.kindDrugs",
+  feed: "marketplace.kindFeeds",
+}
+
+const APPROVE_DESC_KEYS: Record<ListingKind, string> = {
+  animal: "marketplace.approveDesc",
+  drug: "marketplace.approveDescDrug",
+  feed: "marketplace.approveDescFeed",
+}
 
 // "removal" is not a request status: it lists published listings whose seller has
 // asked for them to be taken down, fetched from its own queue.
@@ -63,9 +80,9 @@ const TABS = ["pending", "removal", "approved", "rejected"] as const
 type Tab = (typeof TABS)[number]
 
 /**
- * The review queue for sellers' posting requests: farmers' animals and pharmacies'
- * drugs, one kind at a time. `allowedKinds` follows the reviewer's category grant;
- * the API enforces the same rule on every call.
+ * The review queue for sellers' posting requests: farmers' animals, pharmacies' drugs
+ * and feed suppliers' feed, one kind at a time. `allowedKinds` follows the reviewer's
+ * category grant; the API enforces the same rule on every call.
  */
 export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingKind[] }) {
   const { t } = useLanguage()
@@ -205,7 +222,7 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
           <TabsList>
             {allowedKinds.map((value) => (
               <TabsTrigger key={value} value={value}>
-                {value === "drug" ? t("marketplace.kindDrugs") : t("marketplace.kindAnimals")}
+                {t(KIND_TAB_LABEL_KEYS[value])}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -276,7 +293,9 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-medium text-gray-900">{request.title}</h3>
-                    <Badge variant="secondary">{request.kind === "drug" ? request.drugType : request.animalType}</Badge>
+                    <Badge variant="secondary">
+                      {request.kind === "drug" ? request.drugType : request.kind === "feed" ? request.feedType : request.animalType}
+                    </Badge>
                     {request.resubmitCount > 0 && (
                       <Badge className="bg-amber-100 text-amber-800" variant="secondary">
                         {t("marketplace.resubmitted")} · {request.resubmitCount}
@@ -330,6 +349,31 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
                         </p>
                       )}
                     </>
+                  ) : request.kind === "feed" ? (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                      {request.stock != null && (
+                        <span className="flex items-center gap-1.5">
+                          <Package className="h-3.5 w-3.5 text-gray-400" />
+                          {t("pharmacy.inStockCount")}: {request.stock.toLocaleString()}
+                          {request.unit ? ` × ${request.unit}` : ""}
+                        </span>
+                      )}
+                      {(request.targetAnimal || request.quality) && (
+                        <span className="flex items-center gap-1.5">
+                          <Tag className="h-3.5 w-3.5 text-gray-400" />
+                          {[request.targetAnimal, request.quality && `${request.quality} ${t("feeds.quality")}`]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      )}
+                      {request.expiryDate && (
+                        <span className="flex items-center gap-1.5">
+                          <CalendarClock className="h-3.5 w-3.5 text-gray-400" />
+                          {t("pharmacy.expiresOn")} {request.expiryDate}
+                        </span>
+                      )}
+                      {request.batchNumber && <span>{t("pharmacy.batchNumber")}: {request.batchNumber}</span>}
+                    </div>
                   ) : (
                     <p className="text-sm text-gray-600">
                       {[request.breed, request.age, request.sex].filter(Boolean).join(" · ")}
@@ -371,6 +415,9 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
                 <div className="flex flex-col gap-2 lg:w-48 flex-shrink-0">
                   <p className="text-lg font-semibold text-gray-900">
                     RWF {request.proposedPrice.toLocaleString()}
+                    {request.kind === "feed" && request.unit && (
+                      <span className="text-xs font-normal text-gray-500"> / {request.unit}</span>
+                    )}
                   </p>
 
                   {tab === "removal" ? (
@@ -444,7 +491,7 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              {approveTarget?.kind === "drug" ? t("marketplace.approveDescDrug") : t("marketplace.approveDesc")}{" "}
+              {t(APPROVE_DESC_KEYS[approveTarget?.kind ?? "animal"])}{" "}
               <strong>{approveTarget?.title}</strong>
             </p>
             <div>

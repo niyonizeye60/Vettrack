@@ -53,6 +53,7 @@ const ROLE_BADGE_COLOR: Record<string, string> = {
   marketplace_admin: "bg-amber-100 text-amber-800",
   finance_manager: "bg-teal-100 text-teal-800",
   pharmacy: "bg-cyan-100 text-cyan-800",
+  feed_supplier: "bg-lime-100 text-lime-800",
 }
 
 // Same translation keys users-management.tsx's translateRole uses, so a role reads the
@@ -65,6 +66,7 @@ const ROLE_LABEL_KEY: Record<string, string> = {
   marketplace_admin: "superadmin.marketplaceAdmin",
   finance_manager: "superadmin.financeManager",
   pharmacy: "superadmin.pharmacy",
+  feed_supplier: "superadmin.feedSupplier",
 }
 
 const CATEGORY_META: Record<string, { label: string; icon: any; color: string }> = {
@@ -236,6 +238,7 @@ export default function ActivityLogPageClient({ initialData, initialCounts }: Ac
                 <SelectItem value="marketplace_admin">{t('superadmin.marketplaceAdmin') || 'Marketplace Admin'}</SelectItem>
                 <SelectItem value="finance_manager">{t('superadmin.financeManager') || 'Finance Manager'}</SelectItem>
                 <SelectItem value="pharmacy">{t('superadmin.pharmacy') || 'Pharmacy'}</SelectItem>
+                <SelectItem value="feed_supplier">{t('superadmin.feedSupplier') || 'Feed Supplier'}</SelectItem>
               </SelectContent>
             </Select>
             <Button

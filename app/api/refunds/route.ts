@@ -7,8 +7,8 @@ import { createRefundRequest, listRefunds, RefundError, serializeRefund } from "
 import { REFUND_STATUSES, refundRequestSchema, type RefundStatus } from "@/lib/validations/refund"
 
 /**
- * GET - finance sees every refund (`?status=` to filter); a pharmacy sees the refunds
- * touching its own items, each showing only its part.
+ * GET - finance sees every refund (`?status=` to filter); a seller (pharmacy or feed
+ * supplier) sees the refunds touching its own items, each showing only its part.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       const refunds = await listRefunds({ status })
       return NextResponse.json(refunds.map((refund) => serializeRefund(refund)))
     }
-    if (can(user.role, "marketplace.drugs.request")) {
+    if (can(user.role, "marketplace.sales.own")) {
       const refunds = await listRefunds({ status, sellerId: user._id })
       return NextResponse.json(refunds.map((refund) => serializeRefund(refund, { sellerId: user._id })))
     }
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST - ask for a refund. A pharmacy may only ask about its own items; finance may
+ * POST - ask for a refund. A seller may only ask about its own items; finance may
  * open one on any line of any paid order. Either way finance then completes or
  * declines it.
  */
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const isFinance = can(user.role, "finance.refunds")
-    const isSeller = can(user.role, "marketplace.drugs.request")
+    const isSeller = can(user.role, "marketplace.sales.own")
     if (!isFinance && !isSeller) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const parsed = refundRequestSchema.safeParse(await req.json())

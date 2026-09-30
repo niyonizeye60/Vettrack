@@ -25,7 +25,7 @@ export interface AnnouncementInput {
   active: boolean
   targetType: "all" | "role" | "user"
   // "admin" targeting is a superadmin-only capability; see assertTargetAllowed.
-  targetRole?: "farmer" | "doctor" | "pharmacy" | "admin" | ""
+  targetRole?: "farmer" | "doctor" | "pharmacy" | "feed_supplier" | "admin" | ""
   targetUserId?: string
   targetUserName?: string
   // Only honored for superadmin-created announcements; see createAnnouncement.
@@ -77,7 +77,7 @@ export async function getTargetableUsers(): Promise<TargetableUser[]> {
     const user = await requireStaff()
     const client = await clientPromise
     const db = client.db(DB)
-    const roles = user.role === "superadmin" ? ["farmer", "doctor", "pharmacy", "admin"] : ["farmer", "doctor", "pharmacy"]
+    const roles = user.role === "superadmin" ? [...EVERYONE_ROLES, "admin"] : EVERYONE_ROLES
     const users = await db.collection("users")
       .find({ role: { $in: roles } }, { projection: { name: 1, email: 1, role: 1 } })
       .sort({ name: 1 })
@@ -97,11 +97,11 @@ export async function getTargetableUsers(): Promise<TargetableUser[]> {
 // The roles an announcement can be addressed to. Checked on the server because
 // targetRole arrives from the client: without it, a crafted request could address
 // roles no picker offers (superadmin, marketplace_admin, ...).
-const TARGETABLE_ROLES = ["farmer", "doctor", "pharmacy", "admin"]
+const TARGETABLE_ROLES = ["farmer", "doctor", "pharmacy", "feed_supplier", "admin"]
 
-// Who "Everyone" reaches by email: every farmer, vet and pharmacy, never staff. Admins
-// may also pick any one of these users individually.
-const EVERYONE_ROLES = ["farmer", "doctor", "pharmacy"]
+// Who "Everyone" reaches by email: every farmer, vet, pharmacy and feed supplier, never
+// staff. Admins may also pick any one of these users individually.
+const EVERYONE_ROLES = ["farmer", "doctor", "pharmacy", "feed_supplier"]
 
 // Only a superadmin may target admins, whether by role or by individual user -
 // this is enforced here (not just hidden in the UI) so a crafted request from

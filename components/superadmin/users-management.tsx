@@ -316,6 +316,8 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
         return "bg-teal-100 text-teal-800"
       case "pharmacy":
         return "bg-cyan-100 text-cyan-800"
+      case "feed_supplier":
+        return "bg-lime-100 text-lime-800"
       case "doctor":
         return "bg-green-100 text-green-800"
       case "farmer":
@@ -339,6 +341,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
       case 'marketplace_admin': return t('superadmin.marketplaceAdmin')
       case 'finance_manager': return t('superadmin.financeManager')
       case 'pharmacy': return t('superadmin.pharmacy')
+      case 'feed_supplier': return t('superadmin.feedSupplier')
       default: return role
     }
   }
@@ -799,6 +802,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                       <SelectItem value="superadmin">{t('superadmin.superAdmin')}</SelectItem>
                       <SelectItem value="marketplace_admin">{t('superadmin.marketplaceAdmin')}</SelectItem>
                       <SelectItem value="pharmacy">{t('superadmin.pharmacy')}</SelectItem>
+                      <SelectItem value="feed_supplier">{t('superadmin.feedSupplier')}</SelectItem>
                     </SelectContent>
                   </Select>
                   {selectedUser._id === currentUserId && (
@@ -841,7 +845,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                     </div>
                   </div>
                 )}
-                {(editRole === "farmer" || editRole === "doctor" || editRole === "pharmacy") && (
+                {(editRole === "farmer" || editRole === "doctor" || editRole === "pharmacy" || editRole === "feed_supplier") && (
                   <>
                     <div>
                       <Label htmlFor="district">{t('superadmin.district')}</Label>
@@ -1120,6 +1124,10 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                     <RadioGroupItem value="pharmacy" id="create-pharmacy" />
                     <Label htmlFor="create-pharmacy">{t('superadmin.pharmacy')}</Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="feed_supplier" id="create-feed-supplier" />
+                    <Label htmlFor="create-feed-supplier">{t('superadmin.feedSupplier')}</Label>
+                  </div>
                 </RadioGroup>
               </div>
               
@@ -1176,7 +1184,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                 </div>
               )}
 
-              {(createUserData.role === "farmer" || createUserData.role === "doctor" || createUserData.role === "pharmacy") && (
+              {(createUserData.role === "farmer" || createUserData.role === "doctor" || createUserData.role === "pharmacy" || createUserData.role === "feed_supplier") && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="create-district">{t('superadmin.district')}</Label>

@@ -34,7 +34,7 @@ type Viewer = { _id: string; role?: string; marketplaceAccess?: unknown }
 
 /**
  * A reviewer for this request: holds the review capability and the category the
- * request publishes into ("sales" for an animal, "drugs" for a drug).
+ * request publishes into ("sales" for an animal, "drugs" for a drug, "feeds" for feed).
  */
 function canReview(user: Viewer, request: ListingRequest) {
   return (
@@ -110,8 +110,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
  *
  * A reviewer approves or rejects; the owning farmer withdraws a pending request,
  * resubmits a rejected one, edits a published one, or asks for a published one to be
- * removed (which a reviewer then approves or declines). A pharmacy also sets the
- * stock of its published drugs. Each transition is guarded inside the data layer by a
+ * removed (which a reviewer then approves or declines). A pharmacy or feed supplier
+ * also sets the stock of its published products. Each transition is guarded inside the data layer by a
  * status filter, so two reviewers racing on the same request cannot both publish
  * the animal and a double-clicked resubmit cannot queue it twice.
  */
@@ -184,7 +184,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json(serializeRequest(edited))
     }
 
-    // Pharmacy setting how many units of a published drug it has. Live at once.
+    // Pharmacy or feed supplier setting how many units of a published product it has. Live at once.
     if (body?.action === "stock") {
       if (!isOwningSeller(currentUser, request)) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 })

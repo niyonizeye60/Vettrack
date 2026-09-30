@@ -14,8 +14,8 @@ export interface ProductRef {
 }
 
 /**
- * Tell whoever looks after a product: the pharmacy that listed it, or marketplace
- * staff for Vettrack's own stock.
+ * Tell whoever looks after a product: the pharmacy or feed supplier that listed it,
+ * or marketplace staff for Vettrack's own stock.
  */
 export async function notifyProductOwner(product: ProductRef, title: string, message: string) {
   if (product.sellerId && ObjectId.isValid(product.sellerId)) {

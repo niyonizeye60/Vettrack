@@ -6,7 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Clock, CheckCircle2, XCircle, Pill, Plus, PackageX, Wallet, AlertTriangle, CalendarClock } from "lucide-react"
+import { Clock, CheckCircle2, XCircle, Wheat, Plus, PackageX, Wallet, AlertTriangle, CalendarClock } from "lucide-react"
 import { expiryState, isLowStock } from "@/lib/product-rules"
 import { useProductRules } from "@/hooks/use-product-rules"
 
@@ -32,11 +32,11 @@ interface SalesSummary {
 }
 
 /**
- * Where a pharmacy lands after login: how its drug requests stand, which live drugs
- * need attention (stock or expiry), and what it has earned. The work itself happens
- * on the drugs and sales pages.
+ * Where a feed supplier lands after login: how its feed requests stand, which live feed
+ * needs attention (stock or expiry), and what it has earned. The work itself happens on
+ * the feed and sales pages. The pharmacy dashboard's twin.
  */
-export default function PharmacyDashboardPage() {
+export default function FeedSupplierDashboardPage() {
   const { t } = useLanguage()
   const rules = useProductRules()
   const [requests, setRequests] = useState<RequestSummary[] | null>(null)
@@ -85,7 +85,7 @@ export default function PharmacyDashboardPage() {
 
   const attentionStats = [
     {
-      // Live drugs buyers can't see because every unit is sold or in a checkout.
+      // Live feed buyers can't see because every unit is sold or in a checkout.
       label: t("pharmacy.outOfStock"),
       value: count((r) => live(r) && available(r) === 0),
       icon: <PackageX className="h-5 w-5 text-red-600" />,
@@ -98,6 +98,7 @@ export default function PharmacyDashboardPage() {
       tint: "bg-amber-50",
     },
     {
+      // Feed without an expiry date never counts here.
       label: t("pharmacy.expiringOrOffSale"),
       value: count((r) => live(r) && ["soon", "unsellable"].includes(expiryState(r.expiryDate, rules.sellByDays))),
       icon: <CalendarClock className="h-5 w-5 text-orange-600" />,
@@ -133,12 +134,12 @@ export default function PharmacyDashboardPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">{t("pharmacy.dashboard")}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t("pharmacy.dashboardDesc")}</p>
+          <p className="text-sm text-gray-500 mt-1">{t("feedSupplier.dashboardDesc")}</p>
         </div>
         <Button asChild>
-          <Link href="/pharmacy-portal/listings">
+          <Link href="/feed-supplier/listings">
             <Plus className="h-4 w-4 mr-2" />
-            {t("pharmacy.requestListing")}
+            {t("feedSupplier.requestListing")}
           </Link>
         </Button>
       </div>
@@ -148,8 +149,8 @@ export default function PharmacyDashboardPage() {
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium text-gray-700">{t("pharmacy.needsAttention")}</h2>
-          <Link href="/pharmacy-portal/listings" className="text-sm font-medium text-primary hover:underline">
-            {t("pharmacy.goToListings")}
+          <Link href="/feed-supplier/listings" className="text-sm font-medium text-primary hover:underline">
+            {t("feedSupplier.goToListings")}
           </Link>
         </div>
         {statGrid(attentionStats)}
@@ -164,10 +165,10 @@ export default function PharmacyDashboardPage() {
               </div>
               <div>
                 <p className="font-medium text-gray-900">{t("pharmacy.sales")}</p>
-                <p className="text-xs text-gray-500">{t("pharmacy.collectedByVettrackNote")}</p>
+                <p className="text-xs text-gray-500">{t("feedSupplier.collectedByVettrackNote")}</p>
               </div>
             </div>
-            <Link href="/pharmacy-portal/sales" className="text-sm font-medium text-primary hover:underline">
+            <Link href="/feed-supplier/sales" className="text-sm font-medium text-primary hover:underline">
               {t("pharmacy.viewSales")}
             </Link>
           </div>
@@ -198,11 +199,11 @@ export default function PharmacyDashboardPage() {
 
       <Card className="bg-green-50 border-green-200">
         <CardContent className="p-4 flex gap-3">
-          <Pill className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
+          <Wheat className="h-5 w-5 text-green-700 flex-shrink-0 mt-0.5" />
           <div className="space-y-2">
-            <p className="text-sm text-green-900">{t("pharmacy.howItWorks")}</p>
-            <Link href="/pharmacy-portal/listings" className="text-sm font-medium text-green-800 hover:underline">
-              {t("pharmacy.goToListings")}
+            <p className="text-sm text-green-900">{t("feedSupplier.howItWorks")}</p>
+            <Link href="/feed-supplier/listings" className="text-sm font-medium text-green-800 hover:underline">
+              {t("feedSupplier.goToListings")}
             </Link>
           </div>
         </CardContent>

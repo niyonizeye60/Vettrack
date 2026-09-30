@@ -14,6 +14,7 @@ export const ROLES = [
   "marketplace_admin",
   "finance_manager",
   "pharmacy",
+  "feed_supplier",
 ] as const
 
 export type Role = (typeof ROLES)[number]
@@ -51,10 +52,10 @@ export function isPrivilegedRole(role: unknown): boolean {
 
 /**
  * The only roles the public register form may create. Everything else - the
- * privileged roles above, and pharmacy, whose drugs go on sale under Vettrack's name -
- * requires an authenticated superadmin. An allowlist rather than a blocklist, so a
- * new role is superadmin-only until someone decides otherwise. Enforced in
- * lib/actions/auth.ts.
+ * privileged roles above, and pharmacy and feed_supplier, whose products go on sale
+ * under Vettrack's name - requires an authenticated superadmin. An allowlist rather
+ * than a blocklist, so a new role is superadmin-only until someone decides otherwise.
+ * Enforced in lib/actions/auth.ts.
  */
 export const SELF_REGISTRATION_ROLES = ["farmer", "doctor"] as const
 
@@ -77,6 +78,11 @@ export const CAPABILITIES = {
   // A pharmacy asks for its drugs to go on the pharmacy storefront; the marketplace
   // reviews them in the same queue as farmers' animals.
   "marketplace.drugs.request": ["pharmacy"],
+  // A feed supplier does the same for its feed, on the feeds storefront.
+  "marketplace.feeds.request": ["feed_supplier"],
+  // Sellers whose products go through the cart: they see their own sales and payouts,
+  // and ask for refunds on their own items.
+  "marketplace.sales.own": ["pharmacy", "feed_supplier"],
   "finance.view": ["finance_manager", "superadmin"],
   "finance.export": ["finance_manager", "superadmin"],
   "finance.commission.configure": ["finance_manager", "superadmin"],
@@ -113,6 +119,8 @@ const ROLE_HOME_PATH: Record<Role, string> = {
   // Not "/pharmacy": that is the public drug storefront, and a portal prefix makes
   // the middleware demand a session for every path under it.
   pharmacy: "/pharmacy-portal",
+  // Not "/feeds" either, for the same reason: that is the public feed storefront.
+  feed_supplier: "/feed-supplier",
 }
 
 export function homePathForRole(role: unknown): string {

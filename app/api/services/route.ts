@@ -7,7 +7,7 @@ import { can, canViewSellerContact } from '@/lib/roles'
 import { canAccessMarketplaceCategory } from '@/lib/marketplace-access'
 import { logActivity } from '@/lib/activity-log'
 import { resolveLocation } from '@/lib/rwanda-geo'
-import { notifyFarmer, sellerListingsPath } from '@/lib/marketplace-notifications'
+import { notifyFarmer, sellerListingFallbackName, sellerListingsPath } from '@/lib/marketplace-notifications'
 import { availableUnits, isStockTracked, publicProductFilter } from '@/lib/stock'
 import { sweepExpiryAlerts } from '@/lib/product-alerts'
 import { getSellByDays } from '@/lib/db-settings'
@@ -265,7 +265,7 @@ export async function DELETE(request: NextRequest) {
       await notifyFarmer(
         existing.sellerId,
         'Your listing was removed',
-        `"${existing.name ?? (existing.category === 'drugs' ? 'Your drug' : 'Your animal')}" was removed from the marketplace by Vettrack.`,
+        `"${existing.name ?? sellerListingFallbackName(existing.category)}" was removed from the marketplace by Vettrack.`,
         sellerListingsPath(existing.category)
       )
     }
