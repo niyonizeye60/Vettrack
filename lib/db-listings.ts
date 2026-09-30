@@ -1,6 +1,7 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { notifyFarmer, sellerListingsPath } from "@/lib/marketplace-notifications"
+import { heldUnits, isStockTracked } from "@/lib/stock"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -23,6 +24,15 @@ export interface ListingVisibility {
    * cannot edit the listing while this is true - see sellerEditableFilter.
    */
   locked: boolean
+  /**
+   * Units the seller has that are not sold yet, or null for a listing that doesn't
+   * count stock (animals, and drugs published before stock existed).
+   */
+  stock: number | null
+  /** Of those, units set aside for checkouts that haven't been paid for yet. */
+  held: number
+  /** The seller's low-stock warning level; null means the default (lib/product-rules.ts). */
+  lowStockAt: number | null
 }
 
 export class ListingVisibilityError extends Error {}
@@ -68,7 +78,7 @@ export async function getListingVisibility(serviceIds: string[]): Promise<Map<st
   const docs = await services
     .find(
       { _id: { $in: valid.map((id) => new ObjectId(id)) } },
-      { projection: { hidden: 1, hiddenReason: 1, listingStatus: 1, reservedUntil: 1 } }
+      { projection: { hidden: 1, hiddenReason: 1, listingStatus: 1, reservedUntil: 1, stock: 1, stockHolds: 1, lowStockAt: 1 } }
     )
     .toArray()
 
@@ -78,6 +88,9 @@ export async function getListingVisibility(serviceIds: string[]): Promise<Map<st
       hidden: doc.hidden === true,
       reason: doc.hidden === true ? doc.hiddenReason ?? null : null,
       locked: isListingLocked({ listingStatus: doc.listingStatus, reservedUntil: doc.reservedUntil }, now),
+      stock: isStockTracked(doc) ? doc.stock : null,
+      held: heldUnits(doc, now),
+      lowStockAt: typeof doc.lowStockAt === "number" ? doc.lowStockAt : null,
     })
   }
   return result

@@ -11,6 +11,9 @@ import {
 } from "@/lib/validations/listing-request"
 import { sellerEditableFilter, setListingHidden, type ListingVisibility } from "@/lib/db-listings"
 import { notifyFarmer, notifySuperadmin, sellerListingsPath } from "@/lib/marketplace-notifications"
+import { setStock } from "@/lib/stock"
+import { getSellByDays } from "@/lib/db-settings"
+import { earliestAcceptableExpiry, MIN_DAYS_ON_SALE } from "@/lib/product-rules"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -45,6 +48,19 @@ export interface ListingRequest {
   /** Drug fields: null or absent on an animal request. */
   drugType?: string | null
   usageDescription?: string | null
+  /**
+   * Units the pharmacy had when it asked (drugs only). Copied onto the listing at
+   * approval; from then on the live count is the listing's `stock`, which the
+   * pharmacy updates directly - see updateListingStock.
+   */
+  stock?: number | null
+  /** Drugs only: expiry date on the pack, YYYY-MM-DD. Published as the listing's `expiresOn`. */
+  expiryDate?: string | null
+  batchNumber?: string | null
+  /** Rwanda FDA registration number. */
+  registrationNumber?: string | null
+  /** Sold only against a vet's prescription uploaded at checkout. */
+  prescriptionRequired?: boolean
   proposedPrice: number
   description: string
   district: string
@@ -133,7 +149,7 @@ function emptyToNull(value: string | undefined | null): string | null {
 type SellerFields = Pick<
   ListingRequest,
   | "title" | "description" | "proposedPrice" | "photos" | "animalType" | "breed" | "age" | "sex"
-  | "drugType" | "usageDescription"
+  | "drugType" | "usageDescription" | "expiryDate" | "batchNumber" | "registrationNumber" | "prescriptionRequired"
   | "district" | "sector" | "village" | "latitude" | "longitude" | "sellerPhone" | "sellerEmail"
 >
 
@@ -150,7 +166,15 @@ function publishedFields(kind: ListingKind, source: SellerFields) {
   const fallback = resolveLocation(source.district, source.sector)
   const kindFields =
     kind === "drug"
-      ? { drugType: source.drugType ?? "", usageDescription: source.usageDescription ?? "" }
+      ? {
+          drugType: source.drugType ?? "",
+          usageDescription: source.usageDescription ?? "",
+          // Read by the public filter: the drug comes off sale shortly before this date.
+          expiresOn: source.expiryDate ?? null,
+          batchNumber: source.batchNumber ?? "",
+          registrationNumber: source.registrationNumber ?? "",
+          prescriptionRequired: source.prescriptionRequired === true,
+        }
       : { animalType: source.animalType ?? "", breed: source.breed ?? "", age: source.age ?? "", sex: source.sex ?? "" }
   return {
     name: source.title,
@@ -191,6 +215,11 @@ function requestFieldsFromInput(
           sex: null,
           drugType: submission.data.drugType,
           usageDescription: emptyToNull(submission.data.usageDescription),
+          stock: submission.data.stock,
+          expiryDate: submission.data.expiryDate,
+          batchNumber: emptyToNull(submission.data.batchNumber),
+          registrationNumber: emptyToNull(submission.data.registrationNumber),
+          prescriptionRequired: submission.data.prescriptionRequired,
         }
       : {
           animalId: emptyToNull(submission.data.animalId),
@@ -200,6 +229,11 @@ function requestFieldsFromInput(
           sex: submission.data.sex ?? null,
           drugType: null,
           usageDescription: null,
+          stock: null,
+          expiryDate: null,
+          batchNumber: null,
+          registrationNumber: null,
+          prescriptionRequired: false,
         }
   return {
     farmerName: farmer.name,
@@ -216,6 +250,11 @@ function requestFieldsFromInput(
     longitude: input.longitude ?? null,
     photos: input.photos,
   }
+}
+
+/** A form's kind, read from which columns it filled. */
+function listingKindOfFields(fields: ReturnType<typeof requestFieldsFromInput>): ListingKind {
+  return fields.drugType ? "drug" : "animal"
 }
 
 const clip = (value: string) => (value.length > 300 ? `${value.slice(0, 297)}...` : value)
@@ -239,6 +278,13 @@ function diffListing(before: ListingRequest, after: ReturnType<typeof requestFie
   compare("sex", before.sex, after.sex)
   compare("drugType", before.drugType ?? null, after.drugType)
   compare("usageDescription", before.usageDescription ?? null, after.usageDescription)
+  compare("expiryDate", before.expiryDate ?? null, after.expiryDate)
+  compare("batchNumber", before.batchNumber ?? null, after.batchNumber)
+  compare("registrationNumber", before.registrationNumber ?? null, after.registrationNumber)
+  if (listingKindOfFields(after) === "drug") {
+    const yesNo = (value: boolean | undefined) => (value ? "Yes" : "No")
+    compare("prescriptionRequired", yesNo(before.prescriptionRequired), yesNo(after.prescriptionRequired))
+  }
   compare("price", before.proposedPrice, after.proposedPrice)
   compare("description", before.description, after.description)
   compare("district", before.district, after.district)
@@ -252,11 +298,28 @@ function diffListing(before: ListingRequest, after: ReturnType<typeof requestFie
   return changes
 }
 
+/**
+ * A drug must stay on sale for at least MIN_DAYS_ON_SALE after it is listed, under the
+ * sell-by cutoff in force now. Checked here rather than in the form schema because the
+ * cutoff is a superadmin setting.
+ */
+async function assertListableExpiry(submission: SellerSubmission): Promise<void> {
+  if (submission.kind !== "drug") return
+  const earliest = earliestAcceptableExpiry(await getSellByDays())
+  if (submission.data.expiryDate < earliest) {
+    throw new ListingRequestError(
+      `This drug expires too soon to list: it must stay on sale for at least ${MIN_DAYS_ON_SALE} days. ` +
+        `Choose an expiry date on or after ${earliest}.`
+    )
+  }
+}
+
 export async function createListingRequest(
   farmer: { _id: string; name: string; phone?: string; email: string },
   submission: SellerSubmission
 ): Promise<ListingRequest> {
   const collection = await getCollection()
+  await assertListableExpiry(submission)
 
   const now = new Date()
   const doc: Omit<ListingRequest, "_id"> = {
@@ -353,6 +416,9 @@ export async function approveRequest(
   const kind = listingKindOf(request)
   const service = {
     ...publishedFields(kind, request),
+    // A drug counts its units from here on (lib/pharmacy-stock.ts). Not part of
+    // publishedFields: an edit of the live listing must not reset the count.
+    ...(kind === "drug" && typeof request.stock === "number" ? { stock: request.stock, stockHolds: [] } : {}),
     duration: "",
     category: LISTING_KIND_CATEGORY[kind],
     categoryId,
@@ -452,6 +518,7 @@ export async function resubmitRequest(
   if (request.status !== "rejected") {
     throw new ListingRequestError("Only a request that was not approved can be resubmitted")
   }
+  await assertListableExpiry(submission)
 
   const now = new Date()
   const updated = await collection.findOneAndUpdate(
@@ -704,7 +771,7 @@ export async function deleteRequestForFarmer(id: string, farmerId: string): Prom
     const doc = await db
       .collection("services")
       .findOne({ _id: new ObjectId(request.publishedServiceId) }, { projection: { hidden: 1 } })
-    listing = doc ? { hidden: doc.hidden === true, reason: null, locked: false } : null
+    listing = doc ? { hidden: doc.hidden === true, reason: null, locked: false, stock: null, held: 0, lowStockAt: null } : null
   }
   if (!canFarmerDelete(request, listing)) {
     throw new ListingRequestError("Only a post that is unpublished or has been removed can be deleted")
@@ -755,8 +822,14 @@ export async function editPublishedListing(
     throw new ListingRequestError("This listing was removed and can no longer be edited")
   }
 
-  const next = requestFieldsFromInput(farmer, submission)
-  const changes = diffListing(request, next)
+  const fields = requestFieldsFromInput(farmer, submission)
+  const changes = diffListing(request, fields)
+  // Only a new expiry date is held to the listing rule: an unrelated edit (a price)
+  // must still work on a drug whose date is getting close.
+  if (changes.some((change) => change.field === "expiryDate")) await assertListableExpiry(submission)
+  // The stock on the form is what was asked for at submission; the live count is
+  // changed with updateListingStock, so an edit keeps the original on the request.
+  const next = { ...fields, stock: request.stock ?? null }
   if (changes.length === 0) {
     throw new ListingRequestError("Nothing was changed")
   }
@@ -766,12 +839,15 @@ export async function editPublishedListing(
   const entry = { at: now, changes }
   const logPush = { editLog: { $each: [entry], $slice: -EDIT_LOG_LIMIT } }
 
+  // A new expiry date re-arms the expiry warnings for the new date.
+  const expiryChanged = changes.some((change) => change.field === "expiryDate")
   const published = await services.updateOne(
     { _id: serviceId, sellerId: farmer._id, ...sellerEditableFilter(now) } as any,
     {
       $set: { ...publishedFields(submission.kind, next), editedAt: now, updatedAt: now },
       $inc: { editCount: 1 },
       $push: logPush,
+      ...(expiryChanged ? { $unset: { expiryWarnedAt: "", expiryHiddenNotifiedAt: "" } } : {}),
     } as any
   )
   if (published.matchedCount === 0) {
@@ -804,6 +880,33 @@ export async function editPublishedListing(
   return { request: updated, changes }
 }
 
+/**
+ * A pharmacy setting how many units of a published drug it has. Goes live at once
+ * and without review - it is a count, not a change to what is being sold - so
+ * nobody is notified. Setting 0 takes the drug off the pharmacy page; anything above
+ * brings it back.
+ */
+export async function updateListingStock(
+  id: string,
+  seller: { _id: string },
+  stock: number,
+  lowStockAt?: number
+): Promise<void> {
+  const request = await getRequestById(id)
+  if (!request || request.farmerId !== seller._id || request.farmerDeletedAt || listingKindOf(request) !== "drug") {
+    throw new ListingRequestError("Request not found")
+  }
+  if (request.status !== "approved" || !request.publishedServiceId) {
+    throw new ListingRequestError("Only a published drug has stock to update")
+  }
+  if (request.removal?.status === "approved") {
+    throw new ListingRequestError("This drug was removed from the pharmacy page")
+  }
+  if (!(await setStock(request.publishedServiceId, stock, { sellerId: seller._id, lowStockAt }))) {
+    throw new ListingRequestError("This drug is no longer on the pharmacy page")
+  }
+}
+
 /** Wire shape - ObjectIds stringified, nothing sensitive added. */
 export function serializeRequest(request: ListingRequest, listing?: ListingVisibility | null) {
   // `undefined` means the caller did not look the listing up (single-request reads), so
@@ -831,6 +934,11 @@ export function serializeRequest(request: ListingRequest, listing?: ListingVisib
     sex: request.sex,
     drugType: request.drugType ?? null,
     usageDescription: request.usageDescription ?? null,
+    stock: request.stock ?? null,
+    expiryDate: request.expiryDate ?? null,
+    batchNumber: request.batchNumber ?? null,
+    registrationNumber: request.registrationNumber ?? null,
+    prescriptionRequired: request.prescriptionRequired === true,
     proposedPrice: request.proposedPrice,
     description: request.description,
     district: request.district,

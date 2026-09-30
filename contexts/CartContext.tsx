@@ -13,6 +13,8 @@ export interface CartItem {
   price: number
   quantity: number
   maxQuantity?: number
+  /** Checkout asks for a vet's prescription when any item in the cart needs one. */
+  prescriptionRequired?: boolean
 }
 
 interface CartContextValue {

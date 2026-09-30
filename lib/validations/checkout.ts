@@ -24,6 +24,8 @@ export const orderItemInputSchema = z.object({
 export const createOrderSchema = z.object({
   items: z.array(orderItemInputSchema).min(1, "Your cart is empty"),
   buyer: buyerSchema,
+  /** A vet's prescription uploaded at checkout, needed when the cart holds a prescription-only drug. */
+  prescriptionId: z.string().trim().optional(),
 })
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>

@@ -22,7 +22,11 @@ function serializeOrder(order: Order) {
     paymentMethod: order.paymentMethod,
     total: order.total,
     currency: order.currency,
-    items: order.items,
+    // Which seller listed each item, and how its price splits between Vettrack and
+    // that seller, is internal; the order id is the buyer's only key.
+    items: order.items.map(
+      ({ sellerId: _sellerId, commissionPercent: _percent, commissionAmount: _commission, sellerAmount: _share, ...item }) => item
+    ),
     buyer: order.buyer,
     createdAt: order.createdAt,
     paidAt: order.paidAt,

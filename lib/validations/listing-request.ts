@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { isDateString } from "@/lib/product-rules"
 
 /**
  * What a seller submits when they ask Vettrack to put something on the marketplace.
@@ -53,12 +54,38 @@ export type ListingRequestInput = z.infer<typeof listingRequestSchema>
 /** The values staff already use for drugs they list themselves (components/marketplace/listings-manager.tsx). */
 export const DRUG_TYPES = ["Antibiotic", "Vaccine", "Dewormer", "Pain Relief", "Vitamins"] as const
 
+export const MAX_STOCK = 1_000_000
+
+/**
+ * A product's expiry date, YYYY-MM-DD. How far away it must be depends on the sell-by
+ * cutoff superadmin sets, which needs the database, so that check is made when the
+ * request is saved (assertListableExpiry in lib/db-listing-requests.ts).
+ */
+export const expiryDateSchema = z
+  .string({ required_error: "Enter the expiry date on the pack" })
+  .trim()
+  .refine(isDateString, "Enter the expiry date on the pack")
+
 /** What a pharmacy submits when it asks for a drug to go on the pharmacy storefront. */
 export const drugRequestSchema = z.object({
   title: z.string().trim().min(3, "Give the drug a name").max(120),
   drugType: z.enum(DRUG_TYPES, { errorMap: () => ({ message: "Choose the type of drug" }) }),
   usageDescription: z.string().trim().max(1000).optional().or(z.literal("")),
   proposedPrice: z.coerce.number().int("Enter a whole number").positive("Enter a price above zero").max(100_000_000),
+  /**
+   * Units the pharmacy has to sell. Copied onto the listing when it is approved; after
+   * that the pharmacy keeps it up to date with stockUpdateSchema, and an edit of the
+   * published listing leaves it alone.
+   */
+  stock: z.coerce.number().int("Enter a whole number").min(1, "Enter how many you have in stock").max(MAX_STOCK),
+  /** The expiry printed on the pack. The drug stops selling a week before it - see lib/product-rules.ts. */
+  expiryDate: expiryDateSchema,
+  /** Batch / lot number on the pack, so a recalled batch can be traced. */
+  batchNumber: z.string().trim().max(60).optional().or(z.literal("")),
+  /** Rwanda FDA registration number of the product. */
+  registrationNumber: z.string().trim().max(60).optional().or(z.literal("")),
+  /** Only sold to a buyer who uploads a vet's prescription at checkout. */
+  prescriptionRequired: z.boolean().default(false),
   description: z.string().trim().min(10, "Describe the drug in a sentence or two").max(2000),
   district: z.string().trim().min(1, "Choose a district"),
   sector: z.string().trim().max(80).optional().or(z.literal("")),
@@ -69,6 +96,17 @@ export const drugRequestSchema = z.object({
 })
 
 export type DrugRequestInput = z.infer<typeof drugRequestSchema>
+
+/**
+ * A pharmacy correcting how many units of a published drug it has - after restocking,
+ * or after selling some in its own shop. Zero is allowed: it takes the drug off the
+ * pharmacy page until there is stock again. Goes live at once, without review.
+ */
+export const stockUpdateSchema = z.object({
+  stock: z.coerce.number().int("Enter a whole number").min(0, "Stock can't be below zero").max(MAX_STOCK),
+  /** Warn the pharmacy when stock falls to this many units. */
+  lowStockAt: z.coerce.number().int("Enter a whole number").min(0).max(MAX_STOCK).optional(),
+})
 
 /** A validated submission, tagged with its kind so the data layer knows which fields it carries. */
 export type SellerSubmission =
@@ -106,6 +144,7 @@ export interface ListingEditLogEntry {
 export const LISTING_CHANGE_FIELDS = [
   "title", "animalType", "breed", "age", "sex", "drugType", "usageDescription", "price", "description",
   "district", "sector", "village", "photos", "gps",
+  "expiryDate", "batchNumber", "registrationNumber", "prescriptionRequired",
 ] as const
 export type ListingChangeField = (typeof LISTING_CHANGE_FIELDS)[number]
 
@@ -125,6 +164,10 @@ export const LISTING_CHANGE_LABEL_KEYS: Record<ListingChangeField, string> = {
   village: "listing.village",
   photos: "listing.photos",
   gps: "listing.locationPinned",
+  expiryDate: "pharmacy.expiryDate",
+  batchNumber: "pharmacy.batchNumber",
+  registrationNumber: "pharmacy.registrationNumber",
+  prescriptionRequired: "pharmacy.prescriptionRequired",
 }
 
 /** Marketplace admin's decision on a pending request. */

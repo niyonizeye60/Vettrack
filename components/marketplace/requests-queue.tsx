@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Loader2, Check, X, MapPin, Phone, ExternalLink, Expand } from "lucide-react"
+import { Loader2, Check, X, MapPin, Phone, ExternalLink, Expand, Package, CalendarClock, FileCheck } from "lucide-react"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
 import { LISTING_KIND_CATEGORY, type ListingKind } from "@/lib/validations/listing-request"
 
@@ -26,6 +26,12 @@ interface ListingRequest {
   animalType: string | null
   drugType: string | null
   usageDescription: string | null
+  /** Units the pharmacy says it has (drugs only). */
+  stock: number | null
+  expiryDate: string | null
+  batchNumber: string | null
+  registrationNumber: string | null
+  prescriptionRequired: boolean
   breed: string | null
   age: string | null
   sex: string | null
@@ -293,11 +299,37 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
                   </div>
 
                   {request.kind === "drug" ? (
-                    request.usageDescription && (
-                      <p className="text-sm text-gray-600 line-clamp-1">
-                        <span className="font-medium">{t("content.usageDescription")}:</span> {request.usageDescription}
-                      </p>
-                    )
+                    <>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                        {request.stock != null && (
+                          <span className="flex items-center gap-1.5">
+                            <Package className="h-3.5 w-3.5 text-gray-400" />
+                            {t("pharmacy.inStockCount")}: {request.stock.toLocaleString()}
+                          </span>
+                        )}
+                        {request.expiryDate && (
+                          <span className="flex items-center gap-1.5">
+                            <CalendarClock className="h-3.5 w-3.5 text-gray-400" />
+                            {t("pharmacy.expiresOn")} {request.expiryDate}
+                          </span>
+                        )}
+                        {request.batchNumber && <span>{t("pharmacy.batchNumber")}: {request.batchNumber}</span>}
+                        <span className={request.registrationNumber ? "" : "text-amber-700"}>
+                          {t("pharmacy.registrationNumber")}: {request.registrationNumber || t("marketplace.notGiven")}
+                        </span>
+                      </div>
+                      {request.prescriptionRequired && (
+                        <p className="text-sm text-purple-800 flex items-center gap-1.5">
+                          <FileCheck className="h-3.5 w-3.5" />
+                          {t("pharmacy.prescriptionOnly")}
+                        </p>
+                      )}
+                      {request.usageDescription && (
+                        <p className="text-sm text-gray-600 line-clamp-1">
+                          <span className="font-medium">{t("content.usageDescription")}:</span> {request.usageDescription}
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm text-gray-600">
                       {[request.breed, request.age, request.sex].filter(Boolean).join(" · ")}

@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Heart, Share2, MapPin, Pill } from "lucide-react"
+import { Heart, Share2, MapPin, Pill, CalendarClock, Hash, ShieldCheck, FileCheck } from "lucide-react"
+import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
 import Link from "next/link"
 import Image from "next/image"
 import { useParams } from "next/navigation"
@@ -25,6 +26,12 @@ interface Drug {
   sector?: string
   village?: string
   usageDescription?: string
+  /** Units left to order; null when the drug doesn't count stock. Sold-out drugs never arrive here. */
+  available?: number | null
+  expiresOn?: string | null
+  batchNumber?: string
+  registrationNumber?: string
+  prescriptionRequired?: boolean
 }
 
 export default function DrugDetailPage() {
@@ -118,7 +125,13 @@ export default function DrugDetailPage() {
             <div className="relative">
               <div className="relative h-96 rounded-lg overflow-hidden">
                 <Image src={drug.image || "/placeholder.svg"} alt={drug.name} fill className="object-cover" />
-                <Badge className="absolute top-4 right-4 bg-blue-600">{t('common.inStock')}</Badge>
+                {drug.available != null && drug.available <= SHOW_UNITS_LEFT_AT ? (
+                  <Badge className="absolute top-4 right-4 bg-orange-500">
+                    {t('pharmacy.onlyLeft').replace('{count}', String(drug.available))}
+                  </Badge>
+                ) : (
+                  <Badge className="absolute top-4 right-4 bg-blue-600">{t('common.inStock')}</Badge>
+                )}
               </div>
             </div>
 
@@ -150,8 +163,23 @@ export default function DrugDetailPage() {
                   ...(drug.district
                     ? [{ icon: MapPin, label: t('common.location'), text: [drug.district, drug.sector].filter(Boolean).join(', ') }]
                     : []),
+                  ...(drug.expiresOn ? [{ icon: CalendarClock, label: t('pharmacy.expiryDate'), text: drug.expiresOn }] : []),
+                  ...(drug.batchNumber ? [{ icon: Hash, label: t('pharmacy.batchNumber'), text: drug.batchNumber }] : []),
+                  ...(drug.registrationNumber
+                    ? [{ icon: ShieldCheck, label: t('pharmacy.registrationNumber'), text: drug.registrationNumber }]
+                    : []),
                 ]}
               />
+
+              {drug.prescriptionRequired && (
+                <div className="flex gap-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
+                  <FileCheck className="h-5 w-5 text-purple-700 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-purple-900">{t('pharmacy.prescriptionOnly')}</p>
+                    <p className="text-sm text-purple-800">{t('pharmacy.prescriptionBuyerNote')}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <Button variant="outline" onClick={toggleWishlist} className="flex-shrink-0">
@@ -172,6 +200,8 @@ export default function DrugDetailPage() {
                   name: drug.name,
                   image: drug.image,
                   price: drug.price,
+                  ...(drug.available ? { maxQuantity: drug.available } : {}),
+                  ...(drug.prescriptionRequired ? { prescriptionRequired: true } : {}),
                 }}
               />
             </div>

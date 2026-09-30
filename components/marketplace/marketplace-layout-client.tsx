@@ -5,6 +5,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 import StaffLayoutClient from "@/components/staff/staff-layout-client"
 import StaffSidebar from "@/components/staff/staff-sidebar"
 import StaffHeader from "@/components/staff/staff-header"
+import NotificationBell from "@/components/staff/notification-bell"
 
 /**
  * The marketplace portal shell. Nav mirrors the marketplace admin's actual job:
@@ -45,6 +46,8 @@ export default function MarketplaceLayoutClient({
           tagline={t("marketplace.tagline")}
           homeHref="/marketplace"
           brandIcon={<Store className="h-6 w-6 sm:h-7 sm:w-7" />}
+          // Stock and expiry alerts on Vettrack's own products arrive here.
+          notifications={<NotificationBell role="marketplace_admin" viewAllHref="/marketplace/listings" />}
         />
       }
     >

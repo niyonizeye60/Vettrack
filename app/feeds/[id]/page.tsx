@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Heart, Share2, MapPin, Wheat, Tag } from "lucide-react"
+import { Heart, Share2, MapPin, Wheat, Tag, CalendarClock, Hash } from "lucide-react"
+import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
 import Link from "next/link"
 import Image from "next/image"
 import { useParams } from "next/navigation"
@@ -26,6 +27,10 @@ interface Feed {
   district?: string
   sector?: string
   village?: string
+  /** Units left to order; null when the feed doesn't count stock. Sold-out feed never arrives here. */
+  available?: number | null
+  expiresOn?: string | null
+  batchNumber?: string
 }
 
 export default function FeedDetailPage() {
@@ -128,7 +133,13 @@ export default function FeedDetailPage() {
             <div className="relative">
               <div className="relative h-96 rounded-lg overflow-hidden">
                 <Image src={feed.image || "/placeholder.svg"} alt={feed.name} fill className="object-cover" />
-                <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
+                {feed.available != null && feed.available <= SHOW_UNITS_LEFT_AT ? (
+                  <Badge className="absolute top-4 right-4 bg-orange-500">
+                    {t('pharmacy.onlyLeft').replace('{count}', String(feed.available))}
+                  </Badge>
+                ) : (
+                  <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
+                )}
                 {feed.quality && (
                   <Badge className={`absolute top-4 left-4 ${getQualityColor(feed.quality)} text-white`}>
                     {feed.quality} {t('feeds.quality')}
@@ -162,6 +173,8 @@ export default function FeedDetailPage() {
                   ...(feed.district
                     ? [{ icon: MapPin, label: t('common.location'), text: [feed.district, feed.sector].filter(Boolean).join(', ') }]
                     : []),
+                  ...(feed.expiresOn ? [{ icon: CalendarClock, label: t('pharmacy.expiryDate'), text: feed.expiresOn }] : []),
+                  ...(feed.batchNumber ? [{ icon: Hash, label: t('pharmacy.batchNumber'), text: feed.batchNumber }] : []),
                 ]}
               />
 
@@ -184,6 +197,7 @@ export default function FeedDetailPage() {
                   name: feed.name,
                   image: feed.image,
                   price: feed.price,
+                  ...(feed.available ? { maxQuantity: feed.available } : {}),
                 }}
               />
             </div>

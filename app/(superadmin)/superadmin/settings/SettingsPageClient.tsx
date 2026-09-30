@@ -40,6 +40,7 @@ import { updateSystemSettings, performDatabaseAction, setFarmLocationRestriction
 import type { FarmLocationRestrictionStatus } from "@/lib/farm-location-restriction"
 import { getCurrentUser } from "@/lib/auth"
 import { useRouter } from "next/navigation"
+import ProductRulesSettings from "@/components/superadmin/product-rules-settings"
 
 interface SettingsPageClientProps {
   settings: any
@@ -608,6 +609,9 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
             )}
           </CardContent>
         </Card>
+
+        {/* Sell-by cutoff for drugs and feed - saved on its own, not via Save Settings below */}
+        <ProductRulesSettings />
 
         {/* System Limits & Performance */}
         <Card>

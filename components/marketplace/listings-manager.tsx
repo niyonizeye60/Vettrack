@@ -15,7 +15,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Edit, Trash2, Search, Tag, Calendar, MapPin, DollarSign, Crosshair, Loader2, Eye, EyeOff } from "lucide-react"
+import { Plus, Edit, Trash2, Search, Tag, Calendar, MapPin, DollarSign, Crosshair, Loader2, Eye, EyeOff, Package, CalendarClock, FileCheck } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DEFAULT_LOW_STOCK_AT, expiryState, isLowStock } from "@/lib/product-rules"
+import { useProductRules } from "@/hooks/use-product-rules"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import AdminProductCard from "@/components/admin/admin-product-card"
@@ -58,6 +61,16 @@ interface Service {
   reservedUntil?: string | null
   hidden?: boolean
   hiddenReason?: string | null
+  /** A pharmacy's drug counts its units; null or absent when the listing doesn't. */
+  stock?: number | null
+  /** Units buyers can still order. At 0 the listing is off the public pages until restocked. */
+  available?: number | null
+  lowStockAt?: number | null
+  /** YYYY-MM-DD; the listing comes off sale a week before. */
+  expiresOn?: string | null
+  batchNumber?: string
+  registrationNumber?: string
+  prescriptionRequired?: boolean
   images?: string[]
   latitude?: number | null
   longitude?: number | null
@@ -82,6 +95,8 @@ const emptyForm = {
   sellerPhone: "", sellerEmail: "", drugType: "", usageDescription: "",
   feedType: "", quality: "", targetAnimal: "",
   latitude: "" as string | number, longitude: "" as string | number,
+  stock: "", lowStockAt: "", expiresOn: "", batchNumber: "", registrationNumber: "",
+  prescriptionRequired: false,
 }
 
 const CATEGORIES: Cat[] = [...MARKETPLACE_CATEGORIES]
@@ -100,6 +115,7 @@ const CATEGORIES: Cat[] = [...MARKETPLACE_CATEGORIES]
  */
 export default function ListingsManager({ allowedCategories }: { allowedCategories: Cat[] }) {
   const { t } = useLanguage()
+  const rules = useProductRules()
 
   const [services, setServices] = useState<Record<Cat, Service[]>>({ sales: [], drugs: [], feeds: [] })
   const [categories, setCategories] = useState<Record<Cat, Category[]>>({ sales: [], drugs: [], feeds: [] })
@@ -122,6 +138,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   const [editCategoryTarget, setEditCategoryTarget] = useState<Category | null>(null)
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<Category | null>(null)
   const [busy, setBusy] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [locating, setLocating] = useState(false)
 
   const loadAll = async () => {
@@ -143,14 +160,37 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   // --- services ---------------------------------------------------------------
 
   const saveService = async () => {
+    setFormError(null)
+    // Everything sold through the cart counts its units, so the count is required.
+    if ((activeCat === "drugs" || activeCat === "feeds") && form.stock.trim() === "") {
+      setFormError(t("marketplace.stockRequired"))
+      return
+    }
     setBusy(true)
     try {
       // Explicit coordinates only travel when the seller pinned them; the API
       // otherwise stamps district/sector-derived ones.
-      const { latitude, longitude, ...rest } = form
+      const {
+        latitude, longitude, stock, lowStockAt, expiresOn, batchNumber, registrationNumber, prescriptionRequired, ...rest
+      } = form
       const hasCoords = latitude !== "" && longitude !== "" && latitude !== undefined && longitude !== undefined
+      // Stock and expiry belong to products sold through the cart. The count is only
+      // sent when it was changed here: sales since the form opened have lowered it,
+      // and saving an unrelated edit must not put the old number back.
+      const isProduct = activeCat === "drugs" || activeCat === "feeds"
+      const stockChanged = !editTarget || stock !== (editTarget.stock != null ? String(editTarget.stock) : "")
+      const product = isProduct
+        ? {
+            ...(stockChanged ? { stock } : {}),
+            lowStockAt,
+            expiresOn,
+            batchNumber,
+            ...(activeCat === "drugs" ? { registrationNumber, prescriptionRequired } : {}),
+          }
+        : {}
       const payload = {
         ...rest,
+        ...product,
         price: Number(form.price) || 0,
         category: activeCat,
         ...(hasCoords ? { latitude: Number(latitude), longitude: Number(longitude) } : {}),
@@ -171,7 +211,12 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
         setCreateOpen(false)
         setEditTarget(null)
         setForm(emptyForm)
+      } else {
+        const body = await res.json().catch(() => ({}))
+        setFormError(body.error || t("marketplace.saveFailed"))
       }
+    } catch {
+      setFormError(t("marketplace.saveFailed"))
     } finally {
       setBusy(false)
     }
@@ -207,6 +252,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
   }
 
   const openEdit = (service: Service) => {
+    setFormError(null)
     setActiveCat(service.category as Cat)
     setEditTarget(service)
     setForm({
@@ -219,6 +265,11 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
       usageDescription: service.usageDescription || "", feedType: service.feedType || "",
       quality: service.quality || "", targetAnimal: service.targetAnimal || "",
       latitude: (service as any).latitude ?? "", longitude: (service as any).longitude ?? "",
+      stock: service.stock != null ? String(service.stock) : "",
+      lowStockAt: service.lowStockAt != null ? String(service.lowStockAt) : "",
+      expiresOn: service.expiresOn || "", batchNumber: service.batchNumber || "",
+      registrationNumber: service.registrationNumber || "",
+      prescriptionRequired: service.prescriptionRequired === true,
     })
   }
 
@@ -250,11 +301,17 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
         ? [
             [t("content.drugType"), service.drugType],
             [t("content.usageDescription"), service.usageDescription],
+            [t("pharmacy.expiryDate"), service.expiresOn ?? undefined],
+            [t("pharmacy.batchNumber"), service.batchNumber],
+            [t("pharmacy.registrationNumber"), service.registrationNumber],
+            [t("pharmacy.prescriptionRequired"), service.prescriptionRequired ? t("common.yes") : undefined],
           ]
         : [
             [t("content.feedType"), service.feedType],
             [t("content.quality"), service.quality],
             [t("content.targetAnimal"), service.targetAnimal],
+            [t("pharmacy.expiryDate"), service.expiresOn ?? undefined],
+            [t("pharmacy.batchNumber"), service.batchNumber],
           ]
     return rows.filter((row): row is [string, string] => !!row[1])
   }
@@ -421,6 +478,50 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
       )
     }
 
+    // Stock, expiry and batch - shared by everything sold through the cart.
+    const productFields = (
+      <div className="space-y-3 rounded-md border border-gray-200 p-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label>{t("pharmacy.stockLabel")}</Label>
+            <Input type="number" inputMode="numeric" min={0} required value={form.stock} onChange={(e) => set({ stock: e.target.value })} />
+            <p className="text-xs text-gray-500 mt-1">{t("marketplace.stockRequiredHint")}</p>
+          </div>
+          <div>
+            <Label>{t("pharmacy.lowStockAt")}</Label>
+            <Input type="number" inputMode="numeric" min={0} value={form.lowStockAt} onChange={(e) => set({ lowStockAt: e.target.value })} placeholder={String(DEFAULT_LOW_STOCK_AT)} />
+          </div>
+          <div>
+            <Label>{t("pharmacy.expiryDate")}</Label>
+            <Input type="date" value={form.expiresOn} onChange={(e) => set({ expiresOn: e.target.value })} />
+          </div>
+          <div>
+            <Label>{t("pharmacy.batchNumber")}</Label>
+            <Input value={form.batchNumber} onChange={(e) => set({ batchNumber: e.target.value })} />
+          </div>
+        </div>
+        {cat === "drugs" && (
+          <>
+            <div>
+              <Label>{t("pharmacy.registrationNumber")}</Label>
+              <Input value={form.registrationNumber} onChange={(e) => set({ registrationNumber: e.target.value })} />
+            </div>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <Checkbox
+                checked={form.prescriptionRequired}
+                onCheckedChange={(checked) => set({ prescriptionRequired: checked === true })}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-900">{t("pharmacy.prescriptionRequired")}</span>
+                <span className="block text-xs text-gray-500">{t("pharmacy.prescriptionRequiredHint")}</span>
+              </span>
+            </label>
+          </>
+        )}
+      </div>
+    )
+
     if (cat === "drugs") {
       return (
         <>
@@ -441,6 +542,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             <Label>{t("content.usageDescription")}</Label>
             <Textarea rows={3} value={form.usageDescription} onChange={(e) => set({ usageDescription: e.target.value })} placeholder={t("content.howToUse")} />
           </div>
+          {productFields}
         </>
       )
     }
@@ -484,6 +586,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             </SelectContent>
           </Select>
         </div>
+        {productFields}
       </>
     )
   }
@@ -499,12 +602,35 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
           ? [{ icon: MapPin, text: [service.district, service.sector].filter(Boolean).join(", ") }] : []),
       ]
     }
+    // Stock and expiry state, so staff can see what needs restocking or replacing.
+    const stockDetails = [
+      ...(service.stock != null
+        ? [{
+            icon: Package,
+            text: `${t("pharmacy.inStockCount")}: ${service.stock.toLocaleString()}` +
+              (service.available === 0
+                ? ` · ${t("pharmacy.outOfStock")}`
+                : isLowStock(service.available, service.lowStockAt)
+                  ? ` · ${t("pharmacy.lowStock")}`
+                  : ""),
+          }]
+        : []),
+      ...(service.expiresOn
+        ? [{
+            icon: CalendarClock,
+            text: `${t("pharmacy.expiresOn")} ${service.expiresOn}` +
+              (expiryState(service.expiresOn, rules.sellByDays) === "unsellable" ? ` · ${t("pharmacy.offSaleExpiry")}` : ""),
+          }]
+        : []),
+      ...(service.prescriptionRequired ? [{ icon: FileCheck, text: t("pharmacy.prescriptionOnly") }] : []),
+    ]
     if (cat === "drugs") {
-      return service.drugType ? [{ icon: Tag, text: service.drugType }] : []
+      return [...(service.drugType ? [{ icon: Tag, text: service.drugType }] : []), ...stockDetails]
     }
     return [
       ...(service.feedType ? [{ icon: Tag, text: service.feedType }] : []),
       ...(service.targetAnimal ? [{ icon: Calendar, text: service.targetAnimal }] : []),
+      ...stockDetails,
     ]
   }
 
@@ -567,7 +693,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button variant="ghost" size="sm" aria-label={t("content.addItemToCategory")}
-                              onClick={() => { setActiveCat(cat); setEditTarget(null); setForm({ ...emptyForm, categoryId: category.id }); setCreateOpen(true) }}>
+                              onClick={() => { setActiveCat(cat); setEditTarget(null); setForm({ ...emptyForm, categoryId: category.id }); setFormError(null); setCreateOpen(true) }}>
                               <Plus className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="sm" aria-label={t("content.editCategory")}
@@ -685,7 +811,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
       {/* Create / edit listing */}
       <Dialog
         open={serviceDialogOpen}
-        onOpenChange={(next) => { if (!next) { setCreateOpen(false); setEditTarget(null); setForm(emptyForm) } }}
+        onOpenChange={(next) => { if (!next) { setCreateOpen(false); setEditTarget(null); setForm(emptyForm); setFormError(null) } }}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -730,6 +856,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             </div>
 
             {specificFields(activeCat)}
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
           </div>
 
           <DialogFooter>

@@ -13,6 +13,7 @@ import {
   type ListingRequest,
 } from "@/lib/db-listing-requests"
 import { getListingVisibility } from "@/lib/db-listings"
+import { sweepExpiryAlerts } from "@/lib/product-alerts"
 import {
   isListingKind,
   LISTING_KIND_CATEGORY,
@@ -66,6 +67,8 @@ export async function GET(req: NextRequest) {
     }
 
     if (sellerListingKind(currentUser.role)) {
+      // A pharmacy checking its drugs is when an expiry warning is most useful.
+      await sweepExpiryAlerts()
       return NextResponse.json(await serializeWithVisibility(await listRequestsForFarmer(currentUser._id)))
     }
 

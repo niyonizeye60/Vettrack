@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { resolveLocation } from "@/lib/rwanda-geo"
+import { publicProductFilter } from "@/lib/stock"
+import { getSellByDays } from "@/lib/db-settings"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -57,12 +59,12 @@ export async function GET(request: NextRequest) {
     const searchRegex = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null
 
     // 1. Public listings — same availability rule as ordering: active, never
-    //    statused (legacy rows), or an expired reservation. Sold, withdrawn
-    //    and marketplace-hidden listings never appear in search.
+    //    statused (legacy rows), or an expired reservation. Sold, withdrawn,
+    //    sold-out, past-sell-by and marketplace-hidden listings never appear.
     const now = new Date()
     const serviceFilter: Record<string, any> = {
       $and: [
-        { hidden: { $ne: true } },
+        publicProductFilter(await getSellByDays(), now),
         {
           $or: [
             { listingStatus: "active" },

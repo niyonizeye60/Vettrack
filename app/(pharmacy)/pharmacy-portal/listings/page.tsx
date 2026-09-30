@@ -18,15 +18,29 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair, Pencil, EyeOff, Trash2, Ban } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair, Pencil, EyeOff, Trash2, Ban, Package, PackageX,
+  CalendarClock, AlertTriangle, FileCheck,
+} from "lucide-react"
 import { DRUG_TYPES, MAX_LISTING_PHOTOS } from "@/lib/validations/listing-request"
+import {
+  DEFAULT_LOW_STOCK_AT, earliestAcceptableExpiry, expiryState, isLowStock, lastSellableDay,
+} from "@/lib/product-rules"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
+import { useProductRules } from "@/hooks/use-product-rules"
 
 interface DrugRequest {
   id: string
   title: string
   drugType: string | null
   usageDescription: string | null
+  /** Units in stock when the request was sent; the live count is on `listing`. */
+  stock: number | null
+  expiryDate: string | null
+  batchNumber: string | null
+  registrationNumber: string | null
+  prescriptionRequired: boolean
   proposedPrice: number
   description: string
   district: string
@@ -40,8 +54,18 @@ interface DrugRequest {
   resubmitCount: number
   reviewHistory: { note: string; reviewedAt: string | null }[]
   publishedServiceId: string | null
-  /** Live state of the published listing; null when unpublished or staff deleted it. */
-  listing: { hidden: boolean; reason: string | null; locked: boolean } | null
+  /**
+   * Live state of the published listing; null when unpublished or staff deleted it.
+   * `stock` is null for a drug published before stock was counted.
+   */
+  listing: {
+    hidden: boolean
+    reason: string | null
+    locked: boolean
+    stock: number | null
+    held: number
+    lowStockAt: number | null
+  } | null
   /** Decided by the server, which is also what enforces them. */
   removed: boolean
   editable: boolean
@@ -69,6 +93,11 @@ const emptyForm = {
   drugType: "",
   usageDescription: "",
   proposedPrice: "",
+  stock: "",
+  expiryDate: "",
+  batchNumber: "",
+  registrationNumber: "",
+  prescriptionRequired: false,
   description: "",
   district: "",
   sector: "",
@@ -92,6 +121,7 @@ function statusVariant(status: DrugRequest["status"]) {
  */
 export default function PharmacyListingsPage() {
   const { t } = useLanguage()
+  const rules = useProductRules()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [home, setHome] = useState<{ district: string; sector: string }>({ district: "", sector: "" })
@@ -118,6 +148,11 @@ export default function PharmacyListingsPage() {
   const [removeReason, setRemoveReason] = useState("")
   const [removing, setRemoving] = useState(false)
   const [removeError, setRemoveError] = useState<string | null>(null)
+  const [stockTarget, setStockTarget] = useState<DrugRequest | null>(null)
+  const [stockValue, setStockValue] = useState("")
+  const [lowStockValue, setLowStockValue] = useState("")
+  const [savingStock, setSavingStock] = useState(false)
+  const [stockError, setStockError] = useState<string | null>(null)
   const [detailTarget, setDetailTarget] = useState<DrugRequest | null>(null)
   const [detailIndex, setDetailIndex] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -198,6 +233,11 @@ export default function PharmacyListingsPage() {
       drugType: request.drugType ?? "",
       usageDescription: request.usageDescription ?? "",
       proposedPrice: String(request.proposedPrice),
+      stock: request.stock != null ? String(request.stock) : "",
+      expiryDate: request.expiryDate ?? "",
+      batchNumber: request.batchNumber ?? "",
+      registrationNumber: request.registrationNumber ?? "",
+      prescriptionRequired: request.prescriptionRequired,
       description: request.description,
       district: request.district,
       sector: request.sector ?? "",
@@ -335,6 +375,70 @@ export default function PharmacyListingsPage() {
     }
   }
 
+  const openStock = (request: DrugRequest) => {
+    setStockTarget(request)
+    setStockValue(request.listing?.stock != null ? String(request.listing.stock) : "")
+    setLowStockValue(String(request.listing?.lowStockAt ?? DEFAULT_LOW_STOCK_AT))
+    setStockError(null)
+  }
+
+  const closeStock = () => {
+    setStockTarget(null)
+    setStockError(null)
+  }
+
+  /** Set how many units the pharmacy has. Live at once; 0 takes the drug off the pharmacy page. */
+  const saveStock = async () => {
+    if (!stockTarget) return
+    setStockError(null)
+    setSavingStock(true)
+    try {
+      const res = await fetch(`/api/listing-requests/${stockTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "stock",
+          stock: stockValue,
+          ...(lowStockValue.trim() !== "" ? { lowStockAt: lowStockValue } : {}),
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setStockError(data.error || t("pharmacy.stockFailed"))
+        return
+      }
+      closeStock()
+      await fetchRequests()
+    } catch {
+      setStockError(t("pharmacy.stockFailed"))
+    } finally {
+      setSavingStock(false)
+    }
+  }
+
+  /** A published drug that staff have not taken off the pharmacy page. */
+  const isLive = (request: DrugRequest) =>
+    request.status === "approved" && !request.removed && !!request.listing && !request.listing.hidden
+
+  /** Units buyers can still order, or null when the drug doesn't count stock. */
+  const available = (request: DrugRequest) =>
+    request.listing?.stock != null ? Math.max(0, request.listing.stock - request.listing.held) : null
+
+  /** Live, but every unit is sold or in someone's checkout, so buyers can't see it. */
+  const isOutOfStock = (request: DrugRequest) => isLive(request) && available(request) === 0
+
+  /** Live, with stock at or below the pharmacy's warning level. */
+  const isLow = (request: DrugRequest) =>
+    isLive(request) && isLowStock(available(request), request.listing?.lowStockAt)
+
+  /** Live, but too close to its expiry date to be ordered. */
+  const isExpiredOffSale = (request: DrugRequest) =>
+    isLive(request) && expiryState(request.expiryDate, rules.sellByDays) === "unsellable"
+
+  /** The live count once published, the count that was sent before that. */
+  const stockShown = (request: DrugRequest) =>
+    request.status === "approved" ? request.listing?.stock ?? null : request.stock
+
   /** A published listing staff have taken off the public pages but could bring back. */
   const isHidden = (request: DrugRequest) =>
     request.status === "approved" && !request.removed && request.listing?.hidden === true
@@ -350,6 +454,16 @@ export default function PharmacyListingsPage() {
       <Badge className="bg-gray-200 text-gray-700" variant="secondary">
         <EyeOff className="h-3 w-3 mr-1" />
         {t("listing.hiddenBadge")}
+      </Badge>
+    ) : isOutOfStock(request) ? (
+      <Badge className="bg-red-100 text-red-800" variant="secondary">
+        <PackageX className="h-3 w-3 mr-1" />
+        {t("pharmacy.outOfStock")}
+      </Badge>
+    ) : isExpiredOffSale(request) ? (
+      <Badge className="bg-red-100 text-red-800" variant="secondary">
+        <CalendarClock className="h-3 w-3 mr-1" />
+        {t("pharmacy.offSaleExpiry")}
       </Badge>
     ) : (
       <Badge className={statusVariant(request.status)} variant="secondary">
@@ -448,6 +562,24 @@ export default function PharmacyListingsPage() {
                       {request.title}
                     </button>
                     {statusBadge(request)}
+                    {isLow(request) && (
+                      <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        {t("pharmacy.lowStock")}
+                      </Badge>
+                    )}
+                    {isLive(request) && expiryState(request.expiryDate, rules.sellByDays) === "soon" && (
+                      <Badge className="bg-amber-100 text-amber-800" variant="secondary">
+                        <CalendarClock className="h-3 w-3 mr-1" />
+                        {t("pharmacy.expiresSoon")}
+                      </Badge>
+                    )}
+                    {request.prescriptionRequired && (
+                      <Badge className="bg-purple-100 text-purple-800" variant="secondary">
+                        <FileCheck className="h-3 w-3 mr-1" />
+                        {t("pharmacy.prescriptionOnly")}
+                      </Badge>
+                    )}
                     {request.status === "approved" && !request.removed && request.removal?.status === "pending" && (
                       <Badge className="bg-amber-100 text-amber-800" variant="secondary">
                         {t("listing.removalRequested")}
@@ -476,6 +608,39 @@ export default function PharmacyListingsPage() {
                   <p className="text-sm font-medium text-gray-900">
                     RWF {request.proposedPrice.toLocaleString()}
                   </p>
+                  {request.status === "approved" && !request.removed && request.listing?.stock != null ? (
+                    <p className="text-sm text-gray-600 flex flex-wrap items-center gap-1.5">
+                      <Package className="h-3.5 w-3.5 text-gray-400" />
+                      {t("pharmacy.inStockCount")}: {request.listing.stock.toLocaleString()}
+                      {request.listing.held > 0 && (
+                        <span className="text-xs text-gray-500">
+                          ({request.listing.held.toLocaleString()} {t("pharmacy.inCheckout")})
+                        </span>
+                      )}
+                    </p>
+                  ) : (
+                    request.status !== "approved" && request.stock != null && (
+                      <p className="text-sm text-gray-600 flex items-center gap-1.5">
+                        <Package className="h-3.5 w-3.5 text-gray-400" />
+                        {t("pharmacy.inStockCount")}: {request.stock.toLocaleString()}
+                      </p>
+                    )
+                  )}
+                  {isOutOfStock(request) && (
+                    <p className="text-xs text-red-700">
+                      {request.listing!.held > 0 ? t("pharmacy.allInCheckoutNote") : t("pharmacy.outOfStockNote")}
+                    </p>
+                  )}
+                  {request.expiryDate && !request.removed && (
+                    <p className={`text-xs ${isExpiredOffSale(request) ? "text-red-700" : "text-gray-500"}`}>
+                      {t("pharmacy.expiresOn")} {request.expiryDate}
+                      {isExpiredOffSale(request)
+                        ? ` · ${t("pharmacy.offSaleExpiryNote")}`
+                        : isLive(request) && expiryState(request.expiryDate, rules.sellByDays) === "soon"
+                          ? ` · ${t("pharmacy.sellsUntil")} ${lastSellableDay(request.expiryDate, rules.sellByDays)}`
+                          : ""}
+                    </p>
+                  )}
                   {request.status === "pending" && request.resubmitCount > 0 && (
                     <p className="text-xs text-amber-700 pt-1">
                       {t("listing.resubmittedTimes")} {request.resubmitCount + 1}
@@ -507,6 +672,16 @@ export default function PharmacyListingsPage() {
                   {request.status === "pending" && (
                     <Button variant="outline" size="sm" onClick={() => setWithdrawTarget(request)}>
                       {t("listing.withdraw")}
+                    </Button>
+                  )}
+                  {request.status === "approved" && request.listing && !request.removed && (
+                    <Button
+                      variant={isOutOfStock(request) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => openStock(request)}
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      {t("pharmacy.updateStock")}
                     </Button>
                   )}
                   {request.editable && (
@@ -601,6 +776,72 @@ export default function PharmacyListingsPage() {
                 />
               </div>
             </div>
+
+            {/* A live drug's count is changed with "Update stock", which needs no review. */}
+            {!editing && (
+              <div>
+                <Label htmlFor="stock">{t("pharmacy.stockLabel")}</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  value={form.stock}
+                  onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                  placeholder={t("pharmacy.stockPlaceholder")}
+                  className="sm:max-w-[50%]"
+                />
+                <p className="text-xs text-gray-500 mt-1">{t("pharmacy.stockHint")}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="expiry">{t("pharmacy.expiryDate")}</Label>
+                <Input
+                  id="expiry"
+                  type="date"
+                  min={earliestAcceptableExpiry(rules.sellByDays)}
+                  value={form.expiryDate}
+                  onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="batch">{t("pharmacy.batchNumber")}</Label>
+                <Input
+                  id="batch"
+                  value={form.batchNumber}
+                  onChange={(e) => setForm({ ...form, batchNumber: e.target.value })}
+                  placeholder={t("common.optional")}
+                />
+              </div>
+              <div>
+                <Label htmlFor="registration">{t("pharmacy.registrationNumber")}</Label>
+                <Input
+                  id="registration"
+                  value={form.registrationNumber}
+                  onChange={(e) => setForm({ ...form, registrationNumber: e.target.value })}
+                  placeholder={t("common.optional")}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 -mt-2">
+              {t("pharmacy.expiryHint")
+                .replace("{days}", String(rules.sellByDays))
+                .replace("{minDays}", String(rules.minDaysOnSale))}
+            </p>
+
+            <label className="flex items-start gap-3 rounded-md border border-gray-200 p-3 cursor-pointer">
+              <Checkbox
+                checked={form.prescriptionRequired}
+                onCheckedChange={(checked) => setForm({ ...form, prescriptionRequired: checked === true })}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-900">{t("pharmacy.prescriptionRequired")}</span>
+                <span className="block text-xs text-gray-500">{t("pharmacy.prescriptionRequiredHint")}</span>
+              </span>
+            </label>
 
             <div>
               <Label htmlFor="description">{t("listing.description")}</Label>
@@ -819,6 +1060,59 @@ export default function PharmacyListingsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* How many units the pharmacy has */}
+      <Dialog open={!!stockTarget} onOpenChange={(next) => { if (!next) closeStock() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("pharmacy.updateStock")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              {t("pharmacy.updateStockDesc")} <strong>{stockTarget?.title}</strong>
+            </p>
+            <div>
+              <Label htmlFor="stock-value">{t("pharmacy.stockLabel")}</Label>
+              <Input
+                id="stock-value"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={stockValue}
+                onChange={(e) => setStockValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && stockValue.trim() !== "") saveStock() }}
+              />
+              <p className="text-xs text-gray-500 mt-1">{t("pharmacy.updateStockHint")}</p>
+              {!!stockTarget?.listing?.held && (
+                <p className="text-xs text-amber-700 mt-1">
+                  {stockTarget.listing.held.toLocaleString()} {t("pharmacy.inCheckoutHint")}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="low-stock-value">{t("pharmacy.lowStockAt")}</Label>
+              <Input
+                id="low-stock-value"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={lowStockValue}
+                onChange={(e) => setLowStockValue(e.target.value)}
+                className="sm:max-w-[50%]"
+              />
+              <p className="text-xs text-gray-500 mt-1">{t("pharmacy.lowStockAtHint")}</p>
+            </div>
+            {stockError && <p className="text-sm text-red-600">{stockError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeStock}>{t("common.cancel")}</Button>
+            <Button onClick={saveStock} disabled={savingStock || stockValue.trim() === ""}>
+              {savingStock && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("pharmacy.saveStock")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Drug details */}
       <Dialog open={!!detailTarget} onOpenChange={(next) => !next && setDetailTarget(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -881,6 +1175,37 @@ export default function PharmacyListingsPage() {
                 <div className="text-sm">
                   <span className="text-gray-500">{t("content.drugType")}:</span> {drugTypeLabel(detailTarget.drugType)}
                 </div>
+              )}
+
+              {stockShown(detailTarget) != null && (
+                <div className="text-sm">
+                  <span className="text-gray-500">{t("pharmacy.inStockCount")}:</span>{" "}
+                  {stockShown(detailTarget)!.toLocaleString()}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                {detailTarget.expiryDate && (
+                  <div>
+                    <span className="text-gray-500">{t("pharmacy.expiryDate")}:</span> {detailTarget.expiryDate}
+                  </div>
+                )}
+                {detailTarget.batchNumber && (
+                  <div>
+                    <span className="text-gray-500">{t("pharmacy.batchNumber")}:</span> {detailTarget.batchNumber}
+                  </div>
+                )}
+                {detailTarget.registrationNumber && (
+                  <div>
+                    <span className="text-gray-500">{t("pharmacy.registrationNumber")}:</span> {detailTarget.registrationNumber}
+                  </div>
+                )}
+              </div>
+              {detailTarget.prescriptionRequired && (
+                <p className="text-sm text-purple-800 flex items-center gap-1.5">
+                  <FileCheck className="h-4 w-4" />
+                  {t("pharmacy.prescriptionRequiredHint")}
+                </p>
               )}
 
               <div>

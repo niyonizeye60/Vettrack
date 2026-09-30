@@ -24,6 +24,9 @@ interface ProductCardProps {
   details?: ProductDetail[]
   wishlisted?: boolean
   onToggleWishlist?: () => void
+  /** Most a buyer can put in the cart - the units left, for a listing that counts stock. */
+  maxQuantity?: number
+  prescriptionRequired?: boolean
 }
 
 export default function ProductCard({
@@ -40,6 +43,8 @@ export default function ProductCard({
   details = [],
   wishlisted,
   onToggleWishlist,
+  maxQuantity,
+  prescriptionRequired,
 }: ProductCardProps) {
   const { t } = useLanguage()
 
@@ -104,7 +109,11 @@ export default function ProductCard({
           {category !== "sales" && (
             <AddToCartControls
               size="sm"
-              item={{ id, categoryId, category, name, image, price }}
+              item={{
+                id, categoryId, category, name, image, price,
+                ...(maxQuantity ? { maxQuantity } : {}),
+                ...(prescriptionRequired ? { prescriptionRequired: true } : {}),
+              }}
             />
           )}
         </div>

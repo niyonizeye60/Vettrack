@@ -2,8 +2,9 @@ export const dynamic = "force-dynamic"
 import { NextResponse } from "next/server"
 import { NextRequest } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { getCommissionPercentage, setCommissionPercentage, getAllSettings } from "@/lib/db-settings"
+import { getCommissionPercentage, setCommissionPercentage, getAllSettings, getSellByDays, setSellByDays } from "@/lib/db-settings"
 import { COMMISSION_PERCENTAGE } from "@/lib/constants"
+import { DEFAULT_SELL_BY_DAYS, MAX_SELL_BY_DAYS } from "@/lib/product-rules"
 
 export async function GET() {
   try {
@@ -12,13 +13,18 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const settings = await getAllSettings()
-    const commissionPct = await getCommissionPercentage()
+    const [settings, commissionPct, sellByDays] = await Promise.all([
+      getAllSettings(),
+      getCommissionPercentage(),
+      getSellByDays(),
+    ])
 
     return NextResponse.json({
       settings,
       commissionPercentage: commissionPct,
       defaultCommissionPercentage: COMMISSION_PERCENTAGE,
+      sellByDays,
+      defaultSellByDays: DEFAULT_SELL_BY_DAYS,
     })
   } catch (error) {
     console.error("Error fetching settings:", error)
@@ -43,9 +49,22 @@ export async function PUT(request: NextRequest) {
       await setCommissionPercentage(pct)
     }
 
+    // Days before expiry that drugs and feed stop selling (lib/product-rules.ts).
+    if (body.sellByDays !== undefined) {
+      const days = Number(body.sellByDays)
+      if (!Number.isInteger(days) || days < 0 || days > MAX_SELL_BY_DAYS) {
+        return NextResponse.json(
+          { error: `The sell-by cutoff must be a whole number of days from 0 to ${MAX_SELL_BY_DAYS}` },
+          { status: 400 }
+        )
+      }
+      await setSellByDays(days)
+    }
+
     return NextResponse.json({
       success: true,
       commissionPercentage: await getCommissionPercentage(),
+      sellByDays: await getSellByDays(),
     })
   } catch (error) {
     console.error("Error updating settings:", error)

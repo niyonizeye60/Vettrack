@@ -61,3 +61,38 @@ export async function notifySuperadmin(title: string, message: string, actionUrl
     console.error("Failed to insert superadmin marketplace notification:", error)
   }
 }
+
+/**
+ * A notification for everyone holding a role, e.g. every finance manager. Stored as a
+ * broadcast - each person's read and dismissed state is kept separately (see
+ * lib/notification-access.ts).
+ */
+export async function notifyRole(role: string, title: string, message: string, actionUrl: string) {
+  try {
+    const client = await clientPromise
+    await client.db(DB_NAME).collection("notifications").insertOne({
+      title,
+      message,
+      type: "marketplace",
+      priority: "normal",
+      targetRole: role,
+      readBy: [],
+      deletedBy: [],
+      actionUrl,
+      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      createdAt: new Date(),
+    })
+  } catch (error) {
+    console.error(`Failed to insert ${role} notification:`, error)
+  }
+}
+
+/** Stock and expiry alerts for Vettrack's own products go to whoever manages listings. */
+export async function notifyMarketplaceStaff(title: string, message: string, actionUrl = "/marketplace/listings") {
+  await Promise.all([notifySuperadmin(title, message, actionUrl), notifyRole("marketplace_admin", title, message, actionUrl)])
+}
+
+/** Refund work goes to finance managers, and to superadmin, who can act on it too. */
+export async function notifyFinance(title: string, message: string, actionUrl = "/finance/refunds") {
+  await Promise.all([notifySuperadmin(title, message, actionUrl), notifyRole("finance_manager", title, message, actionUrl)])
+}

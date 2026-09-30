@@ -10,6 +10,8 @@ const SENSITIVE_API_PATHS = new Set([
   "/api/reset-password",
   "/api/change-password",
   "/api/newsletter",
+  // Anonymous checkout uploads of vet prescriptions, stored in the database.
+  "/api/prescriptions",
 ])
 
 // Payment-gateway webhooks are machine-to-machine: the caller has no session

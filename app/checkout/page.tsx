@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Loader2, ShoppingCart, ChevronLeft } from "lucide-react"
+import { Loader2, ShoppingCart, ChevronLeft, FileCheck, Upload } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useCart } from "@/contexts/CartContext"
 import { useToast } from "@/hooks/use-toast"
@@ -28,6 +28,41 @@ export default function CheckoutPage() {
   const [placingOrder, setPlacingOrder] = useState(false)
   const [pollOrderId, setPollOrderId] = useState<string | null>(null)
 
+  // A prescription-only drug in the cart needs the vet's prescription before paying.
+  // The server can also ask for one (a cart saved before the drug became
+  // prescription-only doesn't know it needs one).
+  const [serverNeedsPrescription, setServerNeedsPrescription] = useState(false)
+  const [prescriptionId, setPrescriptionId] = useState<string | null>(null)
+  const [prescriptionName, setPrescriptionName] = useState("")
+  const [uploadingPrescription, setUploadingPrescription] = useState(false)
+  const [prescriptionError, setPrescriptionError] = useState<string | null>(null)
+  const prescriptionInput = useRef<HTMLInputElement>(null)
+  const needsPrescription = serverNeedsPrescription || items.some((item) => item.prescriptionRequired)
+  const prescriptionItems = items.filter((item) => item.prescriptionRequired).map((item) => item.name)
+
+  const uploadPrescription = async (file: File | undefined) => {
+    if (!file) return
+    setUploadingPrescription(true)
+    setPrescriptionError(null)
+    try {
+      const body = new FormData()
+      body.append("file", file)
+      const res = await fetch("/api/prescriptions", { method: "POST", body })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setPrescriptionError(data.error || t('checkout.prescriptionUploadFailed'))
+        return
+      }
+      setPrescriptionId(data.prescriptionId)
+      setPrescriptionName(file.name)
+    } catch {
+      setPrescriptionError(t('checkout.prescriptionUploadFailed'))
+    } finally {
+      setUploadingPrescription(false)
+      if (prescriptionInput.current) prescriptionInput.current.value = ""
+    }
+  }
+
   const placeOrder = async () => {
     if (!paymentMethod) return
     setPlacingOrder(true)
@@ -38,10 +73,17 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           items: items.map((i) => ({ serviceId: i.id, quantity: i.quantity })),
           buyer,
+          ...(prescriptionId ? { prescriptionId } : {}),
         }),
       })
       const orderData = await orderRes.json()
       if (!orderRes.ok) {
+        if (orderData.code === "prescription_required") {
+          // Show the upload (again - an earlier upload may have lapsed).
+          setServerNeedsPrescription(true)
+          setPrescriptionId(null)
+          setPrescriptionName("")
+        }
         toast({ title: t('common.error'), description: orderData.error, variant: "destructive" })
         return
       }
@@ -161,6 +203,43 @@ export default function CheckoutPage() {
                 <h2 className="text-base font-semibold text-gray-900 mb-4">{t('checkout.paymentMethod')}</h2>
                 <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
 
+                {needsPrescription && (
+                  <div className="mt-6 rounded-lg border border-purple-200 bg-purple-50 p-4 space-y-2">
+                    <p className="flex items-center gap-2 font-medium text-purple-900">
+                      <FileCheck className="h-4 w-4" />
+                      {t('checkout.prescriptionTitle')}
+                    </p>
+                    <p className="text-sm text-purple-800">
+                      {t('checkout.prescriptionDesc')}
+                      {prescriptionItems.length > 0 && <strong> {prescriptionItems.join(", ")}</strong>}
+                    </p>
+                    <input
+                      ref={prescriptionInput}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      className="hidden"
+                      onChange={(e) => uploadPrescription(e.target.files?.[0])}
+                    />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => prescriptionInput.current?.click()}
+                        disabled={uploadingPrescription}
+                      >
+                        {uploadingPrescription ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                        {prescriptionId ? t('checkout.prescriptionReplace') : t('checkout.prescriptionUpload')}
+                      </Button>
+                      {prescriptionId && (
+                        <span className="text-sm text-green-700 break-all">✓ {prescriptionName}</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-purple-700">{t('checkout.prescriptionHint')}</p>
+                    {prescriptionError && <p className="text-sm text-red-600">{prescriptionError}</p>}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100 text-sm font-medium">
                   <span className="text-gray-600">{t('checkout.total')}</span>
                   <span className="text-lg font-bold text-gray-900">RWF {subtotal.toLocaleString()}</span>
@@ -169,7 +248,7 @@ export default function CheckoutPage() {
                 <Button
                   className="w-full mt-4"
                   onClick={placeOrder}
-                  disabled={!paymentMethod || placingOrder}
+                  disabled={!paymentMethod || placingOrder || (needsPrescription && !prescriptionId)}
                   aria-busy={placingOrder}
                 >
                   {placingOrder && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

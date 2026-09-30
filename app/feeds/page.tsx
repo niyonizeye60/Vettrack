@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductCard from "@/components/products/product-card"
+import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
 import ProductGridSkeleton from "@/components/products/product-grid-skeleton"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -25,6 +26,10 @@ interface Feed {
   district?: string
   sector?: string
   village?: string
+  /** Units left to order; null when the feed doesn't count stock. Sold-out feed never arrives here. */
+  available?: number | null
+  expiresOn?: string | null
+  batchNumber?: string
 }
 
 interface Category {
@@ -294,11 +299,14 @@ export default function FeedsPage() {
                   unit={feed.duration}
                   detailHref={`/feeds/${feed.id}`}
                   badges={[
-                    { label: t('common.available'), className: "bg-green-600 text-white" },
+                    feed.available != null && feed.available <= SHOW_UNITS_LEFT_AT
+                      ? { label: t('pharmacy.onlyLeft').replace('{count}', String(feed.available)), className: "bg-orange-500 text-white" }
+                      : { label: t('common.available'), className: "bg-green-600 text-white" },
                     ...(feed.quality
                       ? [{ label: `${feed.quality} ${t('feeds.quality')}`, className: `${getQualityColor(feed.quality)} text-white` }]
                       : []),
                   ]}
+                  maxQuantity={feed.available ?? undefined}
                   wishlisted={wishlist.includes(feed.id)}
                   onToggleWishlist={() => toggleWishlist(feed.id)}
                   details={[

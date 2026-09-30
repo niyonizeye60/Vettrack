@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
-import { createOrder, OrderValidationError } from "@/lib/db-orders"
+import { createOrder, OrderValidationError, PrescriptionRequiredError } from "@/lib/db-orders"
 import { createOrderSchema } from "@/lib/validations/checkout"
 
 export async function POST(request: NextRequest) {
@@ -21,9 +21,14 @@ export async function POST(request: NextRequest) {
       notes: parsed.data.buyer.notes || undefined,
     }
 
-    const order = await createOrder(parsed.data.items, buyer)
+    const order = await createOrder(parsed.data.items, buyer, { prescriptionId: parsed.data.prescriptionId })
     return NextResponse.json({ orderId: order._id.toString(), total: order.total })
   } catch (error) {
+    // The code lets checkout open the prescription upload even for a cart saved before
+    // the drug became prescription-only.
+    if (error instanceof PrescriptionRequiredError) {
+      return NextResponse.json({ error: error.message, code: "prescription_required" }, { status: 400 })
+    }
     if (error instanceof OrderValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }

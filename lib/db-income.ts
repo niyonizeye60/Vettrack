@@ -29,6 +29,12 @@ export interface IncomeEntry {
   occurredAt: Date
   createdAt: Date
   reversedAt: Date | null
+  /**
+   * Set on a refund's entry: the sourceId of the sale it refunds. A refund is booked as
+   * its own negative entry in the month it was paid, so a closed month never changes -
+   * see bookRefund in lib/db-refunds.ts.
+   */
+  refundOf?: string | null
 }
 
 export interface RecordIncomeInput {
@@ -42,6 +48,7 @@ export interface RecordIncomeInput {
   sellerId?: string | null
   reference: string
   occurredAt?: Date
+  refundOf?: string | null
 }
 
 async function getDb() {
@@ -103,6 +110,7 @@ export async function recordIncome(input: RecordIncomeInput): Promise<boolean> {
     occurredAt: input.occurredAt ?? new Date(),
     createdAt: new Date(),
     reversedAt: null,
+    ...(input.refundOf ? { refundOf: input.refundOf } : {}),
   }
 
   try {
@@ -129,6 +137,20 @@ export async function reverseIncome(sourceType: IncomeSource, sourceId: string):
   )
 }
 
+/**
+ * Reverse the refund entries booked against these sales. A payment reversed after
+ * part of it was refunded must not leave the refund subtracting money that is no
+ * longer counted in the first place.
+ */
+export async function reverseRefundsOf(sourceIds: string[]): Promise<void> {
+  if (sourceIds.length === 0) return
+  const collection = await getCollection()
+  await collection.updateMany(
+    { refundOf: { $in: sourceIds }, reversedAt: null },
+    { $set: { reversedAt: new Date() } }
+  )
+}
+
 export interface SourceTotal {
   sourceType: IncomeSource
   grossAmount: number
@@ -147,7 +169,8 @@ export async function getIncomeSummary(from: Date, to: Date): Promise<SourceTota
           _id: "$sourceType",
           grossAmount: { $sum: "$grossAmount" },
           platformRevenue: { $sum: "$platformRevenue" },
-          count: { $sum: 1 },
+          // Refund entries lower the money but aren't sales of their own.
+          count: { $sum: { $cond: [{ $ifNull: ["$refundOf", false] }, 0, 1] } },
         },
       },
     ])
@@ -190,5 +213,6 @@ export function serializeEntry(entry: IncomeEntry) {
     buyerPhone: entry.buyerPhone,
     reference: entry.reference,
     occurredAt: entry.occurredAt,
+    refundOf: entry.refundOf ?? null,
   }
 }

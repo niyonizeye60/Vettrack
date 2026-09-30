@@ -80,6 +80,8 @@ export const CAPABILITIES = {
   "finance.view": ["finance_manager", "superadmin"],
   "finance.export": ["finance_manager", "superadmin"],
   "finance.commission.configure": ["finance_manager", "superadmin"],
+  // Recording that a buyer was paid back, and declining refund requests.
+  "finance.refunds": ["finance_manager", "superadmin"],
 } as const satisfies Record<string, readonly Role[]>
 
 export type Capability = keyof typeof CAPABILITIES

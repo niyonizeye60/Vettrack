@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductCard from "@/components/products/product-card"
+import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
 import ProductGridSkeleton from "@/components/products/product-grid-skeleton"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -24,6 +25,9 @@ interface Drug {
   sector?: string
   village?: string
   usageDescription?: string
+  /** Units left to order; null when the drug doesn't count stock. Sold-out drugs never arrive here. */
+  available?: number | null
+  prescriptionRequired?: boolean
 }
 
 interface Category {
@@ -246,7 +250,16 @@ export default function PharmacyPage() {
                   price={drug.price}
                   unit={drug.duration}
                   detailHref={`/pharmacy/${drug.id}`}
-                  badges={[{ label: t('common.inStock'), className: "bg-blue-600 text-white" }]}
+                  badges={[
+                    drug.available != null && drug.available <= SHOW_UNITS_LEFT_AT
+                      ? { label: t('pharmacy.onlyLeft').replace('{count}', String(drug.available)), className: "bg-orange-500 text-white" }
+                      : { label: t('common.inStock'), className: "bg-blue-600 text-white" },
+                    ...(drug.prescriptionRequired
+                      ? [{ label: t('pharmacy.prescriptionOnly'), className: "bg-purple-600 text-white" }]
+                      : []),
+                  ]}
+                  maxQuantity={drug.available ?? undefined}
+                  prescriptionRequired={drug.prescriptionRequired}
                   wishlisted={wishlist.includes(drug.id)}
                   onToggleWishlist={() => toggleWishlist(drug.id)}
                   details={[

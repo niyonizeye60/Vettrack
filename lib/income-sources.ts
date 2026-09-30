@@ -67,6 +67,11 @@ export const INCOME_SOURCE_COLORS: Record<IncomeSource, string> = {
  */
 export const BROKERED_SOURCES: readonly IncomeSource[] = ["marketplace_animal"]
 
+// marketplace_medicine is not brokered, but its gross can still exceed its revenue:
+// a pharmacy's drug sale books the whole payment as gross and only Vettrack's
+// commission as revenue (bookIncomeForOrder in lib/db-orders.ts). Unlike an animal,
+// that gross did pass through Vettrack, so it is not labelled "off platform".
+
 export function isBrokered(source: IncomeSource): boolean {
   return BROKERED_SOURCES.includes(source)
 }

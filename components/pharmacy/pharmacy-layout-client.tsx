@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Home, Pill } from "lucide-react"
+import { Bell, Home, Pill, Receipt } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import StaffLayoutClient from "@/components/staff/staff-layout-client"
 import StaffSidebar from "@/components/staff/staff-sidebar"
@@ -9,8 +9,9 @@ import NotificationBell from "@/components/staff/notification-bell"
 
 /**
  * The pharmacy portal shell. A pharmacy's job here is narrow - ask for drugs to go on
- * the public pharmacy page and follow each request - so the nav is just that, plus
- * the notifications that tell it how each review went.
+ * the public pharmacy page, keep their stock up to date, and see what sold - so the
+ * nav is just that, plus the notifications that tell it how each review went and
+ * when something sells.
  */
 export default function PharmacyLayoutClient({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage()
@@ -18,6 +19,7 @@ export default function PharmacyLayoutClient({ children }: { children: React.Rea
   const navItems = [
     { href: "/pharmacy-portal", label: t("pharmacy.dashboard"), icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/pharmacy-portal/listings", label: t("pharmacy.myListings"), icon: <Pill className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/pharmacy-portal/sales", label: t("pharmacy.sales"), icon: <Receipt className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/pharmacy-portal/notifications", label: t("notifications.title"), icon: <Bell className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ]
 

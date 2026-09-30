@@ -16,6 +16,7 @@ import {
   requestRemoval,
   resubmitRequest,
   serializeRequest,
+  updateListingStock,
   withdrawRequest,
   ListingRequestError,
   type ListingRequest,
@@ -26,6 +27,7 @@ import {
   removalDecisionSchema,
   removalRequestSchema,
   reviewDecisionSchema,
+  stockUpdateSchema,
 } from "@/lib/validations/listing-request"
 
 type Viewer = { _id: string; role?: string; marketplaceAccess?: unknown }
@@ -108,7 +110,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
  *
  * A reviewer approves or rejects; the owning farmer withdraws a pending request,
  * resubmits a rejected one, edits a published one, or asks for a published one to be
- * removed (which a reviewer then approves or declines). Each transition is guarded inside the data layer by a
+ * removed (which a reviewer then approves or declines). A pharmacy also sets the
+ * stock of its published drugs. Each transition is guarded inside the data layer by a
  * status filter, so two reviewers racing on the same request cannot both publish
  * the animal and a double-clicked resubmit cannot queue it twice.
  */
@@ -179,6 +182,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         `Edited ${edited.title}: ${changes.map((c) => c.field).join(", ")}`
       )
       return NextResponse.json(serializeRequest(edited))
+    }
+
+    // Pharmacy setting how many units of a published drug it has. Live at once.
+    if (body?.action === "stock") {
+      if (!isOwningSeller(currentUser, request)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+      const parsed = stockUpdateSchema.safeParse(body)
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || "Invalid stock" },
+          { status: 400 }
+        )
+      }
+      await updateListingStock(params.id, { _id: currentUser._id }, parsed.data.stock, parsed.data.lowStockAt)
+      await logActivity(currentUser._id, "marketplace.listing.stock", `Set stock of ${request.title} to ${parsed.data.stock}`)
+      return NextResponse.json({ success: true })
     }
 
     // Seller asking for their published listing to be taken down. Staff decide.
