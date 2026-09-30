@@ -992,7 +992,8 @@ export async function getRecentActivities() {
       activities.push({
         id: `user-${user._id}`,
         type: 'user',
-        message: `New ${user.role} registered: ${user.name}`,
+        // "feed_supplier" -> "feed supplier", so every role reads like "New farmer registered".
+        message: `New ${String(user.role ?? "user").replace(/_/g, " ")} registered: ${user.name}`,
         time: getTimeAgo(user.createdAt),
         createdAt: user.createdAt
       })
