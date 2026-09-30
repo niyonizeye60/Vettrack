@@ -12,7 +12,8 @@ import { useLanguage } from "@/contexts/LanguageContext"
 import { getActivityLogs, getActivityLogCategoryCounts } from "@/lib/actions/superadmin"
 import {
   Eye, ChevronLeft, ChevronRight, Search, RotateCw,
-  LogIn, PawPrint, FileText, Briefcase, LifeBuoy, UserCog, Shield, Download, CircleDot, History
+  LogIn, PawPrint, FileText, Briefcase, LifeBuoy, UserCog, Shield, Download, CircleDot, History,
+  Store, Undo2, Wallet
 } from "lucide-react"
 
 interface ActivityLog {
@@ -78,6 +79,11 @@ const CATEGORY_META: Record<string, { label: string; icon: any; color: string }>
   account: { label: "Account", icon: UserCog, color: "text-pink-600" },
   admin: { label: "Admin", icon: Shield, color: "text-indigo-600" },
   export: { label: "Exports", icon: Download, color: "text-fuchsia-600" },
+  // Sellers' listings, stock and removals, and the marketplace team's reviews of them.
+  marketplace: { label: "Marketplace", icon: Store, color: "text-amber-600" },
+  // Refunds asked for by pharmacies and feed suppliers, and paid or declined by finance.
+  refund: { label: "Refunds", icon: Undo2, color: "text-rose-600" },
+  finance: { label: "Finance", icon: Wallet, color: "text-emerald-600" },
 }
 const DEFAULT_META = { label: "Other", icon: CircleDot, color: "text-gray-600" }
 

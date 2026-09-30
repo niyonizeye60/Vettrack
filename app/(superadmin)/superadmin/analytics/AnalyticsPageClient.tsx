@@ -41,6 +41,8 @@ const ROLE_COLORS: Record<string, string> = {
   superadmin: '#8B5CF6',
   marketplace_admin: '#EC4899',
   finance_manager: '#14B8A6',
+  pharmacy: '#06B6D4',
+  feed_supplier: '#84CC16',
 }
 
 export default function AnalyticsPageClient({
@@ -77,6 +79,8 @@ export default function AnalyticsPageClient({
     superadmin: t('superadmin.superAdmin') || 'Super Admin',
     marketplace_admin: t('superadmin.marketplaceAdmin') || 'Marketplace Admin',
     finance_manager: t('superadmin.financeManager') || 'Finance Manager',
+    pharmacy: t('superadmin.pharmacies') || 'Pharmacies',
+    feed_supplier: t('superadmin.feedSuppliers') || 'Feed Suppliers',
   }
   const roleDistributionData = Object.entries(systemStats.userStats)
     .filter(([, count]) => count > 0)

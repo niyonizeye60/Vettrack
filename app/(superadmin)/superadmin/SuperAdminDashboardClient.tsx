@@ -27,7 +27,8 @@ import {
   RefreshCw,
   Download,
   Mail,
-  Wifi
+  Wifi,
+  Store
 } from "lucide-react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -44,6 +45,8 @@ interface SuperAdminDashboardClientProps {
       superadmin?: number
       marketplace_admin?: number
       finance_manager?: number
+      pharmacy?: number
+      feed_supplier?: number
     }
     consultationStats: {
       pending?: number
@@ -78,6 +81,8 @@ interface SuperAdminDashboardClientProps {
       superadmin?: number
       marketplace_admin?: number
       finance_manager?: number
+      pharmacy?: number
+      feed_supplier?: number
     }
   }
   registrationTrend: Array<{
@@ -88,6 +93,8 @@ interface SuperAdminDashboardClientProps {
     superadmin: number
     marketplace_admin: number
     finance_manager: number
+    pharmacy: number
+    feed_supplier: number
     total: number
   }>
   activitySnapshot: {
@@ -152,6 +159,7 @@ export default function SuperAdminDashboardClient({
       case 'subscriber': return { icon: Mail, color: 'text-purple-600' }
       case 'login': return { icon: Wifi, color: 'text-teal-600' }
       case 'admin': return { icon: Shield, color: 'text-indigo-600' }
+      case 'seller': return { icon: Store, color: 'text-amber-600' }
       case 'system': return { icon: Database, color: 'text-gray-600' }
       default: return { icon: AlertCircle, color: 'text-gray-600' }
     }
@@ -264,6 +272,8 @@ export default function SuperAdminDashboardClient({
                 <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.superadmin || 0}</span></div>
                 <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.marketplaceAdmin') || 'Marketplace'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.marketplace_admin || 0}</span></div>
                 <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.financeManager') || 'Finance'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.finance_manager || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.pharmacies') || 'Pharmacies'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.pharmacy || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.feedSuppliers') || 'Feed Suppliers'}</span><span className="text-gray-600 font-medium flex-shrink-0">{stats.userStats.feed_supplier || 0}</span></div>
               </div>
             </CardContent>
           </Card>
@@ -285,6 +295,8 @@ export default function SuperAdminDashboardClient({
                 <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.superAdmin') || 'Super Admin'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.superadmin || 0}</span></div>
                 <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.marketplaceAdmin') || 'Marketplace'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.marketplace_admin || 0}</span></div>
                 <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.financeManager') || 'Finance'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.finance_manager || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.pharmacies') || 'Pharmacies'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.pharmacy || 0}</span></div>
+                <div className="flex items-center justify-between gap-1 min-w-0"><span className="truncate">{t('superadmin.feedSuppliers') || 'Feed Suppliers'}</span><span className="text-gray-600 font-medium flex-shrink-0">{onlineUsers.byRole.feed_supplier || 0}</span></div>
               </div>
             </CardContent>
           </Card>
@@ -350,7 +362,9 @@ export default function SuperAdminDashboardClient({
                 <Bar dataKey="admin" name={t('superadmin.admin') || 'Admin'} stackId="reg" fill="#F59E0B" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="superadmin" name={t('superadmin.superAdmin') || 'Super Admin'} stackId="reg" fill="#8B5CF6" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="marketplace_admin" name={t('superadmin.marketplaceAdmin') || 'Marketplace'} stackId="reg" fill="#EC4899" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="finance_manager" name={t('superadmin.financeManager') || 'Finance'} stackId="reg" fill="#14B8A6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="finance_manager" name={t('superadmin.financeManager') || 'Finance'} stackId="reg" fill="#14B8A6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="pharmacy" name={t('superadmin.pharmacies') || 'Pharmacies'} stackId="reg" fill="#06B6D4" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="feed_supplier" name={t('superadmin.feedSuppliers') || 'Feed Suppliers'} stackId="reg" fill="#84CC16" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

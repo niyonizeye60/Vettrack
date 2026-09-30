@@ -8,6 +8,7 @@ import { getCurrentUser } from "./auth"
 import { logActivity, logSystemError as recordSystemError } from "../activity-log"
 import { isPresenceOnline, type PresenceDoc } from "../presence"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
+import { CAPABILITIES, ROLES, isRole, type Role } from "../roles"
 import {
   FARM_LOCATION_RESTRICTION_FIELDS,
   getFarmLocationRestrictionStatus,
@@ -929,6 +930,20 @@ export async function getAllConsultations() {
   }
 }
 
+// The seller actions that reach the dashboard's recent activity. Each one's logged details
+// already reads as a sentence ("Set stock of Maize bran to 20", "Asked to remove ..."), so
+// the feed only puts the seller's name in front. Tidying a rejected post off their own
+// list (marketplace.request.deleted) is left out as noise.
+const SELLER_FEED_ACTIONS = [
+  "marketplace.request.created",
+  "marketplace.request.resubmitted",
+  "marketplace.request.withdrawn",
+  "marketplace.listing.edited",
+  "marketplace.listing.stock",
+  "marketplace.removal.requested",
+  "refund.requested",
+]
+
 // Get recent activities for dashboard
 export async function getRecentActivities() {
   try {
@@ -937,7 +952,7 @@ export async function getRecentActivities() {
     const db = client.db("ntdm_animal_hospital")
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-    const [recentUsers, recentConsultations, recentReports, recentSubscribers, loginBuckets, adminActionLogs] = await Promise.all([
+    const [recentUsers, recentConsultations, recentReports, recentSubscribers, loginBuckets, adminActionLogs, sellerActionLogs] = await Promise.all([
       db.collection("users")
         .find({ createdAt: { $gte: since } })
         .sort({ createdAt: -1 })
@@ -974,7 +989,18 @@ export async function getRecentActivities() {
         .find({ createdAt: { $gte: since }, action: { $regex: /^(admin|chat)\./ } })
         .sort({ createdAt: -1 })
         .limit(6)
-        .toArray()
+        .toArray(),
+      // What pharmacies and feed suppliers did in their portals. Filtered on the actor's
+      // role, because farmers log the same marketplace.request.* actions for their animals.
+      db.collection("user_activity_logs").aggregate([
+        { $match: { createdAt: { $gte: since }, action: { $in: SELLER_FEED_ACTIONS } } },
+        { $sort: { createdAt: -1 } },
+        { $lookup: { from: "users", localField: "userId", foreignField: "_id", as: "actor" } },
+        { $unwind: "$actor" },
+        { $match: { "actor.role": { $in: [...CAPABILITIES["marketplace.sales.own"]] } } },
+        { $limit: 5 },
+        { $project: { action: 1, details: 1, createdAt: 1, "actor.name": 1, "actor.role": 1 } }
+      ]).toArray()
     ])
 
     const actorIds = [...new Set(adminActionLogs.map(log => log.userId?.toString()).filter(Boolean))]
@@ -1048,6 +1074,19 @@ export async function getRecentActivities() {
         id: `admin-${log._id}`,
         type: 'admin',
         message: `${actorName} ${description}`,
+        time: getTimeAgo(log.createdAt),
+        createdAt: log.createdAt
+      })
+    })
+
+    sellerActionLogs.forEach(log => {
+      if (!log.details) return
+      const role = String(log.actor.role).replace(/_/g, " ")
+      activities.push({
+        id: `seller-${log._id}`,
+        type: 'seller',
+        // e.g. "Korra (feed supplier) set stock of Maize bran to 20"
+        message: `${log.actor.name} (${role}) ${log.details.charAt(0).toLowerCase()}${log.details.slice(1)}`,
         time: getTimeAgo(log.createdAt),
         createdAt: log.createdAt
       })
@@ -1645,21 +1684,22 @@ export async function getUserRegistrationTrend(days = 30) {
       }
     ]).toArray()
 
-    // Build a zero-filled day-by-day series so the chart doesn't skip empty days
-    const byDate: Record<string, { date: string; farmer: number; doctor: number; admin: number; superadmin: number; marketplace_admin: number; finance_manager: number; total: number }> = {}
+    // Build a zero-filled day-by-day series so the chart doesn't skip empty days. One
+    // column per role in ROLES, so a new role is counted without touching this.
+    const byDate: Record<string, { date: string; total: number } & Record<Role, number>> = {}
     for (let i = 0; i < days; i++) {
       const d = new Date(start)
       d.setUTCDate(d.getUTCDate() + i)
       const key = d.toISOString().slice(0, 10)
-      byDate[key] = { date: key, farmer: 0, doctor: 0, admin: 0, superadmin: 0, marketplace_admin: 0, finance_manager: 0, total: 0 }
+      byDate[key] = { date: key, total: 0, ...(Object.fromEntries(ROLES.map((role) => [role, 0])) as Record<Role, number>) }
     }
 
     for (const row of rows) {
-      const key = row._id.date
-      const role = row._id.role as "farmer" | "doctor" | "admin" | "superadmin" | "marketplace_admin" | "finance_manager"
-      if (byDate[key] && role in byDate[key]) {
-        byDate[key][role] += row.count
-        byDate[key].total += row.count
+      const day = byDate[row._id.date]
+      const role = row._id.role
+      if (day && isRole(role)) {
+        day[role] += row.count
+        day.total += row.count
       }
     }
 
