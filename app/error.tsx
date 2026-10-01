@@ -7,6 +7,7 @@ import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
+import NoIndex from "@/components/seo/no-index"
 import { reportClientError } from "@/lib/actions"
 import { isPortalPath } from "@/lib/roles"
 
@@ -46,6 +47,7 @@ export default function GlobalRouteError({
   if (isPortalPath(pathname)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <NoIndex />
         <div className="max-w-md w-full text-center space-y-4">
           {icon}
           <h1 className="text-xl font-bold text-gray-900">{t('error.title')}</h1>
@@ -60,6 +62,7 @@ export default function GlobalRouteError({
   // the hero banner under it or the nav links are white on white.
   return (
     <>
+      <NoIndex />
       <ServicesBanner title={t('error.title')} subtitle={t('error.desc')} />
 
       <div className="min-h-[50vh] bg-gray-50 py-12">

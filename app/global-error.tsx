@@ -21,6 +21,10 @@ export default function GlobalError({
 
   return (
     <html lang="en">
+      {/* Served under the URL that failed, so without this Google indexes the error text as that page. */}
+      <head>
+        <meta name="robots" content="noindex" />
+      </head>
       <body style={{ margin: 0, fontFamily: "system-ui, sans-serif", background: "#f9fafb" }}>
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ maxWidth: 420, width: "100%", textAlign: "center" }}>

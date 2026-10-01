@@ -1,3 +1,5 @@
+import type { Metadata } from "next"
+import { cache } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -121,12 +123,30 @@ interface BlogPostPageProps {
   params: Promise<{ id: string }>
 }
 
+// Static posts use small numeric ids; dynamic posts use 24-char Mongo ObjectIds.
+// Number.parseInt("6a1b2c...") would silently return 6, so only treat the id as a
+// static post id when it's made up entirely of digits.
+const findStaticPost = (id: string) => (/^\d+$/.test(id) ? blogPosts.find((p) => p.id === Number(id)) : undefined)
+
+// Metadata and the page both need the post; cache() makes that one database read.
+const getPublishedPost = cache(async (id: string) => {
+  const post = await getBlogPostById(id)
+  return post && post.status === "published" ? post : null
+})
+
+export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
+  const { id } = await params
+  const staticPost = findStaticPost(id)
+  if (staticPost) return { title: `${staticPost.title} - NTDM Vettrack`, description: staticPost.excerpt }
+
+  const post = await getPublishedPost(id)
+  if (!post) notFound()
+  return { title: `${post.title} - NTDM Vettrack`, ...(post.excerpt ? { description: post.excerpt } : {}) }
+}
+
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { id } = await params
-  // Static posts use small numeric ids; dynamic posts use 24-char Mongo ObjectIds.
-  // Number.parseInt("6a1b2c...") would silently return 6, so only treat the id as a
-  // static post id when it's made up entirely of digits.
-  const staticPost = /^\d+$/.test(id) ? blogPosts.find((p) => p.id === Number(id)) : undefined
+  const staticPost = findStaticPost(id)
 
   if (staticPost) {
     return (
@@ -173,9 +193,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     )
   }
 
-  const dynamicPost = await getBlogPostById(id)
+  const dynamicPost = await getPublishedPost(id)
 
-  if (!dynamicPost || dynamicPost.status !== "published") {
+  if (!dynamicPost) {
     notFound()
   }
 

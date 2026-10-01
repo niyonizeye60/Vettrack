@@ -12,6 +12,7 @@ import ServicesBanner from "@/components/services/services-banner"
 import ProductDetailRows from "@/components/products/product-detail-rows"
 import ConnectCta from "@/components/marketplace/connect-cta"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
+import NoIndex from "@/components/seo/no-index"
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"
@@ -121,6 +122,7 @@ export default function AnimalDetailPage() {
   if (!animal) {
     return (
       <>
+        <NoIndex />
         <ServicesBanner
           backHref="/services?tab=sales"
           title={t('animals.title')}

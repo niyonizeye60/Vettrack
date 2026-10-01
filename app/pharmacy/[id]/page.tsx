@@ -12,6 +12,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductDetailRows from "@/components/products/product-detail-rows"
 import AddToCartControls from "@/components/products/add-to-cart-controls"
+import NoIndex from "@/components/seo/no-index"
 
 interface Drug {
   id: string
@@ -95,6 +96,7 @@ export default function DrugDetailPage() {
   if (!drug) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
+        <NoIndex />
         <div className="container-custom">
           <Link href="/pharmacy" className="inline-flex items-center text-primary hover:underline mb-8">
             {t('common.backTo')} {t('pharmacy.title')}

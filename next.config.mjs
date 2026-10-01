@@ -1,7 +1,30 @@
 import { withSentryConfig } from "@sentry/nextjs/config"
 
+// URLs that must stay out of search results. Sent as an X-Robots-Tag header rather
+// than a <meta> tag because most of these pages are client components that can't
+// export metadata, and Google reads the header before rendering anything.
+// Don't also Disallow them in robots.txt: Google has to fetch a page to see its
+// noindex, and a blocked URL can still be listed from links alone.
+const NOINDEX_PATHS = [
+  // JSON, not pages. Google still fetches it to render the storefronts, which load
+  // their products from /api/services, so it is noindexed here, never blocked.
+  "/api/:path*",
+  "/checkout/:path*",
+  "/booking/callback",
+  "/connect/:path*",
+  "/forgot-password",
+  "/reset-password",
+  "/maintenance",
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async headers() {
+    return NOINDEX_PATHS.map((source) => ({
+      source,
+      headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+    }))
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
