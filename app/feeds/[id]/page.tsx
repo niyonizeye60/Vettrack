@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Heart, Share2, MapPin, Wheat, Tag, CalendarClock, Hash } from "lucide-react"
 import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
 import Link from "next/link"
-import Image from "next/image"
 import { useParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductDetailRows from "@/components/products/product-detail-rows"
 import AddToCartControls from "@/components/products/add-to-cart-controls"
+import ListingGallery, { listingPhotos } from "@/components/marketplace/listing-gallery"
 import NoIndex from "@/components/seo/no-index"
 
 interface Feed {
@@ -21,6 +21,7 @@ interface Feed {
   price: number
   duration: string
   image: string
+  images?: string[]
   categoryId: string
   feedType?: string
   quality?: string
@@ -132,23 +133,20 @@ export default function FeedDetailPage() {
         <div className="container-custom">
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div className="relative">
-              <div className="relative h-96 rounded-lg overflow-hidden">
-                <Image src={feed.image || "/placeholder.svg"} alt={feed.name} fill className="object-cover" />
-                {feed.available != null && feed.available <= SHOW_UNITS_LEFT_AT ? (
-                  <Badge className="absolute top-4 right-4 bg-orange-500">
-                    {t('pharmacy.onlyLeft').replace('{count}', String(feed.available))}
-                  </Badge>
-                ) : (
-                  <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
-                )}
-                {feed.quality && (
-                  <Badge className={`absolute top-4 left-4 ${getQualityColor(feed.quality)} text-white`}>
-                    {feed.quality} {t('feeds.quality')}
-                  </Badge>
-                )}
-              </div>
-            </div>
+            <ListingGallery photos={listingPhotos(feed)} alt={feed.name}>
+              {feed.available != null && feed.available <= SHOW_UNITS_LEFT_AT ? (
+                <Badge className="absolute top-4 right-4 bg-orange-500">
+                  {t('pharmacy.onlyLeft').replace('{count}', String(feed.available))}
+                </Badge>
+              ) : (
+                <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
+              )}
+              {feed.quality && (
+                <Badge className={`absolute top-4 left-4 ${getQualityColor(feed.quality)} text-white`}>
+                  {feed.quality} {t('feeds.quality')}
+                </Badge>
+              )}
+            </ListingGallery>
 
             <div className="space-y-6">
               <div>

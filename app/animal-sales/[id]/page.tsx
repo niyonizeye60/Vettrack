@@ -3,15 +3,14 @@
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Heart, Share2, MapPin, Calendar, Tag, Mail, Phone, Expand, SearchX } from "lucide-react"
+import { Heart, Share2, MapPin, Calendar, Tag, Mail, Phone, SearchX } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 import { useParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductDetailRows from "@/components/products/product-detail-rows"
 import ConnectCta from "@/components/marketplace/connect-cta"
-import PhotoLightbox from "@/components/marketplace/photo-lightbox"
+import ListingGallery, { listingPhotos } from "@/components/marketplace/listing-gallery"
 import NoIndex from "@/components/seo/no-index"
 
 const HERO_IMAGE =
@@ -41,8 +40,6 @@ export default function AnimalDetailPage() {
   const [animal, setAnimal] = useState<Animal | null>(null)
   const [loading, setLoading] = useState(true)
   const [wishlist, setWishlist] = useState<string[]>([])
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [lightboxOpen, setLightboxOpen] = useState(false)
   const params = useParams()
   const animalId = params.id as string
   const { t } = useLanguage()
@@ -61,23 +58,12 @@ export default function AnimalDetailPage() {
       const animals = await response.json()
       const foundAnimal = animals.find((a: Animal) => a.id === animalId)
       setAnimal(foundAnimal || null)
-      setActiveIndex(0)
     } catch (error) {
       console.error('Failed to fetch animal:', error)
     } finally {
       setLoading(false)
     }
   }
-
-  const photos = animal
-    ? animal.images && animal.images.length > 0
-      ? animal.images.filter(Boolean)
-      : animal.image
-        ? [animal.image]
-        : []
-    : []
-
-  const activePhoto = photos[activeIndex] || animal?.image || "/placeholder.svg"
 
   const toggleWishlist = () => {
     if (!animal) return
@@ -162,49 +148,9 @@ export default function AnimalDetailPage() {
         <div className="container-custom">
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setLightboxOpen(true)}
-                className="group relative block h-96 w-full rounded-lg overflow-hidden"
-              >
-                <Image src={activePhoto} alt={animal.name} fill className="object-cover" />
-                <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
-                <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                  <Expand className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                </span>
-                {photos.length > 1 && (
-                  <span className="absolute bottom-4 right-4 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                    {activeIndex + 1} / {photos.length}
-                  </span>
-                )}
-              </button>
-
-              {photos.length > 1 && (
-                <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-                  {photos.map((url, i) => (
-                    <button
-                      key={url + i}
-                      type="button"
-                      onClick={() => setActiveIndex(i)}
-                      className={`relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden border-2 transition-colors ${
-                        i === activeIndex ? "border-primary" : "border-transparent hover:border-gray-300"
-                      }`}
-                    >
-                      <Image src={url} alt={`${animal.name} ${i + 1}`} fill className="object-cover" sizes="64px" />
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <PhotoLightbox
-                photos={photos}
-                alt={animal.name}
-                open={lightboxOpen}
-                onOpenChange={setLightboxOpen}
-                initialIndex={activeIndex}
-              />
-            </div>
+            <ListingGallery photos={listingPhotos(animal)} alt={animal.name}>
+              <Badge className="absolute top-4 right-4 bg-green-600">{t('common.available')}</Badge>
+            </ListingGallery>
 
             <div className="space-y-6">
               <div>

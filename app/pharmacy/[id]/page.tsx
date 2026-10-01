@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Heart, Share2, MapPin, Pill, CalendarClock, Hash, ShieldCheck, FileCheck } from "lucide-react"
 import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
 import Link from "next/link"
-import Image from "next/image"
 import { useParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductDetailRows from "@/components/products/product-detail-rows"
 import AddToCartControls from "@/components/products/add-to-cart-controls"
+import ListingGallery, { listingPhotos } from "@/components/marketplace/listing-gallery"
 import NoIndex from "@/components/seo/no-index"
 
 interface Drug {
@@ -21,6 +21,7 @@ interface Drug {
   price: number
   duration: string
   image: string
+  images?: string[]
   categoryId: string
   drugType?: string
   district?: string
@@ -124,18 +125,15 @@ export default function DrugDetailPage() {
         <div className="container-custom">
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div className="relative">
-              <div className="relative h-96 rounded-lg overflow-hidden">
-                <Image src={drug.image || "/placeholder.svg"} alt={drug.name} fill className="object-cover" />
-                {drug.available != null && drug.available <= SHOW_UNITS_LEFT_AT ? (
-                  <Badge className="absolute top-4 right-4 bg-orange-500">
-                    {t('pharmacy.onlyLeft').replace('{count}', String(drug.available))}
-                  </Badge>
-                ) : (
-                  <Badge className="absolute top-4 right-4 bg-blue-600">{t('common.inStock')}</Badge>
-                )}
-              </div>
-            </div>
+            <ListingGallery photos={listingPhotos(drug)} alt={drug.name}>
+              {drug.available != null && drug.available <= SHOW_UNITS_LEFT_AT ? (
+                <Badge className="absolute top-4 right-4 bg-orange-500">
+                  {t('pharmacy.onlyLeft').replace('{count}', String(drug.available))}
+                </Badge>
+              ) : (
+                <Badge className="absolute top-4 right-4 bg-blue-600">{t('common.inStock')}</Badge>
+              )}
+            </ListingGallery>
 
             <div className="space-y-6">
               <div>
