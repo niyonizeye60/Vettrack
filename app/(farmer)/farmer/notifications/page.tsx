@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
+import { localizeNotification } from "@/lib/notification-messages"
 
 interface Notification {
   _id: string
@@ -25,6 +26,8 @@ interface Notification {
   read: boolean
   createdAt: string
   expiresAt?: string
+  /** Marketplace notifications carry their template, so they show in the reader's language. */
+  i18n?: unknown
 }
 
 function getTimeLeft(expiresAt?: string) {
@@ -55,7 +58,7 @@ function typeConfig(type: string) {
 }
 
 export default function FarmerNotificationsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -169,10 +172,11 @@ export default function FarmerNotificationsPage() {
   const unreadCount = notifications.filter(n => !n.read && !n._id.startsWith("announcement-")).length
   const readCount   = notifications.filter(n =>  n.read).length
 
-  const visibleNotifications =
+  const visibleNotifications = (
     activeTab === "unread" ? notifications.filter(n => !n.read) :
     activeTab === "read"   ? notifications.filter(n =>  n.read) :
     notifications
+  ).map(n => localizeNotification(n, language, t))
 
   if (loading) {
     return (

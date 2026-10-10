@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
+import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeNotification } from "@/lib/notification-messages"
 
 export interface FeedItem {
   id: string
@@ -12,6 +14,8 @@ export interface FeedItem {
   read: boolean
   announcement: boolean
   actionUrl: string | null
+  /** Marketplace notifications carry their template, so they show in the reader's language. */
+  i18n?: unknown
 }
 
 const ANNOUNCEMENT_PREFIX = "announcement-"
@@ -66,6 +70,13 @@ export function useNotificationsFeed(
   const onNewRef = useRef(onNew)
   onNewRef.current = onNew
 
+  // Translated as they are read rather than when loaded, so switching language
+  // re-renders them without waiting for the next poll.
+  const { language, t } = useLanguage()
+  const localize = (item: FeedItem) => localizeNotification(item, language, t)
+  const localizeRef = useRef(localize)
+  localizeRef.current = localize
+
   const readKey = `${role}-read-announcements`
   const dismissedKey = `${role}-dismissed-announcements`
 
@@ -93,6 +104,7 @@ export function useNotificationsFeed(
               read: !!n.read,
               announcement: false,
               actionUrl: n.actionUrl ?? null,
+              i18n: n.i18n ?? null,
             }))
           : []
 
@@ -120,7 +132,7 @@ export function useNotificationsFeed(
         } else {
           const fresh = all.filter((item) => !item.read && !seenIds.current!.has(item.id))
           all.forEach((item) => seenIds.current!.add(item.id))
-          if (fresh.length > 0) onNewRef.current?.(fresh)
+          if (fresh.length > 0) onNewRef.current?.(fresh.map(localizeRef.current))
         }
 
         setItems(all)
@@ -247,7 +259,7 @@ export function useNotificationsFeed(
 
   const unreadCount = items.filter((item) => !item.read).length
 
-  return { userId, items, unreadCount, loading, refreshing, refresh, markRead, markAllRead, dismiss }
+  return { userId, items: items.map(localize), unreadCount, loading, refreshing, refresh, markRead, markAllRead, dismiss }
 }
 
 /** Announcement bodies are HTML; the bell shows a one-line text preview. */

@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { isDateString } from "@/lib/product-rules"
+import { errorMessage } from "@/lib/error-messages"
 import { MAX_STOCK } from "@/lib/validations/listing-request"
 
 /**
@@ -19,7 +20,7 @@ export const productFieldsSchema = z.object({
   stock: optionalCount,
   lowStockAt: optionalCount,
   expiresOn: z
-    .union([z.literal(""), z.null(), z.string().trim().refine(isDateString, "Enter the expiry date as YYYY-MM-DD")])
+    .union([z.literal(""), z.null(), z.string().trim().refine(isDateString, errorMessage("expiryFormat"))])
     .optional(),
   batchNumber: z.string().trim().max(60).optional(),
   registrationNumber: z.string().trim().max(60).optional(),

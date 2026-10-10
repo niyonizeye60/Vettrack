@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { isDateString } from "@/lib/product-rules"
+import { errorMessage } from "@/lib/error-messages"
 
 /**
  * What a seller submits when they ask Vettrack to put something on the marketplace.
@@ -29,19 +30,19 @@ export type ListingRequestStatus = (typeof LISTING_REQUEST_STATUSES)[number]
 export const MAX_LISTING_PHOTOS = 6
 
 export const listingRequestSchema = z.object({
-  title: z.string().trim().min(3, "Give the listing a short title").max(120),
-  animalType: z.enum(ANIMAL_TYPES, { errorMap: () => ({ message: "Choose the type of animal" }) }),
+  title: z.string().trim().min(3, errorMessage("listingTitle")).max(120),
+  animalType: z.enum(ANIMAL_TYPES, { errorMap: () => ({ message: errorMessage("chooseAnimalType") }) }),
   breed: z.string().trim().max(80).optional().or(z.literal("")),
   age: z.string().trim().max(40).optional().or(z.literal("")),
   sex: z.enum(ANIMAL_SEXES).optional(),
   // The farmer's asking price. Whether the marketplace admin may change it before
   // publishing is still an open decision - today approve copies it through as-is.
-  proposedPrice: z.coerce.number().int("Enter a whole number").positive("Enter a price above zero").max(100_000_000),
-  description: z.string().trim().min(10, "Describe the animal in a sentence or two").max(2000),
-  district: z.string().trim().min(1, "Choose a district"),
+  proposedPrice: z.coerce.number().int(errorMessage("wholeNumber")).positive(errorMessage("priceAboveZero")).max(100_000_000),
+  description: z.string().trim().min(10, errorMessage("describeAnimal")).max(2000),
+  district: z.string().trim().min(1, errorMessage("chooseDistrict")),
   sector: z.string().trim().max(80).optional().or(z.literal("")),
   village: z.string().trim().max(80).optional().or(z.literal("")),
-  photos: z.array(z.string().min(1)).min(1, "Add at least one photo").max(MAX_LISTING_PHOTOS),
+  photos: z.array(z.string().min(1)).min(1, errorMessage("addPhoto")).max(MAX_LISTING_PHOTOS),
   /** Optional exact spot from device GPS; district/sector center is used when absent. */
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
@@ -62,22 +63,22 @@ export const MAX_STOCK = 1_000_000
  * request is saved (assertListableExpiry in lib/db-listing-requests.ts).
  */
 export const expiryDateSchema = z
-  .string({ required_error: "Enter the expiry date on the pack" })
+  .string({ required_error: errorMessage("expiryOnPack") })
   .trim()
-  .refine(isDateString, "Enter the expiry date on the pack")
+  .refine(isDateString, errorMessage("expiryOnPack"))
 
 /** What a pharmacy submits when it asks for a drug to go on the pharmacy storefront. */
 export const drugRequestSchema = z.object({
-  title: z.string().trim().min(3, "Give the drug a name").max(120),
-  drugType: z.enum(DRUG_TYPES, { errorMap: () => ({ message: "Choose the type of drug" }) }),
+  title: z.string().trim().min(3, errorMessage("drugName")).max(120),
+  drugType: z.enum(DRUG_TYPES, { errorMap: () => ({ message: errorMessage("chooseDrugType") }) }),
   usageDescription: z.string().trim().max(1000).optional().or(z.literal("")),
-  proposedPrice: z.coerce.number().int("Enter a whole number").positive("Enter a price above zero").max(100_000_000),
+  proposedPrice: z.coerce.number().int(errorMessage("wholeNumber")).positive(errorMessage("priceAboveZero")).max(100_000_000),
   /**
    * Units the pharmacy has to sell. Copied onto the listing when it is approved; after
    * that the pharmacy keeps it up to date with stockUpdateSchema, and an edit of the
    * published listing leaves it alone.
    */
-  stock: z.coerce.number().int("Enter a whole number").min(1, "Enter how many you have in stock").max(MAX_STOCK),
+  stock: z.coerce.number().int(errorMessage("wholeNumber")).min(1, errorMessage("stockCount")).max(MAX_STOCK),
   /** The expiry printed on the pack. The drug stops selling a week before it - see lib/product-rules.ts. */
   expiryDate: expiryDateSchema,
   /** Batch / lot number on the pack, so a recalled batch can be traced. */
@@ -86,11 +87,11 @@ export const drugRequestSchema = z.object({
   registrationNumber: z.string().trim().max(60).optional().or(z.literal("")),
   /** Only sold to a buyer who uploads a vet's prescription at checkout. */
   prescriptionRequired: z.boolean().default(false),
-  description: z.string().trim().min(10, "Describe the drug in a sentence or two").max(2000),
-  district: z.string().trim().min(1, "Choose a district"),
+  description: z.string().trim().min(10, errorMessage("describeDrug")).max(2000),
+  district: z.string().trim().min(1, errorMessage("chooseDistrict")),
   sector: z.string().trim().max(80).optional().or(z.literal("")),
   village: z.string().trim().max(80).optional().or(z.literal("")),
-  photos: z.array(z.string().min(1)).min(1, "Add at least one photo").max(MAX_LISTING_PHOTOS),
+  photos: z.array(z.string().min(1)).min(1, errorMessage("addPhoto")).max(MAX_LISTING_PHOTOS),
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
 })
@@ -104,29 +105,29 @@ export const FEED_TARGET_ANIMALS = ["Cattle", "Goats", "Sheep", "Poultry", "Pigs
 
 /** What a feed supplier submits when it asks for a feed to go on the feeds storefront. */
 export const feedRequestSchema = z.object({
-  title: z.string().trim().min(3, "Give the feed a name").max(120),
-  feedType: z.enum(FEED_TYPES, { errorMap: () => ({ message: "Choose the type of feed" }) }),
+  title: z.string().trim().min(3, errorMessage("feedName")).max(120),
+  feedType: z.enum(FEED_TYPES, { errorMap: () => ({ message: errorMessage("chooseFeedType") }) }),
   // "" is "not stated": one enum rather than a union, so a bad value gets a readable message.
-  quality: z.enum(["", ...FEED_QUALITIES], { errorMap: () => ({ message: "Choose the quality from the list" }) }).optional(),
+  quality: z.enum(["", ...FEED_QUALITIES], { errorMap: () => ({ message: errorMessage("chooseQuality") }) }).optional(),
   targetAnimal: z
-    .enum(["", ...FEED_TARGET_ANIMALS], { errorMap: () => ({ message: "Choose the animal from the list" }) })
+    .enum(["", ...FEED_TARGET_ANIMALS], { errorMap: () => ({ message: errorMessage("chooseTargetAnimal") }) })
     .optional(),
   /** What one unit is - "50 kg bag", "bale". The price is per unit, so it is required. */
-  unit: z.string().trim().min(1, "Say what one unit is, e.g. a 50 kg bag").max(40),
-  proposedPrice: z.coerce.number().int("Enter a whole number").positive("Enter a price above zero").max(100_000_000),
+  unit: z.string().trim().min(1, errorMessage("feedUnit")).max(40),
+  proposedPrice: z.coerce.number().int(errorMessage("wholeNumber")).positive(errorMessage("priceAboveZero")).max(100_000_000),
   /** Units to sell; handled exactly like a drug's stock (see drugRequestSchema). */
-  stock: z.coerce.number().int("Enter a whole number").min(1, "Enter how many you have in stock").max(MAX_STOCK),
+  stock: z.coerce.number().int(errorMessage("wholeNumber")).min(1, errorMessage("stockCount")).max(MAX_STOCK),
   /**
    * Optional: hay and minerals often carry no date. When given, the same sell-by rules
    * as a drug apply - see assertListableExpiry in lib/db-listing-requests.ts.
    */
   expiryDate: expiryDateSchema.optional().or(z.literal("")),
   batchNumber: z.string().trim().max(60).optional().or(z.literal("")),
-  description: z.string().trim().min(10, "Describe the feed in a sentence or two").max(2000),
-  district: z.string().trim().min(1, "Choose a district"),
+  description: z.string().trim().min(10, errorMessage("describeFeed")).max(2000),
+  district: z.string().trim().min(1, errorMessage("chooseDistrict")),
   sector: z.string().trim().max(80).optional().or(z.literal("")),
   village: z.string().trim().max(80).optional().or(z.literal("")),
-  photos: z.array(z.string().min(1)).min(1, "Add at least one photo").max(MAX_LISTING_PHOTOS),
+  photos: z.array(z.string().min(1)).min(1, errorMessage("addPhoto")).max(MAX_LISTING_PHOTOS),
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
 })
@@ -139,9 +140,9 @@ export type FeedRequestInput = z.infer<typeof feedRequestSchema>
  * storefront until there is stock again. Goes live at once, without review.
  */
 export const stockUpdateSchema = z.object({
-  stock: z.coerce.number().int("Enter a whole number").min(0, "Stock can't be below zero").max(MAX_STOCK),
+  stock: z.coerce.number().int(errorMessage("wholeNumber")).min(0, errorMessage("stockNotNegative")).max(MAX_STOCK),
   /** Warn the pharmacy when stock falls to this many units. */
-  lowStockAt: z.coerce.number().int("Enter a whole number").min(0).max(MAX_STOCK).optional(),
+  lowStockAt: z.coerce.number().int(errorMessage("wholeNumber")).min(0).max(MAX_STOCK).optional(),
 })
 
 /** A validated submission, tagged with its kind so the data layer knows which fields it carries. */
@@ -163,7 +164,7 @@ export function parseSellerSubmission(
 ): { success: true; submission: SellerSubmission } | { success: false; error: string } {
   const parsed = SUBMISSION_SCHEMAS[kind].safeParse(body)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message || "Invalid request" }
+    return { success: false, error: parsed.error.issues[0]?.message || errorMessage("invalidRequest") }
   }
   return { success: true, submission: { kind, data: parsed.data } as SellerSubmission }
 }
@@ -218,17 +219,54 @@ export const LISTING_CHANGE_LABEL_KEYS: Record<ListingChangeField, string> = {
   unit: "feedSupplier.unit",
 }
 
+type ListingListValue =
+  | (typeof ANIMAL_TYPES)[number]
+  | (typeof ANIMAL_SEXES)[number]
+  | (typeof DRUG_TYPES)[number]
+  | (typeof FEED_TYPES)[number]
+  | (typeof FEED_QUALITIES)[number]
+  | (typeof FEED_TARGET_ANIMALS)[number]
+
+/** Translation key for each value the lists above store; they are saved in English. */
+const LISTING_VALUE_LABEL_KEYS: Record<ListingListValue, string> = {
+  Cow: "content.cow", Goat: "content.goat", Sheep: "content.sheep", Pig: "content.pig",
+  Chicken: "content.chicken", Dog: "content.dog", Cat: "content.cat",
+  Male: "content.male", Female: "content.female",
+  Antibiotic: "content.antibiotic", Vaccine: "content.vaccine", Dewormer: "content.dewormer",
+  "Pain Relief": "content.painRelief", Vitamins: "content.vitamins",
+  Hay: "content.hay", Concentrates: "content.concentrates", Minerals: "content.minerals", Supplements: "content.supplements",
+  High: "content.high", Medium: "content.medium", Low: "content.low",
+  Cattle: "content.cattle", Goats: "content.goats", Poultry: "content.poultry", Pigs: "content.pigs",
+}
+
+/**
+ * A stored list value (animal type, sex, drug type, feed type, quality, target animal)
+ * in the reader's language. Anything outside the lists - older or hand-typed data -
+ * shows as stored.
+ */
+export function listingValueLabel(value: string | null | undefined, t: (key: string) => string): string {
+  if (!value) return ""
+  return Object.prototype.hasOwnProperty.call(LISTING_VALUE_LABEL_KEYS, value)
+    ? t(LISTING_VALUE_LABEL_KEYS[value as ListingListValue])
+    : value
+}
+
+/** Change-log fields whose from/to values come from the lists above. */
+export const LISTING_CHANGE_LIST_FIELDS: ReadonlySet<ListingChangeField> = new Set([
+  "animalType", "sex", "drugType", "feedType", "quality", "targetAnimal",
+])
+
 /** Marketplace admin's decision on a pending request. */
 export const reviewDecisionSchema = z.discriminatedUnion("decision", [
   z.object({
     decision: z.literal("approve"),
     // Which storefront category the published listing lands in.
-    categoryId: z.string().trim().min(1, "Choose a category"),
+    categoryId: z.string().trim().min(1, errorMessage("chooseCategory")),
     note: z.string().trim().max(500).optional().or(z.literal("")),
   }),
   z.object({
     decision: z.literal("reject"),
-    note: z.string().trim().min(3, "Tell the seller why").max(500),
+    note: z.string().trim().min(3, errorMessage("tellSellerWhy")).max(500),
   }),
 ])
 
@@ -241,6 +279,9 @@ export type ReviewDecision = z.infer<typeof reviewDecisionSchema>
 export const REMOVAL_STATUSES = ["pending", "approved", "declined"] as const
 export type RemovalStatus = (typeof REMOVAL_STATUSES)[number]
 
+/** The hidden reason recorded when staff take a listing down because its seller asked; screens translate it. */
+export const SELLER_REMOVAL_REASON = "Removed at the seller's request"
+
 export const removalRequestSchema = z.object({
   reason: z.string().trim().max(300).optional().or(z.literal("")),
 })
@@ -252,6 +293,6 @@ export const removalDecisionSchema = z.discriminatedUnion("decision", [
   }),
   z.object({
     decision: z.literal("decline"),
-    note: z.string().trim().min(3, "Tell the seller why").max(300),
+    note: z.string().trim().min(3, errorMessage("tellSellerWhy")).max(300),
   }),
 ])

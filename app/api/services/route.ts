@@ -12,9 +12,11 @@ import { availableUnits, isStockTracked, publicProductFilter } from '@/lib/stock
 import { sweepExpiryAlerts } from '@/lib/product-alerts'
 import { getSellByDays } from '@/lib/db-settings'
 import { productFieldsSchema, productFieldUpdates, SERVER_ONLY_PRODUCT_FIELDS } from '@/lib/validations/product'
+import { notificationText } from '@/lib/notification-messages'
+import { errorMessage } from '@/lib/error-messages'
 
-const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-const forbidden = () => NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+const unauthorized = () => NextResponse.json({ error: errorMessage('unauthorized') }, { status: 401 })
+const forbidden = () => NextResponse.json({ error: errorMessage('forbidden') }, { status: 403 })
 const canManage = (role: unknown) => can(role, 'marketplace.listings.manage')
 
 /**
@@ -94,7 +96,7 @@ const PRODUCT_KEYS = ['stock', 'lowStockAt', 'expiresOn', 'batchNumber', 'regist
 /** Sold through the cart, so every one of them counts its units. */
 const COUNTED_CATEGORIES = ['drugs', 'feeds']
 const stockRequired = () =>
-  NextResponse.json({ error: 'Enter how many units are in stock - every drug and feed must have a count' }, { status: 400 })
+  NextResponse.json({ error: errorMessage('stockRequired') }, { status: 400 })
 
 /**
  * Pull the stock, expiry and regulation fields out of a staff payload and validate
@@ -109,7 +111,7 @@ function takeProductFields(data: Record<string, unknown>) {
     delete data[key]
   }
   const parsed = productFieldsSchema.safeParse(picked)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message || 'Invalid product details' }
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message || errorMessage('invalidProduct') }
   return productFieldUpdates(parsed.data)
 }
 
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error creating service:', error)
-    return NextResponse.json({ error: 'Failed to create service' }, { status: 500 })
+    return NextResponse.json({ error: errorMessage('serviceCreateFailed') }, { status: 500 })
   }
 }
 
@@ -164,7 +166,7 @@ export async function PUT(request: NextRequest) {
     const { id, ...data } = await request.json()
 
     if (!id || !ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
+      return NextResponse.json({ error: errorMessage('invalidId') }, { status: 400 })
     }
     const product = takeProductFields(data)
     if ('error' in product) return NextResponse.json({ error: product.error }, { status: 400 })
@@ -177,7 +179,7 @@ export async function PUT(request: NextRequest) {
       { projection: { category: 1, stock: 1 } }
     )
     if (!existing) {
-      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+      return NextResponse.json({ error: errorMessage('serviceNotFound') }, { status: 404 })
     }
     // A drug or feed must count its units. Saving one that has no count yet needs one;
     // one that has a count can't have it cleared. (The count itself is only sent when
@@ -213,7 +215,7 @@ export async function PUT(request: NextRequest) {
     )
 
     if (result.matchedCount === 0) {
-      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+      return NextResponse.json({ error: errorMessage('serviceNotFound') }, { status: 404 })
     }
 
     await logActivity(currentUser!._id, 'marketplace.listing.updated', `Updated listing ${id}`)
@@ -221,7 +223,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error updating service:', error)
-    return NextResponse.json({ error: 'Failed to update service' }, { status: 500 })
+    return NextResponse.json({ error: errorMessage('serviceUpdateFailed') }, { status: 500 })
   }
 }
 
@@ -264,8 +266,7 @@ export async function DELETE(request: NextRequest) {
     if (existing.sellerId && ObjectId.isValid(existing.sellerId)) {
       await notifyFarmer(
         existing.sellerId,
-        'Your listing was removed',
-        `"${existing.name ?? sellerListingFallbackName(existing.category)}" was removed from the marketplace by Vettrack.`,
+        notificationText('listingDeleted', { name: existing.name ?? sellerListingFallbackName(existing.category) }),
         sellerListingsPath(existing.category)
       )
     }

@@ -28,7 +28,10 @@ interface AdminProductCardProps {
   /** The seller changed this listing after it went live. */
   edited?: boolean
   /** Screen text, passed in because this card is shared and has no language context of its own. */
-  labels?: { view?: string; edited?: string; hidden?: string }
+  labels?: {
+    view?: string; edited?: string; hidden?: string
+    edit?: string; delete?: string; showOnPublic?: string; hideFromPublic?: string
+  }
 }
 
 export default function AdminProductCard({
@@ -47,6 +50,10 @@ export default function AdminProductCard({
   edited,
   labels,
 }: AdminProductCardProps) {
+  const visibilityLabel = hidden
+    ? labels?.showOnPublic ?? "Show on the public pages"
+    : labels?.hideFromPublic ?? "Hide from the public pages"
+
   const picture = (
     <Image
       src={image || "/placeholder.jpg"}
@@ -125,14 +132,14 @@ export default function AdminProductCard({
           )}
           <Button variant="outline" size="sm" className="flex-1" onClick={onEdit}>
             <Edit className="h-3.5 w-3.5 mr-1.5" />
-            Edit
+            {labels?.edit ?? "Edit"}
           </Button>
           {onToggleHidden && (
             <Button
               variant="ghost"
               size="sm"
-              title={hidden ? "Show on the public pages" : "Hide from the public pages"}
-              aria-label={hidden ? "Show on the public pages" : "Hide from the public pages"}
+              title={visibilityLabel}
+              aria-label={visibilityLabel}
               onClick={onToggleHidden}
             >
               {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -142,7 +149,7 @@ export default function AdminProductCard({
             variant="ghost"
             size="sm"
             className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            aria-label="Delete"
+            aria-label={labels?.delete ?? "Delete"}
             onClick={onDelete}
           >
             <Trash2 className="h-3.5 w-3.5" />

@@ -5,6 +5,7 @@ import { recordIncome } from "@/lib/db-income"
 import { applyRefundToPayout } from "@/lib/db-payouts"
 import { returnStock } from "@/lib/stock"
 import { notifyFarmer, notifyFinance, sellerSalesPath } from "@/lib/marketplace-notifications"
+import { notificationText } from "@/lib/notification-messages"
 import { sendRefundEmail } from "@/lib/email"
 import { can } from "@/lib/roles"
 import {
@@ -175,9 +176,12 @@ export async function createRefundRequest(
   const result = await collection.insertOne(doc as Refund)
 
   await notifyFinance(
-    "Refund requested",
-    `${requester.name} asked to refund RWF ${doc.amount.toLocaleString()} on order ${doc.reference} ` +
-      `(${lines.map((line) => `${line.quantity} × ${line.name}`).join(", ")}).`
+    notificationText("refundRequested", {
+      requester: requester.name,
+      amount: doc.amount.toLocaleString(),
+      ref: doc.reference,
+      items: lines.map((line) => `${line.quantity} × ${line.name}`).join(", "),
+    })
   )
 
   return { ...doc, _id: result.insertedId } as Refund
@@ -247,22 +251,18 @@ export async function completeRefund(
   if (clawbackTotal > 0) {
     await collection.updateOne({ _id: refund._id }, { $set: { clawbackAmount: clawbackTotal } })
     await notifyFinance(
-      "Refund after the seller was paid",
-      `Refund on order ${refund.reference} covers items the seller had already been paid for. ` +
-        `They owe RWF ${clawbackTotal.toLocaleString()} back.`
+      notificationText("refundClawback", { ref: refund.reference, amount: clawbackTotal.toLocaleString() })
     )
   }
 
   for (const [sellerId, note] of sellerNotes) {
     const share = note.lines.reduce((sum, line) => sum + line.sellerShare, 0)
+    const items = note.lines.map((line) => `${line.quantity} × ${line.name}`).join(", ")
     await notifyFarmer(
       sellerId,
-      "Refund paid to the buyer",
-      `Order ${refund.reference}: ${note.lines.map((line) => `${line.quantity} × ${line.name}`).join(", ")} ` +
-        `refunded to the buyer. ` +
-        (note.clawback > 0
-          ? `You had already been paid RWF ${note.clawback.toLocaleString()} for them - Vettrack will contact you to settle it.`
-          : `Your share of RWF ${share.toLocaleString()} is no longer due.`),
+      note.clawback > 0
+        ? notificationText("refundPaidClawback", { ref: refund.reference, items, amount: note.clawback.toLocaleString() })
+        : notificationText("refundPaid", { ref: refund.reference, items, share: share.toLocaleString() }),
       sellerSalesPath(note.lines[0].category)
     )
   }
@@ -347,8 +347,7 @@ export async function declineRefund(id: string, decider: Actor, note: string): P
   if (can(refund.requestedBy.role, "marketplace.sales.own")) {
     await notifyFarmer(
       refund.requestedBy.id,
-      "Refund request declined",
-      `Your refund request on order ${refund.reference} was declined. ${note.trim()}`,
+      notificationText("refundDeclined", { ref: refund.reference, note: note.trim() }),
       sellerSalesPath(refund.lines[0]?.category)
     )
   }

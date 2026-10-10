@@ -27,9 +27,13 @@ import { rwandaData } from "@/lib/rwanda-data"
 import { MARKETPLACE_CATEGORIES, type MarketplaceCategory } from "@/lib/marketplace-access"
 import {
   LISTING_CHANGE_LABEL_KEYS,
+  LISTING_CHANGE_LIST_FIELDS,
+  listingValueLabel,
+  SELLER_REMOVAL_REASON,
   type ListingChange,
   type ListingEditLogEntry,
 } from "@/lib/validations/listing-request"
+import { localizeError } from "@/lib/error-messages"
 
 type Cat = MarketplaceCategory
 
@@ -114,7 +118,7 @@ const CATEGORIES: Cat[] = [...MARKETPLACE_CATEGORIES]
  * than the enforcement point.
  */
 export default function ListingsManager({ allowedCategories }: { allowedCategories: Cat[] }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const rules = useProductRules()
 
   const [services, setServices] = useState<Record<Cat, Service[]>>({ sales: [], drugs: [], feeds: [] })
@@ -213,7 +217,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
         setForm(emptyForm)
       } else {
         const body = await res.json().catch(() => ({}))
-        setFormError(body.error || t("marketplace.saveFailed"))
+        setFormError(localizeError(body.error, language) || t("marketplace.saveFailed"))
       }
     } catch {
       setFormError(t("marketplace.saveFailed"))
@@ -287,19 +291,22 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
     return status
   }
 
+  /** Animal type, sex, drug and feed types are stored in English; show them in the reader's language. */
+  const valueLabel = (value?: string | null) => listingValueLabel(value, t)
+
   const detailRows = (service: Service): [string, string][] => {
     const rows: [string, string | undefined][] =
       service.category === "sales"
         ? [
-            [t("content.animalType"), service.animalType],
+            [t("content.animalType"), valueLabel(service.animalType)],
             [t("content.breed"), service.breed],
             [t("content.age"), service.age],
-            [t("content.sex"), service.sex],
+            [t("content.sex"), valueLabel(service.sex)],
             [t("common.location"), [service.village, service.sector, service.district].filter(Boolean).join(", ")],
           ]
         : service.category === "drugs"
         ? [
-            [t("content.drugType"), service.drugType],
+            [t("content.drugType"), valueLabel(service.drugType)],
             [t("content.usageDescription"), service.usageDescription],
             [t("pharmacy.expiryDate"), service.expiresOn ?? undefined],
             [t("pharmacy.batchNumber"), service.batchNumber],
@@ -307,20 +314,30 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             [t("pharmacy.prescriptionRequired"), service.prescriptionRequired ? t("common.yes") : undefined],
           ]
         : [
-            [t("content.feedType"), service.feedType],
-            [t("content.quality"), service.quality],
-            [t("content.targetAnimal"), service.targetAnimal],
+            [t("content.feedType"), valueLabel(service.feedType)],
+            [t("content.quality"), valueLabel(service.quality)],
+            [t("content.targetAnimal"), valueLabel(service.targetAnimal)],
             [t("pharmacy.expiryDate"), service.expiresOn ?? undefined],
             [t("pharmacy.batchNumber"), service.batchNumber],
           ]
     return rows.filter((row): row is [string, string] => !!row[1])
   }
 
+  /** One side of a change. List values and the prescription yes/no are logged in English. */
+  const changeValue = (change: ListingChange, value: string) =>
+    !value
+      ? "—"
+      : change.field === "prescriptionRequired"
+        ? t(value === "Yes" ? "common.yes" : "common.no")
+        : LISTING_CHANGE_LIST_FIELDS.has(change.field)
+          ? valueLabel(value)
+          : value
+
   /** "from → to" for a seller's edit; photos read out as counts, so a swap with the same count says so. */
   const changeText = (change: ListingChange) =>
     change.field === "photos" && change.from === change.to
       ? t("listing.photosUpdated")
-      : `${change.from || "—"} → ${change.to || "—"}`
+      : `${changeValue(change, change.from)} → ${changeValue(change, change.to)}`
 
   // --- categories -------------------------------------------------------------
 
@@ -396,7 +413,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
                 <SelectTrigger><SelectValue placeholder={t("content.selectAnimalType")} /></SelectTrigger>
                 <SelectContent>
                   {["Cow", "Goat", "Sheep", "Dog", "Cat", "Chicken", "Pig"].map((a) => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
+                    <SelectItem key={a} value={a}>{valueLabel(a)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -596,9 +613,9 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
     if (cat === "sales") {
       return [
         ...(service.animalType || service.breed
-          ? [{ icon: Tag, text: [service.animalType, service.breed].filter(Boolean).join(" · ") }] : []),
+          ? [{ icon: Tag, text: [valueLabel(service.animalType), service.breed].filter(Boolean).join(" · ") }] : []),
         ...(service.age || service.sex
-          ? [{ icon: Calendar, text: [service.age, service.sex].filter(Boolean).join(" · ") }] : []),
+          ? [{ icon: Calendar, text: [service.age, valueLabel(service.sex)].filter(Boolean).join(" · ") }] : []),
         ...(service.district
           ? [{ icon: MapPin, text: [service.district, service.sector].filter(Boolean).join(", ") }] : []),
       ]
@@ -626,11 +643,11 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
       ...(service.prescriptionRequired ? [{ icon: FileCheck, text: t("pharmacy.prescriptionOnly") }] : []),
     ]
     if (cat === "drugs") {
-      return [...(service.drugType ? [{ icon: Tag, text: service.drugType }] : []), ...stockDetails]
+      return [...(service.drugType ? [{ icon: Tag, text: valueLabel(service.drugType) }] : []), ...stockDetails]
     }
     return [
-      ...(service.feedType ? [{ icon: Tag, text: service.feedType }] : []),
-      ...(service.targetAnimal ? [{ icon: Calendar, text: service.targetAnimal }] : []),
+      ...(service.feedType ? [{ icon: Tag, text: valueLabel(service.feedType) }] : []),
+      ...(service.targetAnimal ? [{ icon: Calendar, text: valueLabel(service.targetAnimal) }] : []),
       ...stockDetails,
     ]
   }
@@ -701,7 +718,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
                               onClick={() => { setEditCategoryTarget(category); setCategoryForm({ name: category.name, description: category.description, image: category.image || "" }) }}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" aria-label={t("content.actions")}
+                            <Button variant="ghost" size="sm" aria-label={t("common.delete")}
                               onClick={() => setDeleteCategoryTarget(category)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -764,6 +781,10 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
                       view: t("marketplace.viewDetails"),
                       edited: t("marketplace.editedBadge"),
                       hidden: t("listing.hiddenBadge"),
+                      edit: t("common.edit"),
+                      delete: t("common.delete"),
+                      showOnPublic: t("marketplace.showOnPublic"),
+                      hideFromPublic: t("marketplace.hideFromPublic"),
                     }}
                   />
                 ))}
@@ -1011,7 +1032,9 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
                 {viewTarget.hidden && (
                   <p className="text-sm text-gray-600">
                     <span className="font-medium">{t("marketplace.hiddenState")}</span>
-                    {viewTarget.hiddenReason ? `: ${viewTarget.hiddenReason}` : ""}
+                    {viewTarget.hiddenReason
+                      ? `: ${viewTarget.hiddenReason === SELLER_REMOVAL_REASON ? t("marketplace.removedAtSellerRequest") : viewTarget.hiddenReason}`
+                      : ""}
                   </p>
                 )}
 
@@ -1127,7 +1150,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteCategory} disabled={busy}>{t("content.actions")}</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteCategory} disabled={busy}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

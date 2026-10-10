@@ -19,7 +19,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair, Pencil, EyeOff, Trash2, Ban } from "lucide-react"
-import { ANIMAL_TYPES, ANIMAL_SEXES, MAX_LISTING_PHOTOS } from "@/lib/validations/listing-request"
+import { ANIMAL_TYPES, ANIMAL_SEXES, MAX_LISTING_PHOTOS, listingValueLabel } from "@/lib/validations/listing-request"
+import { localizeError } from "@/lib/error-messages"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
 
 interface Animal { _id: string; name: string; type: string }
@@ -88,7 +89,9 @@ function statusVariant(status: ListingRequest["status"]) {
 }
 
 export default function FarmerListingsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  /** Animal type and sex are stored in English; show them in the reader's language. */
+  const valueLabel = (value?: string | null) => listingValueLabel(value, t)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [user, setUser] = useState<any>(null)
@@ -250,7 +253,7 @@ export default function FarmerListingsPage() {
           })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || (editing ? t("listing.editFailed") : t("listing.submitFailed")))
+        setError(localizeError(data.error, language) || (editing ? t("listing.editFailed") : t("listing.submitFailed")))
         return
       }
       setOpen(false)
@@ -277,7 +280,7 @@ export default function FarmerListingsPage() {
       const res = await fetch(`/api/listing-requests/${deleteTarget.id}`, { method: "DELETE" })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setDeleteError(data.error || t("listing.deleteFailed"))
+        setDeleteError(localizeError(data.error, language) || t("listing.deleteFailed"))
         return
       }
       closeDelete()
@@ -322,7 +325,7 @@ export default function FarmerListingsPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setRemoveError(data.error || t("listing.removalFailed"))
+        setRemoveError(localizeError(data.error, language) || t("listing.removalFailed"))
         return
       }
       closeRemoval()
@@ -436,7 +439,7 @@ export default function FarmerListingsPage() {
                     )}
                   </div>
                   <p className="text-sm text-gray-600">
-                    {[request.animalType, request.breed, request.age].filter(Boolean).join(" · ")}
+                    {[valueLabel(request.animalType), request.breed, request.age].filter(Boolean).join(" · ")}
                   </p>
                   {request.removed && <p className="text-xs text-gray-500">{t("listing.removedNote")}</p>}
                   {isHidden(request) && (
@@ -597,7 +600,7 @@ export default function FarmerListingsPage() {
                   <SelectTrigger><SelectValue placeholder={t("listing.animalTypePlaceholder")} /></SelectTrigger>
                   <SelectContent>
                     {ANIMAL_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                      <SelectItem key={type} value={type}>{valueLabel(type)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -624,7 +627,7 @@ export default function FarmerListingsPage() {
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
                     {ANIMAL_SEXES.map((sex) => (
-                      <SelectItem key={sex} value={sex}>{sex}</SelectItem>
+                      <SelectItem key={sex} value={sex}>{valueLabel(sex)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -908,7 +911,7 @@ export default function FarmerListingsPage() {
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 {detailTarget.animalType && (
-                  <div><span className="text-gray-500">{t("listing.animalType")}:</span> {detailTarget.animalType}</div>
+                  <div><span className="text-gray-500">{t("listing.animalType")}:</span> {valueLabel(detailTarget.animalType)}</div>
                 )}
                 {detailTarget.breed && (
                   <div><span className="text-gray-500">{t("listing.breed")}:</span> {detailTarget.breed}</div>
@@ -917,7 +920,7 @@ export default function FarmerListingsPage() {
                   <div><span className="text-gray-500">{t("listing.age")}:</span> {detailTarget.age}</div>
                 )}
                 {detailTarget.sex && (
-                  <div><span className="text-gray-500">{t("listing.sex")}:</span> {detailTarget.sex}</div>
+                  <div><span className="text-gray-500">{t("listing.sex")}:</span> {valueLabel(detailTarget.sex)}</div>
                 )}
               </div>
 

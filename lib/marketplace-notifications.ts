@@ -1,5 +1,6 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
+import type { NotificationText } from "@/lib/notification-messages"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -36,17 +37,11 @@ export function sellerSalesPath(category: unknown): string {
  * Notify a seller (farmer, pharmacy or feed supplier) about their request. Mirrors the
  * shape used elsewhere in the app.
  */
-export async function notifyFarmer(
-  farmerId: string,
-  title: string,
-  message: string,
-  actionUrl: string
-) {
+export async function notifyFarmer(farmerId: string, text: NotificationText, actionUrl: string) {
   try {
     const client = await clientPromise
     await client.db(DB_NAME).collection("notifications").insertOne({
-      title,
-      message,
+      ...text,
       type: "marketplace",
       priority: "normal",
       read: false,
@@ -63,12 +58,11 @@ export async function notifyFarmer(
 }
 
 /** Tell superadmin a new request needs review - the queue otherwise has no push signal. */
-export async function notifySuperadmin(title: string, message: string, actionUrl: string) {
+export async function notifySuperadmin(text: NotificationText, actionUrl: string) {
   try {
     const client = await clientPromise
     await client.db(DB_NAME).collection("notifications").insertOne({
-      title,
-      message,
+      ...text,
       type: "marketplace",
       priority: "normal",
       role: "superadmin",
@@ -88,12 +82,11 @@ export async function notifySuperadmin(title: string, message: string, actionUrl
  * broadcast - each person's read and dismissed state is kept separately (see
  * lib/notification-access.ts).
  */
-export async function notifyRole(role: string, title: string, message: string, actionUrl: string) {
+export async function notifyRole(role: string, text: NotificationText, actionUrl: string) {
   try {
     const client = await clientPromise
     await client.db(DB_NAME).collection("notifications").insertOne({
-      title,
-      message,
+      ...text,
       type: "marketplace",
       priority: "normal",
       targetRole: role,
@@ -109,11 +102,11 @@ export async function notifyRole(role: string, title: string, message: string, a
 }
 
 /** Stock and expiry alerts for Vettrack's own products go to whoever manages listings. */
-export async function notifyMarketplaceStaff(title: string, message: string, actionUrl = "/marketplace/listings") {
-  await Promise.all([notifySuperadmin(title, message, actionUrl), notifyRole("marketplace_admin", title, message, actionUrl)])
+export async function notifyMarketplaceStaff(text: NotificationText, actionUrl = "/marketplace/listings") {
+  await Promise.all([notifySuperadmin(text, actionUrl), notifyRole("marketplace_admin", text, actionUrl)])
 }
 
 /** Refund work goes to finance managers, and to superadmin, who can act on it too. */
-export async function notifyFinance(title: string, message: string, actionUrl = "/finance/refunds") {
-  await Promise.all([notifySuperadmin(title, message, actionUrl), notifyRole("finance_manager", title, message, actionUrl)])
+export async function notifyFinance(text: NotificationText, actionUrl = "/finance/refunds") {
+  await Promise.all([notifySuperadmin(text, actionUrl), notifyRole("finance_manager", text, actionUrl)])
 }

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { can } from "@/lib/roles"
 import { canAccessMarketplaceCategory, sellerListingKind } from "@/lib/marketplace-access"
 import { logActivity } from "@/lib/activity-log"
+import { errorMessage } from "@/lib/error-messages"
 import {
   approveRequest,
   decideRemoval,
@@ -52,16 +53,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: errorMessage("unauthorized") }, { status: 401 })
     }
 
     const request = await getRequestById(params.id)
     if (!request) {
-      return NextResponse.json({ error: "Request not found" }, { status: 404 })
+      return NextResponse.json({ error: errorMessage("requestNotFound") }, { status: 404 })
     }
 
     if (!canReview(currentUser, request) && request.farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
     }
 
     return NextResponse.json(serializeRequest(request))
@@ -82,15 +83,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: errorMessage("unauthorized") }, { status: 401 })
     }
 
     const request = await getRequestById(params.id)
     if (!request || request.farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Request not found" }, { status: 404 })
+      return NextResponse.json({ error: errorMessage("requestNotFound") }, { status: 404 })
     }
     if (!isOwningSeller(currentUser, request)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
     }
 
     await deleteRequestForFarmer(params.id, currentUser._id)
@@ -101,7 +102,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
     console.error("Error deleting listing request:", error)
-    return NextResponse.json({ error: "Failed to delete request" }, { status: 500 })
+    return NextResponse.json({ error: errorMessage("requestDeleteFailed") }, { status: 500 })
   }
 }
 
@@ -119,12 +120,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: errorMessage("unauthorized") }, { status: 401 })
     }
 
     const request = await getRequestById(params.id)
     if (!request) {
-      return NextResponse.json({ error: "Request not found" }, { status: 404 })
+      return NextResponse.json({ error: errorMessage("requestNotFound") }, { status: 404 })
     }
 
     const body = await req.json()
@@ -132,7 +133,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Farmer withdrawing their own request.
     if (body?.action === "withdraw") {
       if (request.farmerId !== currentUser._id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
       }
       await withdrawRequest(params.id, currentUser._id)
       await logActivity(currentUser._id, "marketplace.request.withdrawn", `Withdrew ${request.title}`)
@@ -142,7 +143,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Seller revising a rejected request and sending it back for another review.
     if (body?.action === "resubmit") {
       if (!isOwningSeller(currentUser, request)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
       }
       const parsed = parseSellerSubmission(listingKindOf(request), body)
       if (!parsed.success) {
@@ -165,7 +166,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // told what changed.
     if (body?.action === "edit") {
       if (!isOwningSeller(currentUser, request)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
       }
       const parsed = parseSellerSubmission(listingKindOf(request), body)
       if (!parsed.success) {
@@ -187,12 +188,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Pharmacy or feed supplier setting how many units of a published product it has. Live at once.
     if (body?.action === "stock") {
       if (!isOwningSeller(currentUser, request)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
       }
       const parsed = stockUpdateSchema.safeParse(body)
       if (!parsed.success) {
         return NextResponse.json(
-          { error: parsed.error.issues[0]?.message || "Invalid stock" },
+          { error: parsed.error.issues[0]?.message || errorMessage("invalidStock") },
           { status: 400 }
         )
       }
@@ -204,12 +205,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Seller asking for their published listing to be taken down. Staff decide.
     if (body?.action === "request_removal") {
       if (!isOwningSeller(currentUser, request)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
       }
       const parsed = removalRequestSchema.safeParse(body)
       if (!parsed.success) {
         return NextResponse.json(
-          { error: parsed.error.issues[0]?.message || "Invalid request" },
+          { error: parsed.error.issues[0]?.message || errorMessage("invalidRequest") },
           { status: 400 }
         )
       }
@@ -221,12 +222,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Staff answering that ask.
     if (body?.action === "removal_decision") {
       if (!canReview(currentUser, request)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
       }
       const parsed = removalDecisionSchema.safeParse(body)
       if (!parsed.success) {
         return NextResponse.json(
-          { error: parsed.error.issues[0]?.message || "Invalid decision" },
+          { error: parsed.error.issues[0]?.message || errorMessage("invalidDecision") },
           { status: 400 }
         )
       }
@@ -241,13 +242,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     // Everything else is a review decision.
     if (!canReview(currentUser, request)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
     }
 
     const parsed = reviewDecisionSchema.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message || "Invalid decision" },
+        { error: parsed.error.issues[0]?.message || errorMessage("invalidDecision") },
         { status: 400 }
       )
     }
@@ -279,6 +280,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
     console.error("Error reviewing listing request:", error)
-    return NextResponse.json({ error: "Failed to update request" }, { status: 500 })
+    return NextResponse.json({ error: errorMessage("requestUpdateFailed") }, { status: 500 })
   }
 }

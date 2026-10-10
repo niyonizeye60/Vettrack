@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { can } from "@/lib/roles"
 import { canAccessMarketplaceCategory, sellerListingKind } from "@/lib/marketplace-access"
 import { logActivity } from "@/lib/activity-log"
+import { errorMessage } from "@/lib/error-messages"
 import {
   createListingRequest,
   listRemovalRequests,
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: errorMessage("unauthorized") }, { status: 401 })
     }
 
     if (can(currentUser.role, "marketplace.requests.review")) {
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
       // requires that category - otherwise a marketplace_admin scoped to feeds only
       // could still approve animals or drugs outside their grant.
       if (!canAccessMarketplaceCategory(currentUser, LISTING_KIND_CATEGORY[kind])) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
       }
 
       // The removal queue: published listings whose seller has asked for them to come down.
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(await serializeWithVisibility(await listRequestsForFarmer(currentUser._id)))
     }
 
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
   } catch (error) {
     console.error("Error listing listing requests:", error)
     return NextResponse.json({ error: "Failed to load requests" }, { status: 500 })
@@ -84,12 +85,12 @@ export async function POST(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: errorMessage("unauthorized") }, { status: 401 })
     }
 
     const kind = sellerListingKind(currentUser.role)
     if (!kind) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      return NextResponse.json({ error: errorMessage("forbidden") }, { status: 403 })
     }
 
     const parsed = parseSellerSubmission(kind, await req.json())
@@ -116,6 +117,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(serializeRequest(request), { status: 201 })
   } catch (error) {
     console.error("Error creating listing request:", error)
-    return NextResponse.json({ error: "Failed to submit request" }, { status: 500 })
+    return NextResponse.json({ error: errorMessage("requestSubmitFailed") }, { status: 500 })
   }
 }

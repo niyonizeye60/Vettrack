@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeNotification } from "@/lib/notification-messages"
 import { createNotificationTemplate, sendBulkNotification, scheduleNotification, deleteNotificationTemplate } from "@/lib/actions/superadmin"
 import { Plus, Send, Clock, FileText, Users, Calendar, Trash2, RotateCcw, Eye, Search } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -40,7 +41,7 @@ export default function NotificationsPageClient({
   scheduledNotifications, 
   users 
 }: NotificationsPageClientProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [templates, setTemplates] = useState(initialTemplates)
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false)
@@ -530,7 +531,8 @@ export default function NotificationsPageClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sentNotifications.map(n => {
+                    {sentNotifications.map(raw => {
+                      const n = localizeNotification(raw, language, t)
                       const now = Date.now()
                       const isDeleted = n.deletedBy?.length > 0
                       const isExpired = n.expiresAt ? new Date(n.expiresAt).getTime() < now : false

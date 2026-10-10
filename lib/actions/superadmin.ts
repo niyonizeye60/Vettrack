@@ -2037,7 +2037,8 @@ export async function getNotifications(userId: string) {
       priority: n.priority || "normal",
       read: n.read || false,
       createdAt: n.createdAt,
-      actionUrl: n.actionUrl || null
+      actionUrl: n.actionUrl || null,
+      i18n: n.i18n || null
     }))
   } catch (error) {
     console.error("Error fetching notifications:", error)

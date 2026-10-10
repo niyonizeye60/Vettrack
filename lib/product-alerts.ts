@@ -1,6 +1,7 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { notifyFarmer, notifyMarketplaceStaff, sellerListingsPath } from "@/lib/marketplace-notifications"
+import { notificationText, type NotificationText } from "@/lib/notification-messages"
 import { addDays, EXPIRY_WARNING_DAYS, kigaliToday, lastSellableDay } from "@/lib/product-rules"
 import { getSellByDays } from "@/lib/db-settings"
 
@@ -17,28 +18,20 @@ export interface ProductRef {
  * Tell whoever looks after a product: the pharmacy or feed supplier that listed it,
  * or marketplace staff for Vettrack's own stock.
  */
-export async function notifyProductOwner(product: ProductRef, title: string, message: string) {
+export async function notifyProductOwner(product: ProductRef, text: NotificationText) {
   if (product.sellerId && ObjectId.isValid(product.sellerId)) {
-    await notifyFarmer(product.sellerId, title, message, sellerListingsPath(product.category))
+    await notifyFarmer(product.sellerId, text, sellerListingsPath(product.category))
   } else {
-    await notifyMarketplaceStaff(title, message)
+    await notifyMarketplaceStaff(text)
   }
 }
 
 export async function alertLowStock(product: ProductRef, remaining: number) {
-  await notifyProductOwner(
-    product,
-    "Stock running low",
-    `Only ${remaining} of "${product.name}" left. Update the stock when you restock so it stays on sale.`
-  )
+  await notifyProductOwner(product, notificationText("lowStock", { count: remaining, name: product.name }))
 }
 
 export async function alertOutOfStock(product: ProductRef) {
-  await notifyProductOwner(
-    product,
-    "Out of stock",
-    `"${product.name}" sold out and is no longer shown to buyers. Update its stock to show it again.`
-  )
+  await notifyProductOwner(product, notificationText("outOfStock", { name: product.name }))
 }
 
 let lastSweep = 0
@@ -82,8 +75,7 @@ export async function sweepExpiryAlerts(options: { force?: boolean } = {}): Prom
       if (claim.modifiedCount === 0) continue
       await notifyProductOwner(
         { name: doc.name, sellerId: doc.sellerId, category: doc.category },
-        "Off sale: expiry date",
-        `"${doc.name}" expires on ${doc.expiresOn}, so buyers can no longer order it. Update the listing when you restock with a newer batch.`
+        notificationText("expiredOffSale", { name: doc.name, date: doc.expiresOn })
       )
     }
 
@@ -103,8 +95,11 @@ export async function sweepExpiryAlerts(options: { force?: boolean } = {}): Prom
       if (claim.modifiedCount === 0) continue
       await notifyProductOwner(
         { name: doc.name, sellerId: doc.sellerId, category: doc.category },
-        "Expires soon",
-        `"${doc.name}" expires on ${doc.expiresOn}. Buyers can order it until ${lastSellableDay(doc.expiresOn, sellByDays)}.`
+        notificationText("expiresSoon", {
+          name: doc.name,
+          date: doc.expiresOn,
+          lastDay: lastSellableDay(doc.expiresOn, sellByDays),
+        })
       )
     }
   } catch (error) {

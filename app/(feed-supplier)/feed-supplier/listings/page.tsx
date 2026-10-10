@@ -23,8 +23,9 @@ import {
   CalendarClock, AlertTriangle,
 } from "lucide-react"
 import {
-  FEED_QUALITIES, FEED_TARGET_ANIMALS, FEED_TYPES, MAX_LISTING_PHOTOS,
+  FEED_QUALITIES, FEED_TARGET_ANIMALS, FEED_TYPES, MAX_LISTING_PHOTOS, listingValueLabel,
 } from "@/lib/validations/listing-request"
+import { localizeError } from "@/lib/error-messages"
 import {
   DEFAULT_LOW_STOCK_AT, earliestAcceptableExpiry, expiryState, isLowStock, lastSellableDay,
 } from "@/lib/product-rules"
@@ -79,28 +80,6 @@ interface FeedRequest {
   createdAt: string
 }
 
-/** Labels for the feed fields, reusing the ones staff see when they list feed themselves. */
-const FEED_TYPE_LABEL_KEYS: Record<(typeof FEED_TYPES)[number], string> = {
-  Hay: "content.hay",
-  Concentrates: "content.concentrates",
-  Minerals: "content.minerals",
-  Supplements: "content.supplements",
-}
-
-const QUALITY_LABEL_KEYS: Record<(typeof FEED_QUALITIES)[number], string> = {
-  High: "content.high",
-  Medium: "content.medium",
-  Low: "content.low",
-}
-
-const TARGET_ANIMAL_LABEL_KEYS: Record<(typeof FEED_TARGET_ANIMALS)[number], string> = {
-  Cattle: "content.cattle",
-  Goats: "content.goats",
-  Sheep: "content.sheep",
-  Poultry: "content.poultry",
-  Pigs: "content.pigs",
-}
-
 /**
  * A Select item can't carry an empty value, so an optional field left unset shows as
  * this item ("Any animal", "Not stated") and is sent as "".
@@ -139,7 +118,7 @@ function statusVariant(status: FeedRequest["status"]) {
  * with the feed form in place of the drug one.
  */
 export default function FeedSupplierListingsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const rules = useProductRules()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -310,7 +289,7 @@ export default function FeedSupplierListingsPage() {
           })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || (editing ? t("listing.editFailed") : t("listing.submitFailed")))
+        setError(localizeError(data.error, language) || (editing ? t("listing.editFailed") : t("listing.submitFailed")))
         return
       }
       setOpen(false)
@@ -337,7 +316,7 @@ export default function FeedSupplierListingsPage() {
       const res = await fetch(`/api/listing-requests/${deleteTarget.id}`, { method: "DELETE" })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setDeleteError(data.error || t("listing.deleteFailed"))
+        setDeleteError(localizeError(data.error, language) || t("listing.deleteFailed"))
         return
       }
       closeDelete()
@@ -382,7 +361,7 @@ export default function FeedSupplierListingsPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setRemoveError(data.error || t("listing.removalFailed"))
+        setRemoveError(localizeError(data.error, language) || t("listing.removalFailed"))
         return
       }
       closeRemoval()
@@ -423,7 +402,7 @@ export default function FeedSupplierListingsPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setStockError(data.error || t("pharmacy.stockFailed"))
+        setStockError(localizeError(data.error, language) || t("pharmacy.stockFailed"))
         return
       }
       closeStock()
@@ -490,17 +469,15 @@ export default function FeedSupplierListingsPage() {
       </Badge>
     )
 
-  const label = (keys: Record<string, string>, value: string | null) => (value ? t(keys[value] ?? value) : null)
-  const feedTypeLabel = (value: string | null) => label(FEED_TYPE_LABEL_KEYS, value)
-  const qualityLabel = (value: string | null) => label(QUALITY_LABEL_KEYS, value)
-  const targetAnimalLabel = (value: string | null) => label(TARGET_ANIMAL_LABEL_KEYS, value)
+  /** Feed type, target animal and quality are stored in English; show them in the reader's language. */
+  const valueLabel = (value: string | null) => listingValueLabel(value, t)
 
-  /** "Concentrates · Cattle · High quality" - whichever of them the supplier filled in. */
+  /** "Concentrates · Cattle · Quality: High" - whichever of them the supplier filled in. */
   const feedSummary = (request: FeedRequest) =>
     [
-      feedTypeLabel(request.feedType),
-      targetAnimalLabel(request.targetAnimal),
-      request.quality ? `${qualityLabel(request.quality)} ${t("feeds.quality").toLowerCase()}` : null,
+      valueLabel(request.feedType),
+      valueLabel(request.targetAnimal),
+      request.quality ? `${t("feeds.quality")}: ${valueLabel(request.quality)}` : null,
     ]
       .filter(Boolean)
       .join(" · ")
@@ -787,7 +764,7 @@ export default function FeedSupplierListingsPage() {
                   <SelectTrigger><SelectValue placeholder={t("content.selectFeedType")} /></SelectTrigger>
                   <SelectContent>
                     {FEED_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>{t(FEED_TYPE_LABEL_KEYS[type])}</SelectItem>
+                      <SelectItem key={type} value={type}>{valueLabel(type)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -802,7 +779,7 @@ export default function FeedSupplierListingsPage() {
                   <SelectContent>
                     <SelectItem value={NOT_SET}>{t("feedSupplier.anyAnimal")}</SelectItem>
                     {FEED_TARGET_ANIMALS.map((animal) => (
-                      <SelectItem key={animal} value={animal}>{t(TARGET_ANIMAL_LABEL_KEYS[animal])}</SelectItem>
+                      <SelectItem key={animal} value={animal}>{valueLabel(animal)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -817,7 +794,7 @@ export default function FeedSupplierListingsPage() {
                   <SelectContent>
                     <SelectItem value={NOT_SET}>{t("feedSupplier.notStated")}</SelectItem>
                     {FEED_QUALITIES.map((quality) => (
-                      <SelectItem key={quality} value={quality}>{t(QUALITY_LABEL_KEYS[quality])}</SelectItem>
+                      <SelectItem key={quality} value={quality}>{valueLabel(quality)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1218,17 +1195,17 @@ export default function FeedSupplierListingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                 {detailTarget.feedType && (
                   <div>
-                    <span className="text-gray-500">{t("content.feedType")}:</span> {feedTypeLabel(detailTarget.feedType)}
+                    <span className="text-gray-500">{t("content.feedType")}:</span> {valueLabel(detailTarget.feedType)}
                   </div>
                 )}
                 {detailTarget.targetAnimal && (
                   <div>
-                    <span className="text-gray-500">{t("content.targetAnimal")}:</span> {targetAnimalLabel(detailTarget.targetAnimal)}
+                    <span className="text-gray-500">{t("content.targetAnimal")}:</span> {valueLabel(detailTarget.targetAnimal)}
                   </div>
                 )}
                 {detailTarget.quality && (
                   <div>
-                    <span className="text-gray-500">{t("content.quality")}:</span> {qualityLabel(detailTarget.quality)}
+                    <span className="text-gray-500">{t("content.quality")}:</span> {valueLabel(detailTarget.quality)}
                   </div>
                 )}
               </div>

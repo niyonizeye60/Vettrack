@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
           createdAt: n.createdAt,
           expiresAt: n.expiresAt || null,
           deletedBy: n.deletedBy || [],
-          actionUrl: n.actionUrl || null
+          actionUrl: n.actionUrl || null,
+          i18n: n.i18n || null
         }))
       })
     }
@@ -75,7 +76,9 @@ export async function GET(request: NextRequest) {
         read: isReadBy(n, user._id),
         createdAt: n.createdAt,
         expiresAt: n.expiresAt || null,
-        actionUrl: n.actionUrl || null
+        actionUrl: n.actionUrl || null,
+        // Lets the reader's screen show a marketplace notification in their language.
+        i18n: n.i18n || null
       }))
     })
   } catch (error) {

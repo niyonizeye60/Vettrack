@@ -23,7 +23,8 @@ import {
   Plus, X, Loader2, ImagePlus, Info, Expand, Crosshair, Pencil, EyeOff, Trash2, Ban, Package, PackageX,
   CalendarClock, AlertTriangle, FileCheck,
 } from "lucide-react"
-import { DRUG_TYPES, MAX_LISTING_PHOTOS } from "@/lib/validations/listing-request"
+import { DRUG_TYPES, MAX_LISTING_PHOTOS, listingValueLabel } from "@/lib/validations/listing-request"
+import { localizeError } from "@/lib/error-messages"
 import {
   DEFAULT_LOW_STOCK_AT, earliestAcceptableExpiry, expiryState, isLowStock, lastSellableDay,
 } from "@/lib/product-rules"
@@ -79,15 +80,6 @@ interface DrugRequest {
   createdAt: string
 }
 
-/** Labels for the drug types, reusing the ones staff see when they list a drug themselves. */
-const DRUG_TYPE_LABEL_KEYS: Record<(typeof DRUG_TYPES)[number], string> = {
-  Antibiotic: "content.antibiotic",
-  Vaccine: "content.vaccine",
-  Dewormer: "content.dewormer",
-  "Pain Relief": "content.painRelief",
-  Vitamins: "content.vitamins",
-}
-
 const emptyForm = {
   title: "",
   drugType: "",
@@ -120,7 +112,7 @@ function statusVariant(status: DrugRequest["status"]) {
  * with the drug form in place of the animal one.
  */
 export default function PharmacyListingsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const rules = useProductRules()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -291,7 +283,7 @@ export default function PharmacyListingsPage() {
           })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || (editing ? t("listing.editFailed") : t("listing.submitFailed")))
+        setError(localizeError(data.error, language) || (editing ? t("listing.editFailed") : t("listing.submitFailed")))
         return
       }
       setOpen(false)
@@ -318,7 +310,7 @@ export default function PharmacyListingsPage() {
       const res = await fetch(`/api/listing-requests/${deleteTarget.id}`, { method: "DELETE" })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setDeleteError(data.error || t("listing.deleteFailed"))
+        setDeleteError(localizeError(data.error, language) || t("listing.deleteFailed"))
         return
       }
       closeDelete()
@@ -363,7 +355,7 @@ export default function PharmacyListingsPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setRemoveError(data.error || t("listing.removalFailed"))
+        setRemoveError(localizeError(data.error, language) || t("listing.removalFailed"))
         return
       }
       closeRemoval()
@@ -404,7 +396,7 @@ export default function PharmacyListingsPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setStockError(data.error || t("pharmacy.stockFailed"))
+        setStockError(localizeError(data.error, language) || t("pharmacy.stockFailed"))
         return
       }
       closeStock()
@@ -471,8 +463,8 @@ export default function PharmacyListingsPage() {
       </Badge>
     )
 
-  const drugTypeLabel = (value: string | null) =>
-    value ? t(DRUG_TYPE_LABEL_KEYS[value as keyof typeof DRUG_TYPE_LABEL_KEYS] ?? value) : null
+  /** Drug types are stored in English; show them in the reader's language. */
+  const drugTypeLabel = (value: string | null) => listingValueLabel(value, t)
 
   const sectors = form.district ? rwandaData[form.district] ?? [] : []
 
@@ -759,7 +751,7 @@ export default function PharmacyListingsPage() {
                   <SelectTrigger><SelectValue placeholder={t("content.selectDrugType")} /></SelectTrigger>
                   <SelectContent>
                     {DRUG_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>{t(DRUG_TYPE_LABEL_KEYS[type])}</SelectItem>
+                      <SelectItem key={type} value={type}>{drugTypeLabel(type)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

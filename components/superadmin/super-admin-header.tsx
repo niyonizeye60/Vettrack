@@ -31,6 +31,7 @@ import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { getNotifications, markNotificationRead, generateSystemNotifications } from "@/lib/actions/superadmin"
+import { localizeNotification } from "@/lib/notification-messages"
 import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
 import { useMobileSidebar } from "./mobile-sidebar-context"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -46,7 +47,7 @@ interface SuperAdminHeaderProps {
 }
 
 export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toggleMobileSidebar } = useMobileSidebar()
   const [notifications, setNotifications] = useState<any[]>([])
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true)
@@ -210,7 +211,7 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
                 ) : notifications.length === 0 ? (
                   <div className="p-4 text-center text-sm text-gray-500">{t('superadmin.noNotifications') || 'No notifications'}</div>
                 ) : (
-                  notifications.map((notification) => (
+                  notifications.map((n) => localizeNotification(n, language, t)).map((notification) => (
                     <div
                       key={notification._id}
                       onClick={() => handleNotificationClick(notification)}

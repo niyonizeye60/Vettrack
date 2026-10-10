@@ -2,7 +2,9 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { resolveLocation } from "@/lib/rwanda-geo"
 import {
+  LISTING_CHANGE_LABEL_KEYS,
   LISTING_KIND_CATEGORY,
+  SELLER_REMOVAL_REASON,
   type ListingChange,
   type ListingKind,
   type ListingRequestStatus,
@@ -11,6 +13,8 @@ import {
 } from "@/lib/validations/listing-request"
 import { sellerEditableFilter, setListingHidden, type ListingVisibility } from "@/lib/db-listings"
 import { notifyFarmer, notifySuperadmin, sellerListingsPath } from "@/lib/marketplace-notifications"
+import { notificationText } from "@/lib/notification-messages"
+import { errorMessage, type ErrorId } from "@/lib/error-messages"
 import { setStock } from "@/lib/stock"
 import { getSellByDays } from "@/lib/db-settings"
 import { earliestAcceptableExpiry, MIN_DAYS_ON_SALE } from "@/lib/product-rules"
@@ -124,7 +128,12 @@ export interface ReviewHistoryEntry {
   reviewedBy: ObjectId | null
 }
 
-export class ListingRequestError extends Error {}
+/** Carries English from lib/error-messages.ts, which the seller's screen translates. */
+export class ListingRequestError extends Error {
+  constructor(id: ErrorId, params?: Record<string, string | number>) {
+    super(errorMessage(id, params))
+  }
+}
 
 async function getDb() {
   const client = await clientPromise
@@ -143,18 +152,6 @@ export function listingKindOf(request: Pick<ListingRequest, "kind">): ListingKin
 /** Matches one kind; animals also match the older documents that carry no `kind`. */
 function kindFilter(kind: ListingKind) {
   return kind === "animal" ? { kind: { $nin: ["drug", "feed"] } } : { kind }
-}
-
-/** For messages sellers read, so a pharmacy never hears about "this animal". */
-function noun(kind: ListingKind) {
-  return kind
-}
-
-/** The public page each kind goes live on, as sellers are told. */
-const STOREFRONT_NAME: Record<ListingKind, string> = {
-  animal: "the marketplace",
-  drug: "the pharmacy page",
-  feed: "the feeds page",
 }
 
 function emptyToNull(value: string | undefined | null): string | null {
@@ -358,10 +355,7 @@ async function assertListableExpiry(submission: SellerSubmission): Promise<void>
   if (submission.kind === "animal" || !submission.data.expiryDate) return
   const earliest = earliestAcceptableExpiry(await getSellByDays())
   if (submission.data.expiryDate < earliest) {
-    throw new ListingRequestError(
-      `This ${noun(submission.kind)} expires too soon to list: it must stay on sale for at least ${MIN_DAYS_ON_SALE} days. ` +
-        `Choose an expiry date on or after ${earliest}.`
-    )
+    throw new ListingRequestError(`expiresTooSoon.${submission.kind}`, { days: MIN_DAYS_ON_SALE, date: earliest })
   }
 }
 
@@ -389,8 +383,7 @@ export async function createListingRequest(
   const result = await collection.insertOne(doc as ListingRequest)
 
   await notifySuperadmin(
-    submission.kind === "animal" ? "New listing request" : `New ${noun(submission.kind)} listing request`,
-    `${farmer.name} submitted "${doc.title}" for review.`,
+    notificationText(`requestNew.${submission.kind}`, { seller: farmer.name, title: doc.title }),
     "/marketplace/requests"
   )
 
@@ -443,8 +436,8 @@ export async function approveRequest(
   const db = await getDb()
 
   const request = await getRequestById(id)
-  if (!request) throw new ListingRequestError("Request not found")
-  if (request.status !== "pending") throw new ListingRequestError("This request has already been reviewed")
+  if (!request) throw new ListingRequestError("requestNotFound")
+  if (request.status !== "pending") throw new ListingRequestError("alreadyReviewed")
 
   // Claim the request before creating the listing, so a lost race can't leave a
   // published listing behind with no approved request pointing at it.
@@ -461,7 +454,7 @@ export async function approveRequest(
     }
   )
   if (claim.matchedCount === 0) {
-    throw new ListingRequestError("This request has already been reviewed")
+    throw new ListingRequestError("alreadyReviewed")
   }
 
   const kind = listingKindOf(request)
@@ -501,10 +494,7 @@ export async function approveRequest(
 
   await notifyFarmer(
     request.farmerId,
-    `Your ${noun(kind)} is now listed`,
-    kind === "animal"
-      ? `"${request.title}" is live on the marketplace. Buyers who want it will be put in touch with you through Vettrack.`
-      : `"${request.title}" is live on ${STOREFRONT_NAME[kind]}.`,
+    notificationText(`requestPublished.${kind}`, { title: request.title }),
     sellerListingsPath(LISTING_KIND_CATEGORY[kind])
   )
 
@@ -519,7 +509,7 @@ export async function rejectRequest(
   const collection = await getCollection()
 
   const request = await getRequestById(id)
-  if (!request) throw new ListingRequestError("Request not found")
+  if (!request) throw new ListingRequestError("requestNotFound")
 
   const result = await collection.updateOne(
     { _id: new ObjectId(id), status: "pending" },
@@ -534,13 +524,12 @@ export async function rejectRequest(
     }
   )
   if (result.matchedCount === 0) {
-    throw new ListingRequestError("This request has already been reviewed")
+    throw new ListingRequestError("alreadyReviewed")
   }
 
   await notifyFarmer(
     request.farmerId,
-    "Your listing request was not approved",
-    `"${request.title}" was not published. ${note.trim()} You can update it and send it again.`,
+    notificationText("requestRejected", { title: request.title, note: note.trim() }),
     sellerListingsPath(LISTING_KIND_CATEGORY[listingKindOf(request)])
   )
 }
@@ -562,13 +551,13 @@ export async function resubmitRequest(
 
   const request = await getRequestById(id)
   if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
-    throw new ListingRequestError("Request not found")
+    throw new ListingRequestError("requestNotFound")
   }
   if (listingKindOf(request) !== submission.kind) {
-    throw new ListingRequestError("Request not found")
+    throw new ListingRequestError("requestNotFound")
   }
   if (request.status !== "rejected") {
-    throw new ListingRequestError("Only a request that was not approved can be resubmitted")
+    throw new ListingRequestError("onlyRejectedResubmit")
   }
   await assertListableExpiry(submission)
 
@@ -598,12 +587,11 @@ export async function resubmitRequest(
     { returnDocument: "after" }
   )
   if (!updated) {
-    throw new ListingRequestError("This request can no longer be resubmitted")
+    throw new ListingRequestError("cannotResubmit")
   }
 
   await notifySuperadmin(
-    "Listing request resubmitted",
-    `${farmer.name} revised "${updated.title}" and sent it back for review.`,
+    notificationText("requestResubmitted", { seller: farmer.name, title: updated.title }),
     "/marketplace/requests"
   )
 
@@ -618,7 +606,7 @@ export async function withdrawRequest(id: string, farmerId: string): Promise<voi
     { $set: { status: "withdrawn", updatedAt: new Date() } }
   )
   if (result.matchedCount === 0) {
-    throw new ListingRequestError("This request can no longer be withdrawn")
+    throw new ListingRequestError("cannotWithdraw")
   }
 }
 
@@ -639,10 +627,10 @@ export async function requestRemoval(
 
   const request = await getRequestById(id)
   if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
-    throw new ListingRequestError("Request not found")
+    throw new ListingRequestError("requestNotFound")
   }
   if (request.status !== "approved" || !request.publishedServiceId || !ObjectId.isValid(request.publishedServiceId)) {
-    throw new ListingRequestError("Only a published listing can be removed")
+    throw new ListingRequestError("onlyPublishedRemoved")
   }
 
   // A listing staff have hidden can still be asked to come down: hidden is a marketplace
@@ -650,7 +638,7 @@ export async function requestRemoval(
   const listing = await db
     .collection("services")
     .findOne({ _id: new ObjectId(request.publishedServiceId) }, { projection: { _id: 1 } })
-  if (!listing) throw new ListingRequestError("This listing is no longer on the marketplace")
+  if (!listing) throw new ListingRequestError("listingGone")
 
   const updated = await collection.findOneAndUpdate(
     { _id: new ObjectId(id), farmerId: farmer._id, status: "approved", "removal.status": { $ne: "pending" } } as any,
@@ -668,11 +656,10 @@ export async function requestRemoval(
     },
     { returnDocument: "after" }
   )
-  if (!updated) throw new ListingRequestError("A removal request is already waiting for review")
+  if (!updated) throw new ListingRequestError("removalAlreadyPending")
 
   await notifySuperadmin(
-    "Listing removal requested",
-    `${farmer.name} asked to remove "${updated.title}" from the marketplace.`,
+    notificationText("removalRequested", { seller: farmer.name, title: updated.title }),
     "/marketplace/requests"
   )
 
@@ -705,9 +692,9 @@ export async function decideRemoval(
   const db = await getDb()
 
   const request = await getRequestById(id)
-  if (!request) throw new ListingRequestError("Request not found")
+  if (!request) throw new ListingRequestError("requestNotFound")
   if (request.removal?.status !== "pending") {
-    throw new ListingRequestError("There is no removal request waiting on this listing")
+    throw new ListingRequestError("noRemovalPending")
   }
 
   // Claim the decision first, so two reviewers can't both act on the same ask.
@@ -723,7 +710,7 @@ export async function decideRemoval(
     }
   )
   if (claim.matchedCount === 0) {
-    throw new ListingRequestError("This removal request has already been decided")
+    throw new ListingRequestError("removalAlreadyDecided")
   }
 
   if (decision === "approve" && request.publishedServiceId && ObjectId.isValid(request.publishedServiceId)) {
@@ -741,7 +728,7 @@ export async function decideRemoval(
             category: LISTING_KIND_CATEGORY[listingKindOf(request)],
           },
           true,
-          "Removed at the seller's request",
+          SELLER_REMOVAL_REASON,
           { notify: false }
         )
       } catch (error) {
@@ -765,10 +752,9 @@ export async function decideRemoval(
 
   await notifyFarmer(
     request.farmerId,
-    decision === "approve" ? "Your listing was removed" : "Your removal request was declined",
     decision === "approve"
-      ? `"${request.title}" was taken off the marketplace, as you asked.`
-      : `"${request.title}" stays on the marketplace. ${note?.trim() ?? ""}`.trim(),
+      ? notificationText("removalApproved", { title: request.title })
+      : notificationText("removalDeclined", { title: request.title, note: note?.trim() ?? "" }),
     sellerListingsPath(LISTING_KIND_CATEGORY[listingKindOf(request)])
   )
 }
@@ -815,7 +801,7 @@ export async function deleteRequestForFarmer(id: string, farmerId: string): Prom
 
   const request = await getRequestById(id)
   if (!request || request.farmerId !== farmerId || request.farmerDeletedAt) {
-    throw new ListingRequestError("Request not found")
+    throw new ListingRequestError("requestNotFound")
   }
 
   let listing: ListingVisibility | null = null
@@ -826,7 +812,7 @@ export async function deleteRequestForFarmer(id: string, farmerId: string): Prom
     listing = doc ? { hidden: doc.hidden === true, reason: null, locked: false, stock: null, held: 0, lowStockAt: null } : null
   }
   if (!canFarmerDelete(request, listing)) {
-    throw new ListingRequestError("Only a post that is unpublished or has been removed can be deleted")
+    throw new ListingRequestError("onlyOffMarketDeleted")
   }
 
   // Pinned to the status it was checked in: a request resubmitted in the meantime is
@@ -836,7 +822,7 @@ export async function deleteRequestForFarmer(id: string, farmerId: string): Prom
     { $set: { farmerDeletedAt: new Date() } }
   )
   if (result.matchedCount === 0) {
-    throw new ListingRequestError("This post can no longer be deleted")
+    throw new ListingRequestError("cannotDelete")
   }
 }
 
@@ -862,16 +848,16 @@ export async function editPublishedListing(
 
   const request = await getRequestById(id)
   if (!request || request.farmerId !== farmer._id || request.farmerDeletedAt) {
-    throw new ListingRequestError("Request not found")
+    throw new ListingRequestError("requestNotFound")
   }
   if (listingKindOf(request) !== submission.kind) {
-    throw new ListingRequestError("Request not found")
+    throw new ListingRequestError("requestNotFound")
   }
   if (request.status !== "approved" || !request.publishedServiceId || !ObjectId.isValid(request.publishedServiceId)) {
-    throw new ListingRequestError("Only a published listing can be edited")
+    throw new ListingRequestError("onlyPublishedEdited")
   }
   if (request.removal?.status === "approved") {
-    throw new ListingRequestError("This listing was removed and can no longer be edited")
+    throw new ListingRequestError("removedNoEdit")
   }
 
   const fields = requestFieldsFromInput(farmer, submission)
@@ -883,7 +869,7 @@ export async function editPublishedListing(
   // changed with updateListingStock, so an edit keeps the original on the request.
   const next = { ...fields, stock: request.stock ?? null }
   if (changes.length === 0) {
-    throw new ListingRequestError("Nothing was changed")
+    throw new ListingRequestError("nothingChanged")
   }
 
   const now = new Date()
@@ -904,11 +890,11 @@ export async function editPublishedListing(
   )
   if (published.matchedCount === 0) {
     const current = await services.findOne({ _id: serviceId }, { projection: { listingStatus: 1 } })
-    if (!current) throw new ListingRequestError("This listing is no longer on the marketplace")
+    if (!current) throw new ListingRequestError("listingGone")
     throw new ListingRequestError(
       current.listingStatus === "sold" || current.listingStatus === "withdrawn"
-        ? `This ${noun(submission.kind)} has been sold or withdrawn, so it can't be edited`
-        : `A buyer is arranging this ${noun(submission.kind)} right now, so it can't be edited until that finishes`
+        ? `editSold.${submission.kind}`
+        : `editHeld.${submission.kind}`
     )
   }
 
@@ -921,11 +907,14 @@ export async function editPublishedListing(
     } as any,
     { returnDocument: "after" }
   )
-  if (!updated) throw new ListingRequestError("This listing can no longer be edited")
+  if (!updated) throw new ListingRequestError("cannotEdit")
 
   await notifySuperadmin(
-    "Listing edited by the seller",
-    `${farmer.name} edited "${updated.title}". Changed: ${changes.map((c) => c.field).join(", ")}.`,
+    notificationText("listingEdited", {
+      seller: farmer.name,
+      title: updated.title,
+      fields: { keys: changes.map((c) => LISTING_CHANGE_LABEL_KEYS[c.field]), text: changes.map((c) => c.field).join(", ") },
+    }),
     "/marketplace/listings"
   )
 
@@ -947,16 +936,16 @@ export async function updateListingStock(
   const request = await getRequestById(id)
   const kind = request ? listingKindOf(request) : null
   if (!request || !kind || request.farmerId !== seller._id || request.farmerDeletedAt || kind === "animal") {
-    throw new ListingRequestError("Request not found")
+    throw new ListingRequestError("requestNotFound")
   }
   if (request.status !== "approved" || !request.publishedServiceId) {
-    throw new ListingRequestError(`Only a published ${noun(kind)} has stock to update`)
+    throw new ListingRequestError(`stockNotPublished.${kind}`)
   }
   if (request.removal?.status === "approved") {
-    throw new ListingRequestError(`This ${noun(kind)} was removed from ${STOREFRONT_NAME[kind]}`)
+    throw new ListingRequestError(`stockRemoved.${kind}`)
   }
   if (!(await setStock(request.publishedServiceId, stock, { sellerId: seller._id, lowStockAt }))) {
-    throw new ListingRequestError(`This ${noun(kind)} is no longer on ${STOREFRONT_NAME[kind]}`)
+    throw new ListingRequestError(`stockGone.${kind}`)
   }
 }
 

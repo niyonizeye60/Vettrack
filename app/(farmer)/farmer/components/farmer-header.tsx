@@ -17,6 +17,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { useToast } from "@/hooks/use-toast"
 import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
 import { playChatNotificationSound } from "@/lib/notification-sound"
+import { localizeNotification } from "@/lib/notification-messages"
 import { useMobileSidebar } from "./mobile-sidebar-context"
 
 interface HeaderUser {
@@ -32,7 +33,7 @@ function stripHtml(html: string) {
 }
 
 export default function FarmerHeader() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
   const { toggleMobileSidebar } = useMobileSidebar()
@@ -84,6 +85,7 @@ export default function FarmerHeader() {
           read: n.read,
           type: "notification",
           rawType: n.type,
+          i18n: n.i18n,
         }))
 
         const chatNotifs = formatted.filter((n: any) => n.rawType === "chat")
@@ -226,7 +228,7 @@ export default function FarmerHeader() {
                 {notifications.length === 0 ? (
                   <div className="p-4 text-center text-gray-500 text-sm">{t("farmer.noNotifications")}</div>
                 ) : (
-                  notifications.map((n, i) => (
+                  notifications.map((n) => localizeNotification(n, language, t)).map((n, i) => (
                     <div
                       key={n._id || i}
                       className={`p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors ${

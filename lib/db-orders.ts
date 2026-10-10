@@ -14,6 +14,7 @@ import {
   releaseStock,
 } from "@/lib/stock"
 import { notifyFarmer, notifyFinance, sellerSalesPath } from "@/lib/marketplace-notifications"
+import { notificationText } from "@/lib/notification-messages"
 import { alertLowStock, alertOutOfStock } from "@/lib/product-alerts"
 import { getCommissionPercentage, getSellByDays } from "@/lib/db-settings"
 import { attachPrescription, detachPrescription, getPrescription } from "@/lib/db-prescriptions"
@@ -696,10 +697,7 @@ async function commitStockForOrder(order: Order): Promise<void> {
   if (shortServiceIds.size > 0) {
     await collection.updateOne({ _id: order._id }, { $set: { stockShortfall: true } })
     const names = [...shortServiceIds].map((id) => itemFor(id)?.name ?? id).join(", ")
-    await notifyFinance(
-      "Order paid for more stock than was left",
-      `Order ${ref} was paid for, but not enough of ${names} was left in stock. Check with the seller, or refund the buyer from Refunds.`
-    )
+    await notifyFinance(notificationText("orderStockShort", { ref, items: names }))
   }
 
   // Only a pharmacy's drugs and a feed supplier's feed carry a seller on a cart order -
@@ -715,10 +713,13 @@ async function commitStockForOrder(order: Order): Promise<void> {
     const short = items.some((item) => shortServiceIds.has(item.serviceId))
     await notifyFarmer(
       sellerId,
-      "New sale",
-      `Order ${ref}: ${summary} for ${order.buyer.name}. Vettrack collected RWF ${amount.toLocaleString()}; ` +
-        `your share is RWF ${share.toLocaleString()}. Open Sales for the buyer's contact and delivery details.` +
-        (short ? " Your stock was short for part of this order - Vettrack will contact you." : ""),
+      notificationText(short ? "newSaleShort" : "newSale", {
+        ref,
+        items: summary,
+        buyer: order.buyer.name,
+        amount: amount.toLocaleString(),
+        share: share.toLocaleString(),
+      }),
       sellerSalesPath(items[0].category)
     )
   }

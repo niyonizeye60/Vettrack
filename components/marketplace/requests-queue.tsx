@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2, Check, X, MapPin, Phone, ExternalLink, Expand, Package, CalendarClock, FileCheck, Tag } from "lucide-react"
 import PhotoLightbox from "@/components/marketplace/photo-lightbox"
-import { LISTING_KIND_CATEGORY, type ListingKind } from "@/lib/validations/listing-request"
+import { LISTING_KIND_CATEGORY, listingValueLabel, type ListingKind } from "@/lib/validations/listing-request"
+import { localizeError } from "@/lib/error-messages"
 
 interface ListingRequest {
   id: string
@@ -85,7 +86,9 @@ type Tab = (typeof TABS)[number]
  * category grant; the API enforces the same rule on every call.
  */
 export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingKind[] }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  /** Animal type, sex, drug and feed types are stored in English; show them in the reader's language. */
+  const valueLabel = (value?: string | null) => listingValueLabel(value, t)
   const [kind, setKind] = useState<ListingKind>(allowedKinds[0] ?? "animal")
   const [tab, setTab] = useState<Tab>("pending")
   const [requests, setRequests] = useState<ListingRequest[]>([])
@@ -143,7 +146,7 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || t("marketplace.decisionFailed"))
+        setError(localizeError(data.error, language) || t("marketplace.decisionFailed"))
         return false
       }
       await fetchRequests(kind, tab)
@@ -294,7 +297,7 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-medium text-gray-900">{request.title}</h3>
                     <Badge variant="secondary">
-                      {request.kind === "drug" ? request.drugType : request.kind === "feed" ? request.feedType : request.animalType}
+                      {valueLabel(request.kind === "drug" ? request.drugType : request.kind === "feed" ? request.feedType : request.animalType)}
                     </Badge>
                     {request.resubmitCount > 0 && (
                       <Badge className="bg-amber-100 text-amber-800" variant="secondary">
@@ -361,7 +364,7 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
                       {(request.targetAnimal || request.quality) && (
                         <span className="flex items-center gap-1.5">
                           <Tag className="h-3.5 w-3.5 text-gray-400" />
-                          {[request.targetAnimal, request.quality && `${request.quality} ${t("feeds.quality")}`]
+                          {[valueLabel(request.targetAnimal), request.quality && `${t("feeds.quality")}: ${valueLabel(request.quality)}`]
                             .filter(Boolean)
                             .join(" · ")}
                         </span>
@@ -376,7 +379,7 @@ export default function RequestsQueue({ allowedKinds }: { allowedKinds: ListingK
                     </div>
                   ) : (
                     <p className="text-sm text-gray-600">
-                      {[request.breed, request.age, request.sex].filter(Boolean).join(" · ")}
+                      {[request.breed, request.age, valueLabel(request.sex)].filter(Boolean).join(" · ")}
                     </p>
                   )}
                   <p className="text-sm text-gray-700 line-clamp-2">{request.description}</p>
