@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { logPortalExport } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeColumns } from "@/lib/export-columns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,8 +53,37 @@ function getPresetRange(preset: Preset): { start: string; end: string } {
 
 const fmt = (n: number) => `RWF ${Math.round(n).toLocaleString()}`
 
+/** Profit & loss row labels; the rows are built in English (the code checks them) and drawn translated. */
+const PL_LABEL_KEYS: Record<string, string> = {
+  "INCOME": "farmReport.income",
+  "Milk Sales": "farmReport.milkSales",
+  "Livestock Sales": "farmReport.livestockSales",
+  "By-product Sales": "farmReport.byProductSales",
+  "TOTAL INCOME": "farmReport.totalIncome",
+  "EXPECTED LOSS": "farmReport.expectedLoss",
+  "Milking Supplies Costs": "farmReport.milkingSuppliesCosts",
+  "TOTAL EXPECTED LOSS": "farmReport.totalExpectedLoss",
+  "EXPENSES": "farmReport.expenses",
+  "Insemination Costs": "farmReport.inseminationCosts",
+  "Vaccination Costs": "farmReport.vaccinationCosts",
+  "Veterinary & Health": "farmReport.veterinaryHealth",
+  "Labour / Wages": "farmReport.labourWages",
+  "Livestock Purchases": "farmReport.livestockPurchases",
+  "Feed & Water Costs": "farmReport.feedWaterCosts",
+  "Calf Rearing Costs": "farmReport.calfRearingCosts",
+  "Animal Expenses": "farmReport.animalExpenses",
+  "TOTAL EXPENSES": "farmReport.totalExpenses",
+  "NET PROFIT / (LOSS)": "farmReport.netProfitLoss",
+  "Farm General Report": "farmReport.farmGeneralReport",
+}
+
 export default function GeneralReportPage() {
   const { t } = useLanguage()
+  const plLabel = (label: string) => {
+    const indent = label.match(/^\s*/)?.[0] ?? ""
+    const key = PL_LABEL_KEYS[label.trim()]
+    return key ? indent + t(key) : label
+  }
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -116,18 +146,18 @@ export default function GeneralReportPage() {
       doc.setTextColor(17, 24, 39)
       doc.setFontSize(15)
       doc.setFont("helvetica", "bold")
-      doc.text("Farm General Report", 15, 15)
+      doc.text(t("farmReport.farmGeneralReport"), 15, 15)
       doc.setTextColor(75, 85, 99)
       doc.setFontSize(9)
       doc.setFont("helvetica", "normal")
-      doc.text(`Period: ${report.range.startDate} to ${report.range.endDate}`, 15, 23)
+      doc.text(t("pdf.periodRange").replace("{start}", report.range.startDate).replace("{end}", report.range.endDate), 15, 23)
       doc.setDrawColor(226, 232, 240)
       doc.line(0, 32, pageWidth, 32)
 
       doc.setTextColor(55, 65, 81)
       doc.setFontSize(9)
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 15, 40)
-      doc.text(`Farmer: ${user?.name || "Unknown"}`, 15, 46)
+      doc.text(t("pdf.generated").replace("{date}", new Date().toLocaleString()), 15, 40)
+      doc.text(t("pdf.farmer").replace("{name}", user?.name || t("pdf.unknown")), 15, 46)
 
       let y = 58
       doc.setFillColor(240, 253, 244)
@@ -135,8 +165,8 @@ export default function GeneralReportPage() {
       doc.rect(15, y, pageWidth - 30, 22, "FD")
       doc.setFontSize(10)
       doc.setTextColor(55, 65, 81)
-      doc.text("TOTAL INCOME", 20, y + 9)
-      doc.text("TOTAL EXPENSES", 20, y + 17)
+      doc.text(t("farmReport.totalIncome"), 20, y + 9)
+      doc.text(t("farmReport.totalExpenses"), 20, y + 17)
       doc.setFont("helvetica", "bold")
       doc.setTextColor(17, 24, 39)
       doc.text(fmt(report.income.total), pageWidth - 20, y + 9, { align: "right" })
@@ -151,7 +181,7 @@ export default function GeneralReportPage() {
       doc.setFontSize(12)
       doc.setFont("helvetica", "bold")
       doc.setTextColor(isEven ? 75 : isProfit ? 22 : 220, isEven ? 85 : isProfit ? 163 : 38, isEven ? 99 : isProfit ? 74 : 38)
-      const label = isEven ? "BREAK EVEN" : isProfit ? "NET PROFIT" : "NET LOSS"
+      const label = isEven ? t("farmReport.breakEven") : isProfit ? t("farmReport.netProfit") : t("farmReport.netLoss")
       doc.text(label, 20, y + 10)
       doc.text(isProfit || isEven ? fmt(report.netResult) : `(${fmt(Math.abs(report.netResult))})`, pageWidth - 20, y + 10, { align: "right" })
       doc.setFont("helvetica", "normal")
@@ -160,7 +190,7 @@ export default function GeneralReportPage() {
       doc.setTextColor(55, 65, 81)
       doc.setFontSize(11)
       doc.setFont("helvetica", "bold")
-      doc.text("Profit & Loss Statement", 15, y)
+      doc.text(t("farmReport.profitLossStatement"), 15, y)
       y += 8
 
       const plRows: [string, string][] = [
@@ -190,7 +220,7 @@ export default function GeneralReportPage() {
         const isTotal = label.startsWith("TOTAL")
         doc.setFont("helvetica", isHeader || isTotal ? "bold" : "normal")
         doc.setTextColor(isHeader ? 55 : 75, isHeader ? 65 : 85, isHeader ? 81 : 99)
-        doc.text(label, 15, y)
+        doc.text(plLabel(label), 15, y)
         if (value) doc.text(value, pageWidth - 20, y, { align: "right" })
         if (isTotal) doc.line(15, y + 1.5, pageWidth - 15, y + 1.5)
         y += 7
@@ -205,9 +235,9 @@ export default function GeneralReportPage() {
         doc.setFillColor(248, 250, 252); doc.rect(0, ph - 18, pw, 18, "F")
         doc.setDrawColor(226, 232, 240); doc.line(0, ph - 18, pw, ph - 18)
         doc.setFontSize(7); doc.setTextColor(107, 114, 128)
-        doc.text(`Generated by: ${user?.name || "Unknown"}`, 15, ph - 7)
-        doc.text(`© ${new Date().getFullYear()} NTDM Vettrack. All rights reserved`, pw / 2, ph - 7, { align: "center" })
-        doc.text(`Page ${page} of ${totalPages}`, pw - 15, ph - 7, { align: "right" })
+        doc.text(t("pdf.generatedBy").replace("{name}", user?.name || t("pdf.unknown")), 15, ph - 7)
+        doc.text(t("pdf.rights").replace("{year}", String(new Date().getFullYear())), pw / 2, ph - 7, { align: "center" })
+        doc.text(t("pdf.page").replace("{page}", String(page)).replace("{total}", String(totalPages)), pw - 15, ph - 7, { align: "right" })
       }
 
       doc.save(`farm-general-report-${report.range.startDate}-to-${report.range.endDate}.pdf`)
@@ -227,7 +257,7 @@ export default function GeneralReportPage() {
       const wb = XLSX.utils.book_new()
 
       const summarySheet = XLSX.utils.aoa_to_sheet([
-        ["Farm General Report", `${report.range.startDate} to ${report.range.endDate}`],
+        ["Farm General Report", t("farmReport.rangeTo").replace("{start}", report.range.startDate).replace("{end}", report.range.endDate)],
         [],
         ["INCOME", ""],
         ["Milk Sales", report.income.milkSales],
@@ -251,17 +281,17 @@ export default function GeneralReportPage() {
         ["TOTAL EXPENSES", report.expenses.total],
         [],
         ["NET PROFIT / (LOSS)", report.netResult],
-      ])
-      XLSX.utils.book_append_sheet(wb, summarySheet, "P&L Summary")
+      ].map(row => (row.length ? [plLabel(String(row[0])), ...row.slice(1)] : row)))
+      XLSX.utils.book_append_sheet(wb, summarySheet, t("farmReport.pLSummary"))
 
-      const incomeSheet = XLSX.utils.json_to_sheet(report.incomeLedger.map(e => ({ Date: e.date, Source: e.label, Description: e.description, "Amount (RWF)": e.amount })))
-      XLSX.utils.book_append_sheet(wb, incomeSheet, "Income Ledger")
+      const incomeSheet = XLSX.utils.json_to_sheet(localizeColumns(report.incomeLedger.map(e => ({ Date: e.date, Source: e.label, Description: e.description, "Amount (RWF)": e.amount })), t))
+      XLSX.utils.book_append_sheet(wb, incomeSheet, t("farmReport.incomeLedger"))
 
-      const expectedLossSheet = XLSX.utils.json_to_sheet(report.expectedLossLedger.map(e => ({ Date: e.date, Category: e.label, Description: e.description, "Amount (RWF)": e.amount })))
-      XLSX.utils.book_append_sheet(wb, expectedLossSheet, "Expected Loss Ledger")
+      const expectedLossSheet = XLSX.utils.json_to_sheet(localizeColumns(report.expectedLossLedger.map(e => ({ Date: e.date, Category: e.label, Description: e.description, "Amount (RWF)": e.amount })), t))
+      XLSX.utils.book_append_sheet(wb, expectedLossSheet, t("farmReport.expectedLossLedger"))
 
-      const expenseSheet = XLSX.utils.json_to_sheet(report.expenseLedger.map(e => ({ Date: e.date, Category: e.label, Description: e.description, "Amount (RWF)": e.amount })))
-      XLSX.utils.book_append_sheet(wb, expenseSheet, "Expense Ledger")
+      const expenseSheet = XLSX.utils.json_to_sheet(localizeColumns(report.expenseLedger.map(e => ({ Date: e.date, Category: e.label, Description: e.description, "Amount (RWF)": e.amount })), t))
+      XLSX.utils.book_append_sheet(wb, expenseSheet, t("farmReport.expenseLedger"))
 
       XLSX.writeFile(wb, `farm-general-report-${report.range.startDate}-to-${report.range.endDate}.xlsx`)
       logPortalExport("General report", "Excel")
@@ -744,7 +774,7 @@ export default function GeneralReportPage() {
                           ) : report.milkSupplies.records.map((r, i) => (
                             <TableRow key={i}>
                               <TableCell className="text-sm">{r.date}</TableCell>
-                              <TableCell><Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">{r.expenseType === "washing_drugs" ? "Washing Drugs" : "Milking Oil"}</Badge></TableCell>
+                              <TableCell><Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">{r.expenseType === "washing_drugs" ? t("farmReport.washingDrugs") : t("farmReport.milkingOil")}</Badge></TableCell>
                               <TableCell className="text-sm text-gray-700">{r.quantity} {r.unit}</TableCell>
                               <TableCell className="text-sm text-gray-700">{r.pricePerUnit ? `RWF ${r.pricePerUnit.toLocaleString()}` : "—"}</TableCell>
                               <TableCell className="text-right font-medium text-amber-700">{fmt(r.amount)}</TableCell>
@@ -813,7 +843,7 @@ export default function GeneralReportPage() {
                               <TableCell className="text-sm text-gray-500">{r.time || "—"}</TableCell>
                               <TableCell className="text-sm text-gray-600">
                                 {r.expenseType === "feed"
-                                  ? [r.foodCost ? `Feed RWF ${r.foodCost.toLocaleString()}` : null, r.waterCost ? `Water RWF ${r.waterCost.toLocaleString()}` : null, r.saltCost ? `Salt RWF ${r.saltCost.toLocaleString()}` : null].filter(Boolean).join(", ") || "—"
+                                  ? [r.foodCost ? t("farmReport.feedCost").replace("{amount}", r.foodCost.toLocaleString()) : null, r.waterCost ? t("farmReport.waterCost").replace("{amount}", r.waterCost.toLocaleString()) : null, r.saltCost ? t("farmReport.saltCost").replace("{amount}", r.saltCost.toLocaleString()) : null].filter(Boolean).join(", ") || "—"
                                   : (r.description || "—")}
                               </TableCell>
                               <TableCell className="text-right font-medium text-red-700">{fmt(r.amount)}</TableCell>

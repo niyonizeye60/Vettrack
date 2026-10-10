@@ -110,14 +110,14 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
     const now = new Date()
     const diffInMinutes = Math.floor((now.getTime() - new Date(date).getTime()) / (1000 * 60))
 
-    if (diffInMinutes < 1) return 'Just now'
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+    if (diffInMinutes < 1) return t("time.justNow")
+    if (diffInMinutes < 60) return t("time.minutesAgo").replace("{n}", String(diffInMinutes))
 
     const diffInHours = Math.floor(diffInMinutes / 60)
-    if (diffInHours < 24) return `${diffInHours}h ago`
+    if (diffInHours < 24) return t("time.hoursAgo").replace("{n}", String(diffInHours))
 
     const diffInDays = Math.floor(diffInHours / 24)
-    return `${diffInDays}d ago`
+    return t("time.daysAgo").replace("{n}", String(diffInDays))
   }
 
   const handleLogout = async () => {
@@ -149,7 +149,7 @@ export default function SuperAdminHeader({ user }: SuperAdminHeaderProps) {
             size="sm"
             onClick={toggleMobileSidebar}
             className="md:hidden p-2"
-            aria-label="Toggle navigation menu"
+            aria-label={t("staff.toggleNav")}
           >
             <Menu className="h-5 w-5" />
           </Button>

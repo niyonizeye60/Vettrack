@@ -4,8 +4,10 @@ import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Loader2, CheckCircle, XCircle, Mail } from "lucide-react"
 import Link from "next/link"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function BookingCallbackPage() {
+  const { t } = useLanguage()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<"loading" | "completed" | "failed" | "pending">("loading")
   const [amount, setAmount] = useState<number | null>(null)
@@ -50,34 +52,34 @@ export default function BookingCallbackPage() {
           {status === "loading" ? (
             <div className="py-10">
               <Loader2 className="h-12 w-12 text-primary mx-auto animate-spin" />
-              <p className="mt-4 text-gray-500">Verifying your payment...</p>
+              <p className="mt-4 text-gray-500">{t("bookingCallback.verifying")}</p>
             </div>
           ) : status === "completed" ? (
             <div className="py-6">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-6">
                 <CheckCircle className="h-10 w-10 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful! 🎉</h2>
-              <p className="text-gray-600 mb-4">Your booking has been confirmed.</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("booking.paymentSuccessful")} 🎉</h2>
+              <p className="text-gray-600 mb-4">{t("booking.bookingConfirmed")}</p>
               <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 inline-block">
                 {amount !== null && (
                   <p className="text-green-800 font-medium">
-                    ✅ RWF {amount.toLocaleString()} paid successfully
+                    ✅ {t("booking.paidAmount").replace("{amount}", amount.toLocaleString())}
                   </p>
                 )}
                 <p className="text-green-700 text-sm mt-1">
-                  You will receive a confirmation message shortly.
+                  {t("bookingCallback.confirmationSoon")}
                 </p>
               </div>
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-6">
                 <Mail className="h-4 w-4" />
-                <span>Check your email and phone for confirmation details</span>
+                <span>{t("bookingCallback.checkEmailPhone")}</span>
               </div>
               <Link
                 href="/booking"
                 className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/90 transition-colors shadow-md"
               >
-                Book Another Consultation
+                {t("booking.bookAnother")}
               </Link>
             </div>
           ) : status === "pending" ? (
@@ -85,15 +87,15 @@ export default function BookingCallbackPage() {
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-yellow-100 mb-6">
                 <Loader2 className="h-10 w-10 text-yellow-600 animate-spin" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Pending</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("bookingCallback.pending")}</h2>
               <p className="text-gray-600 mb-6">
-                Your payment is being processed. Please wait a moment.
+                {t("bookingCallback.processing")}
               </p>
               <Link
                 href="/booking"
                 className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/90 transition-colors shadow-md"
               >
-                Back to Booking
+                {t("bookingCallback.backToBooking")}
               </Link>
             </div>
           ) : (
@@ -101,15 +103,15 @@ export default function BookingCallbackPage() {
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-100 mb-6">
                 <XCircle className="h-10 w-10 text-red-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Failed</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">{t("booking.paymentFailed")}</h2>
               <p className="text-gray-600 mb-6">
-                Something went wrong with your payment. Please try again.
+                {t("bookingCallback.failedDesc")}
               </p>
               <Link
                 href="/booking"
                 className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-full font-medium hover:bg-primary/90 transition-colors shadow-md"
               >
-                Try Again
+                {t("common.tryAgain")}
               </Link>
             </div>
           )}

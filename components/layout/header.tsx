@@ -106,7 +106,7 @@ export default function Header() {
               size="icon"
               className="bg-primary text-white hover:bg-primary/90"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle menu"
+              aria-label={t("header.toggleMenu")}
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </Button>

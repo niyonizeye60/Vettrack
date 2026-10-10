@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals } from "@/lib/actions"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { ageInMonths, isReadyToGraduate, CALF_GRADUATION_AGE_MONTHS } from "@/lib/calf-age"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -47,15 +48,16 @@ interface Pagination { page: number; pageSize: number; total: number; totalPages
 const emptyPagination: Pagination = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 }
 
 function PaginationFooter({ pagination, page, setPage, loading, className }: { pagination: Pagination; page: number; setPage: (updater: (p: number) => number) => void; loading: boolean; className?: string }) {
+  const { t } = useLanguage()
   if (pagination.totalPages <= 1) return null
   return (
     <div className={cn("flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-gray-100", className)}>
       <p className="text-sm text-gray-500">
-        Showing{" "}
+        {t("pagination.showing")}{" "}
         <span className="font-medium">{(pagination.page - 1) * pagination.pageSize + 1}</span>
         {" - "}
         <span className="font-medium">{Math.min(pagination.page * pagination.pageSize, pagination.total)}</span>
-        {" "}of{" "}
+        {" "}{t("pagination.of")}{" "}
         <span className="font-medium">{pagination.total}</span>
       </p>
       <div className="flex items-center gap-2">
@@ -95,7 +97,7 @@ function animalStatusText(status: string | undefined, t: (k: string) => string) 
 }
 
 export default function CalvesPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -334,9 +336,9 @@ export default function CalvesPage() {
 
   const validateCalf = () => {
     const e: Record<string, string> = {}
-    if (!calfName.trim()) e.calfName = "Enter a calf name"
-    if (!gender) e.gender = "Select gender"
-    if (!birthDate) e.birthDate = "Select a birth date"
+    if (!calfName.trim()) e.calfName = t("calves.enterACalfName")
+    if (!gender) e.gender = t("calves.selectGender")
+    if (!birthDate) e.birthDate = t("calves.selectABirthDate")
     setCalfErrors(e)
     return Object.keys(e).length === 0
   }
@@ -418,7 +420,7 @@ export default function CalvesPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setGradError(data?.error || "Failed to move calf to animals")
+        setGradError(localizeError(data?.error, language) || t("calves.failedToMoveCalfToAnimals"))
         return
       }
       setGradResult({ name: graduateCalf.name, moved: data.vaccinationRecordsMoved || 0 })
@@ -426,7 +428,7 @@ export default function CalvesPage() {
       const farmerId = user._id.toString()
       await Promise.all([fetchCalves(farmerId), fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch)])
     } catch {
-      setGradError("Failed to move calf to animals")
+      setGradError(t("calves.failedToMoveCalfToAnimals"))
     } finally {
       setGraduating(false)
     }
@@ -439,9 +441,9 @@ export default function CalvesPage() {
 
   const validateWeight = () => {
     const e: Record<string, string> = {}
-    if (!weightCalfId) e.weightCalfId = "Select a calf"
-    if (!weightValue || Number(weightValue) <= 0) e.weightValue = "Enter a valid weight"
-    if (!weightDate) e.weightDate = "Select a date"
+    if (!weightCalfId) e.weightCalfId = t("calves.selectACalf")
+    if (!weightValue || Number(weightValue) <= 0) e.weightValue = t("calves.enterAValidWeight")
+    if (!weightDate) e.weightDate = t("calves.selectADate")
     setWeightErrors(e)
     return Object.keys(e).length === 0
   }
@@ -498,15 +500,15 @@ export default function CalvesPage() {
 
   const validateExpense = () => {
     const e: Record<string, string> = {}
-    if (!expCalfId) e.expCalfId = "Select a calf"
-    if (!amount || Number(amount) <= 0) e.amount = "Enter a valid amount"
-    if (!expDate) e.expDate = "Select a date"
+    if (!expCalfId) e.expCalfId = t("calves.selectACalf")
+    if (!amount || Number(amount) <= 0) e.amount = t("calves.enterAValidAmount")
+    if (!expDate) e.expDate = t("calves.selectADate")
     if (expenseType === "milk") {
-      if (!milkLiters || Number(milkLiters) <= 0) e.milkLiters = "Enter how many liters the calf consumed"
-      else if (Number(milkLiters) > availableHomeConsumptionForForm) e.milkLiters = `Only ${availableHomeConsumptionForForm.toFixed(1)}L of home consumption milk is available`
+      if (!milkLiters || Number(milkLiters) <= 0) e.milkLiters = t("calves.enterHowManyLitersTheCalf")
+      else if (Number(milkLiters) > availableHomeConsumptionForForm) e.milkLiters = t("calves.milkBalanceShort").replace("{liters}", availableHomeConsumptionForForm.toFixed(1))
     }
-    if (expenseType === "feed" && waterLiters && !(Number(waterLiters) >= 0)) e.waterLiters = "Enter a valid number of liters"
-    if (expenseType === "feed" && waterCost && !(Number(waterCost) >= 0)) e.waterCost = "Enter a valid water cost"
+    if (expenseType === "feed" && waterLiters && !(Number(waterLiters) >= 0)) e.waterLiters = t("calves.enterAValidNumberOfLiters")
+    if (expenseType === "feed" && waterCost && !(Number(waterCost) >= 0)) e.waterCost = t("calves.enterAValidWaterCost")
     setExpErrors(e)
     return Object.keys(e).length === 0
   }
@@ -524,7 +526,7 @@ export default function CalvesPage() {
       : await fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
 
     if (!res.ok) {
-      const { error } = await res.json().catch(() => ({ error: "Failed to save expense" }))
+      const { error } = await res.json().catch(() => ({ error: t("calves.failedToSaveExpense") }))
       setExpErrors({ [expenseType === "milk" ? "milkLiters" : "amount"]: error })
       setSaving(false)
       return
@@ -914,7 +916,7 @@ export default function CalvesPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: any) => [`${v} kg`, "Weight"]} />
+                    <Tooltip formatter={(v: any) => [`${v} kg`, t("calves.weight")]} />
                     <Line type="monotone" dataKey="weight" stroke="#7c3aed" strokeWidth={2} dot={{ fill: "#7c3aed" }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -1038,7 +1040,7 @@ export default function CalvesPage() {
                     {expenseType !== "milk" && (
                       <div className="space-y-1">
                         <label className="text-sm font-medium text-gray-700">{t('farmer.expenseDescription')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                        <Input placeholder="e.g. Deworming injection" value={description} onChange={e => setDescription(e.target.value)} />
+                        <Input placeholder={t("calves.eGDewormingInjection")} value={description} onChange={e => setDescription(e.target.value)} />
                       </div>
                     )}
 
@@ -1196,7 +1198,7 @@ export default function CalvesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.calfName')} *</label>
-                <Input placeholder="e.g. Kalisa" value={calfName} onChange={e => setCalfName(e.target.value)} className={calfErrors.calfName ? "border-red-500" : ""} />
+                <Input placeholder={t("calves.eGKalisa")} value={calfName} onChange={e => setCalfName(e.target.value)} className={calfErrors.calfName ? "border-red-500" : ""} />
                 {calfErrors.calfName && <p className="text-xs text-red-500">{calfErrors.calfName}</p>}
               </div>
 
@@ -1230,7 +1232,7 @@ export default function CalvesPage() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.breed')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                <Input placeholder="e.g. Friesian" value={breed} onChange={e => setBreed(e.target.value)} />
+                <Input placeholder={t("calves.eGFriesian")} value={breed} onChange={e => setBreed(e.target.value)} />
               </div>
 
               <div className="space-y-1">
@@ -1313,11 +1315,11 @@ export default function CalvesPage() {
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.breed')}</label>
-                <Input value={gradBreed} onChange={e => setGradBreed(e.target.value)} placeholder="e.g. Friesian" />
+                <Input value={gradBreed} onChange={e => setGradBreed(e.target.value)} placeholder={t("calves.eGFriesian")} />
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')}</label>
-                <Input value={gradEarTag} onChange={e => setGradEarTag(e.target.value)} placeholder="e.g. RW-00125" />
+                <Input value={gradEarTag} onChange={e => setGradEarTag(e.target.value)} placeholder={t("calves.eGRw00125")} />
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')}</label>

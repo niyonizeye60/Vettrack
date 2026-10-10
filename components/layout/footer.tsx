@@ -5,9 +5,10 @@ import Link from "next/link"
 import { Facebook, Instagram, Twitter, MapPin, Phone, Mail, Clock, Youtube, Linkedin, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { DeveloperCredit } from "@/components/layout/developer-credit"
+import { localizeError } from "@/lib/error-messages"
 
 export default function Footer() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [email, setEmail] = useState("")
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
   const [message, setMessage] = useState("")
@@ -26,11 +27,11 @@ export default function Footer() {
       const data = await res.json()
       if (data.success) {
         setStatus("success")
-        setMessage(data.message)
+        setMessage(localizeError(data.message, language) ?? "")
         setEmail("")
       } else {
         setStatus("error")
-        setMessage(data.message || t('footer.subscribeError'))
+        setMessage(localizeError(data.message, language) || t('footer.subscribeError'))
       }
     } catch {
       setStatus("error")
@@ -241,11 +242,11 @@ export default function Footer() {
           </p>
           <p className="mt-2">
             <Link href="/terms" className="hover:text-primary transition-colors">
-              Terms of Service
+              {t('footer.terms')}
             </Link>
             <span className="mx-2">|</span>
             <Link href="/privacy" className="hover:text-primary transition-colors">
-              Privacy Policy
+              {t('footer.privacy')}
             </Link>
           </p>
           {/* <DeveloperCredit className="mt-2" /> */}

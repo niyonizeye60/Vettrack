@@ -11,6 +11,8 @@ import { Bell, Trash2, RotateCcw, Search, Eye } from "lucide-react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
+import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeNotification, notificationTypeLabel, notificationPriorityLabel } from "@/lib/notification-messages"
 interface Notification {
   _id: string
   title: string
@@ -26,6 +28,7 @@ interface Notification {
 type FilterType = "all" | "deleted" | "expired" | "active"
 
 export default function SuperAdminNotificationsManagePage() {
+  const { t, language } = useLanguage()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
@@ -109,8 +112,8 @@ export default function SuperAdminNotificationsManagePage() {
       <div className="flex items-center gap-3">
         <Bell className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 flex-shrink-0" />
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">Notifications Management</h1>
-          <p className="text-gray-500 mt-1 text-sm">View, restore, or permanently delete all notifications</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">{t("saNotifsManage.notificationsManagement")}</h1>
+          <p className="text-gray-500 mt-1 text-sm">{t("saNotifsManage.viewRestoreOrPermanentlyDeleteAll")}</p>
         </div>
       </div>
 
@@ -135,7 +138,7 @@ export default function SuperAdminNotificationsManagePage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search notifications..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+              <Input placeholder={t("saNotifsManage.searchNotifications")} value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
             </div>
             <Select value={filter} onValueChange={v => setFilter(v as FilterType)}>
               <SelectTrigger className="w-full sm:w-44">
@@ -155,21 +158,22 @@ export default function SuperAdminNotificationsManagePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>{t("saNotifsManage.title")}</TableHead>
+                  <TableHead>{t("saNotifsManage.type")}</TableHead>
+                  <TableHead>{t("saNotifsManage.priority")}</TableHead>
+                  <TableHead>{t("saNotifsManage.created")}</TableHead>
+                  <TableHead>{t("saNotifsManage.expires")}</TableHead>
+                  <TableHead>{t("saNotifsManage.status")}</TableHead>
+                  <TableHead>{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-400">No notifications found</TableCell>
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-400">{t("saNotifsManage.noNotificationsFound")}</TableCell>
                   </TableRow>
-                ) : filtered.map(n => {
+                ) : filtered.map(raw => {
+                  const n = localizeNotification(raw, language, t)
                   const isDeleted = n.deletedBy?.length > 0
                   const isExpired = n.expiresAt ? new Date(n.expiresAt).getTime() < now : false
                   return (
@@ -180,8 +184,8 @@ export default function SuperAdminNotificationsManagePage() {
                           <p className="text-xs text-gray-500 truncate max-w-[200px]">{n.message}</p>
                         </div>
                       </TableCell>
-                      <TableCell><Badge variant="outline">{n.type}</Badge></TableCell>
-                      <TableCell><Badge variant="outline" className={getPriorityColor(n.priority)}>{n.priority}</Badge></TableCell>
+                      <TableCell><Badge variant="outline">{notificationTypeLabel(n.type, t)}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className={getPriorityColor(n.priority)}>{notificationPriorityLabel(n.priority, t)}</Badge></TableCell>
                       <TableCell className="text-sm text-gray-500">{new Date(n.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell className="text-sm text-gray-500">
                         {n.expiresAt ? new Date(n.expiresAt).toLocaleDateString() : "—"}
@@ -189,12 +193,12 @@ export default function SuperAdminNotificationsManagePage() {
                       <TableCell>
                         {isDeleted ? (
                           <Badge className="bg-red-100 text-red-700 border-red-200">
-                            Deleted by {n.deletedBy.length} user{n.deletedBy.length > 1 ? "s" : ""}
+                            {t("saNotifs.deletedBy").replace("{count}", String(n.deletedBy.length))}
                           </Badge>
                         ) : isExpired ? (
-                          <Badge className="bg-amber-100 text-amber-700 border-amber-200">Expired</Badge>
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-200">{t("saNotifsManage.expired")}</Badge>
                         ) : (
-                          <Badge className="bg-green-100 text-green-700 border-green-200">Active</Badge>
+                          <Badge className="bg-green-100 text-green-700 border-green-200">{t("saNotifsManage.active")}</Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -203,7 +207,7 @@ export default function SuperAdminNotificationsManagePage() {
                             <Button
                               size="sm" variant="ghost"
                               className="h-8 w-8 p-0 hover:bg-blue-50"
-                              title="Restore"
+                              title={t("saNotifsManage.restore")}
                               onClick={() => setRestoreId(n._id)}
                             >
                               <RotateCcw className="h-3.5 w-3.5 text-blue-600" />
@@ -212,7 +216,7 @@ export default function SuperAdminNotificationsManagePage() {
                           <Button
                             size="sm" variant="ghost"
                             className="h-8 w-8 p-0 hover:bg-red-50"
-                            title="Permanently Delete"
+                            title={t("saNotifsManage.permanentlyDelete")}
                             onClick={() => setDeleteId(n._id)}
                           >
                             <Trash2 className="h-3.5 w-3.5 text-red-500" />
@@ -232,18 +236,18 @@ export default function SuperAdminNotificationsManagePage() {
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Permanently Delete Notification</AlertDialogTitle>
+            <AlertDialogTitle>{t("saNotifsManage.permanentlyDeleteNotification")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the notification for all users. This action cannot be undone.
+              {t("saNotifsManage.thisWillPermanentlyDeleteTheNotification")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteId && handlePermanentDelete(deleteId)}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Permanently Delete
+              {t("saNotifsManage.permanentlyDelete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -253,18 +257,18 @@ export default function SuperAdminNotificationsManagePage() {
       <AlertDialog open={!!restoreId} onOpenChange={open => !open && setRestoreId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Restore Notification</AlertDialogTitle>
+            <AlertDialogTitle>{t("saNotifsManage.restoreNotification")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will restore the notification and reset its expiry to 48 hours from now. It will become visible to users again.
+              {t("saNotifsManage.thisWillRestoreTheNotificationAnd")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => restoreId && user?._id && handleRestore(restoreId, user._id)}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              Restore
+              {t("saNotifsManage.restore")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

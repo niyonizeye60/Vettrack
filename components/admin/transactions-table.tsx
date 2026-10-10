@@ -30,6 +30,7 @@ import {
   Download,
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import type { OrderPaymentStatus, OrderPaymentMethod } from "@/lib/db-orders"
 
 interface Transaction {
@@ -65,7 +66,7 @@ interface Pagination {
 }
 
 export default function TransactionsTable() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 })
   const [loading, setLoading] = useState(true)
@@ -106,10 +107,10 @@ export default function TransactionsTable() {
         setTransactions(data.transactions)
         setPagination(data.pagination)
       } else {
-        setError(data.error || "Failed to fetch transactions")
+        setError(localizeError(data.error, language) || t("transactions.failedToFetchTransactions"))
       }
     } catch {
-      setError("Failed to fetch transactions")
+      setError(t("transactions.failedToFetchTransactions"))
     } finally {
       setLoading(false)
     }
@@ -143,15 +144,15 @@ export default function TransactionsTable() {
   const getStatusBadge = (paymentStatus: OrderPaymentStatus) => {
     switch (paymentStatus) {
       case "completed":
-        return <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Completed</Badge>
+        return <Badge className="bg-green-100 text-green-800 border-green-200 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> {t("transactions.completed")}</Badge>
       case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex items-center gap-1"><Clock className="h-3 w-3" /> Pending</Badge>
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 flex items-center gap-1"><Clock className="h-3 w-3" /> {t("transactions.pending")}</Badge>
       case "failed":
-        return <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1"><XCircle className="h-3 w-3" /> Failed</Badge>
+        return <Badge className="bg-red-100 text-red-800 border-red-200 flex items-center gap-1"><XCircle className="h-3 w-3" /> {t("transactions.failed")}</Badge>
       case "invalid":
-        return <Badge className="bg-orange-100 text-orange-800 border-orange-200 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Invalid</Badge>
+        return <Badge className="bg-orange-100 text-orange-800 border-orange-200 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {t("transactions.invalid")}</Badge>
       case "reversed":
-        return <Badge className="bg-purple-100 text-purple-800 border-purple-200 flex items-center gap-1"><RefreshCw className="h-3 w-3" /> Reversed</Badge>
+        return <Badge className="bg-purple-100 text-purple-800 border-purple-200 flex items-center gap-1"><RefreshCw className="h-3 w-3" /> {t("transactions.reversed")}</Badge>
       default:
         return <Badge variant="outline">{paymentStatus}</Badge>
     }
@@ -159,9 +160,9 @@ export default function TransactionsTable() {
 
   const getMethodBadge = (pm: OrderPaymentMethod) => {
     if (pm === "intouchpay") {
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1"><Smartphone className="h-3 w-3" /> Mobile Money</Badge>
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1"><Smartphone className="h-3 w-3" /> {t("transactions.mobileMoney")}</Badge>
     }
-    return <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 flex items-center gap-1"><CreditCard className="h-3 w-3" /> Card (Pesapal)</Badge>
+    return <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 flex items-center gap-1"><CreditCard className="h-3 w-3" /> {t("transactions.cardPesapal")}</Badge>
   }
 
   const formatDate = (dateStr: string) => {
@@ -208,8 +209,8 @@ export default function TransactionsTable() {
               className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-400"
             >
               <option value="">{t('transactions.allMethods') || "All Methods"}</option>
-              <option value="intouchpay">Mobile Money (IntouchPay)</option>
-              <option value="pesapal">Card (Pesapal)</option>
+              <option value="intouchpay">{t("transactions.mobileMoneyIntouchpay")}</option>
+              <option value="pesapal">{t("transactions.cardPesapal")}</option>
             </select>
             <select
               value={status}
@@ -217,11 +218,11 @@ export default function TransactionsTable() {
               className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-400"
             >
               <option value="">{t('transactions.allStatuses') || "All Statuses"}</option>
-              <option value="completed">Completed</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-              <option value="invalid">Invalid</option>
-              <option value="reversed">Reversed</option>
+              <option value="completed">{t("transactions.completed")}</option>
+              <option value="pending">{t("transactions.pending")}</option>
+              <option value="failed">{t("transactions.failed")}</option>
+              <option value="invalid">{t("transactions.invalid")}</option>
+              <option value="reversed">{t("transactions.reversed")}</option>
             </select>
             <input
               type="date"
@@ -262,13 +263,13 @@ export default function TransactionsTable() {
         </Card>
         <Card className="border border-gray-200 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 font-medium">{t('transactions.completed') || "Completed"}</p>
+            <p className="text-xs text-gray-500 font-medium">{t('transactions.completed') || t("transactions.completed")}</p>
             <p className="text-2xl font-bold text-green-600 mt-1">{transactions.filter(t => t.paymentStatus === "completed").length}</p>
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 font-medium">{t('transactions.pending') || "Pending"}</p>
+            <p className="text-xs text-gray-500 font-medium">{t('transactions.pending') || t("transactions.pending")}</p>
             <p className="text-2xl font-bold text-yellow-600 mt-1">{transactions.filter(t => t.paymentStatus === "pending").length}</p>
           </CardContent>
         </Card>
@@ -309,7 +310,7 @@ export default function TransactionsTable() {
               {/* Table Header */}
               <div className="hidden md:grid grid-cols-12 gap-3 px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
                 <div className="col-span-2 flex items-center gap-1 cursor-pointer" onClick={() => { setSortBy("createdAt"); setSortOrder(sortOrder === "desc" ? "asc" : "desc") }}>
-                  <Calendar className="h-3 w-3" /> Date <ArrowUpDown className="h-3 w-3" />
+                  <Calendar className="h-3 w-3" /> {t("transactions.date")} <ArrowUpDown className="h-3 w-3" />
                 </div>
                 <div className="col-span-2">{t('transactions.customer') || "Customer"}</div>
                 <div className="col-span-1 flex items-center gap-1 cursor-pointer" onClick={() => { setSortBy("method"); setSortOrder(sortOrder === "desc" ? "asc" : "desc") }}>
@@ -321,7 +322,7 @@ export default function TransactionsTable() {
                 <div className="col-span-2 flex items-center gap-1 cursor-pointer" onClick={() => { setSortBy("status"); setSortOrder(sortOrder === "desc" ? "asc" : "desc") }}>
                   Status <ArrowUpDown className="h-3 w-3" />
                 </div>
-                <div className="col-span-2">Transaction ID</div>
+                <div className="col-span-2">{t("transactions.transactionId")}</div>
                 <div className="col-span-1 text-right">{t('transactions.action') || "Action"}</div>
               </div>
 
@@ -334,7 +335,7 @@ export default function TransactionsTable() {
                   >
                     {/* Date - mobile friendly */}
                     <div className="md:col-span-2 flex md:block items-center justify-between">
-                      <span className="md:hidden text-xs text-gray-500">{t('transactions.date') || "Date"}:</span>
+                      <span className="md:hidden text-xs text-gray-500">{t('transactions.date') || t("transactions.date")}:</span>
                       <span className="text-sm text-gray-700">{formatDate(tx.createdAt)}</span>
                     </div>
 
@@ -375,7 +376,7 @@ export default function TransactionsTable() {
 
                     {/* Transaction ID */}
                     <div className="md:col-span-2 flex md:block items-center justify-between">
-                      <span className="md:hidden text-xs text-gray-500">ID:</span>
+                      <span className="md:hidden text-xs text-gray-500">{t("transactions.id")}</span>
                       <div className="flex items-center gap-1">
                         <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded truncate max-w-[120px] block">
                           {tx.payment.intouchRequestTransactionId || tx.payment.pesapalOrderTrackingId || "-"}
@@ -518,7 +519,7 @@ export default function TransactionsTable() {
                     </div>
                     {selectedTx.buyer.email && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Email:</span>
+                        <span className="text-gray-500">{t("transactions.email")}</span>
                         <span className="font-medium text-gray-900">{selectedTx.buyer.email}</span>
                       </div>
                     )}
@@ -557,7 +558,7 @@ export default function TransactionsTable() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">{t('transactions.paymentMethod') || "Payment Method"}:</span>
                       <span className="font-medium text-gray-900">
-                        {selectedTx.paymentMethod === "intouchpay" ? "Mobile Money (IntouchPay)" : "Card (Pesapal)"}
+                        {selectedTx.paymentMethod === "intouchpay" ? t("transactions.mobileMoneyIntouchpay") : t("transactions.cardPesapal")}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -569,7 +570,7 @@ export default function TransactionsTable() {
                       <>
                         {selectedTx.payment.intouchRequestTransactionId && (
                           <div className="flex justify-between text-sm items-center">
-                            <span className="text-gray-500">Request ID:</span>
+                            <span className="text-gray-500">{t("transactions.requestId")}</span>
                             <div className="flex items-center gap-1">
                               <code className="text-xs bg-white px-1.5 py-0.5 rounded border">{selectedTx.payment.intouchRequestTransactionId}</code>
                               <button onClick={() => copyToClipboard(selectedTx.payment.intouchRequestTransactionId!, "reqid")} className="p-1 hover:bg-gray-200 rounded">
@@ -580,7 +581,7 @@ export default function TransactionsTable() {
                         )}
                         {selectedTx.payment.intouchTransactionId && (
                           <div className="flex justify-between text-sm items-center">
-                            <span className="text-gray-500">Transaction ID:</span>
+                            <span className="text-gray-500">{t("transactions.transactionId2")}</span>
                             <div className="flex items-center gap-1">
                               <code className="text-xs bg-white px-1.5 py-0.5 rounded border">{selectedTx.payment.intouchTransactionId}</code>
                               <button onClick={() => copyToClipboard(selectedTx.payment.intouchTransactionId!, "txid")} className="p-1 hover:bg-gray-200 rounded">
@@ -591,7 +592,7 @@ export default function TransactionsTable() {
                         )}
                         {selectedTx.payment.intouchReferenceNo && (
                           <div className="flex justify-between text-sm items-center">
-                            <span className="text-gray-500">Reference No:</span>
+                            <span className="text-gray-500">{t("transactions.referenceNo")}</span>
                             <div className="flex items-center gap-1">
                               <code className="text-xs bg-white px-1.5 py-0.5 rounded border">{selectedTx.payment.intouchReferenceNo}</code>
                               <button onClick={() => copyToClipboard(selectedTx.payment.intouchReferenceNo!, "refno")} className="p-1 hover:bg-gray-200 rounded">
@@ -607,7 +608,7 @@ export default function TransactionsTable() {
                       <>
                         {selectedTx.payment.pesapalOrderTrackingId && (
                           <div className="flex justify-between text-sm items-center">
-                            <span className="text-gray-500">Tracking ID:</span>
+                            <span className="text-gray-500">{t("transactions.trackingId")}</span>
                             <div className="flex items-center gap-1">
                               <code className="text-xs bg-white px-1.5 py-0.5 rounded border">{selectedTx.payment.pesapalOrderTrackingId}</code>
                               <button onClick={() => copyToClipboard(selectedTx.payment.pesapalOrderTrackingId!, "trackid")} className="p-1 hover:bg-gray-200 rounded">
@@ -620,7 +621,7 @@ export default function TransactionsTable() {
                     )}
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">{t('transactions.date') || "Date"}:</span>
+                      <span className="text-gray-500">{t('transactions.date') || t("transactions.date")}:</span>
                       <span className="font-medium text-gray-900">{formatDate(selectedTx.createdAt)}</span>
                     </div>
                     {selectedTx.paidAt && (
@@ -639,15 +640,15 @@ export default function TransactionsTable() {
                   </Button>
                   <Button size="sm" onClick={() => {
                     const text = [
-                      `Order: ${selectedTx.orderId}`,
-                      `Customer: ${selectedTx.buyer.name} (${selectedTx.buyer.phone})`,
-                      `Amount: RWF ${selectedTx.total.toLocaleString()}`,
-                      `Method: ${selectedTx.paymentMethod}`,
-                      `Status: ${selectedTx.paymentStatus}`,
-                      `Date: ${formatDate(selectedTx.createdAt)}`,
-                      selectedTx.payment.intouchRequestTransactionId ? `IntouchPay Request ID: ${selectedTx.payment.intouchRequestTransactionId}` : null,
-                      selectedTx.payment.intouchTransactionId ? `IntouchPay Transaction ID: ${selectedTx.payment.intouchTransactionId}` : null,
-                      selectedTx.payment.pesapalOrderTrackingId ? `Pesapal Tracking ID: ${selectedTx.payment.pesapalOrderTrackingId}` : null,
+                      t("transactions.copyOrder").replace("{value}", selectedTx.orderId),
+                      t("transactions.copyCustomer").replace("{name}", selectedTx.buyer.name).replace("{phone}", selectedTx.buyer.phone),
+                      t("transactions.copyAmount").replace("{amount}", selectedTx.total.toLocaleString()),
+                      t("transactions.copyMethod").replace("{value}", selectedTx.paymentMethod === "intouchpay" ? t("transactions.mobileMoneyIntouchpay") : t("transactions.cardPesapal")),
+                      t("transactions.copyStatus").replace("{value}", selectedTx.paymentStatus),
+                      t("transactions.copyDate").replace("{value}", formatDate(selectedTx.createdAt)),
+                      selectedTx.payment.intouchRequestTransactionId ? t("transactions.copyRequestId").replace("{value}", selectedTx.payment.intouchRequestTransactionId) : null,
+                      selectedTx.payment.intouchTransactionId ? t("transactions.copyTransactionId").replace("{value}", selectedTx.payment.intouchTransactionId) : null,
+                      selectedTx.payment.pesapalOrderTrackingId ? t("transactions.copyTrackingId").replace("{value}", selectedTx.payment.pesapalOrderTrackingId) : null,
                     ].filter(Boolean).join("\n")
                     navigator.clipboard.writeText(text)
                   }}>

@@ -768,7 +768,7 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
                                 <div className="min-w-0">
                                   <p className="font-medium text-sm text-gray-800 truncate">{user.name}</p>
                                   <p className="text-xs text-gray-500 truncate">
-                                    {user.role === 'doctor' ? (user.specialization ? `Dr. · ${user.specialization}` : 'Veterinarian') : (user.location ?? 'Farmer')}
+                                    {user.role === 'doctor' ? (user.specialization ? `Dr. · ${user.specialization}` : t("messages.veterinarian")) : (user.location ?? t("messages.farmer"))}
                                   </p>
                                 </div>
                               </button>
@@ -1031,7 +1031,7 @@ export function MessagesPanel({ variant = "default" }: MessagesPanelProps) {
                             <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                             <div className={`flex items-center gap-1 mt-0.5 ${msg.isMe ? "justify-end" : "justify-start"}`}>
                               <span className={`text-xs ${msg.isMe ? th.sentTime : "text-gray-400"}`}>
-                                {formatTime(msg.createdAt)}{msg.editedAt && ` · edited`}
+                                {formatTime(msg.createdAt)}{msg.editedAt && ` · ${t("messages.edited")}`}
                               </span>
                               {msg.isMe && (
                                 msg.status === "read"

@@ -5,6 +5,7 @@ import { MapPin, Crosshair, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface LocationPickerProps {
   latitude: number | null
@@ -14,6 +15,7 @@ interface LocationPickerProps {
 }
 
 export default function LocationPicker({ latitude, longitude, onLocationChange, readOnly }: LocationPickerProps) {
+  const { t } = useLanguage()
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -105,7 +107,7 @@ export default function LocationPicker({ latitude, longitude, onLocationChange, 
 
   const handleAutoDetect = () => {
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser")
+      setError(t("locationPicker.unsupported"))
       return
     }
     setDetecting(true)
@@ -124,7 +126,7 @@ export default function LocationPicker({ latitude, longitude, onLocationChange, 
         setDetecting(false)
       },
       (err) => {
-        setError(`Location detection failed: ${err.message}`)
+        setError(t("locationPicker.detectFailed").replace("{error}", err.message))
         setDetecting(false)
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -154,12 +156,12 @@ export default function LocationPicker({ latitude, longitude, onLocationChange, 
       <div className="flex items-center justify-between">
         <Label className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-primary" />
-          Location on Map
+          {t("locationPicker.title")}
         </Label>
         {!readOnly && (
           <Button type="button" variant="outline" size="sm" onClick={handleAutoDetect} disabled={detecting}>
             {detecting ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Crosshair className="h-3 w-3 mr-1" />}
-            {detecting ? "Detecting..." : "Auto-detect"}
+            {detecting ? t("locationPicker.detecting") : t("locationPicker.autoDetect")}
           </Button>
         )}
       </div>
@@ -176,14 +178,14 @@ export default function LocationPicker({ latitude, longitude, onLocationChange, 
       {!mapReady && (
         <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading map...
+          {t("locationPicker.loadingMap")}
         </div>
       )}
 
       {/* Coordinates display */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="lat" className="text-xs">Latitude</Label>
+          <Label htmlFor="lat" className="text-xs">{t("locationPicker.latitude")}</Label>
           <Input
             id="lat"
             type="number"
@@ -196,7 +198,7 @@ export default function LocationPicker({ latitude, longitude, onLocationChange, 
           />
         </div>
         <div>
-          <Label htmlFor="lng" className="text-xs">Longitude</Label>
+          <Label htmlFor="lng" className="text-xs">{t("locationPicker.longitude")}</Label>
           <Input
             id="lng"
             type="number"
@@ -212,7 +214,7 @@ export default function LocationPicker({ latitude, longitude, onLocationChange, 
 
       {latitude && longitude && (
         <p className="text-xs text-gray-400">
-          Click on the map to place a marker, drag to adjust. Or enter coordinates manually.
+          {t("locationPicker.hint")}
         </p>
       )}
     </div>

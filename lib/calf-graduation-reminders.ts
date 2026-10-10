@@ -1,6 +1,7 @@
 import clientPromise from "./db"
 import { ObjectId } from "mongodb"
 import { CALF_GRADUATION_AGE_MONTHS, isReadyToGraduate } from "./calf-age"
+import { notificationText } from "./notification-messages"
 
 const DB = "ntdm_animal_hospital"
 
@@ -54,12 +55,13 @@ async function notifyDueCalves(scope: { farmerId?: string }) {
     }
     if (names.length === 0) continue
 
-    const shown = names.length > 5 ? `${names.slice(0, 5).join(", ")} and ${names.length - 5} more` : names.join(", ")
+    const months = CALF_GRADUATION_AGE_MONTHS
     await db.collection("notifications").insertOne({
-      title: names.length === 1 ? "Calf ready to move to your animals" : "Calves ready to move to your animals",
-      message: names.length === 1
-        ? `${shown} is now ${CALF_GRADUATION_AGE_MONTHS} months old. Open Calves and use Move to Animals to add it to your herd.`
-        : `${shown} are now ${CALF_GRADUATION_AGE_MONTHS} months or older. Open Calves and use Move to Animals to add them to your herd.`,
+      ...(names.length === 1
+        ? notificationText("calfReady", { names: names[0], months })
+        : names.length > 5
+          ? notificationText("calvesReadyMore", { names: names.slice(0, 5).join(", "), more: names.length - 5, months })
+          : notificationText("calvesReady", { names: names.join(", "), months })),
       type: "calves",
       priority: "normal",
       read: false,

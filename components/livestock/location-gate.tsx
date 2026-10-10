@@ -7,6 +7,8 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useCurrentLocation } from "@/hooks/use-current-location"
+import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 
 interface LocationFields {
   lat?: number
@@ -36,6 +38,7 @@ export function toQueryFields(fields: LocationFields): Record<string, string> {
  * setting on every write, so a stale value here can never let a write through.
  */
 export function useLocationGatedRequest() {
+  const { t, language } = useLanguage()
   const { getLocation } = useCurrentLocation()
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   // null until the setting has loaded, and treated as ON meanwhile.
@@ -75,12 +78,12 @@ export function useLocationGatedRequest() {
           body = res.status === 403 ? await res.clone().json().catch(() => null) : null
         }
         if (body?.code === "SECTOR_MISMATCH" || body?.code === "LOCATION_REQUIRED") {
-          setAlertMessage(body.error)
+          setAlertMessage(localizeError(body.error, language) ?? body.error)
         }
       }
       return res
     },
-    [getLocation]
+    [getLocation, language]
   )
 
   const dialog = (
@@ -89,12 +92,12 @@ export function useLocationGatedRequest() {
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-red-600" />
-            Wrong location
+            {t("locationGate.wrongLocation")}
           </AlertDialogTitle>
           <AlertDialogDescription>{alertMessage}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogAction onClick={() => setAlertMessage(null)}>OK</AlertDialogAction>
+          <AlertDialogAction onClick={() => setAlertMessage(null)}>{t("common.ok")}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -28,13 +28,19 @@ function getServiceLink(service: ServiceProps['service']) {
 
 export default function ServiceCard({ service }: ServiceProps) {
   const { t } = useLanguage()
+  // The catalog is English (the booking link matches on the name); its text shows translated.
+  const text = (field: "name" | "description" | "duration") => {
+    const key = `serviceCatalog.${service.id}.${field}`
+    const label = t(key)
+    return label === key ? service[field] : label
+  }
 
   return (
     <div className="salon-card overflow-hidden shadow-salon hover:shadow-salon-hover transition-all group">
       <div className="relative h-48">
         <Image
           src={service.image || "/placeholder.svg"}
-          alt={service.name}
+          alt={text("name")}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
@@ -42,21 +48,21 @@ export default function ServiceCard({ service }: ServiceProps) {
       </div>
 
       <div className="p-6">
-        <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">{service.name}</h3>
-        <p className="text-gray-600 mb-4">{service.description}</p>
+        <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">{text("name")}</h3>
+        <p className="text-gray-600 mb-4">{text("description")}</p>
 
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center text-primary font-semibold">
             {service.price ? (
               <span>{typeof service.price === "number" ? `RWF ${service.price.toLocaleString()}` : service.price}</span>
             ) : (
-              <span className="text-sm text-gray-500">Price from database</span>
+              <span className="text-sm text-gray-500">{t("serviceCatalog.priceFromDatabase")}</span>
             )}
           </div>
 
           <div className="flex items-center text-gray-500 text-sm">
             <Clock className="h-4 w-4 mr-1" />
-            <span>{service.duration}</span>
+            <span>{text("duration")}</span>
           </div>
         </div>
 

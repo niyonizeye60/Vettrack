@@ -10,6 +10,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useLanguage } from "@/contexts/LanguageContext"
 import EpidemicMap from "./epidemic-map"
 import EpidemicRegisterDialog from "./epidemic-register-dialog"
 import {
@@ -31,6 +32,7 @@ interface EpidemicManagementProps {
 const STATUS_FILTERS = ["all", ...EPIDEMIC_STATUSES]
 
 export default function EpidemicManagement({ role, farmerId, farmerName }: EpidemicManagementProps) {
+  const { t } = useLanguage()
   const { toast } = useToast()
   const isStaff = role !== "farmer"
   const canApprove = role === "admin"
@@ -100,12 +102,12 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
         body: JSON.stringify({ name }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to add category")
-      toast({ title: "Category added", description: `"${name}" is now selectable.` })
+      if (!res.ok) throw new Error(data.error || t("epidemic.failedToAddCategory"))
+      toast({ title: t("epidemic.categoryAdded"), description: t("epidemic.nowSelectable").replace("{name}", name) })
       setNewCategory("")
       await fetchCategories()
     } catch (err: any) {
-      toast({ title: "Could not add category", description: err.message || "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemic.couldNotAddCategory"), description: err.message || t("epidemic.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setCategoryBusy(false)
     }
@@ -115,11 +117,11 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
     setCategoryBusy(true)
     try {
       const res = await fetch(`/api/epidemics/diseases?id=${id}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("Failed to delete")
-      toast({ title: "Category removed", description: `${name} deleted.` })
+      if (!res.ok) throw new Error(t("epidemic.failedToDelete"))
+      toast({ title: t("epidemic.categoryRemoved"), description: t("epidemic.nameDeleted").replace("{name}", name) })
       await fetchCategories()
     } catch {
-      toast({ title: "Could not delete category", description: "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemic.couldNotDeleteCategory"), description: t("epidemic.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setCategoryBusy(false)
     }
@@ -134,11 +136,11 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
         body: JSON.stringify({ id: c._id, status }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed")
-      toast({ title: `Case marked as ${status}`, description: `${c.diseaseName} updated.` })
+      if (!res.ok) throw new Error(data.error || t("epidemic.failed"))
+      toast({ title: t("epidemic.caseMarkedAs").replace("{status}", t(`epidemic.status.${status}`)), description: t("epidemic.nameUpdated").replace("{name}", c.diseaseName) })
       await fetchCases()
     } catch (err: any) {
-      toast({ title: "Update failed", description: err.message || "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemic.updateFailed"), description: err.message || t("epidemic.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setActionId(null)
     }
@@ -149,11 +151,11 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
     setActionId(deleteId)
     try {
       const res = await fetch(`/api/epidemics?id=${deleteId}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("Failed to delete")
-      toast({ title: "Case deleted" })
+      if (!res.ok) throw new Error(t("epidemic.failedToDelete"))
+      toast({ title: t("epidemic.caseDeleted") })
       await fetchCases()
     } catch {
-      toast({ title: "Delete failed", description: "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemic.deleteFailed"), description: t("epidemic.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setActionId(null)
       setDeleteId(null)
@@ -186,24 +188,24 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Activity className="h-6 w-6 text-red-500" />
-            Epidemic Outbreak Map
+            {t("epidemic.epidemicOutbreakMap")}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {role === "admin"
-              ? "Monitor and manage epidemic cases reported across the country."
+              ? t("epidemic.monitorAndManageEpidemicCasesReported")
               : role === "doctor"
-                ? "Monitor epidemic cases reported across the country."
-                : "Track epidemic cases you reported and how they were handled."}
+                ? t("epidemic.monitorEpidemicCasesReportedAcrossThe")
+                : t("epidemic.trackEpidemicCasesYouReportedAnd")}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={fetchCases} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            {t("epidemic.refresh")}
           </Button>
           <Button size="sm" className="bg-red-600 hover:bg-red-700" onClick={() => setRegisterOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
-            Report Case
+            {t("epidemic.reportCase")}
           </Button>
         </div>
       </div>
@@ -212,31 +214,31 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card className="border border-gray-200 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-gray-500 font-medium">Total</p>
+            <p className="text-sm text-gray-500 font-medium">{t("epidemic.total")}</p>
             <h3 className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</h3>
           </CardContent>
         </Card>
         <Card className="border-red-200 bg-red-50 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-red-600 font-medium">Confirmed</p>
+            <p className="text-sm text-red-600 font-medium">{t("epidemic.confirmed")}</p>
             <h3 className="text-3xl font-bold text-red-700 mt-1">{stats.confirmed}</h3>
           </CardContent>
         </Card>
         <Card className="border-amber-200 bg-amber-50 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-amber-600 font-medium">Pending</p>
+            <p className="text-sm text-amber-600 font-medium">{t("epidemic.pending")}</p>
             <h3 className="text-3xl font-bold text-amber-700 mt-1">{stats.pending}</h3>
           </CardContent>
         </Card>
         <Card className="border-green-200 bg-green-50 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-green-600 font-medium">Resolved</p>
+            <p className="text-sm text-green-600 font-medium">{t("epidemic.resolved")}</p>
             <h3 className="text-3xl font-bold text-green-700 mt-1">{stats.resolved}</h3>
           </CardContent>
         </Card>
         <Card className="border-gray-200 bg-gray-50 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-sm text-gray-500 font-medium">Rejected</p>
+            <p className="text-sm text-gray-500 font-medium">{t("epidemic.rejected")}</p>
             <h3 className="text-3xl font-bold text-gray-600 mt-1">{stats.rejected}</h3>
           </CardContent>
         </Card>
@@ -248,7 +250,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
               <MapPin className="h-4 w-4 text-red-500" />
-              Cases on the map {filtered.length > 0 && <span className="text-xs font-normal text-gray-400">({filtered.length})</span>}
+              {t("epidemic.casesOnMap")} {filtered.length > 0 && <span className="text-xs font-normal text-gray-400">({filtered.length})</span>}
             </CardTitle>
             <div className="flex flex-wrap gap-1.5">
               {STATUS_FILTERS.map((s) => (
@@ -261,7 +263,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                       : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  {s}
+                  {t(`epidemic.status.${s}`)}
                 </button>
               ))}
             </div>
@@ -294,28 +296,28 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
       {/* Table */}
       <Card className="border border-gray-200 shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-gray-900">All reports</CardTitle>
+          <CardTitle className="text-base font-semibold text-gray-900">{t("epidemic.allReports")}</CardTitle>
         </CardHeader>
         <CardContent className="pt-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Disease</TableHead>
-                <TableHead>Animal</TableHead>
-                {isStaff && <TableHead>Reported by</TableHead>}
-                <TableHead>Location</TableHead>
-                <TableHead>Affected</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Reported</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t("epidemic.disease")}</TableHead>
+                <TableHead>{t("epidemic.animal")}</TableHead>
+                {isStaff && <TableHead>{t("epidemic.reportedBy")}</TableHead>}
+                <TableHead>{t("common.location")}</TableHead>
+                <TableHead>{t("epidemic.affected")}</TableHead>
+                <TableHead>{t("epidemic.severity")}</TableHead>
+                <TableHead>{t("epidemic.status")}</TableHead>
+                <TableHead>{t("epidemic.reported")}</TableHead>
+                <TableHead className="text-right">{t("common.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={isStaff ? 9 : 8} className="text-center text-gray-400 py-8">
-                    No reports match this filter.
+                    {t("epidemic.noReportsMatchThisFilter")}
                   </TableCell>
                 </TableRow>
               )}
@@ -336,12 +338,12 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                   <TableCell>{c.affectedCount}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={EPIDEMIC_SEVERITY_STYLES[c.severity] || ""}>
-                      <span className="capitalize">{c.severity}</span>
+                      <span className="capitalize">{t(`epidemic.severity.${c.severity}`)}</span>
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={EPIDEMIC_STATUS_STYLES[c.status] || ""}>
-                      <span className="capitalize">{c.status}</span>
+                      <span className="capitalize">{t(`epidemic.status.${c.status}`)}</span>
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-gray-500">{new Date(c.reportedAt).toLocaleDateString()}</TableCell>
@@ -349,17 +351,17 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                     <div className="flex items-center justify-end gap-1 flex-wrap">
                       {canApprove && c.status !== "confirmed" && (
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50" disabled={actionId === c._id} onClick={() => updateStatus(c, "confirmed")}>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Confirm
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t("epidemic.confirm")}
                         </Button>
                       )}
                       {canApprove && c.status !== "resolved" && (
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-green-600 border-green-200 hover:bg-green-50" disabled={actionId === c._id} onClick={() => updateStatus(c, "resolved")}>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Resolve
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t("epidemic.resolve")}
                         </Button>
                       )}
                       {canApprove && c.status !== "rejected" && (
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-gray-500 border-gray-200 hover:bg-gray-100" disabled={actionId === c._id} onClick={() => updateStatus(c, "rejected")}>
-                          <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                          <XCircle className="h-3.5 w-3.5 mr-1" /> {t("epidemic.reject")}
                         </Button>
                       )}
                       <Button
@@ -384,15 +386,15 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
       {canApprove && (
         <Card className="border border-gray-200 shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-gray-900">Disease categories</CardTitle>
+            <CardTitle className="text-base font-semibold text-gray-900">{t("epidemic.diseaseCategories")}</CardTitle>
             <p className="text-xs text-gray-400">
-              Categories admins can select when reporting. Typing a new disease name creates it, so it can be reused later.
+              {t("epidemic.categoriesAdminsCanSelectWhenReporting")}
             </p>
           </CardHeader>
           <CardContent className="pt-0 space-y-3">
             <div className="flex flex-wrap gap-2">
               {categories.length === 0 && (
-                <span className="text-sm text-gray-400">No categories yet — add the first one below.</span>
+                <span className="text-sm text-gray-400">{t("epidemic.noCategoriesYetAddTheFirst")}</span>
               )}
               {categories.map((c) => (
                 <span
@@ -403,7 +405,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                   <button
                     onClick={() => removeCategory(c._id, c.name)}
                     className="text-gray-400 hover:text-red-600 transition-colors"
-                    aria-label={`Delete ${c.name}`}
+                    aria-label={t("epidemic.deleteName").replace("{name}", c.name)}
                     disabled={categoryBusy}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -413,7 +415,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
             </div>
             <div className="flex items-center gap-2 max-w-md">
               <Input
-                placeholder="New disease name, e.g. Contagious Bovine Pleuropneumonia"
+                placeholder={t("epidemic.newDiseaseNameEGContagious")}
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCategory()}
@@ -426,7 +428,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                 disabled={categoryBusy || !newCategory.trim()}
               >
                 {categoryBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Add
+                {t("common.add")}
               </Button>
             </div>
           </CardContent>
@@ -449,17 +451,17 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
-              Delete this case?
+              {t("epidemic.deleteThisCase")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the case and its pin from the map. This action cannot be undone.
+              {t("epidemic.thisWillPermanentlyRemoveTheCase")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={actionId === deleteId}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={actionId === deleteId}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction className="bg-red-600 hover:bg-red-700" disabled={actionId === deleteId} onClick={handleDelete}>
               {actionId === deleteId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -473,7 +475,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
               <div>
                 <p className="font-bold text-gray-900">{selectedCase.diseaseName}</p>
                 <p className="text-sm text-gray-500">
-                  {selectedCase.animalName || selectedCase.animalType || "Animal"}
+                  {selectedCase.animalName || selectedCase.animalType || t("epidemic.animal")}
                   {selectedCase.district && ` · ${selectedCase.district}`}
                   {selectedCase.sector && `, ${selectedCase.sector}`}
                   {selectedCase.district ? "" : ` · ${selectedCase.latitude.toFixed(4)}, ${selectedCase.longitude.toFixed(4)}`}
@@ -486,7 +488,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                 <button
                   onClick={() => setSelectedCase(null)}
                   className="text-gray-400 hover:text-gray-600 p-1"
-                  aria-label="Close"
+                  aria-label={t("common.close")}
                 >
                   <XCircle className="h-5 w-5" />
                 </button>

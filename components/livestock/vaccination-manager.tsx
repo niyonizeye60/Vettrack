@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ShieldPlus, Plus, Pencil, Trash2, History, BarChart3, CalendarClock, AlertCircle, Users, DollarSign, Download, FileText } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeColumns } from "@/lib/export-columns"
 import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
 
 type SubjectType = "animal" | "calf"
@@ -140,15 +141,16 @@ const expiredAt = (expiry: string | null, givenOn: string) =>
 const recordCost = (r: VaccinationRecord) => (r.vaccinePrice || 0) + (r.vetPrice || 0)
 
 function DueBadge({ dueDate }: { dueDate: string }) {
+  const { t } = useLanguage()
   const days = daysUntil(dueDate)
   const tone =
     days < 0 ? "bg-red-50 text-red-600 border-red-200"
       : days <= 30 ? "bg-amber-50 text-amber-700 border-amber-200"
         : "bg-green-50 text-green-700 border-green-200"
   const label =
-    days < 0 ? `${Math.abs(days)}d overdue`
-      : days === 0 ? "Due today"
-        : `${days}d left`
+    days < 0 ? t("vacc.daysOverdueShort").replace("{days}", String(Math.abs(days)))
+      : days === 0 ? t("vacc.dueToday")
+        : t("vacc.daysLeftShort").replace("{days}", String(days))
   return (
     <div className="text-center">
       <span className="text-xs text-gray-500 block">{dueDate}</span>
@@ -159,6 +161,15 @@ function DueBadge({ dueDate }: { dueDate: string }) {
 
 export default function VaccinationManager({ farmerId, can, showHeader = true }: VaccinationManagerProps) {
   const { t } = useLanguage()
+  // Vaccine types and routes are stored in English; show them in the reader's language.
+  const optionLabel = (group: "type" | "route", value?: string | null) => {
+    if (!value) return ""
+    const key = `vacc.${group}.${value}`
+    const label = t(key)
+    return label === key ? value : label
+  }
+  const unitLabel = (unit?: string | null) => (unit === "doses" ? t("vacc.unit.doses") : unit || "")
+  const calfSuffix = (type?: string) => (type === "calf" ? ` ${t("vacc.calfSuffix")}` : "")
   const { submitWithLocationGate, dialog: locationGateDialog } = useLocationGatedRequest()
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [vets, setVets] = useState<Vet[]>([])
@@ -255,7 +266,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       // Calves have no ear tag to tell two "Calf 1"s apart, so the dam disambiguates.
       .map(s => ({
         value: subjectKey(s.kind, s._id),
-        label: s.motherName ? `${s.name} — dam: ${s.motherName}` : s.name,
+        label: s.motherName ? t("vacc.dam").replace("{name}", s.name).replace("{mother}", s.motherName) : s.name,
         group: t("farmer.calves"),
       }))
     return [...animalOpts, ...calfOpts]
@@ -327,13 +338,13 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!subjectSel) e.subject = "Select an animal or calf"
-    if (!vaccineName.trim()) e.vaccineName = "Enter the vaccine name"
-    if (!date) e.date = "Select the date given"
-    if (dose && Number(dose) <= 0) e.dose = "Enter a valid dose"
-    if (vaccinePrice && Number(vaccinePrice) < 0) e.vaccinePrice = "Enter a valid price"
-    if (vetPrice && Number(vetPrice) < 0) e.vetPrice = "Enter a valid fee"
-    if (nextVaccinationDate && nextVaccinationDate < date) e.nextVaccinationDate = "Next dose cannot be before the date given"
+    if (!subjectSel) e.subject = t("vacc.selectAnAnimalOrCalf")
+    if (!vaccineName.trim()) e.vaccineName = t("vacc.enterTheVaccineName")
+    if (!date) e.date = t("vacc.selectTheDateGiven")
+    if (dose && Number(dose) <= 0) e.dose = t("vacc.enterAValidDose")
+    if (vaccinePrice && Number(vaccinePrice) < 0) e.vaccinePrice = t("vacc.enterAValidPrice")
+    if (vetPrice && Number(vetPrice) < 0) e.vetPrice = t("vacc.enterAValidFee")
+    if (nextVaccinationDate && nextVaccinationDate < date) e.nextVaccinationDate = t("vacc.nextDoseCannotBeBeforeThe")
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -439,7 +450,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
     records.forEach(r => {
       const key = recordKey(r)
       // Calves are labelled in the chart so two same-named subjects stay distinct.
-      if (!map[key]) map[key] = { name: `${r.subjectName || "—"}${r.subjectType === "calf" ? " (calf)" : ""}`, doses: 0 }
+      if (!map[key]) map[key] = { name: `${r.subjectName || "—"}${calfSuffix(r.subjectType)}`, doses: 0 }
       map[key].doses += 1
     })
     return Object.values(map).sort((a, b) => b.doses - a.doses)
@@ -481,20 +492,20 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
 
       // Meta
       doc.setTextColor(55, 65, 81); doc.setFontSize(10)
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 15, 50)
-      doc.text(`Generated by: ${can.currentUserName || "Unknown"}`, 15, 58)
+      doc.text(t("vacc.pdfGenerated").replace("{date}", new Date().toLocaleString()), 15, 50)
+      doc.text(t("vacc.pdfGeneratedBy").replace("{name}", can.currentUserName || t("vacc.unknown")), 15, 58)
 
       // Summary box
       doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240)
       doc.rect(15, 66, 267, 22, "FD")
       doc.setTextColor(22, 163, 74); doc.setFontSize(11); doc.setFont("helvetica", "bold")
-      doc.text("Summary", 20, 76)
+      doc.text(t("vacc.summary"), 20, 76)
       doc.setTextColor(55, 65, 81); doc.setFont("helvetica", "normal"); doc.setFontSize(10)
-      doc.text(`Doses: ${exportRecords.length}`, 20, 84)
-      doc.text(`Vaccines: ${exportSummary.length}`, 70, 84)
-      doc.text(`Total Cost: RWF ${exportTotalCost.toLocaleString()}`, 120, 84)
-      doc.text(`Due within 30 days: ${dueSoon.length}`, 195, 84)
-      doc.text(`Overdue: ${overdue.length}`, 250, 84)
+      doc.text(t("vacc.pdfDoses").replace("{count}", String(exportRecords.length)), 20, 84)
+      doc.text(t("vacc.pdfVaccines").replace("{count}", String(exportSummary.length)), 70, 84)
+      doc.text(t("vacc.pdfTotalCost").replace("{amount}", exportTotalCost.toLocaleString()), 120, 84)
+      doc.text(t("vacc.pdfDueSoon").replace("{count}", String(dueSoon.length)), 195, 84)
+      doc.text(t("vacc.pdfOverdue").replace("{count}", String(overdue.length)), 250, 84)
 
       // ── Column layout (landscape = 297mm wide, margins 15 each → 267 usable) ──
       const cols = {
@@ -519,18 +530,18 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         doc.rect(15, y - 6, 267, 8, "F")
         doc.setTextColor(255, 255, 255)
         doc.setFontSize(7.5); doc.setFont("helvetica", "bold")
-        doc.text("Date", cols.date.x, y)
-        doc.text("Animal", cols.animal.x, y)
-        doc.text("Vaccine", cols.vaccine.x, y)
-        doc.text("Prevents", cols.prevents.x, y)
-        doc.text("Type", cols.type.x, y)
-        doc.text("Dose", cols.dose.x, y)
-        doc.text("Route", cols.route.x, y)
-        doc.text("Site", cols.site.x, y)
+        doc.text(t("vacc.date"), cols.date.x, y)
+        doc.text(t("vacc.animal"), cols.animal.x, y)
+        doc.text(t("vacc.vaccine"), cols.vaccine.x, y)
+        doc.text(t("vacc.prevents"), cols.prevents.x, y)
+        doc.text(t("vacc.type"), cols.type.x, y)
+        doc.text(t("vacc.dose"), cols.dose.x, y)
+        doc.text(t("vacc.route"), cols.route.x, y)
+        doc.text(t("vacc.site"), cols.site.x, y)
         doc.text("Batch/Lot", cols.batch.x, y)
-        doc.text("Expiry", cols.expiry.x, y)
-        doc.text("Cost", cols.cost.x, y)
-        doc.text("Next", cols.next.x, y)
+        doc.text(t("vacc.expiry"), cols.expiry.x, y)
+        doc.text(t("vacc.cost"), cols.cost.x, y)
+        doc.text(t("vacc.next"), cols.next.x, y)
         doc.setFont("helvetica", "normal")
         y += 8
       }
@@ -541,13 +552,13 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         // Calves are marked inline rather than given their own column - the detail
         // table is already 12 columns wide on landscape A4.
         const animalLines = doc.splitTextToSize(
-          `${r.subjectName || "—"}${r.subjectType === "calf" ? " (calf)" : ""}`,
+          `${r.subjectName || "—"}${calfSuffix(r.subjectType)}`,
           cols.animal.width
         )
         const vaccineLines = doc.splitTextToSize(r.vaccineName || "—", cols.vaccine.width)
         const preventsLines = doc.splitTextToSize(r.diseasePrevented || "—", cols.prevents.width)
-        const typeLines = doc.splitTextToSize(r.vaccineType || "—", cols.type.width)
-        const routeLines = doc.splitTextToSize(r.route || "—", cols.route.width)
+        const typeLines = doc.splitTextToSize(optionLabel("type", r.vaccineType) || "—", cols.type.width)
+        const routeLines = doc.splitTextToSize(optionLabel("route", r.route) || "—", cols.route.width)
         const siteLines = doc.splitTextToSize(r.site || "—", cols.site.width)
         const batchLines = doc.splitTextToSize(r.batchNumber || "—", cols.batch.width)
 
@@ -569,7 +580,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         doc.setTextColor(55, 65, 81)
         doc.text(preventsLines, cols.prevents.x, y)
         doc.text(typeLines, cols.type.x, y)
-        doc.text(r.dose != null ? `${r.dose}${r.doseUnit ? ` ${r.doseUnit}` : ""}` : "—", cols.dose.x, y)
+        doc.text(r.dose != null ? `${r.dose}${r.doseUnit ? ` ${unitLabel(r.doseUnit)}` : ""}` : "—", cols.dose.x, y)
         doc.text(routeLines, cols.route.x, y)
         doc.text(siteLines, cols.site.x, y)
         doc.text(batchLines, cols.batch.x, y)
@@ -598,7 +609,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       if (y > 165) { doc.addPage(); y = 20 }
 
       doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(55, 65, 81)
-      doc.text("Summary per Vaccine", 15, y - 4)
+      doc.text(t("vacc.summaryPerVaccine"), 15, y - 4)
       y += 6
 
       const sumCols = {
@@ -614,12 +625,12 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       doc.rect(15, y - 6, 267, 8, "F")
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(8); doc.setFont("helvetica", "bold")
-      doc.text("Vaccine", sumCols.vaccine.x, y)
-      doc.text("Disease Prevented", sumCols.prevents.x, y)
-      doc.text("Doses", sumCols.doses.x, y)
-      doc.text("Animals", sumCols.animals.x, y)
-      doc.text("Cost (RWF)", sumCols.cost.x, y)
-      doc.text("Last Given", sumCols.last.x, y)
+      doc.text(t("vacc.vaccine"), sumCols.vaccine.x, y)
+      doc.text(t("vacc.diseasePrevented"), sumCols.prevents.x, y)
+      doc.text(t("vacc.doses"), sumCols.doses.x, y)
+      doc.text(t("vacc.animals"), sumCols.animals.x, y)
+      doc.text(t("vacc.costRwf"), sumCols.cost.x, y)
+      doc.text(t("vacc.lastGiven"), sumCols.last.x, y)
       doc.setFont("helvetica", "normal")
       y += 8
 
@@ -655,8 +666,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         doc.setFillColor(248, 250, 252); doc.rect(0, ph - 18, pw, 18, "F")
         doc.setDrawColor(226, 232, 240); doc.line(0, ph - 18, pw, ph - 18)
         doc.setFontSize(7); doc.setTextColor(107, 114, 128)
-        doc.text(`NTDM Vettrack | Generated by: ${can.currentUserName || "Unknown"}`, 15, ph - 7)
-        doc.text(`Page ${page} of ${totalPages}`, pw - 15, ph - 7, { align: "right" })
+        doc.text(t("vacc.pdfFooter").replace("{name}", can.currentUserName || t("vacc.unknown")), 15, ph - 7)
+        doc.text(t("vacc.pdfPage").replace("{page}", String(page)).replace("{total}", String(totalPages)), pw - 15, ph - 7, { align: "right" })
       }
 
       const suffix = exportSubjectName ? `-${exportSubjectName.replace(/\s+/g, "_")}` : ""
@@ -680,18 +691,18 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       const recordsData = exportRecords.map(r => ({
         "Date Given": r.date,
         Subject: r.subjectName || "—",
-        "Subject Type": r.subjectType === "calf" ? "Calf" : "Animal",
+        "Subject Type": r.subjectType === "calf" ? t("vacc.calf") : t("vacc.animal"),
         "Ear Tag ID": getEarTag(r),
         "Vaccine Name": r.vaccineName,
         "Disease Prevented": r.diseasePrevented || "—",
-        "Vaccine Type": r.vaccineType || "—",
-        Dose: r.dose != null ? `${r.dose}${r.doseUnit ? ` ${r.doseUnit}` : ""}` : "—",
-        Route: r.route || "—",
+        "Vaccine Type": optionLabel("type", r.vaccineType) || "—",
+        Dose: r.dose != null ? `${r.dose}${r.doseUnit ? ` ${unitLabel(r.doseUnit)}` : ""}` : "—",
+        Route: optionLabel("route", r.route) || "—",
         "Vaccination Site": r.site || "—",
         "Batch/Lot Number": r.batchNumber || "—",
         Manufacturer: r.manufacturer || "—",
         "Expiry Date": r.expiryDate || "—",
-        "Expired at Administration": expiredAt(r.expiryDate, r.date) ? "YES" : "No",
+        "Expired at Administration": expiredAt(r.expiryDate, r.date) ? t("vacc.yes") : t("common.no"),
         "Vaccine Price (RWF)": r.vaccinePrice ?? "—",
         "Vaccinator Fee (RWF)": r.vetPrice ?? "—",
         "Total Cost (RWF)": recordCost(r) > 0 ? recordCost(r) : "—",
@@ -699,9 +710,9 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         "Next Vaccination": r.nextVaccinationDate || "—",
         Remarks: r.notes || "—",
       }))
-      const ws1 = XLSX.utils.json_to_sheet(recordsData)
+      const ws1 = XLSX.utils.json_to_sheet(localizeColumns(recordsData, t))
       ws1["!cols"] = [14, 20, 14, 16, 26, 28, 18, 12, 18, 18, 20, 24, 14, 22, 20, 20, 18, 22, 18, 30].map(w => ({ wch: w }))
-      XLSX.utils.book_append_sheet(wb, ws1, "All Records")
+      XLSX.utils.book_append_sheet(wb, ws1, t("vacc.allRecords"))
 
       // Sheet 2 — per-vaccine summary
       const summaryData = exportSummary.map(v => ({
@@ -712,23 +723,23 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         "Total Cost (RWF)": v.cost,
         "Last Given": v.lastDate,
       }))
-      const ws2 = XLSX.utils.json_to_sheet(summaryData)
+      const ws2 = XLSX.utils.json_to_sheet(localizeColumns(summaryData, t))
       ws2["!cols"] = [30, 30, 14, 18, 20, 16].map(w => ({ wch: w }))
-      XLSX.utils.book_append_sheet(wb, ws2, "Per-Vaccine Summary")
+      XLSX.utils.book_append_sheet(wb, ws2, t("vacc.perVaccineSummary"))
 
       // Sheet 3 — the live booster schedule
       const scheduleData = schedule.map(s => ({
         Subject: s.record.subjectName || "—",
-        "Subject Type": s.record.subjectType === "calf" ? "Calf" : "Animal",
+        "Subject Type": s.record.subjectType === "calf" ? t("vacc.calf") : t("vacc.animal"),
         "Ear Tag ID": getEarTag(s.record),
         Vaccine: s.record.vaccineName,
         "Last Given": s.record.date,
         "Next Due": s.dueDate,
-        Status: s.days < 0 ? `${Math.abs(s.days)} days overdue` : s.days === 0 ? "Due today" : `${s.days} days left`,
+        Status: s.days < 0 ? t("vacc.daysOverdue").replace("{days}", String(Math.abs(s.days))) : s.days === 0 ? t("vacc.dueToday") : t("vacc.daysLeft").replace("{days}", String(s.days)),
       }))
-      const ws3 = XLSX.utils.json_to_sheet(scheduleData)
+      const ws3 = XLSX.utils.json_to_sheet(localizeColumns(scheduleData, t))
       ws3["!cols"] = [22, 14, 16, 28, 16, 16, 20].map(w => ({ wch: w }))
-      XLSX.utils.book_append_sheet(wb, ws3, "Schedule")
+      XLSX.utils.book_append_sheet(wb, ws3, t("vacc.schedule"))
 
       const suffix = exportSubjectName ? `-${exportSubjectName.replace(/\s+/g, "_")}` : ""
       XLSX.writeFile(wb, `vaccination-report${suffix}-${today}.xlsx`)
@@ -862,8 +873,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                       disabled={subjectOptions.length === 0}
                       options={subjectOptions}
                       placeholder={subjectOptions.length === 0 ? t("farmer.noAnimalsRegistered") : t("farmer.selectAnimalOrCalf")}
-                      searchPlaceholder={t("farmer.searchAnimals") || "Search animals…"}
-                      emptyText={t("farmer.noResultsFound") || "No animals found."}
+                      searchPlaceholder={t("farmer.searchAnimals") || t("vacc.searchAnimals")}
+                      emptyText={t("farmer.noResultsFound") || t("vacc.noAnimalsFound")}
                       className={errors.subject ? "border-red-500" : ""}
                     />
                     {selectedSubject && (
@@ -888,7 +899,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                       readOnly
                       value={
                         isCalfSelected ? t("farmer.notApplicableForCalves")
-                          : earTagId || (subjectSel ? "No ear tag registered" : t("farmer.selectSubjectFirst"))
+                          : earTagId || (subjectSel ? t("vacc.noEarTagRegistered") : t("farmer.selectSubjectFirst"))
                       }
                       className={earTagId && !isCalfSelected ? "bg-amber-50 text-amber-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                     />
@@ -901,7 +912,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                       readOnly
                       value={
                         isCalfSelected ? t("farmer.notApplicableForCalves")
-                          : insuranceId || (subjectSel ? "No insurance registered" : t("farmer.selectSubjectFirst"))
+                          : insuranceId || (subjectSel ? t("vacc.noInsuranceRegistered") : t("farmer.selectSubjectFirst"))
                       }
                       className={insuranceId && !isCalfSelected ? "bg-blue-50 text-blue-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                     />
@@ -919,7 +930,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <label className="text-sm font-medium text-gray-700">{t("farmer.vaccineName")} *</label>
                     <Input
                       list="vaccine-suggestions"
-                      placeholder="e.g. FMD Vaccine"
+                      placeholder={t("vacc.eGFmdVaccine")}
                       value={vaccineName}
                       onChange={e => handleVaccineChange(e.target.value)}
                       className={errors.vaccineName ? "border-red-500" : ""}
@@ -935,7 +946,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <label className="text-sm font-medium text-gray-700">{t("farmer.diseasePrevented")} <span className="text-gray-400 text-xs">({t("common.optional")})</span></label>
                     <Input
                       list="prevented-suggestions"
-                      placeholder="e.g. Foot-and-Mouth Disease"
+                      placeholder={t("vacc.eGFootAndMouthDisease")}
                       value={diseasePrevented}
                       onChange={e => setDiseasePrevented(e.target.value)}
                     />
@@ -950,8 +961,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <Select value={vaccineType || "none"} onValueChange={v => setVaccineType(v === "none" ? "" : v)}>
                       <SelectTrigger><SelectValue placeholder={t("farmer.vaccineType")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">— Not specified —</SelectItem>
-                        {VACCINE_TYPES.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                        <SelectItem value="none">{t("vacc.notSpecified")}</SelectItem>
+                        {VACCINE_TYPES.map(v => <SelectItem key={v} value={v}>{optionLabel("type", v)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -968,7 +979,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                       <Select value={doseUnit} onValueChange={setDoseUnit}>
                         <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {DOSE_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          {DOSE_UNITS.map(u => <SelectItem key={u} value={u}>{unitLabel(u)}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -981,8 +992,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <Select value={route || "none"} onValueChange={v => setRoute(v === "none" ? "" : v)}>
                       <SelectTrigger><SelectValue placeholder={t("farmer.route")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">— Not specified —</SelectItem>
-                        {ROUTES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        <SelectItem value="none">{t("vacc.notSpecified")}</SelectItem>
+                        {ROUTES.map(r => <SelectItem key={r} value={r}>{optionLabel("route", r)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -992,7 +1003,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <label className="text-sm font-medium text-gray-700">{t("farmer.vaccinationSite")} <span className="text-gray-400 text-xs">({t("common.optional")})</span></label>
                     <Input
                       list="site-suggestions"
-                      placeholder="e.g. Neck"
+                      placeholder={t("vacc.eGNeck")}
                       value={site}
                       onChange={e => setSite(e.target.value)}
                     />
@@ -1004,7 +1015,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                   {/* Batch / Lot Number */}
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-gray-700">{t("farmer.batchNumber")} <span className="text-gray-400 text-xs">({t("common.optional")})</span></label>
-                    <Input placeholder="e.g. FMD-2026-087" value={batchNumber} onChange={e => setBatchNumber(e.target.value)} />
+                    <Input placeholder={t("vacc.eGFmd2026087")} value={batchNumber} onChange={e => setBatchNumber(e.target.value)} />
                   </div>
 
                   {/* Manufacturer */}
@@ -1012,7 +1023,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <label className="text-sm font-medium text-gray-700">{t("farmer.manufacturer")} <span className="text-gray-400 text-xs">({t("common.optional")})</span></label>
                     <Input
                       list="manufacturer-suggestions"
-                      placeholder="e.g. MSD Animal Health"
+                      placeholder={t("vacc.eGMsdAnimalHealth")}
                       value={manufacturer}
                       onChange={e => setManufacturer(e.target.value)}
                     />
@@ -1026,7 +1037,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <label className="text-sm font-medium text-gray-700">{t("farmer.expiryDate")} <span className="text-gray-400 text-xs">({t("common.optional")})</span></label>
                     <Input type="month" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} />
                     {expiredAt(expiryDate, date) && (
-                      <p className="text-xs text-red-500">This vial had already expired on the date given.</p>
+                      <p className="text-xs text-red-500">{t("vacc.thisVialHadAlreadyExpiredOn")}</p>
                     )}
                   </div>
 
@@ -1111,7 +1122,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                         const d = daysUntil(nextVaccinationDate)
                         return (
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${d < 0 ? "bg-red-50 text-red-600" : d <= 30 ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
-                            {d < 0 ? `${Math.abs(d)}d overdue` : d === 0 ? "Due today" : `${d}d left`}
+                            {d < 0 ? t("vacc.daysOverdueShort").replace("{days}", String(Math.abs(d))) : d === 0 ? t("vacc.dueToday") : t("vacc.daysLeftShort").replace("{days}", String(d))}
                           </span>
                         )
                       })()}
@@ -1127,7 +1138,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                   {/* Remarks */}
                   <div className="space-y-1 md:col-span-2">
                     <label className="text-sm font-medium text-gray-700">{t("farmer.remarks")} <span className="text-gray-400 text-xs">({t("common.optional")})</span></label>
-                    <Input placeholder="e.g. No adverse reaction." value={notes} onChange={e => setNotes(e.target.value)} />
+                    <Input placeholder={t("vacc.eGNoAdverseReaction")} value={notes} onChange={e => setNotes(e.target.value)} />
                   </div>
                 </div>
 
@@ -1162,8 +1173,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                   onValueChange={v => setFilterSubject(v === "all" ? "" : v)}
                   options={filterSubjectOptions}
                   placeholder={t("farmer.allAnimals")}
-                  searchPlaceholder={t("farmer.searchAnimals") || "Search animals…"}
-                  emptyText={t("farmer.noResultsFound") || "No animals found."}
+                  searchPlaceholder={t("farmer.searchAnimals") || t("vacc.searchAnimals")}
+                  emptyText={t("farmer.noResultsFound") || t("vacc.noAnimalsFound")}
                 />
                 <Select value={filterVaccine || "all"} onValueChange={v => setFilterVaccine(v === "all" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder={t("farmer.allVaccines")} /></SelectTrigger>
@@ -1175,7 +1186,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-3 col-span-2 md:col-span-1">
                   <p className="text-sm text-gray-500">{filteredRecords.length} record{filteredRecords.length !== 1 ? "s" : ""}</p>
-                  <Button variant="outline" onClick={() => { setFilterSubject(""); setFilterVaccine(""); setFilterMonth("") }} className="rounded-lg ml-auto text-xs">Clear</Button>
+                  <Button variant="outline" onClick={() => { setFilterSubject(""); setFilterVaccine(""); setFilterMonth("") }} className="rounded-lg ml-auto text-xs">{t("common.clear")}</Button>
                 </div>
               </div>
 
@@ -1218,21 +1229,21 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                         <TableCell className="text-sm">{r.diseasePrevented || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell>
                           {r.vaccineType
-                            ? <Badge variant="outline" className={`${TYPE_STYLES[r.vaccineType] || TYPE_STYLES.Other} text-xs`}>{r.vaccineType}</Badge>
+                            ? <Badge variant="outline" className={`${TYPE_STYLES[r.vaccineType] || TYPE_STYLES.Other} text-xs`}>{optionLabel("type", r.vaccineType)}</Badge>
                             : <span className="text-gray-400">—</span>}
                         </TableCell>
                         <TableCell className="text-sm">{r.dose != null ? `${r.dose} ${r.doseUnit || ""}`.trim() : <span className="text-gray-400">—</span>}</TableCell>
-                        <TableCell className="text-sm">{r.route || <span className="text-gray-400">—</span>}</TableCell>
+                        <TableCell className="text-sm">{optionLabel("route", r.route) || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell className="text-sm">{r.site || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell className="text-sm font-mono text-xs">{r.batchNumber || <span className="text-gray-400 font-sans">—</span>}</TableCell>
                         <TableCell className="text-sm">
                           {r.expiryDate
                             ? expiredAt(r.expiryDate, r.date)
-                              ? <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px]" title="Expired at administration">{r.expiryDate}</Badge>
+                              ? <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px]" title={t("vacc.expiredAtAdministration")}>{r.expiryDate}</Badge>
                               : r.expiryDate
                             : <span className="text-gray-400">—</span>}
                         </TableCell>
-                        <TableCell className="text-sm font-medium text-orange-700" title={`Vaccine ${r.vaccinePrice ?? 0} + fee ${r.vetPrice ?? 0}`}>
+                        <TableCell className="text-sm font-medium text-orange-700" title={t("vacc.costBreakdown").replace("{vaccine}", String(r.vaccinePrice ?? 0)).replace("{fee}", String(r.vetPrice ?? 0))}>
                           {recordCost(r) > 0 ? recordCost(r).toLocaleString() : <span className="text-gray-400 font-normal">—</span>}
                         </TableCell>
                         <TableCell className="text-sm">{r.vaccinator || <span className="text-gray-400">—</span>}</TableCell>
@@ -1378,7 +1389,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                      <Tooltip formatter={(v: any) => [v, "Doses"]} />
+                      <Tooltip formatter={(v: any) => [v, t("vacc.doses")]} />
                       <Bar dataKey="doses" fill="#16a34a" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1401,7 +1412,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                      <Tooltip formatter={(v: any) => [v, "Doses"]} />
+                      <Tooltip formatter={(v: any) => [v, t("vacc.doses")]} />
                       <Bar dataKey="doses" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1429,8 +1440,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                 onValueChange={v => setExportSubjectFilter(v === "all" ? "" : v)}
                 options={filterSubjectOptions}
                 placeholder={t("farmer.allAnimals")}
-                searchPlaceholder={t("farmer.searchAnimals") || "Search animals…"}
-                emptyText={t("farmer.noResultsFound") || "No animals found."}
+                searchPlaceholder={t("farmer.searchAnimals") || t("vacc.searchAnimals")}
+                emptyText={t("farmer.noResultsFound") || t("vacc.noAnimalsFound")}
               />
             </div>
             <div className="p-3 bg-green-50 rounded-xl border border-green-100">
@@ -1439,7 +1450,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                 <p className="text-gray-600">
                   {exportRecords.length} dose{exportRecords.length !== 1 ? "s" : ""} &bull; {exportSummary.length} vaccine{exportSummary.length !== 1 ? "s" : ""} &bull; {animalsVaccinated} animal(s)
                 </p>
-                <p className="text-gray-600">Total cost: <strong className="text-green-700">RWF {exportTotalCost.toLocaleString()}</strong></p>
+                <p className="text-gray-600">{t("vacc.totalCost")} <strong className="text-green-700">RWF {exportTotalCost.toLocaleString()}</strong></p>
                 <p className="text-gray-600">
                   Schedule: <strong className="text-amber-600">{dueSoon.length} due soon</strong> &bull; <strong className="text-red-600">{overdue.length} overdue</strong>
                 </p>
@@ -1480,7 +1491,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
           <AlertDialogFooter>
             <AlertDialogCancel>{t("farmer.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-red-600 hover:bg-red-700 text-white">
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

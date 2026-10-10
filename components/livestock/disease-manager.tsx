@@ -70,10 +70,22 @@ const SESSION_STYLES: Record<string, string> = {
 }
 
 const PIE_COLORS = ["#ef4444", "#f59e0b", "#16a34a"]
+// Statuses and sessions are stored in English; these label them in the reader's language.
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  Active: "disease.status.active",
+  "Under Treatment": "disease.status.underTreatment",
+  Resolved: "disease.status.resolved",
+}
+const SESSION_LABEL_KEYS: Record<string, string> = { Morning: "farmer.morning", Evening: "farmer.evening" }
 const today = new Date().toISOString().split("T")[0]
 
 export default function DiseaseManager({ farmerId, can, showHeader = true }: DiseaseManagerProps) {
   const { t } = useLanguage()
+  const statusLabel = (s?: string | null) => (s && STATUS_LABEL_KEYS[s] ? t(STATUS_LABEL_KEYS[s]) : s || "")
+  const sessionLabel = (s?: string | null) => (s && SESSION_LABEL_KEYS[s] ? t(SESSION_LABEL_KEYS[s]) : s || "")
+  const doseCountLabel = (n: number) => t(n === 1 ? "disease.doseOne" : "disease.doseMany").replace("{count}", String(n))
+  const medicineSummary = (m: { medicineName: string; doseCount: number; volumeMl?: number | null; cost: number }, withZeroCost = false) =>
+    `${m.medicineName} (${doseCountLabel(m.doseCount)}${m.volumeMl ? `, ${m.volumeMl}mL` : ''}${m.cost > 0 || withZeroCost ? `, RWF ${m.cost.toLocaleString()}` : ''})`
   const { submitWithLocationGate, dialog: locationGateDialog } = useLocationGatedRequest()
   const [animals, setAnimals] = useState<Animal[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -205,9 +217,9 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
   // Validate disease form
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!animalId) e.animalId = "Select an animal"
-    if (!diseaseName.trim()) e.diseaseName = "Enter the disease name"
-    if (!diagnosedDate) e.diagnosedDate = "Select a date"
+    if (!animalId) e.animalId = t("disease.selectAnAnimal")
+    if (!diseaseName.trim()) e.diseaseName = t("disease.enterTheDiseaseName")
+    if (!diagnosedDate) e.diagnosedDate = t("disease.selectADate")
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -215,13 +227,13 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
   // Validate dose form
   const validateDose = () => {
     const e: Record<string, string> = {}
-    if (!doseRecordId) e.doseRecordId = "Select a disease case"
-    if (!doseSession) e.doseSession = "Select a session"
-    if (!doseDate) e.doseDate = "Select a date"
+    if (!doseRecordId) e.doseRecordId = t("disease.selectADiseaseCase")
+    if (!doseSession) e.doseSession = t("disease.selectASession")
+    if (!doseDate) e.doseDate = t("disease.selectADate")
     if (medicines.length === 0) {
-      e.medicines = "Add at least one medicine"
+      e.medicines = t("disease.addAtLeastOneMedicine")
     } else if (medicines.some(m => !m.medicineName.trim() || !m.doseCount || Number(m.doseCount) <= 0 || m.cost === "" || Number(m.cost) < 0)) {
-      e.medicines = "Each medicine needs a name, a dose count greater than 0, and a non-negative cost"
+      e.medicines = t("disease.eachMedicineNeedsANameA")
     }
     setDoseErrors(e)
     return Object.keys(e).length === 0
@@ -381,10 +393,10 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
   }, [filteredRecords])
 
   const statusData = useMemo(() => [
-    { name: "Active", value: activeCount },
-    { name: "Under Treatment", value: underTreatmentCount },
-    { name: "Resolved", value: resolvedCount },
-  ].filter(d => d.value > 0), [activeCount, underTreatmentCount, resolvedCount])
+    { name: statusLabel("Active"), value: activeCount },
+    { name: statusLabel("Under Treatment"), value: underTreatmentCount },
+    { name: statusLabel("Resolved"), value: resolvedCount },
+  ].filter(d => d.value > 0), [activeCount, underTreatmentCount, resolvedCount, t])
 
   // Export
   const [exportOpen, setExportOpen] = useState(false)
@@ -415,9 +427,9 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
     try {
       const jsPDF = (await import('jspdf')).default
       const doc = new jsPDF({ orientation: 'landscape' }) // landscape for more columns
-      const caseLabel = exportCaseId === "all" ? "All Cases" : (() => {
+      const caseLabel = exportCaseId === "all" ? t("disease.allCases") : (() => {
         const r = records.find(r => r._id === exportCaseId)
-        return r ? `${r.animalName} — ${r.diseaseName}` : "Unknown"
+        return r ? `${r.animalName} — ${r.diseaseName}` : t("disease.unknown")
       })()
       const daily = getExportDailyBreakdown()
       const exportDoses = getExportDoses()
@@ -457,22 +469,22 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
 
       // ── META ──
       doc.setTextColor(55, 65, 81); doc.setFontSize(10)
-      doc.text(`Case: ${caseLabel}`, 15, 50)
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 15, 58)
-      doc.text(`Generated by: ${can.currentUserName || 'Unknown'}`, 15, 66)
+      doc.text(t("disease.pdfCase").replace("{label}", caseLabel), 15, 50)
+      doc.text(t("disease.pdfGenerated").replace("{date}", new Date().toLocaleString()), 15, 58)
+      doc.text(t("disease.pdfGeneratedBy").replace("{name}", can.currentUserName || t("disease.unknown")), 15, 66)
 
       // ── SUMMARY BOX ──
       doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240)
       doc.rect(15, 74, PW - 30, 42, 'FD')
       doc.setTextColor(239, 68, 68); doc.setFontSize(11); doc.setFont('helvetica', 'bold')
-      doc.text('Summary', 20, 85)
+      doc.text(t("disease.summary"), 20, 85)
       doc.setTextColor(55, 65, 81); doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
-      doc.text(`Disease Cases: ${exportRecs.length}`, 20, 95)
-      doc.text(`Total Doses: ${totalDoses}`, 90, 95)
-      doc.text(`Treatment Days: ${daily.length}`, 170, 95)
-      doc.text(`Medicine Cost: RWF ${totalMedicineCost.toLocaleString()}`, 20, 105)
-      doc.text(`Vet Cost: RWF ${totalVetCost.toLocaleString()}`, 90, 105)
-      doc.text(`Grand Total: RWF ${grandTotal.toLocaleString()}`, 170, 105)
+      doc.text(t("disease.pdfCases").replace("{count}", String(exportRecs.length)), 20, 95)
+      doc.text(t("disease.pdfTotalDoses").replace("{count}", String(totalDoses)), 90, 95)
+      doc.text(t("disease.pdfTreatmentDays").replace("{count}", String(daily.length)), 170, 95)
+      doc.text(t("disease.pdfMedicineCost").replace("{amount}", totalMedicineCost.toLocaleString()), 20, 105)
+      doc.text(t("disease.pdfVetCost").replace("{amount}", totalVetCost.toLocaleString()), 90, 105)
+      doc.text(t("disease.pdfGrandTotal").replace("{amount}", grandTotal.toLocaleString()), 170, 105)
 
       // ─────────────────────────────────────────────────────────────
       // SECTION 1 — DISEASE CASES (all columns from the form)
@@ -498,25 +510,25 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
 
       const drawCaseSectionTitle = () => {
         doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(55, 65, 81)
-        doc.text('Disease Cases', 15, y - 10)
+        doc.text(t("disease.diseaseCases"), 15, y - 10)
       }
 
       const drawCaseHeader = () => {
         doc.setFillColor(239, 68, 68)
         doc.rect(15, y - 6, PW - 30, 8, 'F')
         doc.setTextColor(255, 255, 255); doc.setFontSize(6.5); doc.setFont('helvetica', 'bold')
-        doc.text('Animal', cCols.animal.x, y)
-        doc.text('Ear Tag', cCols.earTag.x, y)
-        doc.text('Insurance', cCols.insurance.x, y)
-        doc.text('Disease', cCols.disease.x, y)
-        doc.text('Symptoms', cCols.symptoms.x, y)
-        doc.text('Treatment', cCols.treatment.x, y)
-        doc.text('Status', cCols.status.x, y)
-        doc.text('Vet', cCols.vet.x, y)
-        doc.text('Vet Origin', cCols.vetOrigin.x, y)
-        doc.text('Diagnosed', cCols.diagnosed.x, y)
+        doc.text(t("disease.animal"), cCols.animal.x, y)
+        doc.text(t("disease.earTag"), cCols.earTag.x, y)
+        doc.text(t("disease.insurance"), cCols.insurance.x, y)
+        doc.text(t("disease.disease"), cCols.disease.x, y)
+        doc.text(t("disease.symptoms"), cCols.symptoms.x, y)
+        doc.text(t("disease.treatment"), cCols.treatment.x, y)
+        doc.text(t("disease.status"), cCols.status.x, y)
+        doc.text(t("disease.vet"), cCols.vet.x, y)
+        doc.text(t("disease.vetOrigin"), cCols.vetOrigin.x, y)
+        doc.text(t("disease.diagnosed"), cCols.diagnosed.x, y)
         doc.text('Resolved', cCols.resolved.x, y)
-        doc.text('Notes', cCols.notes.x, y)
+        doc.text(t("disease.notes"), cCols.notes.x, y)
         doc.setFont('helvetica', 'normal')
       }
 
@@ -532,7 +544,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
           doc.splitTextToSize(r.diseaseName || '—', cCols.disease.w),
           doc.splitTextToSize(r.symptoms || '—', cCols.symptoms.w),
           doc.splitTextToSize(r.treatment || '—', cCols.treatment.w),
-          doc.splitTextToSize(r.status || '—', cCols.status.w),
+          doc.splitTextToSize(statusLabel(r.status) || '—', cCols.status.w),
           doc.splitTextToSize(r.veterinarianName || '—', cCols.vet.w),
           doc.splitTextToSize(r.vetOrigin || '—', cCols.vetOrigin.w),
           doc.splitTextToSize(r.diagnosedDate || '—', cCols.diagnosed.w),
@@ -579,21 +591,21 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       }
 
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(55, 65, 81)
-      doc.text('Treatment Doses Log', 15, y - 10)
+      doc.text(t("disease.treatmentDosesLog"), 15, y - 10)
 
       const drawDoseHeader = () => {
         doc.setFillColor(234, 88, 12)
         doc.rect(15, y - 6, PW - 30, 8, 'F')
         doc.setTextColor(255, 255, 255); doc.setFontSize(6.5); doc.setFont('helvetica', 'bold')
-        doc.text('Date', dCols.date.x, y)
-        doc.text('Session', dCols.session.x, y)
-        doc.text('Animal', dCols.animal.x, y)
-        doc.text('Disease', dCols.disease.x, y)
-        doc.text('Medicines', dCols.medicines.x, y)
-        doc.text('Med Cost(RWF)', dCols.medCost.x, y)
-        doc.text('Vet Cost(RWF)', dCols.vetCost.x, y)
-        doc.text('Total(RWF)', dCols.total.x, y)
-        doc.text('Notes', dCols.notes.x, y)
+        doc.text(t("disease.date"), dCols.date.x, y)
+        doc.text(t("disease.session"), dCols.session.x, y)
+        doc.text(t("disease.animal"), dCols.animal.x, y)
+        doc.text(t("disease.disease"), dCols.disease.x, y)
+        doc.text(t("disease.medicines"), dCols.medicines.x, y)
+        doc.text(t("disease.medCostRwf"), dCols.medCost.x, y)
+        doc.text(t("disease.vetCostRwf"), dCols.vetCost.x, y)
+        doc.text(t("disease.totalRwf"), dCols.total.x, y)
+        doc.text(t("disease.notes"), dCols.notes.x, y)
         doc.setFont('helvetica', 'normal')
       }
 
@@ -602,11 +614,11 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
 
       exportDoses.forEach((d, i) => {
         const medicineLines = (d.medicines && d.medicines.length > 0)
-          ? d.medicines.flatMap(m => doc.splitTextToSize(`${m.medicineName} (${m.doseCount} dose${m.doseCount !== 1 ? 's' : ''}${m.volumeMl ? `, ${m.volumeMl}mL` : ''}${m.cost > 0 ? `, RWF ${m.cost.toLocaleString()}` : ''})`, dCols.medicines.w))
+          ? d.medicines.flatMap(m => doc.splitTextToSize(medicineSummary(m), dCols.medicines.w))
           : ['—']
         const cells = [
           doc.splitTextToSize(d.date || '—', dCols.date.w),
-          doc.splitTextToSize(d.session || '—', dCols.session.w),
+          doc.splitTextToSize(sessionLabel(d.session) || '—', dCols.session.w),
           doc.splitTextToSize(d.animalName || '—', dCols.animal.w),
           doc.splitTextToSize(d.diseaseName || '—', dCols.disease.w),
           medicineLines,
@@ -645,7 +657,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         doc.setFillColor(255, 237, 213); doc.rect(15, y - 4, PW - 30, rowH, 'F')
         doc.setDrawColor(234, 88, 12); doc.rect(15, y - 4, PW - 30, rowH)
         doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(234, 88, 12)
-        doc.text('TOTALS', 16, y + 1)
+        doc.text(t("disease.totals"), 16, y + 1)
         doc.setTextColor(37, 99, 235)
         doc.text(`RWF ${totalMedicineCost.toLocaleString()}`, dCols.medCost.x, y + 1)
         doc.setTextColor(234, 88, 12)
@@ -662,7 +674,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       if (y > 170) { doc.addPage(); y = 20 }
 
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(55, 65, 81)
-      doc.text('Per-Animal Treatment Summary', 15, y - 10)
+      doc.text(t("disease.perAnimalTreatmentSummary"), 15, y - 10)
 
       const aCols = {
         animal: { x: 16, w: 34 },
@@ -679,14 +691,14 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         doc.setFillColor(124, 58, 237)
         doc.rect(15, y - 6, PW - 30, 8, 'F')
         doc.setTextColor(255, 255, 255); doc.setFontSize(6.5); doc.setFont('helvetica', 'bold')
-        doc.text('Animal', aCols.animal.x, y)
-        doc.text('Ear Tag', aCols.earTag.x, y)
-        doc.text('Insurance ID', aCols.insurance.x, y)
-        doc.text('Diagnoses', aCols.diagnoses.x, y)
-        doc.text('Doses', aCols.doses.x, y)
-        doc.text('Medicine (RWF)', aCols.medicine.x, y)
-        doc.text('Vet (RWF)', aCols.vet.x, y)
-        doc.text('Total (RWF)', aCols.total.x, y)
+        doc.text(t("disease.animal"), aCols.animal.x, y)
+        doc.text(t("disease.earTag"), aCols.earTag.x, y)
+        doc.text(t("disease.insuranceId"), aCols.insurance.x, y)
+        doc.text(t("disease.diagnoses"), aCols.diagnoses.x, y)
+        doc.text(t("disease.doses"), aCols.doses.x, y)
+        doc.text(t("disease.medicineRwf"), aCols.medicine.x, y)
+        doc.text(t("disease.vetRwf"), aCols.vet.x, y)
+        doc.text(t("disease.totalRwf2"), aCols.total.x, y)
         doc.setFont('helvetica', 'normal')
       }
 
@@ -741,7 +753,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       if (y > 170) { doc.addPage(); y = 20 }
 
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(55, 65, 81)
-      doc.text('Daily Cost Breakdown', 15, y - 10)
+      doc.text(t("disease.dailyCostBreakdown"), 15, y - 10)
 
       const dailyCols = {
         date: { x: 16, w: 28 },
@@ -757,13 +769,13 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         doc.setFillColor(239, 68, 68)
         doc.rect(15, y - 6, PW - 30, 8, 'F')
         doc.setTextColor(255, 255, 255); doc.setFontSize(7); doc.setFont('helvetica', 'bold')
-        doc.text('Date', dailyCols.date.x, y)
-        doc.text('Morn. Doses', dailyCols.mDoses.x, y)
-        doc.text('Morn. Cost', dailyCols.mCost.x, y)
-        doc.text('Eve. Doses', dailyCols.eDoses.x, y)
-        doc.text('Eve. Cost', dailyCols.eCost.x, y)
-        doc.text('Day Total', dailyCols.dayTotal.x, y)
-        doc.text('Cumulative', dailyCols.cumul.x, y)
+        doc.text(t("disease.date"), dailyCols.date.x, y)
+        doc.text(t("disease.mornDoses"), dailyCols.mDoses.x, y)
+        doc.text(t("disease.mornCost"), dailyCols.mCost.x, y)
+        doc.text(t("disease.eveDoses"), dailyCols.eDoses.x, y)
+        doc.text(t("disease.eveCost"), dailyCols.eCost.x, y)
+        doc.text(t("disease.dayTotal"), dailyCols.dayTotal.x, y)
+        doc.text(t("disease.cumulative"), dailyCols.cumul.x, y)
         doc.setFont('helvetica', 'normal')
       }
 
@@ -815,7 +827,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         doc.setFillColor(209, 250, 229); doc.rect(15, y - 4, PW - 30, rowH, 'F')
         doc.setDrawColor(16, 185, 129); doc.rect(15, y - 4, PW - 30, rowH)
         doc.setTextColor(4, 120, 87); doc.setFontSize(8); doc.setFont('helvetica', 'bold')
-        doc.text('Grand Total', 16, y + 1)
+        doc.text(t("disease.grandTotal"), 16, y + 1)
         doc.text(`RWF ${grandTotal.toLocaleString()}`, dailyCols.cumul.x, y + 1)
         y += rowH
       }
@@ -828,9 +840,9 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         doc.setFillColor(248, 250, 252); doc.rect(0, ph - 18, PW, 18, 'F')
         doc.setDrawColor(226, 232, 240); doc.line(0, ph - 18, PW, ph - 18)
         doc.setFontSize(7); doc.setTextColor(107, 114, 128); doc.setFont('helvetica', 'normal')
-        doc.text(`Generated by: ${can.currentUserName || 'Unknown'}`, 15, ph - 7)
-        doc.text(`© ${new Date().getFullYear()} NTDM Vettrack. All rights reserved`, PW / 2, ph - 7, { align: 'center' })
-        doc.text(`Page ${page} of ${totalPages}`, PW - 15, ph - 7, { align: 'right' })
+        doc.text(t("disease.pdfGeneratedBy").replace("{name}", can.currentUserName || t("disease.unknown")), 15, ph - 7)
+        doc.text(t("disease.pdfRights").replace("{year}", String(new Date().getFullYear())), PW / 2, ph - 7, { align: 'center' })
+        doc.text(t("disease.pdfPage").replace("{page}", String(page)).replace("{total}", String(totalPages)), PW - 15, ph - 7, { align: 'right' })
       }
 
       doc.save(`disease-report-${caseLabel.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${today}.pdf`)
@@ -848,51 +860,52 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
     try {
       const XLSX = await import('xlsx')
       const wb = XLSX.utils.book_new()
-      const caseLabel = exportCaseId === "all" ? "All Cases" : (() => {
+      const caseLabel = exportCaseId === "all" ? t("disease.allCases") : (() => {
         const r = records.find(r => r._id === exportCaseId)
-        return r ? `${r.animalName} - ${r.diseaseName}` : "Unknown"
+        return r ? `${r.animalName} - ${r.diseaseName}` : t("disease.unknown")
       })()
       const daily = getExportDailyBreakdown()
       const exportRecs = getExportRecords()
       const exportDoses = getExportDoses()
 
       // Sheet 1 — Disease Cases (ALL columns from the form)
+      // Column headings in the reader's language.
       const casesData = exportRecs.map(r => ({
-        Animal: r.animalName || '—',
-        'Ear Tag ID': getAnimalEarTagId(r.animalId),
-        'Insurance ID': getAnimalInsuranceId(r.animalId),
-        Disease: r.diseaseName,
-        Symptoms: r.symptoms || '—',
-        Treatment: r.treatment || '—',
-        Status: r.status,
-        'Diagnosed Date': r.diagnosedDate,
-        'Resolved Date': r.resolvedDate || '—',
-        Veterinarian: r.veterinarianName || '—',
-        'Vet Origin': r.vetOrigin || '—',
-        Notes: r.notes || '—',
+        [t("disease.animal")]: r.animalName || '—',
+        [t("disease.earTagId")]: getAnimalEarTagId(r.animalId),
+        [t("disease.insuranceId")]: getAnimalInsuranceId(r.animalId),
+        [t("disease.disease")]: r.diseaseName,
+        [t("disease.symptoms")]: r.symptoms || '—',
+        [t("disease.treatment")]: r.treatment || '—',
+        [t("disease.status")]: statusLabel(r.status),
+        [t("disease.diagnosedDate")]: r.diagnosedDate,
+        [t("disease.resolvedDate")]: r.resolvedDate || '—',
+        [t("disease.veterinarian")]: r.veterinarianName || '—',
+        [t("disease.vetOrigin")]: r.vetOrigin || '—',
+        [t("disease.notes")]: r.notes || '—',
       }))
       const ws1 = XLSX.utils.json_to_sheet(casesData)
       ws1['!cols'] = [20, 18, 22, 28, 35, 35, 18, 16, 16, 22, 24, 35].map(w => ({ wch: w }))
-      XLSX.utils.book_append_sheet(wb, ws1, 'Disease Cases')
+      XLSX.utils.book_append_sheet(wb, ws1, t("disease.diseaseCases"))
 
       // Sheet 2 — Full Treatment Doses Log
       const dosesData = exportDoses.map(d => ({
-        Date: d.date,
-        Session: d.session,
-        Animal: d.animalName || '—',
-        Disease: d.diseaseName || '—',
-        Medicines: (d.medicines && d.medicines.length > 0)
-          ? d.medicines.map(m => `${m.medicineName} (${m.doseCount} dose${m.doseCount !== 1 ? 's' : ''}${m.volumeMl ? `, ${m.volumeMl}mL` : ''}, RWF ${m.cost.toLocaleString()})`).join('; ')
+        [t("disease.date")]: d.date,
+        [t("disease.session")]: sessionLabel(d.session),
+        [t("disease.animal")]: d.animalName || '—',
+        [t("disease.disease")]: d.diseaseName || '—',
+        [t("disease.medicines")]: (d.medicines && d.medicines.length > 0)
+          ? d.medicines.map(m => medicineSummary(m, true)).join('; ')
           : '—',
-        'Total Doses': doseTotalCount(d),
-        'Medicine Cost (RWF)': doseMedicineCost(d),
-        'Vet Cost (RWF)': d.vetCost,
-        'Total Cost (RWF)': d.totalCost,
-        Notes: d.notes || '—',
+        [t("disease.totalDoses")]: doseTotalCount(d),
+        [t("disease.medicineCostRwf")]: doseMedicineCost(d),
+        [t("disease.vetCostRwf")]: d.vetCost,
+        [t("disease.totalCostRwf")]: d.totalCost,
+        [t("disease.notes")]: d.notes || '—',
       }))
       const ws2 = XLSX.utils.json_to_sheet(dosesData)
       ws2['!cols'] = [14, 12, 20, 28, 45, 14, 20, 18, 18, 35].map(w => ({ wch: w }))
-      XLSX.utils.book_append_sheet(wb, ws2, 'Treatment Doses')
+      XLSX.utils.book_append_sheet(wb, ws2, t("disease.treatmentDoses"))
 
       // Sheet 3 — Daily Cost Breakdown
       const dailyData = daily.map(row => {
@@ -901,18 +914,18 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         const eDoses = row.evening.reduce((s, d) => s + doseTotalCount(d), 0)
         const eCost = row.evening.reduce((s, d) => s + d.totalCost, 0)
         return {
-          Date: row.date,
-          'Morning Doses': mDoses || 0,
-          'Morning Cost (RWF)': mCost,
-          'Evening Doses': eDoses || 0,
-          'Evening Cost (RWF)': eCost,
-          'Daily Total (RWF)': row.dayTotal,
-          'Cumulative Total (RWF)': row.runningTotal,
+          [t("disease.date")]: row.date,
+          [t("disease.morningDoses")]: mDoses || 0,
+          [t("disease.morningCostRwf")]: mCost,
+          [t("disease.eveningDoses")]: eDoses || 0,
+          [t("disease.eveningCostRwf")]: eCost,
+          [t("disease.dailyTotalRwf")]: row.dayTotal,
+          [t("disease.cumulativeTotalRwf")]: row.runningTotal,
         }
       })
       const ws3 = XLSX.utils.json_to_sheet(dailyData)
       ws3['!cols'] = [14, 16, 20, 16, 20, 20, 22].map(w => ({ wch: w }))
-      XLSX.utils.book_append_sheet(wb, ws3, 'Daily Cost Breakdown')
+      XLSX.utils.book_append_sheet(wb, ws3, t("disease.dailyCostBreakdown"))
 
       // Sheet 4 — Per-Animal Summary
       const animalStats: Record<string, { doses: number; medicineCost: number; vetCost: number; totalCost: number; diagnosisCount: number }> = {}
@@ -929,20 +942,20 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       })
       const animalData = exportRecs
         .filter((r, idx, arr) => arr.findIndex(x => x.animalId === r.animalId) === idx)
+        .sort((a, b) => (animalStats[b.animalId]?.totalCost || 0) - (animalStats[a.animalId]?.totalCost || 0))
         .map(r => ({
-          Animal: r.animalName || '—',
-          'Ear Tag ID': getAnimalEarTagId(r.animalId),
-          'Insurance ID': getAnimalInsuranceId(r.animalId),
-          Diagnoses: animalStats[r.animalId]?.diagnosisCount || 0,
-          'Total Doses': animalStats[r.animalId]?.doses || 0,
-          'Medicine Cost (RWF)': animalStats[r.animalId]?.medicineCost || 0,
-          'Vet Cost (RWF)': animalStats[r.animalId]?.vetCost || 0,
-          'Total Cost (RWF)': animalStats[r.animalId]?.totalCost || 0,
+          [t("disease.animal")]: r.animalName || '—',
+          [t("disease.earTagId")]: getAnimalEarTagId(r.animalId),
+          [t("disease.insuranceId")]: getAnimalInsuranceId(r.animalId),
+          [t("disease.diagnoses")]: animalStats[r.animalId]?.diagnosisCount || 0,
+          [t("disease.totalDoses")]: animalStats[r.animalId]?.doses || 0,
+          [t("disease.medicineCostRwf")]: animalStats[r.animalId]?.medicineCost || 0,
+          [t("disease.vetCostRwf")]: animalStats[r.animalId]?.vetCost || 0,
+          [t("disease.totalCostRwf")]: animalStats[r.animalId]?.totalCost || 0,
         }))
-        .sort((a, b) => b['Total Cost (RWF)'] - a['Total Cost (RWF)'])
       const ws4 = XLSX.utils.json_to_sheet(animalData)
       ws4['!cols'] = [20, 18, 22, 14, 14, 22, 18, 20].map(w => ({ wch: w }))
-      XLSX.utils.book_append_sheet(wb, ws4, 'Per-Animal Summary')
+      XLSX.utils.book_append_sheet(wb, ws4, t("disease.perAnimalSummary"))
 
       XLSX.writeFile(wb, `disease-report-${caseLabel.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${today}.xlsx`)
       logPortalExport("Disease report", "Excel")
@@ -1061,8 +1074,8 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                     onValueChange={setAnimalId}
                     options={animals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` }))}
                     placeholder={t('farmer.selectAnimal')}
-                    searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
-                    emptyText={t('farmer.noResultsFound') || "No animals found."}
+                    searchPlaceholder={t('farmer.searchAnimals') || t("disease.searchAnimals")}
+                    emptyText={t('farmer.noResultsFound') || t("disease.noAnimalsFound")}
                     className={errors.animalId ? "border-red-500" : ""}
                   />
                   {errors.animalId && <p className="text-xs text-red-500">{errors.animalId}</p>}
@@ -1072,7 +1085,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                   <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
-                    value={insuranceId || (animalId ? "No insurance registered" : "Select an animal first")}
+                    value={insuranceId || (animalId ? t("disease.noInsuranceRegistered") : t("disease.selectAnAnimalFirst"))}
                     className={insuranceId ? "bg-blue-50 text-blue-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                   />
                 </div>
@@ -1081,7 +1094,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                   <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')} <span className="text-gray-400 text-xs">{t('farmer.autoDetected')}</span></label>
                   <Input
                     readOnly
-                    value={earTagId || (animalId ? "No ear tag registered" : "Select an animal first")}
+                    value={earTagId || (animalId ? t("disease.noEarTagRegistered") : t("disease.selectAnAnimalFirst"))}
                     className={earTagId ? "bg-amber-50 text-amber-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                   />
                 </div>
@@ -1090,7 +1103,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                   <label className="text-sm font-medium text-gray-700">{t('farmer.disease')} *</label>
                   <Input
                     list="disease-suggestions"
-                    placeholder={t('farmer.enterDiseaseName') || "Type or select a disease..."}
+                    placeholder={t('farmer.enterDiseaseName') || t("disease.typeOrSelectADisease")}
                     value={diseaseName}
                     onChange={e => setDiseaseName(e.target.value)}
                     className={errors.diseaseName ? "border-red-500" : ""}
@@ -1106,7 +1119,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                   <Select value={status} onValueChange={setStatus}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1155,7 +1168,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         <SelectValue placeholder={t('farmer.veterinarian')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">— Not assigned —</SelectItem>
+                        <SelectItem value="none">{t("disease.notAssigned")}</SelectItem>
                         {doctors.map(d => (
                           <SelectItem key={d._id} value={d.name}>
                             {d.name}{d.specialization ? ` — ${d.specialization}` : ""}
@@ -1168,21 +1181,21 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
 
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.vetOrigin')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input placeholder="e.g. RAB, MINAGRI, Private Clinic" value={vetOrigin} onChange={e => setVetOrigin(e.target.value)} />
+                  <Input placeholder={t("disease.eGRabMinagriPrivateClinic")} value={vetOrigin} onChange={e => setVetOrigin(e.target.value)} />
 
                   <div className="space-y-1 md:col-span-2">
                     <label className="text-sm font-medium text-gray-700">{t('farmer.symptoms')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                    <Input placeholder="e.g. fever, loss of appetite, swollen joints..." value={symptoms} onChange={e => setSymptoms(e.target.value)} />
+                    <Input placeholder={t("disease.eGFeverLossOfAppetite")} value={symptoms} onChange={e => setSymptoms(e.target.value)} />
                   </div>
 
                   <div className="space-y-1 md:col-span-2">
                     <label className="text-sm font-medium text-gray-700">{t('farmer.treatment')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                    <Input placeholder="e.g. antibiotics, vaccination, isolation..." value={treatment} onChange={e => setTreatment(e.target.value)} />
+                    <Input placeholder={t("disease.eGAntibioticsVaccinationIsolation")} value={treatment} onChange={e => setTreatment(e.target.value)} />
                   </div>
 
                   <div className="space-y-1 md:col-span-2">
                     <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                    <Input placeholder="Any additional observations..." value={notes} onChange={e => setNotes(e.target.value)} />
+                    <Input placeholder={t("disease.anyAdditionalObservations")} value={notes} onChange={e => setNotes(e.target.value)} />
                   </div>
                 </div>
 
@@ -1222,7 +1235,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                       <SelectContent>
                         {records.filter(r => r.status === "Under Treatment").map(r => (
                           <SelectItem key={r._id} value={r._id}>
-                            {r.animalName} — {r.diseaseName} ({r.status})
+                            {r.animalName} — {r.diseaseName} ({statusLabel(r.status)})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1245,7 +1258,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         <SelectValue placeholder={t('farmer.session')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {SESSIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        {SESSIONS.map(s => <SelectItem key={s} value={s}>{sessionLabel(s)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {doseErrors.doseSession && <p className="text-xs text-red-500">{doseErrors.doseSession}</p>}
@@ -1256,16 +1269,16 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-gray-700">{t('farmer.medicinesAdministered')} *</label>
                       <Button type="button" size="sm" variant="outline" onClick={addMedicineRow} className="h-7 text-xs gap-1 rounded-lg">
-                        <Plus className="h-3 w-3" /> Add Medicine
+                        <Plus className="h-3 w-3" /> {t("disease.addMedicine")}
                       </Button>
                     </div>
                     <div className="space-y-2">
                       {medicines.map((m, idx) => (
                         <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_90px_110px_110px_36px] gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                          <Input placeholder="Medicine name, e.g. Oxytetracycline" value={m.medicineName} onChange={e => updateMedicineRow(idx, "medicineName", e.target.value)} />
-                          <Input type="number" min="1" placeholder="Doses" value={m.doseCount} onChange={e => updateMedicineRow(idx, "doseCount", e.target.value)} />
-                          <Input type="number" min="0" step="0.1" placeholder="Vol (mL)" value={m.volumeMl} onChange={e => updateMedicineRow(idx, "volumeMl", e.target.value)} />
-                          <Input type="number" min="0" placeholder="Cost (RWF)" value={m.cost} onChange={e => updateMedicineRow(idx, "cost", e.target.value)} />
+                          <Input placeholder={t("disease.medicineNameEGOxytetracycline")} value={m.medicineName} onChange={e => updateMedicineRow(idx, "medicineName", e.target.value)} />
+                          <Input type="number" min="1" placeholder={t("disease.doses")} value={m.doseCount} onChange={e => updateMedicineRow(idx, "doseCount", e.target.value)} />
+                          <Input type="number" min="0" step="0.1" placeholder={t("disease.volMl")} value={m.volumeMl} onChange={e => updateMedicineRow(idx, "volumeMl", e.target.value)} />
+                          <Input type="number" min="0" placeholder={t("disease.costRwf")} value={m.cost} onChange={e => updateMedicineRow(idx, "cost", e.target.value)} />
                           <Button type="button" size="sm" variant="ghost" onClick={() => removeMedicineRow(idx)} disabled={medicines.length === 1} className="h-9 w-9 p-0 hover:bg-red-50 disabled:opacity-30">
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -1290,13 +1303,13 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                   {/* Notes */}
                   <div className="space-y-1 md:col-span-2">
                     <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                    <Input placeholder="Any observations for this dose..." value={doseNotes} onChange={e => setDoseNotes(e.target.value)} />
+                    <Input placeholder={t("disease.anyObservationsForThisDose")} value={doseNotes} onChange={e => setDoseNotes(e.target.value)} />
                   </div>
                 </div>
 
                 <div className="flex gap-3 pt-2">
                   <Button onClick={handleDoseSubmit} disabled={savingDose || !canSubmitDose} className="bg-orange-500 hover:bg-orange-600 text-white rounded-lg px-6">
-                    {savingDose ? "Saving..." : editDose ? "Update Dose" : "Log Dose"}
+                    {savingDose ? t("disease.saving") : editDose ? t("disease.updateDose") : t("disease.logDose")}
                   </Button>
                   {editDose && <Button variant="outline" onClick={resetDoseForm} className="rounded-lg">{t('farmer.cancel')}</Button>}
                 </div>
@@ -1309,7 +1322,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <div className="w-2 h-2 bg-indigo-500 rounded-full" />
-                    Dose Log
+                    {t("disease.doseLog")}
                   </CardTitle>
                   <Select value={filterDoseRecord || "all"} onValueChange={v => setFilterDoseRecord(v === "all" ? "" : v)}>
                     <SelectTrigger className="w-72">
@@ -1332,24 +1345,24 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                     <TableHeader>
                       <TableRow>
                         <TableHead>{t('farmer.date')}</TableHead>
-                        <TableHead>Session</TableHead>
+                        <TableHead>{t("disease.session")}</TableHead>
                         <TableHead>{t('farmer.animal')}</TableHead>
                         <TableHead>{t('farmer.disease')}</TableHead>
-                        <TableHead>Medicines</TableHead>
-                        <TableHead>Med. Cost</TableHead>
-                        <TableHead>Vet Cost</TableHead>
-                        <TableHead>Total</TableHead>
+                        <TableHead>{t("disease.medicines")}</TableHead>
+                        <TableHead>{t("disease.medCost")}</TableHead>
+                        <TableHead>{t("disease.vetCost")}</TableHead>
+                        <TableHead>{t("disease.total")}</TableHead>
                         <TableHead>{t('farmer.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredDoses.length === 0 ? (
-                        <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">No doses logged yet</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">{t("disease.noDosesLoggedYet")}</TableCell></TableRow>
                       ) : filteredDoses.map(d => (
                         <TableRow key={d._id}>
                           <TableCell className="text-sm">{d.date}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={SESSION_STYLES[d.session] || ""}>{d.session}</Badge>
+                            <Badge variant="outline" className={SESSION_STYLES[d.session] || ""}>{sessionLabel(d.session)}</Badge>
                           </TableCell>
                           <TableCell className="font-medium">{d.animalName || "—"}</TableCell>
                           <TableCell className="text-sm text-gray-600">{d.diseaseName || "—"}</TableCell>
@@ -1357,7 +1370,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                             {d.medicines && d.medicines.length > 0
                               ? d.medicines.map((m, i) => (
                                 <div key={i} className="whitespace-nowrap">
-                                  {m.medicineName} <span className="text-gray-400">({m.doseCount} dose{m.doseCount !== 1 ? "s" : ""}{m.volumeMl ? `, ${m.volumeMl}mL` : ""}{m.cost > 0 ? `, RWF ${m.cost.toLocaleString()}` : ""})</span>
+                                  {m.medicineName} <span className="text-gray-400">({doseCountLabel(m.doseCount)}{m.volumeMl ? `, ${m.volumeMl}mL` : ""}{m.cost > 0 ? `, RWF ${m.cost.toLocaleString()}` : ""})</span>
                                 </div>
                               ))
                               : <span className="text-gray-400">—</span>}
@@ -1391,9 +1404,9 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                 {/* Dose summary footer */}
                 {filteredDoses.length > 0 && (
                   <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-100 flex flex-wrap gap-6 text-sm">
-                    <span className="text-gray-600">Total doses: <strong className="text-gray-900">{filteredDoses.reduce((s, d) => s + doseTotalCount(d), 0)}</strong></span>
-                    <span className="text-gray-600">Medicine cost: <strong className="text-gray-900">RWF {filteredDoses.reduce((s, d) => s + doseMedicineCost(d), 0).toLocaleString()}</strong></span>
-                    <span className="text-gray-600">Vet cost: <strong className="text-gray-900">RWF {filteredDoses.reduce((s, d) => s + d.vetCost, 0).toLocaleString()}</strong></span>
+                    <span className="text-gray-600">{t("disease.totalDoses")} <strong className="text-gray-900">{filteredDoses.reduce((s, d) => s + doseTotalCount(d), 0)}</strong></span>
+                    <span className="text-gray-600">{t("disease.medicineCost")} <strong className="text-gray-900">RWF {filteredDoses.reduce((s, d) => s + doseMedicineCost(d), 0).toLocaleString()}</strong></span>
+                    <span className="text-gray-600">{t("disease.vetCost2")} <strong className="text-gray-900">RWF {filteredDoses.reduce((s, d) => s + d.vetCost, 0).toLocaleString()}</strong></span>
                     <span className="text-green-700 font-semibold">Total: RWF {filteredDoses.reduce((s, d) => s + d.totalCost, 0).toLocaleString()}</span>
                   </div>
                 )}
@@ -1418,7 +1431,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                   <SelectTrigger><SelectValue placeholder={t('farmer.allStatuses')} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">{t('farmer.allStatuses')}</SelectItem>
-                    {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {STATUSES.map(s => <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Combobox
@@ -1429,13 +1442,13 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                     ...animals.map(a => ({ value: a._id, label: a.name })),
                   ]}
                   placeholder={t('farmer.allAnimals')}
-                  searchPlaceholder={t('farmer.searchAnimals') || "Search animals…"}
-                  emptyText={t('farmer.noResultsFound') || "No animals found."}
+                  searchPlaceholder={t('farmer.searchAnimals') || t("disease.searchAnimals")}
+                  emptyText={t('farmer.noResultsFound') || t("disease.noAnimalsFound")}
                 />
                 <Input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} />
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-gray-500 whitespace-nowrap">{filteredRecords.length} found</p>
-                  <Button variant="outline" onClick={() => { setFilterStatus(""); setFilterAnimal(""); setFilterMonth("") }} className="rounded-xl text-xs ml-auto">Clear</Button>
+                  <p className="text-sm text-gray-500 whitespace-nowrap">{t("disease.foundCount").replace("{count}", String(filteredRecords.length))}</p>
+                  <Button variant="outline" onClick={() => { setFilterStatus(""); setFilterAnimal(""); setFilterMonth("") }} className="rounded-xl text-xs ml-auto">{t("common.clear")}</Button>
                 </div>
               </div>
 
@@ -1446,10 +1459,10 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                       <TableHead>{t('farmer.animal')}</TableHead>
                       <TableHead>{t('farmer.disease')}</TableHead>
                       <TableHead>{t('farmer.status')}</TableHead>
-                      <TableHead>Diagnosed</TableHead>
-                      <TableHead>Resolved</TableHead>
-                      <TableHead>Veterinarian</TableHead>
-                      <TableHead>Vet Origin</TableHead>
+                      <TableHead>{t("disease.diagnosed")}</TableHead>
+                      <TableHead>{t("disease.resolved")}</TableHead>
+                      <TableHead>{t("disease.veterinarian")}</TableHead>
+                      <TableHead>{t("disease.vetOrigin")}</TableHead>
                       <TableHead>{t('farmer.treatment')}</TableHead>
                       <TableHead>{t('farmer.actions')}</TableHead>
                     </TableRow>
@@ -1462,7 +1475,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         <TableCell className="font-medium">{r.animalName || "—"}</TableCell>
                         <TableCell className="font-semibold text-gray-800">{r.diseaseName}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={STATUS_STYLES[r.status] || ""}>{r.status}</Badge>
+                          <Badge variant="outline" className={STATUS_STYLES[r.status] || ""}>{statusLabel(r.status)}</Badge>
                         </TableCell>
                         <TableCell className="text-sm">{r.diagnosedDate}</TableCell>
                         <TableCell className="text-sm">{r.resolvedDate || <span className="text-gray-400">—</span>}</TableCell>
@@ -1505,7 +1518,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                 className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <Download className="h-4 w-4" />
-                Export Report
+                {t("disease.exportReport")}
               </Button>
             </div>
             {/* Daily cost breakdown */}
@@ -1514,7 +1527,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <div className="w-2 h-2 bg-green-500 rounded-full" />
-                    Daily Treatment Cost
+                    {t("disease.dailyTreatmentCost")}
                   </CardTitle>
                   <Select value={reportCaseId || "all"} onValueChange={v => setReportCaseId(v === "all" ? "" : v)}>
                     <SelectTrigger className="w-full sm:w-80">
@@ -1533,7 +1546,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
               </CardHeader>
               <CardContent className="space-y-6">
                 {dailyCostBreakdown.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">No cost data yet — log doses to see the breakdown</div>
+                  <div className="text-center py-8 text-gray-400">{t("disease.noCostDataYetLogDoses")}</div>
                 ) : (
                   <>
                     {/* Bar chart — daily cost */}
@@ -1542,8 +1555,8 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                         <YAxis tick={{ fontSize: 11 }} />
-                        <Tooltip formatter={(v: any) => [`RWF ${Number(v).toLocaleString()}`, "Daily Cost"]} />
-                        <Bar dataKey="dayTotal" fill="#16a34a" radius={[4, 4, 0, 0]} name="Daily Cost" />
+                        <Tooltip formatter={(v: any) => [`RWF ${Number(v).toLocaleString()}`, t("disease.dailyCost")]} />
+                        <Bar dataKey="dayTotal" fill="#16a34a" radius={[4, 4, 0, 0]} name={t("disease.dailyCost")} />
                       </BarChart>
                     </ResponsiveContainer>
 
@@ -1553,12 +1566,12 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         <TableHeader>
                           <TableRow>
                             <TableHead>{t('farmer.date')}</TableHead>
-                            <TableHead>Morning Doses</TableHead>
-                            <TableHead>Morning Cost</TableHead>
-                            <TableHead>Evening Doses</TableHead>
-                            <TableHead>Evening Cost</TableHead>
-                            <TableHead>Daily Total</TableHead>
-                            <TableHead>Cumulative Total</TableHead>
+                            <TableHead>{t("disease.morningDoses")}</TableHead>
+                            <TableHead>{t("disease.morningCost")}</TableHead>
+                            <TableHead>{t("disease.eveningDoses")}</TableHead>
+                            <TableHead>{t("disease.eveningCost")}</TableHead>
+                            <TableHead>{t("disease.dailyTotal")}</TableHead>
+                            <TableHead>{t("disease.cumulativeTotal")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1594,23 +1607,23 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                     {/* Grand total footer */}
                     <div className="p-4 bg-green-50 rounded-xl border border-green-100 grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-gray-500 text-xs uppercase font-medium">Treatment Days</p>
+                        <p className="text-gray-500 text-xs uppercase font-medium">{t("disease.treatmentDays")}</p>
                         <p className="text-xl font-bold text-gray-900">{dailyCostBreakdown.length}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500 text-xs uppercase font-medium">Total Doses</p>
+                        <p className="text-gray-500 text-xs uppercase font-medium">{t("disease.totalDoses2")}</p>
                         <p className="text-xl font-bold text-gray-900">
                           {dailyCostBreakdown.reduce((s, r) => s + r.morning.reduce((a, d) => a + doseTotalCount(d), 0) + r.evening.reduce((a, d) => a + doseTotalCount(d), 0), 0)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500 text-xs uppercase font-medium">Avg Daily Cost</p>
+                        <p className="text-gray-500 text-xs uppercase font-medium">{t("disease.avgDailyCost")}</p>
                         <p className="text-xl font-bold text-gray-900">
                           RWF {dailyCostBreakdown.length > 0 ? Math.round(dailyCostBreakdown[dailyCostBreakdown.length - 1].runningTotal / dailyCostBreakdown.length).toLocaleString() : 0}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500 text-xs uppercase font-medium">Grand Total</p>
+                        <p className="text-gray-500 text-xs uppercase font-medium">{t("disease.grandTotal")}</p>
                         <p className="text-xl font-bold text-green-700">
                           RWF {dailyCostBreakdown.length > 0 ? dailyCostBreakdown[dailyCostBreakdown.length - 1].runningTotal.toLocaleString() : 0}
                         </p>
@@ -1626,21 +1639,21 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                  Total Cost per Animal
+                  {t("disease.totalCostPerAnimal")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {costPerAnimal.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">No cost data yet</div>
+                  <div className="text-center py-8 text-gray-400">{t("disease.noCostDataYet")}</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>{t('farmer.animal')}</TableHead>
-                          <TableHead>Total Doses</TableHead>
-                          <TableHead>Medicine Cost (RWF)</TableHead>
-                          <TableHead>Vet Cost (RWF)</TableHead>
+                          <TableHead>{t("disease.totalDoses2")}</TableHead>
+                          <TableHead>{t("disease.medicineCostRwf")}</TableHead>
+                          <TableHead>{t("disease.vetCostRwf2")}</TableHead>
                           <TableHead>{t('farmer.totalCostRWF')}</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1666,12 +1679,12 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-red-500 rounded-full" />
-                  Status Breakdown
+                  {t("disease.statusBreakdown")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {statusData.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">No data available</div>
+                  <div className="text-center py-8 text-gray-400">{t("disease.noDataAvailable")}</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
@@ -1691,12 +1704,12 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                  Most Frequent Diseases
+                  {t("disease.mostFrequentDiseases")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {diseaseFrequency.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">No data available</div>
+                  <div className="text-center py-8 text-gray-400">{t("disease.noDataAvailable")}</div>
                 ) : (
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={diseaseFrequency} layout="vertical">
@@ -1732,7 +1745,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                   <SelectItem value="all">{t('farmer.allCases')}</SelectItem>
                   {records.map(r => (
                     <SelectItem key={r._id} value={r._id}>
-                      {r.animalName} — {r.diseaseName} ({r.status})
+                      {r.animalName} — {r.diseaseName} ({statusLabel(r.status)})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1748,11 +1761,11 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                 const grandTotal = previewDaily.length > 0 ? previewDaily[previewDaily.length - 1].runningTotal : 0
                 return (
                   <div className="text-sm space-y-1">
-                    <p className="font-medium text-red-700">Preview</p>
+                    <p className="font-medium text-red-700">{t("disease.preview")}</p>
                     <p className="text-gray-600">
-                      {previewRecs.length} case{previewRecs.length !== 1 ? 's' : ''} &bull; {previewDoses.reduce((s, d) => s + doseTotalCount(d), 0)} doses &bull; {previewDaily.length} treatment day{previewDaily.length !== 1 ? 's' : ''}
+                      {t(previewRecs.length === 1 ? "disease.previewCasesOne" : "disease.previewCasesMany").replace("{count}", String(previewRecs.length))} &bull; {doseCountLabel(previewDoses.reduce((s, d) => s + doseTotalCount(d), 0))} &bull; {t(previewDaily.length === 1 ? "disease.previewDaysOne" : "disease.previewDaysMany").replace("{count}", String(previewDaily.length))}
                     </p>
-                    <p className="text-gray-600">Total cost: <strong className="text-green-700">RWF {grandTotal.toLocaleString()}</strong></p>
+                    <p className="text-gray-600">{t("disease.totalCost")} <strong className="text-green-700">RWF {grandTotal.toLocaleString()}</strong></p>
                   </div>
                 )
               })()}
@@ -1766,7 +1779,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                 className="rounded-lg bg-green-600 hover:bg-green-700 text-white gap-2"
               >
                 <Download className="h-4 w-4" />
-                {exporting ? 'Exporting...' : 'Excel'}
+                {exporting ? t("disease.exporting") : 'Excel'}
               </Button>
               <Button
                 onClick={exportToPDF}
@@ -1774,7 +1787,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                 className="col-span-2 bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2"
               >
                 <FileText className="h-4 w-4" />
-                {exporting ? 'Exporting...' : 'Export PDF'}
+                {exporting ? t("disease.exporting") : t("disease.exportPdf")}
               </Button>
             </div>
           </div>
@@ -1785,12 +1798,12 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Disease Record</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure? This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{t("disease.deleteDiseaseRecord")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("disease.areYouSureThisActionCannot")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)} className="bg-red-600 hover:bg-red-700 text-white">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1799,12 +1812,12 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       <AlertDialog open={!!deleteDoseId} onOpenChange={open => !open && setDeleteDoseId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Dose Record</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete this dose entry? This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{t("disease.deleteDoseRecord")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("disease.areYouSureYouWantTo")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => deleteDoseId && handleDeleteDose(deleteDoseId)} className="bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={() => deleteDoseId && handleDeleteDose(deleteDoseId)} className="bg-red-600 hover:bg-red-700 text-white">{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

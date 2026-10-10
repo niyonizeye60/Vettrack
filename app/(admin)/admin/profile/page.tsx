@@ -186,7 +186,7 @@ export default function AdminProfilePage() {
         {/* Banner */}
         <div className="h-36">
           {bannerImage ? (
-            <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
+            <img src={bannerImage} alt={t("profile.banner")} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-r from-green-600 to-green-500" />
           )}

@@ -523,7 +523,7 @@ export default function SuperAdminDashboardClient({
                       <span className="text-sm font-medium text-gray-900">{t('superadmin.database') || 'Database'}</span>
                       <p className="text-xs text-gray-500">
                         {typeof systemHealth.database.size === 'number'
-                          ? `${systemHealth.database.size}MB · ${systemHealth.database.collections} collections`
+                          ? t("saDashboard.dbSize").replace("{size}", String(systemHealth.database.size)).replace("{count}", String(systemHealth.database.collections))
                           : (t('superadmin.primaryBackup') || 'Primary & Backup')}
                       </p>
                     </div>

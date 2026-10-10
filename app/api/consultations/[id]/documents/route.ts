@@ -6,6 +6,7 @@ import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import clientPromise from "@/lib/db"
 import { logActivity } from "@/lib/activity-log"
+import { notificationText } from "@/lib/notification-messages"
 import {
   DOCUMENT_MAX_PER_CONSULTATION,
   DOCUMENT_UPLOAD_STATUSES,
@@ -94,10 +95,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     try {
       const farmerId = record.farmerId
       if (farmerId && ObjectId.isValid(farmerId)) {
-        const animalSuffix = consultation.animalName ? ` for ${consultation.animalName}` : ""
         await db.collection("notifications").insertOne({
-          title: "New document from your vet",
-          message: `Your vet added "${name}" to your consultation${animalSuffix}.`,
+          ...(consultation.animalName
+            ? notificationText("consultationDocumentAnimal", { name, animal: consultation.animalName })
+            : notificationText("consultationDocument", { name })),
           type: "consultation",
           priority: "normal",
           read: false,

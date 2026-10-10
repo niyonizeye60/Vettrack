@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { MessageCircle, X, Check, Send } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function EnhancedWhatsAppWidget() {
+  const { t } = useLanguage()
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState("")
   const [name, setName] = useState("")
@@ -23,7 +25,7 @@ export default function EnhancedWhatsAppWidget() {
   const handleSubmit = () => {
     if (!name || !message) return
     
-    const whatsappMessage = encodeURIComponent(`Hello, my name is ${name}. ${message}`)
+    const whatsappMessage = encodeURIComponent(t("whatsapp.introMessage").replace("{name}", name).replace("{message}", message))
     window.open(`https://wa.me/${phoneNumber.replace(/\s+/g, '')}?text=${whatsappMessage}`, "_blank")
     
     setIsOpen(false)
@@ -45,7 +47,7 @@ export default function EnhancedWhatsAppWidget() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-lg hover:bg-[#128C7E] transition-all duration-300 flex items-center justify-center"
-        aria-label="Contact us on WhatsApp"
+        aria-label={t("whatsapp.contactUs")}
       >
         {isOpen ? 
           <X className="h-6 w-6" /> : 
@@ -71,9 +73,9 @@ export default function EnhancedWhatsAppWidget() {
                 )}
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-base">Customer Support</h3>
+                <h3 className="font-bold text-base">{t("whatsapp.support")}</h3>
                 <p className="text-xs opacity-80">
-                  {isOnline ? 'Online' : `Last seen ${lastSeen}`}
+                  {isOnline ? t("whatsapp.online") : t("whatsapp.lastSeen").replace("{time}", lastSeen)}
                 </p>
               </div>
               <button 
@@ -95,7 +97,7 @@ export default function EnhancedWhatsAppWidget() {
           >
             {/* Welcome Message */}
             <div className="bg-white rounded-lg p-2 max-w-[80%] shadow-sm self-start relative">
-              <p className="text-sm">Hello! 👋 How can we help you today?</p>
+              <p className="text-sm">{t("whatsapp.greeting")}</p>
               <span className="text-[10px] text-gray-500 absolute bottom-1 right-2">10:22 AM</span>
               <div className="absolute -bottom-1 -left-1 transform rotate-45 w-3 h-3 bg-white"></div>
             </div>
@@ -115,7 +117,7 @@ export default function EnhancedWhatsAppWidget() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Your Name"
+              placeholder={t("whatsapp.yourName")}
               className="w-full p-2 mb-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-[#25D366]"
             />
             <div className="flex items-center">
@@ -123,7 +125,7 @@ export default function EnhancedWhatsAppWidget() {
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a message..."
+                placeholder={t("whatsapp.typeMessage")}
                 className="flex-1 p-2 rounded-full focus:outline-none"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter' && name && message) {
@@ -144,7 +146,7 @@ export default function EnhancedWhatsAppWidget() {
           {/* Footer */}
           <div className="bg-white p-2 text-center border-t">
             <div className="flex items-center justify-center text-xs text-gray-500">
-              <span>Secured by </span>
+              <span>{t("whatsapp.securedBy")} </span>
               <span className="text-[#25D366] font-semibold ml-1 flex items-center">
                 WhatsApp
                 <Check className="h-3 w-3 ml-1 text-[#25D366]" />

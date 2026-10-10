@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react"
 import Link from "next/link"
 import { loginUser } from "@/lib/actions/auth"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
@@ -17,7 +18,7 @@ export default function LoginForm() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,7 +33,7 @@ export default function LoginForm() {
       const result = await loginUser(formData)
 
       if (!result.success) {
-        setError(result.message || "We couldn't sign you in. Please try again.")
+        setError(localizeError(result.message, language) || t("auth.signInFailed"))
         return
       }
 
@@ -46,7 +47,7 @@ export default function LoginForm() {
       // Next.js replaced the reason with an opaque digest. None of those read
       // as anything useful to the user, so they never get shown.
       console.error("Login error:", error)
-      setError("We couldn't reach the server. Please check your internet connection and try again.")
+      setError(t("auth.serverUnreachable"))
     } finally {
       setIsLoading(false)
     }

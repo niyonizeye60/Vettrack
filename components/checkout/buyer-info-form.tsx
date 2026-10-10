@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { buyerSchema, type Buyer } from "@/lib/validations/checkout"
 
 interface BuyerInfoFormProps {
@@ -14,7 +15,7 @@ interface BuyerInfoFormProps {
 }
 
 export default function BuyerInfoForm({ initialValue, onSubmit }: BuyerInfoFormProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [values, setValues] = useState<Buyer>(initialValue)
   const [errors, setErrors] = useState<Partial<Record<keyof Buyer, string>>>({})
 
@@ -29,7 +30,7 @@ export default function BuyerInfoForm({ initialValue, onSubmit }: BuyerInfoFormP
       const fieldErrors: Partial<Record<keyof Buyer, string>> = {}
       for (const issue of result.error.issues) {
         const field = issue.path[0] as keyof Buyer
-        if (!fieldErrors[field]) fieldErrors[field] = issue.message
+        if (!fieldErrors[field]) fieldErrors[field] = localizeError(issue.message, language) ?? issue.message
       }
       setErrors(fieldErrors)
       return

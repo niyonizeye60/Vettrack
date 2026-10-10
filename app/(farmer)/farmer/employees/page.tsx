@@ -132,10 +132,10 @@ export default function EmployeesPage() {
 
   const validateEmployee = () => {
     const e: Record<string, string> = {}
-    if (!name.trim()) e.name = "Enter employee name"
-    if (!position.trim()) e.position = "Enter a position"
-    if (!wageType) e.wageType = "Select wage type"
-    if (!wageAmount || Number(wageAmount) <= 0) e.wageAmount = "Enter a valid wage amount"
+    if (!name.trim()) e.name = t("employees.enterEmployeeName")
+    if (!position.trim()) e.position = t("employees.enterAPosition")
+    if (!wageType) e.wageType = t("employees.selectWageType")
+    if (!wageAmount || Number(wageAmount) <= 0) e.wageAmount = t("employees.enterAValidWageAmount")
     setEmpErrors(e)
     return Object.keys(e).length === 0
   }
@@ -177,10 +177,10 @@ export default function EmployeesPage() {
 
   const validatePayment = () => {
     const e: Record<string, string> = {}
-    if (!payEmployeeId) e.payEmployeeId = "Select an employee"
-    if (!amount || Number(amount) <= 0) e.amount = "Enter a valid amount"
-    if (!paymentDate) e.paymentDate = "Select a date"
-    if (!method) e.method = "Select a payment method"
+    if (!payEmployeeId) e.payEmployeeId = t("employees.selectAnEmployee")
+    if (!amount || Number(amount) <= 0) e.amount = t("employees.enterAValidAmount")
+    if (!paymentDate) e.paymentDate = t("employees.selectADate")
+    if (!method) e.method = t("employees.selectAPaymentMethod")
     setPayErrors(e)
     return Object.keys(e).length === 0
   }
@@ -304,19 +304,19 @@ export default function EmployeesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.employeeName')} *</label>
-                  <Input placeholder="e.g. Jean Baptiste" value={name} onChange={e => setName(e.target.value)} className={empErrors.name ? "border-red-500" : ""} />
+                  <Input placeholder={t("employees.eGJeanBaptiste")} value={name} onChange={e => setName(e.target.value)} className={empErrors.name ? "border-red-500" : ""} />
                   {empErrors.name && <p className="text-xs text-red-500">{empErrors.name}</p>}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.position')} *</label>
-                  <Input placeholder="e.g. Herder, Milker" value={position} onChange={e => setPosition(e.target.value)} className={empErrors.position ? "border-red-500" : ""} />
+                  <Input placeholder={t("employees.eGHerderMilker")} value={position} onChange={e => setPosition(e.target.value)} className={empErrors.position ? "border-red-500" : ""} />
                   {empErrors.position && <p className="text-xs text-red-500">{empErrors.position}</p>}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.phone')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input placeholder="e.g. 078xxxxxxx" value={phone} onChange={e => setPhone(e.target.value)} />
+                  <Input placeholder={t("employees.eG078xxxxxxx")} value={phone} onChange={e => setPhone(e.target.value)} />
                 </div>
 
                 <div className="space-y-1">
@@ -471,7 +471,7 @@ export default function EmployeesPage() {
 
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-gray-700">{t('farmer.period')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                      <Input placeholder="e.g. July 2026" value={period} onChange={e => setPeriod(e.target.value)} />
+                      <Input placeholder={t("employees.eGJuly2026")} value={period} onChange={e => setPeriod(e.target.value)} />
                     </div>
 
                     <div className="space-y-1">

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart3, TrendingUp, Users, Calendar, Download, Eye, MessageSquare, ArrowRight } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeColumns } from "@/lib/export-columns"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { logPortalExport } from "@/lib/actions"
@@ -250,11 +251,11 @@ export default function AdminReports() {
       const wb = XLSX.utils.book_new()
       if (summary.length) {
         const summarySheet = XLSX.utils.aoa_to_sheet(summary)
-        XLSX.utils.book_append_sheet(wb, summarySheet, "Summary")
+        XLSX.utils.book_append_sheet(wb, summarySheet, t("adminReports.summary"))
       }
       if (table.rows.length) {
         const tableSheet = XLSX.utils.aoa_to_sheet([table.headers, ...table.rows])
-        XLSX.utils.book_append_sheet(wb, tableSheet, "Data")
+        XLSX.utils.book_append_sheet(wb, tableSheet, t("adminReports.data"))
       }
       XLSX.writeFile(wb, `${type}-report-${new Date().toISOString().split('T')[0]}.xlsx`)
       logPortalExport(`${type} report`, "Excel")
@@ -282,30 +283,30 @@ export default function AdminReports() {
       const XLSX = await import('xlsx')
       const wb = XLSX.utils.book_new()
 
-      const usersSheet = XLSX.utils.json_to_sheet(data.users.items.map((u) => ({
+      const usersSheet = XLSX.utils.json_to_sheet(localizeColumns(data.users.items.map((u) => ({
         Name: u.name, Role: u.role, District: u.district || "-", Status: u.status, Registered: new Date(u.createdAt).toLocaleDateString(),
-      })))
-      XLSX.utils.book_append_sheet(wb, usersSheet, "Users")
+      })), t))
+      XLSX.utils.book_append_sheet(wb, usersSheet, t("adminReports.users"))
 
-      const consultSheet = XLSX.utils.json_to_sheet(data.consultations.items.map((c) => ({
+      const consultSheet = XLSX.utils.json_to_sheet(localizeColumns(data.consultations.items.map((c) => ({
         Farmer: c.farmerName, Doctor: c.doctorName, Service: c.service || "-", Date: c.date || "-", Time: c.time || "-", Type: c.type || "-", Status: c.status,
-      })))
-      XLSX.utils.book_append_sheet(wb, consultSheet, "Consultations")
+      })), t))
+      XLSX.utils.book_append_sheet(wb, consultSheet, t("adminReports.consultations"))
 
-      const diseaseSheet = XLSX.utils.json_to_sheet(data.diseases.items.map((r) => ({
+      const diseaseSheet = XLSX.utils.json_to_sheet(localizeColumns(data.diseases.items.map((r) => ({
         Farmer: r.farmerName, District: r.district || "-", Disease: r.diseaseName, Status: r.status, Diagnosed: r.diagnosedDate || "-",
-      })))
-      XLSX.utils.book_append_sheet(wb, diseaseSheet, "Diseases")
+      })), t))
+      XLSX.utils.book_append_sheet(wb, diseaseSheet, t("adminReports.diseases"))
 
-      const ticketSheet = XLSX.utils.json_to_sheet(data.tickets.items.map((tk) => ({
+      const ticketSheet = XLSX.utils.json_to_sheet(localizeColumns(data.tickets.items.map((tk) => ({
         Subject: tk.subject, Requester: tk.requesterName, Role: tk.requesterRole, Status: tk.status, AssignedTo: tk.assignedToName || "-", Created: new Date(tk.createdAt).toLocaleDateString(),
-      })))
-      XLSX.utils.book_append_sheet(wb, ticketSheet, "Support Tickets")
+      })), t))
+      XLSX.utils.book_append_sheet(wb, ticketSheet, t("adminReports.supportTickets"))
 
-      const regionalSheet = XLSX.utils.json_to_sheet(data.byDistrict.map((d) => ({
+      const regionalSheet = XLSX.utils.json_to_sheet(localizeColumns(data.byDistrict.map((d) => ({
         District: d.district, Farmers: d.farmers, Doctors: d.doctors, Consultations: d.consultations, "Disease Cases": d.diseases,
-      })))
-      XLSX.utils.book_append_sheet(wb, regionalSheet, "Regional Summary")
+      })), t))
+      XLSX.utils.book_append_sheet(wb, regionalSheet, t("adminReports.regionalSummary"))
 
       XLSX.writeFile(wb, `vettrack-all-data-${new Date().toISOString().split('T')[0]}.xlsx`)
       logPortalExport("All data", "Excel")

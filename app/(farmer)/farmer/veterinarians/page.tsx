@@ -21,6 +21,7 @@ import {
 import { Stethoscope, ShieldCheck, Plus, Pencil, Trash2, Syringe, ShieldAlert, KeyRound, Lock, History, Search, List, Grid3X3 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import {
   PERMISSION_MODULES, PERMISSION_ACTIONS, emptyPermissions,
   type PermissionMap, type PermissionAction, type PermissionModule,
@@ -73,18 +74,18 @@ const MODULE_TONE: Record<string, string> = {
   access: "bg-purple-50 text-purple-700 border-purple-200",
 }
 
-function dayLabel(iso: string) {
+function dayLabel(iso: string, t: (key: string) => string) {
   const d = new Date(iso)
   const today = new Date()
   const yesterday = new Date()
   yesterday.setDate(today.getDate() - 1)
-  if (d.toDateString() === today.toDateString()) return "Today"
-  if (d.toDateString() === yesterday.toDateString()) return "Yesterday"
+  if (d.toDateString() === today.toDateString()) return t("common.today")
+  if (d.toDateString() === yesterday.toDateString()) return t("common.yesterday")
   return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
 }
 
 export default function FarmerVeterinariansPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
 
   const [user, setUser] = useState<any>(null)
@@ -254,14 +255,14 @@ export default function FarmerVeterinariansPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setFormError(data.error || "Failed to save")
+        setFormError(localizeError(data.error, language) || t("farmer.failedToSaveAccess"))
         return
       }
       setDialogOpen(false)
       toast({ title: editing ? t("farmer.vetAccessUpdated") : t("farmer.vetAccessGranted") })
       await Promise.all([loadGrants(), loadAudit()])
     } catch {
-      setFormError("Failed to save")
+      setFormError(t("farmer.failedToSaveAccess"))
     } finally {
       setSaving(false)
     }
@@ -277,7 +278,7 @@ export default function FarmerVeterinariansPage() {
         await Promise.all([loadGrants(), loadAudit()])
       } else {
         const data = await res.json()
-        toast({ title: data.error || "Failed to revoke", variant: "destructive" })
+        toast({ title: localizeError(data.error, language) || t("farmer.failedToRevokeAccess"), variant: "destructive" })
       }
     } finally {
       setSaving(false)
@@ -294,7 +295,7 @@ export default function FarmerVeterinariansPage() {
   const groupedAudit = useMemo(() => {
     const groups: { label: string; entries: AuditEntry[] }[] = []
     for (const entry of audit) {
-      const label = dayLabel(entry.createdAt)
+      const label = dayLabel(entry.createdAt, t)
       const last = groups[groups.length - 1]
       if (last && last.label === label) last.entries.push(entry)
       else groups.push({ label, entries: [entry] })

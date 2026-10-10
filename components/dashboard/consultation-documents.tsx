@@ -8,6 +8,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import {
   DOCUMENT_ACCEPT,
@@ -40,7 +41,7 @@ export default function ConsultationDocuments({
   canUpload = false,
   onChange,
 }: ConsultationDocumentsProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const inputRef = useRef<HTMLInputElement>(null)
   const [staged, setStaged] = useState<File | null>(null)
@@ -88,7 +89,7 @@ export default function ConsultationDocuments({
         setStaged(null)
         onChange?.()
       } else {
-        toast({ title: t("consultationDocs.uploadFailed"), description: data?.message, variant: "destructive" })
+        toast({ title: t("consultationDocs.uploadFailed"), description: localizeError(data?.message, language), variant: "destructive" })
       }
     } catch {
       toast({ title: t("consultationDocs.uploadFailed"), variant: "destructive" })

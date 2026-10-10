@@ -23,7 +23,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useLanguage } from "@/contexts/LanguageContext"
-import { localizeNotification } from "@/lib/notification-messages"
+import { localizeError } from "@/lib/error-messages"
+import { localizeNotification, notificationTypeLabel, notificationPriorityLabel } from "@/lib/notification-messages"
 import { createNotificationTemplate, sendBulkNotification, scheduleNotification, deleteNotificationTemplate } from "@/lib/actions/superadmin"
 import { Plus, Send, Clock, FileText, Users, Calendar, Trash2, RotateCcw, Eye, Search } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
@@ -89,7 +90,7 @@ export default function NotificationsPageClient({
 
   const handleCreateTemplate = async () => {
     if (!templateForm.name || !templateForm.title || !templateForm.message) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.pleaseFillInAllRequiredFields"), variant: "destructive" })
       return
     }
 
@@ -97,15 +98,15 @@ export default function NotificationsPageClient({
     try {
       const result = await createNotificationTemplate(templateForm)
       if (result.success) {
-        toast({ title: "Success", description: "Template created successfully" })
+        toast({ title: t("saNotifs.success"), description: t("saNotifs.templateCreatedSuccessfully") })
         setIsCreateTemplateOpen(false)
         resetTemplateForm()
         window.location.reload()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to create template", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saNotifs.failedToCreateTemplate"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to create template", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.failedToCreateTemplate"), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -113,7 +114,7 @@ export default function NotificationsPageClient({
 
   const handleSendNotification = async () => {
     if (!selectedTemplate || selectedUsers.length === 0) {
-      toast({ title: "Error", description: "Please select a template and users", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.pleaseSelectATemplateAndUsers"), variant: "destructive" })
       return
     }
 
@@ -121,15 +122,15 @@ export default function NotificationsPageClient({
     try {
       const result = await sendBulkNotification(selectedTemplate, selectedUsers)
       if (result.success) {
-        toast({ title: "Success", description: `Notification sent to ${result.count} users` })
+        toast({ title: t("saNotifs.success"), description: t("saNotifs.sentTo").replace("{count}", String(result.count)) })
         setIsSendNotificationOpen(false)
         setSelectedUsers([])
         setSelectedTemplate("")
       } else {
-        toast({ title: "Error", description: result.message || "Failed to send notification", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saNotifs.failedToSendNotification"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to send notification", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.failedToSendNotification"), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -137,7 +138,7 @@ export default function NotificationsPageClient({
 
   const handleScheduleNotification = async () => {
     if (!selectedTemplate || selectedUsers.length === 0 || !scheduleForm.scheduledFor) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.pleaseFillInAllRequiredFields"), variant: "destructive" })
       return
     }
 
@@ -151,16 +152,16 @@ export default function NotificationsPageClient({
       })
       
       if (result.success) {
-        toast({ title: "Success", description: "Notification scheduled successfully" })
+        toast({ title: t("saNotifs.success"), description: t("saNotifs.notificationScheduledSuccessfully") })
         setIsScheduleOpen(false)
         setSelectedUsers([])
         setSelectedTemplate("")
         setScheduleForm({ scheduledFor: "", recurring: "" })
       } else {
-        toast({ title: "Error", description: result.message || "Failed to schedule notification", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saNotifs.failedToScheduleNotification"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to schedule notification", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.failedToScheduleNotification"), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -200,13 +201,13 @@ export default function NotificationsPageClient({
     try {
       const result = await deleteNotificationTemplate(templateToDelete)
       if (result.success) {
-        toast({ title: "Success", description: "Template deleted successfully" })
+        toast({ title: t("saNotifs.success"), description: t("saNotifs.templateDeletedSuccessfully") })
         setTemplates(prev => prev.filter(t => t._id !== templateToDelete))
       } else {
-        toast({ title: "Error", description: result.message || "Failed to delete template", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saNotifs.failedToDeleteTemplate"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to delete template", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.failedToDeleteTemplate"), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
       setDeleteDialogOpen(false)
@@ -231,9 +232,9 @@ export default function NotificationsPageClient({
     try {
       await fetch(`/api/notifications?id=${id}&permanent=true`, { method: 'DELETE' })
       setSentNotifications(prev => prev.filter(n => n._id !== id))
-      toast({ title: "Deleted", description: "Notification permanently deleted" })
+      toast({ title: t("saNotifs.deleted"), description: t("saNotifs.notificationPermanentlyDeleted") })
     } catch {
-      toast({ title: "Error", description: "Failed to delete", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.failedToDelete"), variant: "destructive" })
     } finally {
       setPermanentDeleteId(null)
     }
@@ -248,9 +249,9 @@ export default function NotificationsPageClient({
       })
       if (!res.ok) throw new Error()
       await fetchSentNotifications()
-      toast({ title: "Restored", description: "Notification restored and expiry reset to 48h" })
+      toast({ title: t("saNotifs.restored"), description: t("saNotifs.notificationRestoredAndExpiryResetTo") })
     } catch {
-      toast({ title: "Error", description: "Failed to restore", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.failedToRestore"), variant: "destructive" })
     } finally {
       setRestoreId(null)
     }
@@ -278,10 +279,10 @@ export default function NotificationsPageClient({
         fetch(`/api/notifications?id=${id}&permanent=true`, { method: 'DELETE' })
       ))
       setSentNotifications(prev => prev.filter(n => !selectedIds.has(n._id)))
-      toast({ title: "Deleted", description: `${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} permanently deleted` })
+      toast({ title: t("saNotifs.deleted"), description: t("saNotifs.deletedCount").replace("{count}", String(selectedIds.size)) })
       setSelectedIds(new Set())
     } catch {
-      toast({ title: "Error", description: "Bulk delete failed", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.bulkDeleteFailed"), variant: "destructive" })
     } finally {
       setBulkAction(null)
     }
@@ -297,10 +298,10 @@ export default function NotificationsPageClient({
         })
       ))
       await fetchSentNotifications()
-      toast({ title: "Restored", description: `${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} restored` })
+      toast({ title: t("saNotifs.restored"), description: t("saNotifs.restoredCount").replace("{count}", String(selectedIds.size)) })
       setSelectedIds(new Set())
     } catch {
-      toast({ title: "Error", description: "Bulk restore failed", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saNotifs.bulkRestoreFailed"), variant: "destructive" })
     } finally {
       setBulkAction(null)
     }
@@ -337,7 +338,7 @@ export default function NotificationsPageClient({
         <TabsList>
           <TabsTrigger value="templates">{t('superadmin.templates') || 'Templates'}</TabsTrigger>
           <TabsTrigger value="scheduled">{t('superadmin.scheduled') || 'Scheduled'}</TabsTrigger>
-          <TabsTrigger value="manage" onClick={fetchSentNotifications}>Manage Sent</TabsTrigger>
+          <TabsTrigger value="manage" onClick={fetchSentNotifications}>{t("saNotifs.manageSent")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="templates" className="space-y-4">
@@ -364,7 +365,7 @@ export default function NotificationsPageClient({
                       <Badge variant="secondary">{template.priority}</Badge>
                       {template.active && (
                         <Badge variant="default" className="bg-green-100 text-green-800">
-                          {t('superadmin.active') || 'Active'}
+                          {t('superadmin.active') || t("saNotifs.active")}
                         </Badge>
                       )}
                     </div>
@@ -435,13 +436,13 @@ export default function NotificationsPageClient({
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10" />
-                      <TableHead>Title</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Sent</TableHead>
-                      <TableHead>Expires</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t("saNotifs.title")}</TableHead>
+                      <TableHead>{t("saNotifs.type")}</TableHead>
+                      <TableHead>{t("saNotifs.priority")}</TableHead>
+                      <TableHead>{t("saNotifs.sent")}</TableHead>
+                      <TableHead>{t("saNotifs.expires")}</TableHead>
+                      <TableHead>{t("saNotifs.status")}</TableHead>
+                      <TableHead>{t("common.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -470,8 +471,8 @@ export default function NotificationsPageClient({
             <Card>
               <CardContent className="text-center py-12">
                 <Eye className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Sent Notifications</h3>
-                <p className="text-gray-600">No notifications have been sent yet.</p>
+                <h3 className="text-lg font-medium mb-2">{t("saNotifs.noSentNotifications")}</h3>
+                <p className="text-gray-600">{t("saNotifs.noNotificationsHaveBeenSentYet")}</p>
               </CardContent>
             </Card>
           ) : (
@@ -479,7 +480,7 @@ export default function NotificationsPageClient({
               {/* Bulk action toolbar */}
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border-b border-emerald-100 rounded-t-lg">
-                  <span className="text-sm font-medium text-emerald-700">{selectedIds.size} selected</span>
+                  <span className="text-sm font-medium text-emerald-700">{t("saNotifs.selectedCount").replace("{count}", String(selectedIds.size))}</span>
                   <div className="flex gap-2 ml-auto">
                     <Button
                       size="sm"
@@ -488,7 +489,7 @@ export default function NotificationsPageClient({
                       onClick={() => setBulkAction('restore')}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
-                      Restore Selected
+                      {t("saNotifs.restoreSelected")}
                     </Button>
                     <Button
                       size="sm"
@@ -497,7 +498,7 @@ export default function NotificationsPageClient({
                       onClick={() => setBulkAction('delete')}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      Delete Selected
+                      {t("saNotifs.deleteSelected")}
                     </Button>
                     <Button
                       size="sm"
@@ -505,7 +506,7 @@ export default function NotificationsPageClient({
                       className="text-gray-500"
                       onClick={() => setSelectedIds(new Set())}
                     >
-                      Clear
+                      {t("common.clear")}
                     </Button>
                   </div>
                 </div>
@@ -518,16 +519,16 @@ export default function NotificationsPageClient({
                         <Checkbox
                           checked={selectedIds.size === sentNotifications.length && sentNotifications.length > 0}
                           onCheckedChange={toggleSelectAll}
-                          aria-label="Select all"
+                          aria-label={t("saNotifs.selectAll")}
                         />
                       </TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Sent</TableHead>
-                      <TableHead>Expires</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead>{t("saNotifs.title")}</TableHead>
+                      <TableHead>{t("saNotifs.type")}</TableHead>
+                      <TableHead>{t("saNotifs.priority")}</TableHead>
+                      <TableHead>{t("saNotifs.sent")}</TableHead>
+                      <TableHead>{t("saNotifs.expires")}</TableHead>
+                      <TableHead>{t("saNotifs.status")}</TableHead>
+                      <TableHead>{t("common.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -543,34 +544,34 @@ export default function NotificationsPageClient({
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => toggleSelect(n._id)}
-                              aria-label="Select row"
+                              aria-label={t("saNotifs.selectRow")}
                             />
                           </TableCell>
                           <TableCell>
                             <p className="font-medium text-sm">{n.title}</p>
                             <p className="text-xs text-gray-500 truncate max-w-[180px]">{n.message}</p>
                           </TableCell>
-                          <TableCell><Badge variant="outline">{n.type}</Badge></TableCell>
-                          <TableCell><Badge variant="outline">{n.priority}</Badge></TableCell>
+                          <TableCell><Badge variant="outline">{notificationTypeLabel(n.type, t)}</Badge></TableCell>
+                          <TableCell><Badge variant="outline">{notificationPriorityLabel(n.priority, t)}</Badge></TableCell>
                           <TableCell className="text-xs text-gray-500">{new Date(n.createdAt).toLocaleDateString()}</TableCell>
                           <TableCell className="text-xs text-gray-500">{n.expiresAt ? new Date(n.expiresAt).toLocaleDateString() : '—'}</TableCell>
                           <TableCell>
                             {isDeleted ? (
-                              <Badge className="bg-red-100 text-red-700 text-xs">Deleted by {n.deletedBy.length} user{n.deletedBy.length > 1 ? 's' : ''}</Badge>
+                              <Badge className="bg-red-100 text-red-700 text-xs">{t("saNotifs.deletedBy").replace("{count}", String(n.deletedBy.length))}</Badge>
                             ) : isExpired ? (
-                              <Badge className="bg-amber-100 text-amber-700 text-xs">Expired</Badge>
+                              <Badge className="bg-amber-100 text-amber-700 text-xs">{t("saNotifs.expired")}</Badge>
                             ) : (
-                              <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge>
+                              <Badge className="bg-green-100 text-green-700 text-xs">{t("saNotifs.active")}</Badge>
                             )}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
                               {(isDeleted || isExpired) && (
-                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-emerald-50" title="Restore" onClick={() => setRestoreId(n._id)}>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-emerald-50" title={t("saNotifs.restore")} onClick={() => setRestoreId(n._id)}>
                                   <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
                                 </Button>
                               )}
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-red-50" title="Permanently Delete" onClick={() => setPermanentDeleteId(n._id)}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-red-50" title={t("saNotifs.permanentlyDelete")} onClick={() => setPermanentDeleteId(n._id)}>
                                 <Trash2 className="h-3.5 w-3.5 text-red-500" />
                               </Button>
                             </div>
@@ -591,21 +592,21 @@ export default function NotificationsPageClient({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {bulkAction === 'restore' ? 'Restore Selected Notifications' : 'Delete Selected Notifications'}
+              {bulkAction === 'restore' ? t("saNotifs.restoreSelectedNotifications") : t("saNotifs.deleteSelectedNotifications")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {bulkAction === 'restore'
-                ? `This will restore ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''} and reset their expiry to 48 hours from now.`
-                : `This will permanently delete ${selectedIds.size} notification${selectedIds.size > 1 ? 's' : ''}. This cannot be undone.`
+                ? t("saNotifs.restoreCountDesc").replace("{count}", String(selectedIds.size))
+                : t("saNotifs.deleteCountDesc").replace("{count}", String(selectedIds.size))
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             {bulkAction === 'restore' ? (
-              <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleBulkRestore}>Restore</AlertDialogAction>
+              <AlertDialogAction className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleBulkRestore}>{t("saNotifs.restore")}</AlertDialogAction>
             ) : (
-              <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={handleBulkDelete}>Delete Permanently</AlertDialogAction>
+              <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={handleBulkDelete}>{t("saNotifs.deletePermanently")}</AlertDialogAction>
             )}
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -615,12 +616,12 @@ export default function NotificationsPageClient({
       <AlertDialog open={!!permanentDeleteId} onOpenChange={open => !open && setPermanentDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Permanently Delete Notification</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete the notification for all users. This cannot be undone.</AlertDialogDescription>
+            <AlertDialogTitle>{t("saNotifs.permanentlyDeleteNotification")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("saNotifs.thisWillPermanentlyDeleteTheNotification")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => permanentDeleteId && handlePermanentDelete(permanentDeleteId)} className="bg-red-600 hover:bg-red-700 text-white">Delete Permanently</AlertDialogAction>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => permanentDeleteId && handlePermanentDelete(permanentDeleteId)} className="bg-red-600 hover:bg-red-700 text-white">{t("saNotifs.deletePermanently")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -629,12 +630,12 @@ export default function NotificationsPageClient({
       <Dialog open={!!restoreId} onOpenChange={open => !open && setRestoreId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Restore Notification</DialogTitle>
-            <DialogDescription>This will restore the notification and reset its expiry to 48 hours from now. It will become visible to users again.</DialogDescription>
+            <DialogTitle>{t("saNotifs.restoreNotification")}</DialogTitle>
+            <DialogDescription>{t("saNotifs.thisWillRestoreTheNotificationAnd")}</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setRestoreId(null)}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => restoreId && handleRestore(restoreId)}>Restore</Button>
+            <Button variant="outline" onClick={() => setRestoreId(null)}>{t("common.cancel")}</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => restoreId && handleRestore(restoreId)}>{t("saNotifs.restore")}</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -679,7 +680,7 @@ export default function NotificationsPageClient({
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <Label>{t('superadmin.type') || 'Type'}</Label>
+                <Label>{t('superadmin.type') || t("saNotifs.type")}</Label>
                 <Select value={templateForm.type} onValueChange={(value) => setTemplateForm({...templateForm, type: value})}>
                   <SelectTrigger>
                     <SelectValue />
@@ -693,7 +694,7 @@ export default function NotificationsPageClient({
                 </Select>
               </div>
               <div>
-                <Label>{t('superadmin.priority') || 'Priority'}</Label>
+                <Label>{t('superadmin.priority') || t("saNotifs.priority")}</Label>
                 <Select value={templateForm.priority} onValueChange={(value) => setTemplateForm({...templateForm, priority: value})}>
                   <SelectTrigger>
                     <SelectValue />
@@ -733,7 +734,7 @@ export default function NotificationsPageClient({
             </div>
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setIsCreateTemplateOpen(false)}>
-                {t('superadmin.cancel') || 'Cancel'}
+                {t('superadmin.cancel') || t("common.cancel")}
               </Button>
               <Button onClick={handleCreateTemplate} disabled={isSubmitting}>
                 {isSubmitting ? (t('superadmin.creating') || 'Creating...') : (t('superadmin.create') || 'Create')}
@@ -776,14 +777,14 @@ export default function NotificationsPageClient({
                     {t('superadmin.selectAll') || 'Select All'}
                   </Button>
                   <Button variant="outline" size="sm" onClick={clearSelection}>
-                    {t('superadmin.clearSelection') || 'Clear'}
+                    {t('superadmin.clearSelection') || t("common.clear")}
                   </Button>
                 </div>
               </div>
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search by name, email or role..."
+                  placeholder={t("saNotifs.searchByNameEmailOrRole")}
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   className="pl-9"
@@ -791,7 +792,7 @@ export default function NotificationsPageClient({
               </div>
               <div className="max-h-60 overflow-y-auto border rounded-lg p-3 space-y-2">
                 {filteredUsers.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">No users match your search.</p>
+                  <p className="text-sm text-gray-500 text-center py-4">{t("saNotifs.noUsersMatchYourSearch")}</p>
                 ) : filteredUsers.map((user) => (
                   <div key={user._id} className="flex items-center space-x-2">
                     <Checkbox
@@ -826,7 +827,7 @@ export default function NotificationsPageClient({
               </Button>
               <div className="space-x-2">
                 <Button variant="outline" onClick={() => setIsSendNotificationOpen(false)}>
-                  {t('superadmin.cancel') || 'Cancel'}
+                  {t('superadmin.cancel') || t("common.cancel")}
                 </Button>
                 <Button onClick={handleSendNotification} disabled={isSubmitting || !selectedTemplate || selectedUsers.length === 0}>
                   {isSubmitting ? (t('superadmin.sending') || 'Sending...') : (t('superadmin.sendNow') || 'Send Now')}
@@ -871,7 +872,7 @@ export default function NotificationsPageClient({
             </div>
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setIsScheduleOpen(false)}>
-                {t('superadmin.cancel') || 'Cancel'}
+                {t('superadmin.cancel') || t("common.cancel")}
               </Button>
               <Button onClick={handleScheduleNotification} disabled={isSubmitting}>
                 {isSubmitting ? (t('superadmin.scheduling') || 'Scheduling...') : (t('superadmin.schedule') || 'Schedule')}
@@ -891,7 +892,7 @@ export default function NotificationsPageClient({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>{t('superadmin.cancel') || 'Cancel'}</AlertDialogCancel>
+            <AlertDialogCancel disabled={isSubmitting}>{t('superadmin.cancel') || t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteTemplate} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-white">
               {isSubmitting ? (t('superadmin.deleting') || 'Deleting...') : (t('superadmin.delete') || 'Delete')}
             </AlertDialogAction>

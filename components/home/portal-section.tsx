@@ -70,7 +70,7 @@ export default function PortalSection() {
           <div className="relative h-[500px] rounded-lg overflow-hidden shadow-xl">
             <Image
               src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=1000&fit=crop&crop=focalpoint&auto=format&q=80"
-              alt="Farmer using tablet to track animals"
+              alt={t("alt.farmerTablet")}
               fill
               className="object-cover"
             />

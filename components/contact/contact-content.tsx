@@ -15,7 +15,7 @@ export default function ContactContent() {
         <div className="absolute inset-0 z-0">
           <Image
             src="https://images.unsplash.com/photo-1520333789090-1afc82db536a?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"
-            alt="Get in touch with our team"
+            alt={t("alt.getInTouch")}
             fill
             className="object-cover"
             priority

@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, MapPin, Calendar, Tag, Heart } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { listingValueLabel } from "@/lib/validations/listing-request"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductCard from "@/components/products/product-card"
 import ProductGridSkeleton from "@/components/products/product-grid-skeleton"
@@ -52,6 +53,8 @@ export default function AnimalSalesPage() {
   const searchParams = useSearchParams()
   const categoryId = searchParams.get('category')
   const { t } = useLanguage()
+  /** Stored listing values are English; show them in the reader's language. */
+  const valueLabel = (value?: string | null) => listingValueLabel(value, t)
 
   useEffect(() => {
     fetchData()
@@ -179,43 +182,43 @@ export default function AnimalSalesPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Select value={selectedAnimalType || "all"} onValueChange={(value) => setSelectedAnimalType(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Animal Type" />
+                  <SelectValue placeholder={t("content.animalType")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="Cow">Cow</SelectItem>
-                  <SelectItem value="Goat">Goat</SelectItem>
-                  <SelectItem value="Sheep">Sheep</SelectItem>
-                  <SelectItem value="Dog">Dog</SelectItem>
-                  <SelectItem value="Cat">Cat</SelectItem>
-                  <SelectItem value="Chicken">Chicken</SelectItem>
-                  <SelectItem value="Pig">Pig</SelectItem>
+                  <SelectItem value="Cow">{valueLabel("Cow")}</SelectItem>
+                  <SelectItem value="Goat">{valueLabel("Goat")}</SelectItem>
+                  <SelectItem value="Sheep">{valueLabel("Sheep")}</SelectItem>
+                  <SelectItem value="Dog">{valueLabel("Dog")}</SelectItem>
+                  <SelectItem value="Cat">{valueLabel("Cat")}</SelectItem>
+                  <SelectItem value="Chicken">{valueLabel("Chicken")}</SelectItem>
+                  <SelectItem value="Pig">{valueLabel("Pig")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={selectedDistrict || "all"} onValueChange={(value) => setSelectedDistrict(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="District" />
+                  <SelectValue placeholder={t("content.district")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="Kigali">Kigali</SelectItem>
-                  <SelectItem value="Northern">Northern</SelectItem>
-                  <SelectItem value="Southern">Southern</SelectItem>
-                  <SelectItem value="Eastern">Eastern</SelectItem>
-                  <SelectItem value="Western">Western</SelectItem>
+                  <SelectItem value="Kigali">{t("province.kigali")}</SelectItem>
+                  <SelectItem value="Northern">{t("province.northern")}</SelectItem>
+                  <SelectItem value="Southern">{t("province.southern")}</SelectItem>
+                  <SelectItem value="Eastern">{t("province.eastern")}</SelectItem>
+                  <SelectItem value="Western">{t("province.western")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Input
-                placeholder="Min Price (RWF)"
+                placeholder={t("storefront.minPriceRwf")}
                 type="number"
                 value={minPrice}
                 onChange={(e) => setMinPrice(e.target.value)}
               />
 
               <Input
-                placeholder="Max Price (RWF)"
+                placeholder={t("storefront.maxPriceRwf")}
                 type="number"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
@@ -227,12 +230,12 @@ export default function AnimalSalesPage() {
             {loading ? (
               <Skeleton className="h-4 w-32" />
             ) : (
-              <p className="text-gray-600">{filteredAnimals.length} {t('animals.title').toLowerCase()} found</p>
+              <p className="text-gray-600">{t("storefront.foundCount").replace("{count}", String(filteredAnimals.length)).replace("{items}", t('animals.title').toLowerCase())}</p>
             )}
             {wishlist.length > 0 && (
               <p className="text-sm text-gray-500">
                 <Heart className="h-4 w-4 inline mr-1" />
-                {wishlist.length} in wishlist
+                {t("storefront.inWishlist").replace("{count}", String(wishlist.length))}
               </p>
             )}
           </div>
@@ -258,7 +261,7 @@ export default function AnimalSalesPage() {
                   onToggleWishlist={() => toggleWishlist(animal.id)}
                   details={[
                     ...(animal.animalType || animal.breed
-                      ? [{ icon: Tag, text: [animal.animalType, animal.breed].filter(Boolean).join(' · ') }]
+                      ? [{ icon: Tag, text: [valueLabel(animal.animalType), animal.breed].filter(Boolean).join(' · ') }]
                       : []),
                     ...(animal.age ? [{ icon: Calendar, text: animal.age }] : []),
                     ...(animal.district

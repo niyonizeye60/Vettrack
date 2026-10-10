@@ -12,6 +12,7 @@ import SearchCombobox from "./search-combobox"
 import { EPIDEMIC_DISEASES, EPIDEMIC_SEVERITIES } from "@/lib/epidemics"
 import { rwandaData } from "@/lib/rwanda-data"
 import { Loader2, MapPin, AlertTriangle, LocateFixed } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface Animal { _id: string; name: string; type: string; district?: string | null; sector?: string | null }
 
@@ -53,6 +54,7 @@ export default function EpidemicRegisterDialog({
   onSaved,
 }: EpidemicRegisterDialogProps) {
   const { toast } = useToast()
+  const { t } = useLanguage()
   const [animals, setAnimals] = useState<Animal[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [animalTypes, setAnimalTypes] = useState<string[]>([])
@@ -123,12 +125,12 @@ export default function EpidemicRegisterDialog({
         body: JSON.stringify({ name: clean }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to add category")
-      toast({ title: "Category added", description: `"${clean}" is now selectable in the dropdown.` })
+      if (!res.ok) throw new Error(data.error || t("epidemicReg.failedToAddCategory"))
+      toast({ title: t("epidemicReg.categoryAdded"), description: t("epidemicReg.nowSelectableDropdown").replace("{name}", clean) })
       set("diseaseName", clean)
       loadCategories()
     } catch (err: any) {
-      toast({ title: "Could not add category", description: err.message || "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemicReg.couldNotAddCategory"), description: err.message || t("epidemicReg.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setDiseaseBusy(false)
     }
@@ -183,7 +185,7 @@ export default function EpidemicRegisterDialog({
       fd.set("price", "0")
       fd.set("acquisitionType", "")
       const res = (await registerAnimal(fd, farmerId)) as any
-      if (!res.success) throw new Error(res.error || "Could not register animal")
+      if (!res.success) throw new Error(res.error || t("epidemicReg.couldNotRegisterAnimal"))
       // registerAnimal returns a MongoDB ObjectId which may not survive server-
       // action serialization — re-fetch and match by name to get the canonical
       // _id string.
@@ -194,9 +196,9 @@ export default function EpidemicRegisterDialog({
       set("animalId", id)
       set("animalName", clean)
       set("animalType", type)
-      toast({ title: "Animal registered", description: `${clean} was added to your registered animals.` })
+      toast({ title: t("epidemicReg.animalRegistered"), description: t("epidemicReg.addedToAnimals").replace("{name}", clean) })
     } catch (err: any) {
-      toast({ title: "Could not register animal", description: err.message || "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemicReg.couldNotRegisterAnimal"), description: err.message || t("epidemicReg.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setAnimalBusy(false)
     }
@@ -221,11 +223,11 @@ export default function EpidemicRegisterDialog({
         body: JSON.stringify({ name: clean }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to add type")
+      if (!res.ok) throw new Error(data.error || t("epidemicReg.failedToAddType"))
       set("animalType", clean)
       loadAnimalTypes()
     } catch (err: any) {
-      toast({ title: "Could not add animal type", description: err.message || "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemicReg.couldNotAddAnimalType"), description: err.message || t("epidemicReg.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setTypeBusy(false)
     }
@@ -259,12 +261,12 @@ export default function EpidemicRegisterDialog({
 
   const useMyLocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      toast({ title: "Location unavailable", description: "Your browser does not support GPS.", variant: "destructive" })
+      toast({ title: t("epidemicReg.locationUnavailable"), description: t("epidemicReg.yourBrowserDoesNotSupportGps"), variant: "destructive" })
       return
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => handlePick(pos.coords.latitude, pos.coords.longitude),
-      () => toast({ title: "Could not get location", description: "Allow location access and try again.", variant: "destructive" })
+      () => toast({ title: t("epidemicReg.couldNotGetLocation"), description: t("epidemicReg.allowLocationAccessAndTryAgain"), variant: "destructive" })
     )
   }
 
@@ -273,16 +275,16 @@ export default function EpidemicRegisterDialog({
   const validate = () => {
     const e: Record<string, string> = {}
     const finalDisease = resolveDisease(form.diseaseName)
-    if (!finalDisease) e.diseaseName = "Select or enter the disease"
-    if (!form.animalName && !selectedAnimal?.name && mode === "farmer") e.animalName = "Add an animal name"
+    if (!finalDisease) e.diseaseName = t("epidemicReg.selectOrEnterTheDisease")
+    if (!form.animalName && !selectedAnimal?.name && mode === "farmer") e.animalName = t("epidemicReg.addAnAnimalName")
     const lat = Number(form.latitude)
     const lng = Number(form.longitude)
     if (!form.latitude || !form.longitude || isNaN(lat) || isNaN(lng)) {
-      e.latitude = "Use GPS or enter coordinates for the location"
+      e.latitude = t("epidemicReg.useGpsOrEnterCoordinatesFor")
     } else if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      e.latitude = "Coordinates are out of range"
+      e.latitude = t("epidemicReg.coordinatesAreOutOfRange")
     }
-    if (!form.affectedCount || Number(form.affectedCount) <= 0) e.affectedCount = "Enter how many animals are affected"
+    if (!form.affectedCount || Number(form.affectedCount) <= 0) e.affectedCount = t("epidemicReg.enterHowManyAnimalsAreAffected")
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -350,13 +352,13 @@ export default function EpidemicRegisterDialog({
         body: JSON.stringify(body),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to save")
-      toast({ title: "Epidemic case reported", description: `${finalDisease} was pinned on the map.` })
+      if (!res.ok) throw new Error(data.error || t("epidemicReg.failedToSave"))
+      toast({ title: t("epidemicReg.epidemicCaseReported"), description: t("epidemicReg.pinnedOnMap").replace("{name}", finalDisease) })
       onSaved?.()
       loadCategories() // pick up any category auto-created for admins
       onOpenChange(false)
     } catch (err: any) {
-      toast({ title: "Could not save the report", description: err.message || "Please try again.", variant: "destructive" })
+      toast({ title: t("epidemicReg.couldNotSaveTheReport"), description: err.message || t("epidemicReg.pleaseTryAgain"), variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -368,10 +370,10 @@ export default function EpidemicRegisterDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <MapPin className="h-5 w-5 text-red-500" />
-            Report an Epidemic Case
+            {t("epidemicReg.reportAnEpidemicCase")}
           </DialogTitle>
           <DialogDescription>
-            Register an animal affected by an epidemic disease. Its location will be pinned on the national outbreak map.
+            {t("epidemicReg.registerAnAnimalAffectedByAn")}
           </DialogDescription>
         </DialogHeader>
 
@@ -387,21 +389,21 @@ export default function EpidemicRegisterDialog({
                   onValueChange={handleAnimalValueChange}
                   onCommit={handleAnimalCommit}
                   items={animalDisplayItems}
-                  placeholder={animals.length ? "Search your animals or type a new name…" : "Type a name to register a new animal…"}
-                  searchPlaceholder="Search animals or type a new one…"
+                  placeholder={animals.length ? t("epidemicReg.searchYourAnimalsOrTypeA") : t("epidemicReg.typeANameToRegisterA")}
+                  searchPlaceholder={t("epidemicReg.searchAnimalsOrTypeANew")}
                   emptyHint={
                     animals.length
-                      ? "No match — type a name and choose \u201CRegister\u201D to add it to your animals."
-                      : "No registered animals yet — type a name and choose \u201CRegister\u201D."
+                      ? t("epidemicReg.noMatchTypeANameAnd")
+                      : t("epidemicReg.noRegisteredAnimalsYetTypeA")
                   }
                   error={!!errors.animalName}
-                  createLabel={(q) => `Register "${q}" as a new animal`}
+                  createLabel={(q) => t("epidemicReg.createAnimal").replace("{q}", q)}
                   onCreate={registerNewAnimal}
                   createBusy={animalBusy}
                 />
               ) : (
                 <Input
-                  placeholder="e.g. Ndama cow, Chicken flock..."
+                  placeholder={t("epidemicReg.eGNdamaCowChickenFlock")}
                   value={form.animalName}
                   onChange={(e) => set("animalName", e.target.value)}
                   className={errors.animalName ? "border-red-500" : ""}
@@ -411,16 +413,16 @@ export default function EpidemicRegisterDialog({
             </div>
             {(!form.animalId || mode === "staff") && (
               <div className="space-y-1.5">
-                <Label>Animal type</Label>
+                <Label>{t("epidemicReg.animalType")}</Label>
                 <SearchCombobox
                   value={form.animalType}
                   onValueChange={(v) => set("animalType", v)}
                   onCommit={(v) => set("animalType", v)}
                   items={typeChoices}
-                  placeholder="Select or type animal type"
-                  searchPlaceholder="Search or type animal type…"
-                emptyHint="Start typing to save a new type…"
-                createLabel={(q) => `Save "${q}" as a new type`}
+                  placeholder={t("epidemicReg.selectOrTypeAnimalType")}
+                  searchPlaceholder={t("epidemicReg.searchOrTypeAnimalType")}
+                emptyHint={t("epidemicReg.startTypingToSaveANew")}
+                createLabel={(q) => t("epidemicReg.createType").replace("{q}", q)}
                   onCreate={addAnimalType}
                   createBusy={typeBusy}
                 />
@@ -433,29 +435,29 @@ export default function EpidemicRegisterDialog({
               reusable category from the dropdown. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Epidemic disease *</Label>
+              <Label>{t("epidemicReg.epidemicDisease")}</Label>
               <SearchCombobox
                 value={form.diseaseName}
                 onValueChange={(v) => set("diseaseName", v)}
                 onCommit={(v) => set("diseaseName", v)}
                 items={diseaseChoices}
-                placeholder="Search or type a disease…"
-                searchPlaceholder="Search disease or type a new one…"
-                emptyHint="Start typing to search or add a disease…"
+                placeholder={t("epidemicReg.searchOrTypeADisease")}
+                searchPlaceholder={t("epidemicReg.searchDiseaseOrTypeANew")}
+                emptyHint={t("epidemicReg.startTypingToSearchOrAdd")}
                 error={!!errors.diseaseName}
-                createLabel={(q) => `Use "${q}" as a new disease`}
+                createLabel={(q) => t("epidemicReg.createDisease").replace("{q}", q)}
                 onCreate={() => {}}
-                secondaryCreateLabel={canManage ? (q) => `Save "${q}" as a category` : undefined}
+                secondaryCreateLabel={canManage ? (q) => t("epidemicReg.createCategory").replace("{q}", q) : undefined}
                 secondaryOnCreate={canManage ? addDiseaseCategory : undefined}
                 secondaryCreateBusy={diseaseBusy}
               />
               {errors.diseaseName && <p className="text-xs text-red-500">{errors.diseaseName}</p>}
               {categories.length === 0 && (
-                <p className="text-xs text-gray-400">Tip: admin can add new disease categories which then appear here.</p>
+                <p className="text-xs text-gray-400">{t("epidemicReg.tipAdminCanAddNewDisease")}</p>
               )}
             </div>
             <div className="space-y-1.5">
-              <Label>Animals affected *</Label>
+              <Label>{t("epidemicReg.animalsAffected")}</Label>
               <Input
                 type="number"
                 min={1}
@@ -466,14 +468,14 @@ export default function EpidemicRegisterDialog({
               {errors.affectedCount && <p className="text-xs text-red-500">{errors.affectedCount}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Severity</Label>
+              <Label>{t("epidemicReg.severity")}</Label>
               <Select value={form.severity} onValueChange={(v) => set("severity", v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {EPIDEMIC_SEVERITIES.map((s) => (
-                    <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                    <SelectItem key={s} value={s} className="capitalize">{t(`epidemic.severity.${s}`)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -483,30 +485,30 @@ export default function EpidemicRegisterDialog({
           {/* Location — district / sector (searchable) + coordinates */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>District</Label>
+              <Label>{t("epidemicReg.district")}</Label>
               <SearchCombobox
                 value={form.district}
                 onValueChange={(v) => set("district", v)}
                 onCommit={handleDistrictCommit}
                 items={DISTRICTS}
-                placeholder="Select or type district"
-                searchPlaceholder="Search district…"
-                emptyHint="No matching district — type to use it."
-                createLabel={(q) => `Use "${q}" as the district`}
+                placeholder={t("epidemicReg.selectOrTypeDistrict")}
+                searchPlaceholder={t("epidemicReg.searchDistrict")}
+                emptyHint={t("epidemicReg.noMatchingDistrictTypeToUse")}
+                createLabel={(q) => t("epidemicReg.createDistrict").replace("{q}", q)}
                 onCreate={() => {}}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Sector</Label>
+              <Label>{t("epidemicReg.sector")}</Label>
               <SearchCombobox
                 value={form.sector}
                 onValueChange={(v) => set("sector", v)}
                 onCommit={(v) => set("sector", v)}
                 items={committedDistrict ? rwandaData[committedDistrict] || [] : []}
-                placeholder={committedDistrict ? "Select sector" : "Pick a district first"}
-                searchPlaceholder="Search sector…"
-                emptyHint={committedDistrict ? "No matching sector — type to use it." : "Choose the district above to see its sectors."}
-                createLabel={(q) => `Use "${q}" as the sector`}
+                placeholder={committedDistrict ? t("epidemicReg.selectSector") : t("epidemicReg.pickADistrictFirst")}
+                searchPlaceholder={t("epidemicReg.searchSector")}
+                emptyHint={committedDistrict ? t("epidemicReg.noMatchingSectorTypeToUse") : t("epidemicReg.chooseTheDistrictAboveToSee")}
+                createLabel={(q) => t("epidemicReg.createSector").replace("{q}", q)}
                 onCreate={() => {}}
               />
             </div>
@@ -516,13 +518,13 @@ export default function EpidemicRegisterDialog({
               page map behind it. Location is set via GPS or coordinates. */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
-              Animal location *
-              <span className="text-xs font-normal text-gray-400">(use GPS or enter coordinates)</span>
+              {t("epidemicReg.animalLocation")}
+              <span className="text-xs font-normal text-gray-400">{t("epidemicReg.useGpsOrEnterCoordinates")}</span>
             </Label>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={useMyLocation} className="gap-1.5">
                 <LocateFixed className="h-3.5 w-3.5 text-green-600" />
-                Use my location
+                {t("epidemicReg.useMyLocation")}
               </Button>
               {pickedLocation && (
                 <span className="text-xs text-gray-500">
@@ -533,7 +535,7 @@ export default function EpidemicRegisterDialog({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Latitude</Label>
+                <Label className="text-xs">{t("epidemicReg.latitude")}</Label>
                 <Input
                   placeholder="-1.9403"
                   value={form.latitude}
@@ -542,7 +544,7 @@ export default function EpidemicRegisterDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Longitude</Label>
+                <Label className="text-xs">{t("epidemicReg.longitude")}</Label>
                 <Input
                   placeholder="29.8739"
                   value={form.longitude}
@@ -557,18 +559,18 @@ export default function EpidemicRegisterDialog({
           {/* Symptoms / notes */}
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
-              <Label>Symptoms observed</Label>
+              <Label>{t("epidemicReg.symptomsObserved")}</Label>
               <Textarea
-                placeholder="e.g. fever, mouth lesions, lameness, sudden death..."
+                placeholder={t("epidemicReg.eGFeverMouthLesionsLameness")}
                 rows={2}
                 value={form.symptoms}
                 onChange={(e) => set("symptoms", e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Additional notes</Label>
+              <Label>{t("epidemicReg.additionalNotes")}</Label>
               <Textarea
-                placeholder="Anything else vets should know..."
+                placeholder={t("epidemicReg.anythingElseVetsShouldKnow")}
                 rows={2}
                 value={form.notes}
                 onChange={(e) => set("notes", e.target.value)}
@@ -579,18 +581,18 @@ export default function EpidemicRegisterDialog({
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
             <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <span>
-              Reported cases appear publicly on the outbreak map so veterinarians and nearby farmers can respond quickly.
+              {t("epidemicReg.reportedCasesAppearPubliclyOnThe")}
             </span>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={saving} className="bg-red-600 hover:bg-red-700">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-            {saving ? "Saving..." : "Report & Pin Case"}
+            {saving ? t("epidemicReg.saving") : t("epidemicReg.reportPinCase")}
           </Button>
         </DialogFooter>
       </DialogContent>

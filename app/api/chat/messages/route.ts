@@ -8,6 +8,7 @@ import { encryptText, decryptText } from "@/lib/crypto"
 import { sendNewMessageAlertEmail } from "@/lib/email"
 import { isPresenceOnline } from "@/lib/presence"
 import { ObjectId } from "mongodb"
+import { notificationText } from "@/lib/notification-messages"
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000
 
@@ -201,8 +202,7 @@ export async function POST(request: NextRequest) {
       const recipientRole = currentUser.role === "farmer" ? "doctor" : "farmer"
       const dashboardSegment = recipientRole === "doctor" ? "veterinary" : "farmer"
       db.collection("notifications").insertOne({
-        title: `New message from ${currentUser.name}`,
-        message: trimmedContent.slice(0, 80),
+        ...notificationText("chatMessage", { sender: currentUser.name, preview: trimmedContent.slice(0, 80) }),
         type: "chat",
         priority: "normal",
         read: false,

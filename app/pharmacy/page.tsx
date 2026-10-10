@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, MapPin, Pill, Heart } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { listingValueLabel } from "@/lib/validations/listing-request"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductCard from "@/components/products/product-card"
 import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
@@ -52,6 +53,8 @@ export default function PharmacyPage() {
   const searchParams = useSearchParams()
   const categoryId = searchParams.get('category')
   const { t } = useLanguage()
+  /** Stored listing values are English; show them in the reader's language. */
+  const valueLabel = (value?: string | null) => listingValueLabel(value, t)
 
   useEffect(() => {
     fetchData()
@@ -178,41 +181,41 @@ export default function PharmacyPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Select value={selectedDrugType || "all"} onValueChange={(value) => setSelectedDrugType(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Drug Type" />
+                  <SelectValue placeholder={t("content.drugType")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="Antibiotic">Antibiotic</SelectItem>
-                  <SelectItem value="Dewormer">Dewormer</SelectItem>
-                  <SelectItem value="Vaccine">Vaccine</SelectItem>
-                  <SelectItem value="Vitamins">Vitamins</SelectItem>
-                  <SelectItem value="Pain Relief">Pain Relief</SelectItem>
+                  <SelectItem value="Antibiotic">{valueLabel("Antibiotic")}</SelectItem>
+                  <SelectItem value="Dewormer">{valueLabel("Dewormer")}</SelectItem>
+                  <SelectItem value="Vaccine">{valueLabel("Vaccine")}</SelectItem>
+                  <SelectItem value="Vitamins">{valueLabel("Vitamins")}</SelectItem>
+                  <SelectItem value="Pain Relief">{valueLabel("Pain Relief")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={selectedDistrict || "all"} onValueChange={(value) => setSelectedDistrict(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="District" />
+                  <SelectValue placeholder={t("content.district")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="Kigali">Kigali</SelectItem>
-                  <SelectItem value="Northern">Northern</SelectItem>
-                  <SelectItem value="Southern">Southern</SelectItem>
-                  <SelectItem value="Eastern">Eastern</SelectItem>
-                  <SelectItem value="Western">Western</SelectItem>
+                  <SelectItem value="Kigali">{t("province.kigali")}</SelectItem>
+                  <SelectItem value="Northern">{t("province.northern")}</SelectItem>
+                  <SelectItem value="Southern">{t("province.southern")}</SelectItem>
+                  <SelectItem value="Eastern">{t("province.eastern")}</SelectItem>
+                  <SelectItem value="Western">{t("province.western")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Input
-                placeholder="Min Price (RWF)"
+                placeholder={t("storefront.minPriceRwf")}
                 type="number"
                 value={minPrice}
                 onChange={(e) => setMinPrice(e.target.value)}
               />
 
               <Input
-                placeholder="Max Price (RWF)"
+                placeholder={t("storefront.maxPriceRwf")}
                 type="number"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
@@ -224,12 +227,12 @@ export default function PharmacyPage() {
             {loading ? (
               <Skeleton className="h-4 w-32" />
             ) : (
-              <p className="text-gray-600">{filteredDrugs.length} {t('pharmacy.title').toLowerCase()} found</p>
+              <p className="text-gray-600">{t("storefront.foundCount").replace("{count}", String(filteredDrugs.length)).replace("{items}", t('pharmacy.title').toLowerCase())}</p>
             )}
             {wishlist.length > 0 && (
               <p className="text-sm text-gray-500">
                 <Heart className="h-4 w-4 inline mr-1" />
-                {wishlist.length} in wishlist
+                {t("storefront.inWishlist").replace("{count}", String(wishlist.length))}
               </p>
             )}
           </div>
@@ -263,7 +266,7 @@ export default function PharmacyPage() {
                   wishlisted={wishlist.includes(drug.id)}
                   onToggleWishlist={() => toggleWishlist(drug.id)}
                   details={[
-                    ...(drug.drugType ? [{ icon: Pill, text: drug.drugType }] : []),
+                    ...(drug.drugType ? [{ icon: Pill, text: valueLabel(drug.drugType) }] : []),
                     ...(drug.district
                       ? [{ icon: MapPin, text: [drug.district, drug.sector].filter(Boolean).join(', ') }]
                       : []),

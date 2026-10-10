@@ -83,7 +83,7 @@ export default function FarmerSidebar() {
                 <button
                   onClick={() => setCollapsed(c => !c)}
                   className="p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
-                  aria-label="Toggle sidebar"
+                  aria-label={t("farmerSidebar.toggleSidebar")}
                 >
                   <Menu className={`h-4 w-4 sm:h-5 sm:w-5 text-gray-500 transform transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
                 </button>

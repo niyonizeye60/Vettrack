@@ -35,6 +35,7 @@ import {
   User as UserIcon
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import { updateSystemSettings, performDatabaseAction, setFarmLocationRestriction } from "@/lib/actions/superadmin"
 import type { FarmLocationRestrictionStatus } from "@/lib/farm-location-restriction"
@@ -48,7 +49,7 @@ interface SettingsPageClientProps {
 }
 
 export default function SettingsPageClient({ settings, farmLocationRestriction }: SettingsPageClientProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
@@ -115,10 +116,10 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
         setAvatarPreview(data.image)
         toast({ title: t("superadmin.profileUpdated"), description: t("superadmin.profileUpdatedDesc") })
       } else {
-        toast({ title: t("common.error"), description: data.message ?? "Upload failed", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(data.message, language) ?? t("saSettings.uploadFailed"), variant: "destructive" })
       }
     } catch {
-      toast({ title: t("common.error"), description: "Upload failed", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saSettings.uploadFailed"), variant: "destructive" })
     } finally {
       setAvatarUploading(false)
       e.target.value = ""
@@ -155,7 +156,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
       const data = await res.json().catch(() => null)
 
       if (!res.ok || !data?.success) {
-        throw new Error(data?.message ?? "Save failed")
+        throw new Error(data?.message ?? t("saSettings.saveFailed"))
       }
 
       toast({ title: t("superadmin.profileUpdated"), description: t("superadmin.profileUpdatedDesc") })
@@ -164,7 +165,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
       setProfileConfirmPassword("")
       await loadProfile()
     } catch (err: any) {
-      toast({ title: t("common.error"), description: err?.message ?? "Failed to save", variant: "destructive" })
+      toast({ title: t("common.error"), description: err?.message ?? t("saSettings.failedToSave"), variant: "destructive" })
     } finally {
       setProfileSaving(false)
     }
@@ -179,13 +180,13 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
     try {
       const result = await updateSystemSettings(formData)
       if (result.success) {
-        toast({ title: "Settings saved", description: "Your changes have been saved successfully." })
+        toast({ title: t("saSettings.settingsSaved"), description: t("saSettings.yourChangesHaveBeenSavedSuccessfully") })
         router.refresh()
       } else {
-        toast({ title: "Error", description: "Failed to save settings: " + result.message, variant: "destructive" })
+        toast({ title: t("common.error"), description: t("saSettings.saveFailedWith").replace("{error}", localizeError(result.message, language) ?? ""), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Error saving settings", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saSettings.errorSavingSettings"), variant: "destructive" })
     }
     setIsSaving(false)
   }
@@ -193,9 +194,9 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
   const handleDatabaseAction = async (action: string) => {
     try {
       const result = await performDatabaseAction(action)
-      toast({ title: "Success", description: result.message })
+      toast({ title: t("saSettings.success"), description: localizeError(result.message, language) })
     } catch (error) {
-      toast({ title: "Error", description: "Error performing action", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saSettings.errorPerformingAction"), variant: "destructive" })
     }
   }
 
@@ -207,13 +208,13 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
       const result = await setFarmLocationRestriction(next)
       if (result.success && result.status) {
         setRestriction(result.status)
-        toast({ title: next ? "Restriction enabled" : "Restriction disabled", description: result.message })
+        toast({ title: next ? t("saSettings.restrictionEnabled") : t("saSettings.restrictionDisabled"), description: localizeError(result.message, language) })
         router.refresh()
       } else {
-        toast({ title: "Error", description: result.message, variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language), variant: "destructive" })
       }
     } catch {
-      toast({ title: "Error", description: "Failed to update farm location restriction", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saSettings.failedToUpdateFarmLocationRestriction"), variant: "destructive" })
     } finally {
       setRestrictionSaving(false)
     }
@@ -221,7 +222,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
 
   const handleRestartServices = () => {
     setRestartConfirmOpen(false)
-    toast({ title: "Not implemented", description: "System restart would be initiated (not implemented)" })
+    toast({ title: t("saSettings.notImplemented"), description: t("saSettings.systemRestartWouldBeInitiatedNot") })
   }
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,13 +236,13 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
       const data = await res.json()
       if (data.success) {
         setBannerPreview(data.bannerImage)
-        toast({ title: "Banner updated", description: "Banner image updated successfully." })
+        toast({ title: t("saSettings.bannerUpdated"), description: t("saSettings.bannerImageUpdatedSuccessfully") })
         router.refresh()
       } else {
-        toast({ title: "Error", description: "Failed to upload banner: " + (data.message ?? "Unknown error"), variant: "destructive" })
+        toast({ title: t("common.error"), description: t("saSettings.bannerUploadFailedWith").replace("{error}", localizeError(data.message, language) ?? t("saSettings.unknownError")), variant: "destructive" })
       }
     } catch {
-      toast({ title: "Error", description: "Error uploading banner", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saSettings.errorUploadingBanner"), variant: "destructive" })
     } finally {
       setBannerUploading(false)
       e.target.value = ""
@@ -255,13 +256,13 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
       const data = await res.json()
       if (data.success) {
         setBannerPreview(null)
-        toast({ title: "Banner removed", description: "The profile page will fall back to the default gradient." })
+        toast({ title: t("saSettings.bannerRemoved"), description: t("saSettings.theProfilePageWillFallBack") })
         router.refresh()
       } else {
-        toast({ title: "Error", description: "Failed to remove banner", variant: "destructive" })
+        toast({ title: t("common.error"), description: t("saSettings.failedToRemoveBanner"), variant: "destructive" })
       }
     } catch {
-      toast({ title: "Error", description: "Error removing banner", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saSettings.errorRemovingBanner"), variant: "destructive" })
     }
   }
 
@@ -496,15 +497,15 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Shield className="h-5 w-5" />
-              <span>System Security</span>
+              <span>{t("saSettings.systemSecurity")}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="enableTwoFactor">Require 2FA for Admins</Label>
+                <Label htmlFor="enableTwoFactor">{t("saSettings.require2faForAdmins")}</Label>
                 <p className="text-sm text-gray-500">
-                  Force two-factor authentication for admin and superadmin accounts
+                  {t("saSettings.forceTwoFactorAuthenticationForAdmin")}
                 </p>
               </div>
               <Switch 
@@ -515,9 +516,9 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="sessionTimeout">Auto-logout inactive sessions</Label>
+                <Label htmlFor="sessionTimeout">{t("saSettings.autoLogoutInactiveSessions")}</Label>
                 <p className="text-sm text-gray-500">
-                  Automatically log out users after period of inactivity
+                  {t("saSettings.automaticallyLogOutUsersAfterPeriod")}
                 </p>
               </div>
               <Switch 
@@ -528,23 +529,23 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="sessionDuration">Session Duration (hours)</Label>
+                <Label htmlFor="sessionDuration">{t("saSettings.sessionDurationHours")}</Label>
                 <Input
                   id="sessionDuration"
                   type="number"
                   value={formData.sessionDuration || 8}
                   onChange={(e) => handleInputChange('sessionDuration', parseInt(e.target.value))}
-                  placeholder="Enter session duration"
+                  placeholder={t("saSettings.enterSessionDuration")}
                 />
               </div>
               <div>
-                <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
+                <Label htmlFor="maxLoginAttempts">{t("saSettings.maxLoginAttempts")}</Label>
                 <Input
                   id="maxLoginAttempts"
                   type="number"
                   value={formData.maxLoginAttempts || 5}
                   onChange={(e) => handleInputChange('maxLoginAttempts', parseInt(e.target.value))}
-                  placeholder="Enter max attempts"
+                  placeholder={t("saSettings.enterMaxAttempts")}
                 />
               </div>
             </div>
@@ -557,7 +558,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
             <CardTitle className="flex flex-wrap items-center justify-between gap-2">
               <span className="flex items-center space-x-2">
                 <MapPin className="h-5 w-5" />
-                <span>Farm Location Restriction</span>
+                <span>{t("saSettings.farmLocationRestriction")}</span>
               </span>
               {restriction && (
                 <span
@@ -566,7 +567,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
                   }`}
                 >
                   <span className={`h-2 w-2 rounded-full ${restriction.enabled ? "bg-green-500" : "bg-red-500"}`} />
-                  {restriction.enabled ? "Enabled" : "Disabled"}
+                  {restriction.enabled ? t("saSettings.enabled") : t("saSettings.disabled")}
                 </span>
               )}
             </CardTitle>
@@ -576,11 +577,11 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
               <>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <Label htmlFor="farmLocationRestriction">Require users to be on the farm</Label>
+                    <Label htmlFor="farmLocationRestriction">{t("saSettings.requireUsersToBeOnThe")}</Label>
                     <p className="text-sm text-gray-500">
                       {restriction.enabled
-                        ? "ON — Users must be within the farm's registered sector to record livestock activities."
-                        : "OFF — Users can record livestock activities without the sector-location restriction."}
+                        ? t("saSettings.onUsersMustBeWithinThe")
+                        : t("saSettings.offUsersCanRecordLivestockActivities")}
                     </p>
                   </div>
                   <Switch
@@ -594,18 +595,18 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
                   />
                 </div>
                 <p className="text-sm text-gray-500">
-                  Applies to creating, editing and deleting insemination, disease, treatment and vaccination
-                  records, for farmers and vets. Test accounts are always exempt. Changes take effect immediately.
+                  {t("saSettings.appliesTo")}
                 </p>
                 {restriction.updatedAt && (
                   <p className="text-xs text-gray-400">
-                    Last changed{restriction.updatedByName ? ` by ${restriction.updatedByName}` : ""} on{" "}
-                    {new Date(restriction.updatedAt).toLocaleString()}
+                    {restriction.updatedByName
+                      ? t("saSettings.lastChangedBy").replace("{name}", restriction.updatedByName).replace("{date}", new Date(restriction.updatedAt).toLocaleString())
+                      : t("saSettings.lastChanged").replace("{date}", new Date(restriction.updatedAt).toLocaleString())}
                   </p>
                 )}
               </>
             ) : (
-              <p className="text-sm text-red-600">Couldn't load the current status. Refresh the page to try again.</p>
+              <p className="text-sm text-red-600">{t("saSettings.couldntLoadTheCurrentStatusRefresh")}</p>
             )}
           </CardContent>
         </Card>
@@ -618,37 +619,37 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Settings className="h-5 w-5" />
-              <span>System Limits</span>
+              <span>{t("saSettings.systemLimits")}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="maxUsersPerRole">Max Users per Role</Label>
+                <Label htmlFor="maxUsersPerRole">{t("saSettings.maxUsersPerRole")}</Label>
                 <Input
                   id="maxUsersPerRole"
                   type="number"
                   value={formData.maxUsersPerRole || 1000}
                   onChange={(e) => handleInputChange('maxUsersPerRole', parseInt(e.target.value))}
-                  placeholder="Enter max users"
+                  placeholder={t("saSettings.enterMaxUsers")}
                 />
               </div>
               <div>
-                <Label htmlFor="maxConsultationsPerDay">Max Consultations/Day</Label>
+                <Label htmlFor="maxConsultationsPerDay">{t("saSettings.maxConsultationsDay")}</Label>
                 <Input
                   id="maxConsultationsPerDay"
                   type="number"
                   value={formData.maxConsultationsPerDay || 500}
                   onChange={(e) => handleInputChange('maxConsultationsPerDay', parseInt(e.target.value))}
-                  placeholder="Enter max consultations"
+                  placeholder={t("saSettings.enterMaxConsultations")}
                 />
               </div>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="maintenanceMode">Maintenance Mode</Label>
+                <Label htmlFor="maintenanceMode">{t("saSettings.maintenanceMode")}</Label>
                 <p className="text-sm text-gray-500">
-                  Enable maintenance mode to restrict system access
+                  {t("saSettings.enableMaintenanceModeToRestrictSystem")}
                 </p>
               </div>
               <Switch 
@@ -671,9 +672,9 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="systemAlerts">System Alerts</Label>
+                <Label htmlFor="systemAlerts">{t("saSettings.systemAlerts")}</Label>
                 <p className="text-sm text-gray-500">
-                  Get notified about system errors, downtime, and critical issues
+                  {t("saSettings.getNotifiedAboutSystemErrorsDowntime")}
                 </p>
               </div>
               <Switch 
@@ -697,9 +698,9 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="suspiciousActivity">Suspicious Activity Alerts</Label>
+                <Label htmlFor="suspiciousActivity">{t("saSettings.suspiciousActivityAlerts")}</Label>
                 <p className="text-sm text-gray-500">
-                  Get notified about failed login attempts and unusual activity
+                  {t("saSettings.getNotifiedAboutFailedLoginAttempts")}
                 </p>
               </div>
               <Switch 
@@ -780,7 +781,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
                   className="text-red-600 hover:text-red-700"
                   onClick={() => setRestartConfirmOpen(true)}
                 >
-                  Restart Services
+                  {t("saSettings.restartServices")}
                 </Button>
               </div>
             </div>
@@ -840,16 +841,16 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
               </div>
             </div>
             <div>
-              <Label htmlFor="bookingNotificationEmail">Booking Notification Recipient</Label>
+              <Label htmlFor="bookingNotificationEmail">{t("saSettings.bookingNotificationRecipient")}</Label>
               <Input
                 id="bookingNotificationEmail"
                 type="email"
                 value={formData.bookingNotificationEmail || ''}
                 onChange={(e) => handleInputChange('bookingNotificationEmail', e.target.value)}
-                placeholder="Email that receives new booking notifications"
+                placeholder={t("saSettings.emailThatReceivesNewBookingNotifications")}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Leave empty to send booking notifications to the SMTP account above.
+                {t("saSettings.leaveEmptyToSendBookingNotifications")}
               </p>
             </div>
             <div className="flex items-center justify-between">
@@ -873,19 +874,19 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Image className="h-5 w-5" />
-              <span>Farmer Profile Banner</span>
+              <span>{t("saSettings.farmerProfileBanner")}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-gray-500">
-              This banner is shown at the top of every farmer's profile page. All farmers see the same image.
+              {t("saSettings.thisBannerIsShownAtThe")}
             </p>
             <div className="relative h-36 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
               {bannerPreview ? (
-                <img src={bannerPreview} alt="Profile banner" className="w-full h-full object-cover" />
+                <img src={bannerPreview} alt={t("saSettings.profileBanner")} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-r from-emerald-600 to-green-500 flex items-center justify-center">
-                  <span className="text-white/70 text-sm">Default gradient (no image set)</span>
+                  <span className="text-white/70 text-sm">{t("saSettings.defaultGradientNoImageSet")}</span>
                 </div>
               )}
             </div>
@@ -897,7 +898,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
                 onClick={() => bannerInputRef.current?.click()}
               >
                 <Upload className="h-4 w-4 mr-2" />
-                {bannerUploading ? "Uploading…" : "Upload Banner"}
+                {bannerUploading ? t("saSettings.uploading") : t("saSettings.uploadBanner")}
               </Button>
               {bannerPreview && (
                 <Button
@@ -907,10 +908,10 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
                   onClick={() => setRemoveBannerConfirmOpen(true)}
                 >
                   <X className="h-4 w-4 mr-1" />
-                  Remove
+                  {t("common.remove")}
                 </Button>
               )}
-              <span className="text-xs text-gray-400">JPEG, PNG, WebP or GIF · max 5 MB</span>
+              <span className="text-xs text-gray-400">{t("saSettings.jpegPngWebpOrGifMax")}</span>
             </div>
             <input
               ref={bannerInputRef}
@@ -926,7 +927,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2 text-amber-600">
             <AlertTriangle className="h-4 w-4" />
-            <span className="text-sm">Changes require system restart to take effect</span>
+            <span className="text-sm">{t("saSettings.changesRequireSystemRestartToTake")}</span>
           </div>
           <Button 
             className="flex items-center space-x-2" 
@@ -934,7 +935,7 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
             disabled={isSaving}
           >
             <Save className="h-4 w-4" />
-            <span>{isSaving ? 'Saving...' : (t('superadmin.saveSettings') || 'Save Settings')}</span>
+            <span>{isSaving ? t("saSettings.saving") : (t('superadmin.saveSettings') || 'Save Settings')}</span>
           </Button>
         </div>
       </div>
@@ -942,15 +943,15 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
       <AlertDialog open={restartConfirmOpen} onOpenChange={setRestartConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Restart all services?</AlertDialogTitle>
+            <AlertDialogTitle>{t("saSettings.restartAllServices")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will restart all services. Any in-progress requests may be interrupted.
+              {t("saSettings.thisWillRestartAllServicesAny")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleRestartServices} className="bg-red-600 hover:bg-red-700 text-white">
-              Restart Services
+              {t("saSettings.restartServices")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -959,15 +960,15 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
       <AlertDialog open={removeBannerConfirmOpen} onOpenChange={setRemoveBannerConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove the current banner image?</AlertDialogTitle>
+            <AlertDialogTitle>{t("saSettings.removeTheCurrentBannerImage")}</AlertDialogTitle>
             <AlertDialogDescription>
-              The profile page will fall back to the default gradient.
+              {t("saSettings.theProfilePageWillFallBack")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemoveBanner} className="bg-red-600 hover:bg-red-700 text-white">
-              Remove
+              {t("common.remove")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -977,21 +978,21 @@ export default function SettingsPageClient({ settings, farmLocationRestriction }
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pendingRestriction ? "Enable the farm location restriction?" : "Disable the farm location restriction?"}
+              {pendingRestriction ? t("saSettings.enableTheFarmLocationRestriction") : t("saSettings.disableTheFarmLocationRestriction")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingRestriction
-                ? "Farmers and vets will again have to be within each farm's registered sector to create, edit or delete insemination, disease, treatment and vaccination records. Anyone recording from elsewhere will be blocked straight away."
-                : "Farmers and vets on every farm will be able to create, edit and delete insemination, disease, treatment and vaccination records from anywhere, without being in the farm's registered sector. This takes effect immediately."}
+                ? t("saSettings.farmersAndVetsWillAgainHave")
+                : t("saSettings.farmersAndVetsOnEveryFarm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmRestriction}
               className={pendingRestriction ? "" : "bg-red-600 hover:bg-red-700 text-white"}
             >
-              {pendingRestriction ? "Enable restriction" : "Disable restriction"}
+              {pendingRestriction ? t("saSettings.enableRestriction") : t("saSettings.disableRestriction")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

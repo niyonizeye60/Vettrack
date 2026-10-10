@@ -8,6 +8,7 @@ import { logActivity, logSystemError } from "../activity-log"
 import { checkRateLimit, getRateLimitKey } from "../rate-limit"
 import { isRole, isPrivilegedRole, canSelfRegister, homePathForRole } from "../roles"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
+import { notificationText } from "../notification-messages"
 
 // Ensured once per warm process, not on every registration - createIndex is a
 // no-op after the first call, but there's no need to pay even that round trip
@@ -160,8 +161,10 @@ export async function registerUser(formData: FormData) {
     // elevated access and when.
     if (isPrivilegedRole(role)) {
       await db.collection("notifications").insertOne({
-        title: "Privileged account created",
-        message: `A new ${role} account was created for ${userData.email}.`,
+        ...notificationText("privilegedAccount", {
+          role: { keys: [`admin.${role}`], text: role },
+          email: String(userData.email),
+        }),
         type: "system",
         priority: "high",
         role: "superadmin",
@@ -239,8 +242,7 @@ export async function loginUser(formData: FormData) {
     })
     if (recentFailures >= LOGIN_LOCKOUT_THRESHOLD) {
       await db.collection("notifications").insertOne({
-        title: "Account locked out",
-        message: `${email} was locked out after ${recentFailures} failed login attempts.`,
+        ...notificationText("accountLockedOut", { email, count: recentFailures }),
         type: "security",
         priority: "high",
         role: "superadmin",

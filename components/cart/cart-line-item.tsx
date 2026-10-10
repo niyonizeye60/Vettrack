@@ -49,7 +49,7 @@ export default function CartLineItem({ item }: { item: CartItem }) {
           <button
             onClick={() => removeItem(item.id)}
             className="text-gray-400 hover:text-red-600 transition-colors"
-            aria-label="Remove"
+            aria-label={t("common.remove")}
           >
             <X className="h-4 w-4" />
           </button>

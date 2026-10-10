@@ -29,7 +29,7 @@ export default async function ConsultationDetailPage({ params }: PageProps) {
   }
   
   // Doctor name is resolved server-side by getConsultationById.
-  const doctorName = consultation.doctorName || "Unknown Doctor";
+  const doctorName = consultation.doctorName || "";
 
   return (
     <ConsultationDetailContent

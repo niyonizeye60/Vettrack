@@ -8,6 +8,7 @@ import { getCurrentUser } from "./auth"
 import { logActivity, logSystemError as recordSystemError } from "../activity-log"
 import { isPresenceOnline, type PresenceDoc } from "../presence"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
+import { notificationText } from "../notification-messages"
 import { CAPABILITIES, ROLES, isRole, type Role } from "../roles"
 import {
   FARM_LOCATION_RESTRICTION_FIELDS,
@@ -1271,8 +1272,7 @@ export async function generateSystemNotifications() {
 
     if (newUsers > 5) {
       notifications.push({
-        title: "High User Registration Activity",
-        message: `${newUsers} new users registered in the last 24 hours`,
+        ...notificationText("highRegistrations", { count: newUsers }),
         type: "system",
         priority: "normal",
         role: "superadmin"
@@ -1281,8 +1281,7 @@ export async function generateSystemNotifications() {
 
     if (pendingConsultations > 10) {
       notifications.push({
-        title: "High Pending Consultations",
-        message: `${pendingConsultations} consultations are pending review`,
+        ...notificationText("highPendingConsultations", { count: pendingConsultations }),
         type: "system",
         priority: "high",
         role: "superadmin",
@@ -1292,8 +1291,7 @@ export async function generateSystemNotifications() {
 
     if (failedLogins > 20) {
       notifications.push({
-        title: "Security Alert",
-        message: `${failedLogins} failed login attempts detected in the last 24 hours`,
+        ...notificationText("failedLoginSpike", { count: failedLogins }),
         type: "security",
         priority: "critical",
         role: "superadmin"
@@ -1302,8 +1300,7 @@ export async function generateSystemNotifications() {
 
     if (pendingListingRequests > 5) {
       notifications.push({
-        title: "High Pending Listing Requests",
-        message: `${pendingListingRequests} marketplace listing requests are pending review`,
+        ...notificationText("highPendingListings", { count: pendingListingRequests }),
         type: "system",
         priority: "high",
         role: "superadmin",
@@ -1313,8 +1310,7 @@ export async function generateSystemNotifications() {
 
     if (failedPayments > 5) {
       notifications.push({
-        title: "Payment Failure Spike",
-        message: `${failedPayments} order payments failed in the last 24 hours`,
+        ...notificationText("paymentFailureSpike", { count: failedPayments }),
         type: "system",
         priority: "high",
         role: "superadmin",
@@ -1361,8 +1357,7 @@ export async function notifyCronFailure(jobName: string, error: unknown) {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
     await db.collection("notifications").insertOne({
-      title: "Scheduled job failed",
-      message: `${jobName} failed to run: ${error instanceof Error ? error.message : String(error)}`,
+      ...notificationText("cronFailed", { job: jobName, error: error instanceof Error ? error.message : String(error) }),
       type: "system",
       priority: "high",
       role: "superadmin",

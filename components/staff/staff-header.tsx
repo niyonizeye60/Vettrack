@@ -100,7 +100,7 @@ export default function StaffHeader({
             size="sm"
             onClick={toggleMobileSidebar}
             className="md:hidden p-2"
-            aria-label="Toggle navigation menu"
+            aria-label={t("staff.toggleNav")}
           >
             <Menu className="h-5 w-5" />
           </Button>

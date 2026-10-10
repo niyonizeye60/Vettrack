@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Check, AlertCircle } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { sendContactEmail } from "@/lib/actions/send-contact-email"
+import { localizeError } from "@/lib/error-messages"
 
 export default function ContactForm() {
   const [name, setName] = useState("")
@@ -19,7 +20,7 @@ export default function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState("")
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,7 +31,7 @@ export default function ContactForm() {
       const result = await sendContactEmail({ name, email, phone, message })
 
       if (!result.success) {
-        setError(result.message)
+        setError(localizeError(result.message, language) ?? "")
         return
       }
 
@@ -40,7 +41,7 @@ export default function ContactForm() {
       setPhone("")
       setMessage("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send message")
+      setError(err instanceof Error ? err.message : t("contact.form.sendFailed"))
     } finally {
       setIsSubmitting(false)
     }

@@ -191,7 +191,7 @@ export default function PharmacyListingsPage() {
         if (data.success) {
           uploaded.push(data.url)
         } else {
-          setError(data.message || t("listing.uploadFailed"))
+          setError(localizeError(data.message, language) || t("listing.uploadFailed"))
         }
       } catch {
         setError(t("listing.uploadFailed"))

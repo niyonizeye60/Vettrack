@@ -93,7 +93,7 @@ export default function AnimalHistoryPanel({ animalId, open, onOpenChange }: Ani
     setError(false)
     fetch(`/api/animal-history?animalId=${animalId}`)
       .then((res) => {
-        if (!res.ok) throw new Error("Failed")
+        if (!res.ok) throw new Error(t("animalHistory.loadFailed"))
         return res.json()
       })
       .then((json) => { if (!cancelled) setData(json) })

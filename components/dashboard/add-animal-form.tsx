@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { registerAnimal } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import { rwandaData } from "@/lib/rwanda-data"
 import { getBreedOptionsForType, getClassOptionsForType } from "@/lib/animal-options"
@@ -19,7 +20,7 @@ interface AddAnimalFormProps {
 }
 
 export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimalFormProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
@@ -93,7 +94,7 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
         toast({ title: t('farmer.animalAdded'), description: t('farmer.animalAddedDesc') })
         onSuccess()
       } else {
-        toast({ title: t('common.error'), description: result.error || t('farmer.actionFailed'), variant: "destructive" })
+        toast({ title: t('common.error'), description: localizeError(result.error, language) || t('farmer.actionFailed'), variant: "destructive" })
       }
     } catch {
       toast({ title: t('common.error'), description: t('farmer.actionFailed'), variant: "destructive" })

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -107,7 +108,7 @@ export interface SellerSalesCopy {
  * and whether that share has been paid out yet.
  */
 export default function SellerSales({ copy }: { copy: SellerSalesCopy }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [data, setData] = useState<SalesData | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -189,7 +190,7 @@ export default function SellerSales({ copy }: { copy: SellerSalesCopy }) {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        setRefundError(body.error || t("refund.requestFailed"))
+        setRefundError(localizeError(body.error, language) || t("refund.requestFailed"))
         return
       }
       setRefundTarget(null)

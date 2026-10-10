@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Calendar, User } from "lucide-react"
 import { getPublishedBlogPosts } from "@/lib/actions/blog"
+import TranslatedText from "@/components/translated-text"
 
 interface DynamicBlogPost {
   id: string
@@ -144,7 +145,7 @@ export default function BlogList({ dynamicPosts: initialDynamicPosts = [] }: Blo
             </CardContent>
             <CardFooter className="px-6 pb-6 pt-0">
               <Button asChild variant="outline" className="w-full bg-transparent">
-                <Link href={`/blog/${post.id}`}>Read More</Link>
+                <Link href={`/blog/${post.id}`}><TranslatedText k="blog.readMore" /></Link>
               </Button>
             </CardFooter>
           </Card>

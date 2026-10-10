@@ -7,6 +7,12 @@ import { useLanguage } from "@/contexts/LanguageContext"
 
 export default function AboutContent() {
   const { t } = useLanguage()
+  // Team titles are written in English below; they show in the reader's language.
+  const teamText = (text: string) => {
+    const key = `aboutTeam.${text.trim()}`
+    const label = t(key)
+    return label === key ? text : label
+  }
 
   return (
     <>
@@ -14,7 +20,7 @@ export default function AboutContent() {
         <div className="absolute inset-0 z-0">
           <Image
             src="https://img.magnific.com/premium-photo/cow-farm_173387-3519.jpg?semt=ais_hybrid&w=740&q=80"
-            alt="Cattle grazing on a farm"
+            alt={t('about.cattleAlt')}
             fill
             className="object-cover"
             priority
@@ -35,13 +41,10 @@ export default function AboutContent() {
           <div>
             <h2 className="heading-lg mb-6">{t('about.history')}</h2>
             <p className="text-gray-600 mb-4">
-              Founded in 2020, NTDM Vettrack has been at the forefront of veterinary innovation in Rwanda. Our
-              journey began with a simple vision: to revolutionize animal health management through technology and
-              expert care.
+              {t('about.historyText1')}
             </p>
             <p className="text-gray-600 mb-4">
-              Over the years, we've grown from a small local clinic to a comprehensive animal health service provider,
-              thanks to our commitment to excellence and our passionate team of skilled veterinarians and technologists.
+              {t('about.historyText2')}
             </p>
             <Button asChild className="mt-4">
               <Link href="/booking">{t('home.hero.bookConsultation')}</Link>
@@ -50,7 +53,7 @@ export default function AboutContent() {
           <div className="relative h-[400px] rounded-lg overflow-hidden">
             <Image
               src="https://b1157417.assetcdn.net/2.0/1157417/wp-content/uploads/2024/03/dairy-cows-socializing-on-pasture-825x526.jpg?lossy=1&strip=1&webp=0"
-              alt="NTDM Vettrack Team"
+              alt={t('about.teamAlt')}
               fill
               className="object-cover"
             />
@@ -62,14 +65,13 @@ export default function AboutContent() {
             <div className="bg-primary/5 p-8 rounded-lg">
               <h2 className="text-2xl font-bold mb-4">{t('about.mission')}</h2>
               <p className="text-gray-700">
-                To transform livestock health and farm management through innovative, technology driven solutions that enable smarter, more sustainable, and data driven farming with AI & IoT.
+                {t('about.missionText')}
               </p>
             </div>
             <div className="bg-secondary/5 p-8 rounded-lg">
               <h2 className="text-2xl font-bold mb-4">{t('about.vision')}</h2>
               <p className="text-gray-700">
-                To become Africa's leading smart animal health and management service, combining IoT and Artificial Intelligence to build a healthier, more sustainable livestock sector.
-                We envision a future where every farmer in Rwanda and beyond benefits from digital veterinary access, real-time disease report and prediction, and a connected agricultural marketplace that drives productivity and strengthens public health.
+                {t('about.visionText')}
               </p>
             </div>
           </div>
@@ -121,8 +123,8 @@ export default function AboutContent() {
                   <Image src={member.image || "/placeholder.svg"} alt={member.name} fill className="object-cover" />
                 </div>
                 <h3 className="text-xl font-semibold mb-1">{member.name}</h3>
-                <p className="text-primary font-medium mb-2">{member.role}</p>
-                <p className="text-gray-600 mb-4">Specialist in {member.specialty}</p>
+                <p className="text-primary font-medium mb-2">{teamText(member.role)}</p>
+                <p className="text-gray-600 mb-4">{t("about.specialistIn").replace("{field}", teamText(member.specialty))}</p>
                 <Link href="/booking" className="text-primary hover:text-primary/80 transition-colors">
                   {t('home.hero.bookConsultation')}
                 </Link>
@@ -146,8 +148,8 @@ export default function AboutContent() {
                 <Image src={member.image || "/placeholder.svg"} alt={member.name} fill className="object-cover" />
               </div>
               <h3 className="text-xl font-semibold mb-1">{member.name}</h3>
-              <p className="text-primary font-medium mb-2">{member.role}</p>
-              <p className="text-gray-600 mb-4"> {member.specialty}</p>
+              <p className="text-primary font-medium mb-2">{teamText(member.role)}</p>
+              <p className="text-gray-600 mb-4"> {teamText(member.specialty)}</p>
               <Link href="/booking" className="text-primary hover:text-primary/80 transition-colors">
                 {t('home.hero.bookConsultation')}
               </Link>
@@ -171,8 +173,8 @@ export default function AboutContent() {
                 <Image src={member.image} alt={member.name} fill className="object-cover" />
               </div>
               <h3 className="text-xl font-semibold mb-1">{member.name}</h3>
-              <p className="text-primary font-medium mb-2">{member.role}</p>
-              <p className="text-gray-600 mb-4">{member.tagline}</p>
+              <p className="text-primary font-medium mb-2">{teamText(member.role)}</p>
+              <p className="text-gray-600 mb-4">{teamText(member.tagline)}</p>
               <Link
                 href={member.link}
                 target="_blank"

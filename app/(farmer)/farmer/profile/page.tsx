@@ -32,28 +32,28 @@ interface ActivityItem {
   date: string
 }
 
-function getDateGroup(dateStr: string): string {
+function getDateGroup(dateStr: string, t: (key: string) => string): string {
   const date = new Date(dateStr)
   const now = new Date()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const yesterdayStart = new Date(todayStart.getTime() - 86400000)
   const weekStart = new Date(todayStart.getTime() - 6 * 86400000)
 
-  if (date >= todayStart) return "TODAY"
-  if (date >= yesterdayStart) return "YESTERDAY"
-  if (date >= weekStart) return "THIS WEEK"
+  if (date >= todayStart) return t("common.today").toUpperCase()
+  if (date >= yesterdayStart) return t("common.yesterday").toUpperCase()
+  if (date >= weekStart) return t("common.thisWeek").toUpperCase()
   return date.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase()
 }
 
-function timeAgoShort(dateStr: string): string {
+function timeAgoShort(dateStr: string, t: (key: string) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "Just now"
-  if (mins < 60) return `${mins} min ago`
+  if (mins < 1) return t("time.justNow")
+  if (mins < 60) return t("time.minAgoLong").replace("{n}", String(mins))
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`
+  if (hours < 24) return t(hours > 1 ? "time.hoursAgoLong" : "time.hourAgoLong").replace("{n}", String(hours))
   const days = Math.floor(hours / 24)
-  if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`
+  if (days < 7) return t(days > 1 ? "time.daysAgoLong" : "time.dayAgoLong").replace("{n}", String(days))
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
@@ -62,7 +62,7 @@ function ActivityTimeline({ activity, t }: { activity: ActivityItem[]; t: (key: 
   const seen = new Map<string, number>()
 
   for (const item of activity) {
-    const label = getDateGroup(item.date)
+    const label = getDateGroup(item.date, t)
     if (!seen.has(label)) {
       seen.set(label, groups.length)
       groups.push({ label, items: [] })
@@ -96,7 +96,7 @@ function ActivityTimeline({ activity, t }: { activity: ActivityItem[]; t: (key: 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{kindLabel}</p>
                     <p className="text-sm text-gray-500 mt-0.5 capitalize">{item.title}{item.description ? ` — ${item.description}` : ""}</p>
-                    <p className="text-xs text-gray-400 mt-1">{timeAgoShort(item.date)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{timeAgoShort(item.date, t)}</p>
                   </div>
                 </div>
               )
@@ -233,7 +233,7 @@ export default function FarmerProfilePage() {
         {/* Banner */}
         <div className="h-36">
           {bannerImage ? (
-            <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
+            <img src={bannerImage} alt={t("farmerProfile.banner")} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-r from-green-600 to-green-500" />
           )}

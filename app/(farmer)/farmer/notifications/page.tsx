@@ -30,13 +30,15 @@ interface Notification {
   i18n?: unknown
 }
 
-function getTimeLeft(expiresAt?: string) {
+function getTimeLeft(expiresAt: string | undefined, t: (key: string) => string) {
   if (!expiresAt) return null
   const diff = new Date(expiresAt).getTime() - Date.now()
-  if (diff <= 0) return "Expired"
+  if (diff <= 0) return t("notifications.expired")
   const h = Math.floor(diff / (1000 * 60 * 60))
   const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-  return h > 0 ? `${h}h ${m}m left` : `${m}m left`
+  return h > 0
+    ? t("notifications.hoursMinutesLeft").replace("{h}", String(h)).replace("{m}", String(m))
+    : t("notifications.minutesLeft").replace("{m}", String(m))
 }
 
 function priorityConfig(priority: string) {
@@ -287,7 +289,7 @@ export default function FarmerNotificationsPage() {
             <div className="divide-y divide-gray-100">
               {visibleNotifications.map(n => {
                 const pc = priorityConfig(n.priority)
-                const timeLeft = getTimeLeft(n.expiresAt)
+                const timeLeft = getTimeLeft(n.expiresAt, t)
                 const expiringSoon = n.expiresAt &&
                   (new Date(n.expiresAt).getTime() - Date.now()) < 6 * 60 * 60 * 1000
 

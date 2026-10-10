@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { animalStatusLabel } from "@/lib/animal-status"
 import AnimalHistoryPanel from "@/components/dashboard/animal-history-panel"
 import { PersonAvatar } from "@/components/ui/person-avatar"
 
@@ -329,7 +330,7 @@ export default function PatientsPageClient({
                             a.status === 'Sick'             ? 'bg-amber-50 text-amber-700 border-amber-200' :
                             a.status === 'Under Treatment'  ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                                               'bg-gray-50 text-gray-600 border-gray-200'
-                          }`}>{a.status}</Badge>
+                          }`}>{animalStatusLabel(a.status, t)}</Badge>
                           <Button
                             variant="outline"
                             size="sm"

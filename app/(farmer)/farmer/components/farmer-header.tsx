@@ -93,7 +93,10 @@ export default function FarmerHeader() {
           seenChatNotificationIds.current = new Set(chatNotifs.map((n: any) => n._id))
         } else {
           const newChat = chatNotifs.filter((n: any) => !seenChatNotificationIds.current!.has(n._id))
-          newChat.forEach((n: any) => toast({ title: n.title, description: n.message }))
+          newChat.forEach((raw: any) => {
+            const n = localizeNotification(raw, language, t)
+            toast({ title: n.title, description: n.message })
+          })
           if (newChat.length > 0) playChatNotificationSound()
           chatNotifs.forEach((n: any) => seenChatNotificationIds.current!.add(n._id))
         }
@@ -179,7 +182,7 @@ export default function FarmerHeader() {
             size="sm"
             onClick={toggleMobileSidebar}
             className="md:hidden p-2"
-            aria-label="Toggle navigation menu"
+            aria-label={t("farmerHeader.toggleNavigationMenu")}
           >
             <Menu className="h-5 w-5" />
           </Button>

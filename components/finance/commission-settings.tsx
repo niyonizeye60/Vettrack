@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2, Percent, Info } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { computeFee } from "@/lib/commission"
 
 interface ActiveRule {
@@ -26,7 +27,7 @@ interface HistoryRule extends Omit<ActiveRule, "configured"> {
 }
 
 export default function CommissionSettings() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [active, setActive] = useState<ActiveRule | null>(null)
   const [history, setHistory] = useState<HistoryRule[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,7 +82,7 @@ export default function CommissionSettings() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || t("finance.commissionSaveFailed"))
+        setError(localizeError(data.error, language) || t("finance.commissionSaveFailed"))
         return
       }
       await load()

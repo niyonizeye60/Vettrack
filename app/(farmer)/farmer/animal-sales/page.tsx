@@ -102,9 +102,9 @@ export default function AnimalSalesPage() {
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!animalName.trim()) e.animalName = "Enter or select an animal"
-    if (!amount || Number(amount) <= 0) e.amount = "Enter a valid amount"
-    if (!date) e.date = "Select a date"
+    if (!animalName.trim()) e.animalName = t("animalSales.enterOrSelectAnAnimal")
+    if (!amount || Number(amount) <= 0) e.amount = t("animalSales.enterAValidAmount")
+    if (!date) e.date = t("animalSales.selectADate")
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -249,14 +249,14 @@ export default function AnimalSalesPage() {
                 {/* Animal name (manual / confirm) */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.name')} *</label>
-                  <Input placeholder="e.g. Brown Cow" value={animalName} onChange={e => setAnimalName(e.target.value)} disabled={!!animalId} className={errors.animalName ? "border-red-500" : ""} />
+                  <Input placeholder={t("animalSales.eGBrownCow")} value={animalName} onChange={e => setAnimalName(e.target.value)} disabled={!!animalId} className={errors.animalName ? "border-red-500" : ""} />
                   {errors.animalName && <p className="text-xs text-red-500">{errors.animalName}</p>}
                 </div>
 
                 {/* Animal type (manual) */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.type')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input placeholder="e.g. cow, goat" value={animalType} onChange={e => setAnimalType(e.target.value)} disabled={!!animalId} />
+                  <Input placeholder={t("animalSales.eGCowGoat")} value={animalType} onChange={e => setAnimalType(e.target.value)} disabled={!!animalId} />
                 </div>
 
                 {/* Quantity */}
@@ -324,8 +324,8 @@ export default function AnimalSalesPage() {
                     <SelectItem value="purchase">{t('farmer.purchase')}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} placeholder="Start date" />
-                <Input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} placeholder="End date" />
+                <Input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} placeholder={t("animalSales.startDate")} />
+                <Input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} placeholder={t("animalSales.endDate")} />
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-gray-500">{filteredTransactions.length}</p>
                   <Button variant="outline" onClick={clearFilters} className="rounded-lg ml-auto">{t('farmer.clearFilters')}</Button>

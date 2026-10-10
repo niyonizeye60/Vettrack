@@ -11,7 +11,7 @@ export default function BookingBanner() {
       <div className="absolute inset-0 z-0">
         <Image
           src="https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"
-          alt="Booking consultation"
+          alt={t("alt.bookingConsultation")}
           fill
           className="object-cover"
           priority

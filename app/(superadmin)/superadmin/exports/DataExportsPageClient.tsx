@@ -19,6 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import {
   exportUsers,
   exportConsultations,
@@ -47,7 +48,7 @@ interface DataExportsPageClientProps {
 }
 
 export default function DataExportsPageClient({ users }: DataExportsPageClientProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [isExporting, setIsExporting] = useState<string | null>(null)
   
@@ -90,7 +91,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
 
   const downloadCSV = (data: any[], filename: string) => {
     if (data.length === 0) {
-      toast({ title: "Error", description: "No data to export", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saExports.noDataToExport"), variant: "destructive" })
       return
     }
 
@@ -143,12 +144,12 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       
       if (result.success) {
         downloadCSV(result.data || [], 'users-export')
-        toast({ title: "Success", description: `Exported ${result.count} users` })
+        toast({ title: t("saExports.success"), description: t("saExports.exportedUsers").replace("{count}", String(result.count)) })
       } else {
-        toast({ title: "Error", description: result.message || 'Failed to export users', variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saExports.failedToExportUsers"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: 'Failed to export users', variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saExports.failedToExportUsers"), variant: "destructive" })
     } finally {
       setIsExporting(null)
     }
@@ -173,12 +174,12 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       
       if (result.success) {
         downloadCSV(result.data || [], 'consultations-export')
-        toast({ title: "Success", description: `Exported ${result.count} consultations` })
+        toast({ title: t("saExports.success"), description: t("saExports.exportedConsultations").replace("{count}", String(result.count)) })
       } else {
-        toast({ title: "Error", description: result.message || 'Failed to export consultations', variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saExports.failedToExportConsultations"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: 'Failed to export consultations', variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saExports.failedToExportConsultations"), variant: "destructive" })
     } finally {
       setIsExporting(null)
     }
@@ -201,12 +202,12 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       
       if (result.success) {
         downloadCSV(result.data || [], 'system-logs-export')
-        toast({ title: "Success", description: `Exported ${result.count} log entries` })
+        toast({ title: t("saExports.success"), description: t("saExports.exportedLogs").replace("{count}", String(result.count)) })
       } else {
-        toast({ title: "Error", description: result.message || 'Failed to export logs', variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saExports.failedToExportLogs"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: 'Failed to export logs', variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saExports.failedToExportLogs"), variant: "destructive" })
     } finally {
       setIsExporting(null)
     }
@@ -219,12 +220,12 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       
       if (result.success) {
         downloadJSON(result.data, 'system-report')
-        toast({ title: "Success", description: 'System report exported successfully' })
+        toast({ title: t("saExports.success"), description: t("saExports.systemReportExportedSuccessfully") })
       } else {
-        toast({ title: "Error", description: result.message || 'Failed to export system report', variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saExports.failedToExportSystemReport"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: 'Failed to export system report', variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saExports.failedToExportSystemReport"), variant: "destructive" })
     } finally {
       setIsExporting(null)
     }
@@ -232,7 +233,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
 
   const handleScheduleExport = async () => {
     if (!scheduleForm.email) {
-      toast({ title: "Error", description: "Please enter an email address", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saExports.pleaseEnterAnEmailAddress"), variant: "destructive" })
       return
     }
 
@@ -244,19 +245,19 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       })
       
       if (result.success) {
-        toast({ title: "Success", description: 'Export scheduled successfully' })
+        toast({ title: t("saExports.success"), description: t("saExports.exportScheduledSuccessfully") })
         setScheduleForm({ exportType: 'users', frequency: 'weekly', email: '' })
       } else {
-        toast({ title: "Error", description: result.message || 'Failed to schedule export', variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saExports.failedToScheduleExport"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: 'Failed to schedule export', variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saExports.failedToScheduleExport"), variant: "destructive" })
     }
   }
 
   const handleDownloadBackup = () => {
     setIsDownloadingBackup(true)
-    toast({ title: "Preparing backup", description: "Your full database backup download will start shortly." })
+    toast({ title: t("saExports.preparingBackup"), description: t("saExports.yourFullDatabaseBackupDownloadWill") })
     window.location.href = "/api/superadmin/database/export"
     setTimeout(() => setIsDownloadingBackup(false), 3000)
   }
@@ -278,15 +279,15 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Import failed")
+        throw new Error(localizeError(data.error, language) || t("saExports.importFailed"))
       }
 
       setImportResult(data)
-      toast({ title: "Import complete", description: `Data imported into "${data.database}"` })
+      toast({ title: t("saExports.importComplete"), description: t("saExports.importedInto").replace("{database}", data.database) })
     } catch (error: any) {
-      const message = error?.message || "Import failed"
+      const message = error?.message || t("saExports.importFailed")
       setImportError(message)
-      toast({ title: "Error", description: message, variant: "destructive" })
+      toast({ title: t("common.error"), description: message, variant: "destructive" })
     } finally {
       setIsImporting(false)
     }
@@ -580,7 +581,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
               </CardTitle>
               <CardDescription>
                 {t('superadmin.exportFullDatabaseDesc') ||
-                  "Downloads every collection and document in the database — including users, sessions, chats, and all other records — as a single compressed backup file."}
+                  t("saExports.downloadsEveryCollectionAndDocumentIn")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -645,7 +646,7 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
                     type="button"
                     onClick={() => setShowConnectionString((v) => !v)}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    aria-label={showConnectionString ? "Hide connection string" : "Show connection string"}
+                    aria-label={showConnectionString ? t("saExports.hideConnectionString") : t("saExports.showConnectionString")}
                   >
                     {showConnectionString ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -701,8 +702,8 @@ export default function DataExportsPageClient({ users }: DataExportsPageClientPr
                   </p>
                   {Object.entries(importResult.summary).map(([name, stats]: [string, any]) => (
                     <p key={name} className="text-green-700">
-                      {name}: {stats.documentsInserted} inserted, {stats.documentsSkipped} already existed
-                      {stats.indexesCreated ? `, ${stats.indexesCreated} indexes created` : ""}
+                      {t("saExports.collectionStats").replace("{name}", name).replace("{inserted}", String(stats.documentsInserted)).replace("{skipped}", String(stats.documentsSkipped))}
+                      {stats.indexesCreated ? t("saExports.indexesCreated").replace("{count}", String(stats.indexesCreated)) : ""}
                     </p>
                   ))}
                 </div>

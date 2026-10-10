@@ -8,6 +8,7 @@ import { Calendar, User, ArrowLeft } from "lucide-react"
 import { notFound } from "next/navigation"
 import { getBlogPostById } from "@/lib/actions/blog"
 import ViewTracker from "@/components/blog/view-tracker"
+import TranslatedText from "@/components/translated-text"
 
 const blogPosts = [
   {
@@ -185,7 +186,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
           <div className="text-center">
             <Button asChild>
-              <Link href="/blog">Read More Articles</Link>
+              <Link href="/blog"><TranslatedText k="blog.readMoreArticles" /></Link>
             </Button>
           </div>
         </div>
@@ -239,7 +240,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
         <div className="text-center">
           <Button asChild>
-            <Link href="/blog">Read More Articles</Link>
+            <Link href="/blog"><TranslatedText k="blog.readMoreArticles" /></Link>
           </Button>
         </div>
       </div>

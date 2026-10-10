@@ -41,6 +41,7 @@ import {
   permanentlyDeleteAllDeletedMessages,
 } from "@/lib/actions/chat-moderation"
 
+import { useLanguage } from "@/contexts/LanguageContext"
 interface ChatReport {
   id: string
   conversationId: string
@@ -80,6 +81,7 @@ interface ChatModerationProps {
 }
 
 export default function ChatModeration({ initialReports, initialConversations }: ChatModerationProps) {
+  const { t } = useLanguage()
   const { toast } = useToast()
   const [reports, setReports] = useState<ChatReport[]>(initialReports)
   const [conversations, setConversations] = useState<ModerationConversation[]>(initialConversations)
@@ -109,7 +111,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
       setConversations(conversationsData as ModerationConversation[])
     } catch (error) {
       console.error("Error loading moderation data:", error)
-      toast({ title: "Failed to load moderation data", variant: "destructive" })
+      toast({ title: t("chatMod.failedToLoadModerationData"), variant: "destructive" })
     }
   }
 
@@ -121,7 +123,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
       setViewMessages(data as ModerationMessage[])
     } catch (error) {
       console.error("Error loading conversation:", error)
-      toast({ title: "Failed to load conversation", variant: "destructive" })
+      toast({ title: t("chatMod.failedToLoadConversation"), variant: "destructive" })
     } finally {
       setLoadingMessages(false)
     }
@@ -132,13 +134,13 @@ export default function ChatModeration({ initialReports, initialConversations }:
     setSubmitting(true)
     try {
       await resolveChatReport(resolvingReport.id, resolutionNote)
-      toast({ title: "Report resolved" })
+      toast({ title: t("chatMod.reportResolved") })
       setResolvingReport(null)
       setResolutionNote("")
       await loadAll()
     } catch (error) {
       console.error("Error resolving report:", error)
-      toast({ title: "Failed to resolve report", variant: "destructive" })
+      toast({ title: t("chatMod.failedToResolveReport"), variant: "destructive" })
     } finally {
       setSubmitting(false)
     }
@@ -147,11 +149,11 @@ export default function ChatModeration({ initialReports, initialConversations }:
   const handleDismiss = async (reportId: string) => {
     try {
       await dismissChatReport(reportId)
-      toast({ title: "Report dismissed" })
+      toast({ title: t("chatMod.reportDismissed") })
       await loadAll()
     } catch (error) {
       console.error("Error dismissing report:", error)
-      toast({ title: "Failed to dismiss report", variant: "destructive" })
+      toast({ title: t("chatMod.failedToDismissReport"), variant: "destructive" })
     }
   }
 
@@ -159,12 +161,12 @@ export default function ChatModeration({ initialReports, initialConversations }:
     if (!suspendUserId) return
     try {
       await suspendReportedUser(suspendUserId)
-      toast({ title: "User suspended" })
+      toast({ title: t("chatMod.userSuspended") })
       setSuspendUserId(null)
       await loadAll()
     } catch (error) {
       console.error("Error suspending user:", error)
-      toast({ title: "Failed to suspend user", variant: "destructive" })
+      toast({ title: t("chatMod.failedToSuspendUser"), variant: "destructive" })
     }
   }
 
@@ -172,11 +174,11 @@ export default function ChatModeration({ initialReports, initialConversations }:
     setRestoringMessageId(messageId)
     try {
       await restoreModerationMessage(messageId)
-      toast({ title: "Message restored" })
+      toast({ title: t("chatMod.messageRestored") })
       if (viewConversationId) await openConversation(viewConversationId)
     } catch (error) {
       console.error("Error restoring message:", error)
-      toast({ title: "Failed to restore message", variant: "destructive" })
+      toast({ title: t("chatMod.failedToRestoreMessage"), variant: "destructive" })
     } finally {
       setRestoringMessageId(null)
     }
@@ -188,12 +190,12 @@ export default function ChatModeration({ initialReports, initialConversations }:
     setPermanentDeleteMessageId(null)
     try {
       await permanentlyDeleteModerationMessage(messageId)
-      toast({ title: "Message permanently deleted" })
+      toast({ title: t("chatMod.messagePermanentlyDeleted") })
       setViewMessages((prev) => prev.filter((m) => m.id !== messageId))
       await loadAll()
     } catch (error) {
       console.error("Error permanently deleting message:", error)
-      toast({ title: "Failed to delete message", variant: "destructive" })
+      toast({ title: t("chatMod.failedToDeleteMessage"), variant: "destructive" })
     }
   }
 
@@ -202,11 +204,11 @@ export default function ChatModeration({ initialReports, initialConversations }:
     setRestoringAll(true)
     try {
       await restoreAllDeletedMessages(viewConversationId)
-      toast({ title: "All deleted messages restored" })
+      toast({ title: t("chatMod.allDeletedMessagesRestored") })
       await openConversation(viewConversationId)
     } catch (error) {
       console.error("Error restoring all messages:", error)
-      toast({ title: "Failed to restore messages", variant: "destructive" })
+      toast({ title: t("chatMod.failedToRestoreMessages"), variant: "destructive" })
     } finally {
       setRestoringAll(false)
     }
@@ -217,12 +219,12 @@ export default function ChatModeration({ initialReports, initialConversations }:
     setPermanentDeletingAll(true)
     try {
       await permanentlyDeleteAllDeletedMessages(viewConversationId)
-      toast({ title: "All deleted messages permanently removed" })
+      toast({ title: t("chatMod.allDeletedMessagesPermanentlyRemoved") })
       setViewMessages((prev) => prev.filter((m) => !m.deletedAt))
       await loadAll()
     } catch (error) {
       console.error("Error permanently deleting all messages:", error)
-      toast({ title: "Failed to delete messages", variant: "destructive" })
+      toast({ title: t("chatMod.failedToDeleteMessages"), variant: "destructive" })
     } finally {
       setPermanentDeletingAll(false)
       setPermanentDeleteAllOpen(false)
@@ -246,33 +248,33 @@ export default function ChatModeration({ initialReports, initialConversations }:
       <div className="flex items-center gap-3">
         <ShieldAlert className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 flex-shrink-0" />
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Chat Moderation</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Review reports and oversee farmer-vet conversations</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t("chatMod.chatModeration")}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{t("chatMod.reviewReportsAndOverseeFarmerVet")}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase font-medium">Open reports</p>
+            <p className="text-xs text-gray-500 uppercase font-medium">{t("chatMod.openReports")}</p>
             <p className="text-2xl font-bold text-red-600">{openReports.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase font-medium">Resolved</p>
+            <p className="text-xs text-gray-500 uppercase font-medium">{t("chatMod.resolved")}</p>
             <p className="text-2xl font-bold text-emerald-600">{resolvedReports.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase font-medium">Conversations</p>
+            <p className="text-xs text-gray-500 uppercase font-medium">{t("chatMod.conversations")}</p>
             <p className="text-2xl font-bold text-gray-900">{conversations.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 uppercase font-medium">Blocked pairs</p>
+            <p className="text-xs text-gray-500 uppercase font-medium">{t("chatMod.blockedPairs")}</p>
             <p className="text-2xl font-bold text-gray-900">{conversations.filter((c) => c.isBlocked).length}</p>
           </CardContent>
         </Card>
@@ -281,17 +283,17 @@ export default function ChatModeration({ initialReports, initialConversations }:
       <Tabs defaultValue="reports">
         <TabsList>
           <TabsTrigger value="reports">
-            <Flag className="h-4 w-4 mr-1.5" /> Reports
+            <Flag className="h-4 w-4 mr-1.5" /> {t("chatMod.reports")}
           </TabsTrigger>
           <TabsTrigger value="conversations">
-            <MessageSquare className="h-4 w-4 mr-1.5" /> All conversations
+            <MessageSquare className="h-4 w-4 mr-1.5" /> {t("chatMod.allConversations")}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="reports" className="space-y-3 mt-4">
           {reports.length === 0 ? (
             <Card>
-              <CardContent className="py-12 text-center text-gray-400">No reports filed</CardContent>
+              <CardContent className="py-12 text-center text-gray-400">{t("chatMod.noReportsFiled")}</CardContent>
             </Card>
           ) : (
             reports.map((r) => (
@@ -301,15 +303,15 @@ export default function ChatModeration({ initialReports, initialConversations }:
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm">
-                          {r.reporter?.name || "Unknown"} reported {r.reportedUser?.name || "Unknown"}
+                          {t("chatMod.reported").replace("{reporter}", r.reporter?.name || t("chatMod.unknown")).replace("{user}", r.reportedUser?.name || t("chatMod.unknown"))}
                         </p>
-                        {r.status === "open" && <Badge className="bg-red-100 text-red-700 border-red-200">Open</Badge>}
+                        {r.status === "open" && <Badge className="bg-red-100 text-red-700 border-red-200">{t("chatMod.open")}</Badge>}
                         {r.status === "resolved" && (
-                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Resolved</Badge>
+                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">{t("chatMod.resolved")}</Badge>
                         )}
-                        {r.status === "dismissed" && <Badge variant="outline">Dismissed</Badge>}
+                        {r.status === "dismissed" && <Badge variant="outline">{t("chatMod.dismissed")}</Badge>}
                         {r.reportedUser?.status === "suspended" && (
-                          <Badge className="bg-gray-800 text-white">User suspended</Badge>
+                          <Badge className="bg-gray-800 text-white">{t("chatMod.userSuspended")}</Badge>
                         )}
                       </div>
                       <p className="text-sm text-gray-600 mt-1">{r.reason}</p>
@@ -322,7 +324,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                     </div>
                     <div className="flex flex-col gap-1.5 items-end">
                       <Button size="sm" variant="ghost" onClick={() => openConversation(r.conversationId)}>
-                        <Eye className="h-3.5 w-3.5 mr-1" /> View chat
+                        <Eye className="h-3.5 w-3.5 mr-1" /> {t("chatMod.viewChat")}
                       </Button>
                       {r.status === "open" && (
                         <>
@@ -332,7 +334,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                             className="text-emerald-700 hover:bg-emerald-50"
                             onClick={() => setResolvingReport(r)}
                           >
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Resolve
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t("chatMod.resolve")}
                           </Button>
                           <Button
                             size="sm"
@@ -340,7 +342,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                             className="text-gray-500 hover:bg-gray-50"
                             onClick={() => handleDismiss(r.id)}
                           >
-                            <XCircle className="h-3.5 w-3.5 mr-1" /> Dismiss
+                            <XCircle className="h-3.5 w-3.5 mr-1" /> {t("chatMod.dismiss")}
                           </Button>
                           {r.reportedUser && r.reportedUser.status !== "suspended" && (
                             <Button
@@ -349,7 +351,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                               className="text-red-600 hover:bg-red-50"
                               onClick={() => setSuspendUserId(r.reportedUser!.id)}
                             >
-                              <Ban className="h-3.5 w-3.5 mr-1" /> Suspend user
+                              <Ban className="h-3.5 w-3.5 mr-1" /> {t("chatMod.suspendUser")}
                             </Button>
                           )}
                         </>
@@ -366,7 +368,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search by participant name or message content..."
+              placeholder={t("chatMod.searchByParticipantNameOrMessage")}
               value={conversationSearch}
               onChange={(e) => setConversationSearch(e.target.value)}
               className="pl-9"
@@ -374,7 +376,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
           </div>
           {filteredConversations.length === 0 ? (
             <Card>
-              <CardContent className="py-12 text-center text-gray-400">No conversations found</CardContent>
+              <CardContent className="py-12 text-center text-gray-400">{t("chatMod.noConversationsFound")}</CardContent>
             </Card>
           ) : (
             filteredConversations.map((c) => (
@@ -385,10 +387,10 @@ export default function ChatModeration({ initialReports, initialConversations }:
                       <p className="font-medium text-sm truncate">
                         {c.participants.map((p) => p.name).join(" ↔ ")}
                       </p>
-                      {c.isBlocked && <Badge className="bg-gray-800 text-white">Blocked</Badge>}
+                      {c.isBlocked && <Badge className="bg-gray-800 text-white">{t("chatMod.blocked")}</Badge>}
                     </div>
                     <p className="text-xs text-gray-500 truncate max-w-md">
-                      {c.lastMessage?.content || "No messages yet"}
+                      {c.lastMessage?.content || t("chatMod.noMessagesYet")}
                     </p>
                   </div>
                   <p className="text-xs text-gray-400 whitespace-nowrap">
@@ -405,8 +407,8 @@ export default function ChatModeration({ initialReports, initialConversations }:
       <Dialog open={!!viewConversationId} onOpenChange={(open) => !open && setViewConversationId(null)}>
         <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Conversation</DialogTitle>
-            <DialogDescription>Decrypted message history for moderation review</DialogDescription>
+            <DialogTitle>{t("chatMod.conversation")}</DialogTitle>
+            <DialogDescription>{t("chatMod.decryptedMessageHistoryForModerationReview")}</DialogDescription>
           </DialogHeader>
           {viewMessages.some((m) => m.deletedAt) && (
             <div className="flex gap-2 pb-2 border-b border-gray-100">
@@ -418,7 +420,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                 onClick={handleRestoreAllMessages}
               >
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                {restoringAll ? "Restoring..." : "Restore all deleted"}
+                {restoringAll ? t("chatMod.restoring") : t("chatMod.restoreAllDeleted")}
               </Button>
               <Button
                 size="sm"
@@ -427,7 +429,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                 onClick={() => setPermanentDeleteAllOpen(true)}
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                Delete all permanently
+                {t("chatMod.deleteAllPermanently")}
               </Button>
             </div>
           )}
@@ -443,7 +445,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                 </div>
               ))
             ) : viewMessages.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">No messages</div>
+              <div className="text-center text-gray-400 py-8">{t("chatMod.noMessages")}</div>
             ) : (
               viewMessages.map((m) => (
                 <div key={m.id} className="text-sm">
@@ -468,7 +470,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                         onClick={() => handleRestoreMessage(m.id)}
                       >
                         <RotateCcw className="h-3 w-3 mr-1" />
-                        {restoringMessageId === m.id ? "Restoring..." : "Restore"}
+                        {restoringMessageId === m.id ? t("chatMod.restoring") : t("chatMod.restore")}
                       </Button>
                       <Button
                         size="sm"
@@ -477,7 +479,7 @@ export default function ChatModeration({ initialReports, initialConversations }:
                         onClick={() => setPermanentDeleteMessageId(m.id)}
                       >
                         <Trash2 className="h-3 w-3 mr-1" />
-                        Delete permanently
+                        {t("chatMod.deletePermanently")}
                       </Button>
                     </div>
                   )}
@@ -492,20 +494,20 @@ export default function ChatModeration({ initialReports, initialConversations }:
       <Dialog open={!!resolvingReport} onOpenChange={(open) => !open && setResolvingReport(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Resolve report</DialogTitle>
-            <DialogDescription>Add an optional note describing the outcome</DialogDescription>
+            <DialogTitle>{t("chatMod.resolveReport")}</DialogTitle>
+            <DialogDescription>{t("chatMod.addAnOptionalNoteDescribingThe")}</DialogDescription>
           </DialogHeader>
           <Textarea
-            placeholder="Resolution note (optional)..."
+            placeholder={t("chatMod.resolutionNoteOptional")}
             value={resolutionNote}
             onChange={(e) => setResolutionNote(e.target.value)}
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setResolvingReport(null)} disabled={submitting}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleResolve} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700">
-              {submitting ? "Resolving..." : "Mark resolved"}
+              {submitting ? t("chatMod.resolving") : t("chatMod.markResolved")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -515,15 +517,15 @@ export default function ChatModeration({ initialReports, initialConversations }:
       <AlertDialog open={!!permanentDeleteMessageId} onOpenChange={(open) => !open && setPermanentDeleteMessageId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Permanently delete this message?</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatMod.permanentlyDeleteThisMessage")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the message from the database entirely. This action cannot be undone.
+              {t("chatMod.thisRemovesTheMessageFromThe")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handlePermanentlyDeleteMessage} className="bg-red-600 hover:bg-red-700 text-white">
-              Delete permanently
+              {t("chatMod.deletePermanently")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -533,17 +535,16 @@ export default function ChatModeration({ initialReports, initialConversations }:
       <AlertDialog open={permanentDeleteAllOpen} onOpenChange={(open) => !permanentDeletingAll && setPermanentDeleteAllOpen(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Permanently delete all deleted messages?</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatMod.permanentlyDeleteAllDeletedMessages")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes every message already marked as deleted in this conversation from the database entirely.
-              Messages that were never deleted are not affected. This action cannot be undone.
+              {t("chatMod.deleteAllDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={permanentDeletingAll}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={permanentDeletingAll}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handlePermanentlyDeleteAllMessages} disabled={permanentDeletingAll}
               className="bg-red-600 hover:bg-red-700 text-white">
-              {permanentDeletingAll ? "Deleting..." : "Delete all permanently"}
+              {permanentDeletingAll ? t("common.deleting") : t("chatMod.deleteAllPermanently")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -553,15 +554,15 @@ export default function ChatModeration({ initialReports, initialConversations }:
       <AlertDialog open={!!suspendUserId} onOpenChange={(open) => !open && setSuspendUserId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Suspend this user?</AlertDialogTitle>
+            <AlertDialogTitle>{t("chatMod.suspendThisUser")}</AlertDialogTitle>
             <AlertDialogDescription>
-              The user will be unable to log in until reactivated from User Management.
+              {t("chatMod.theUserWillBeUnableTo")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleSuspend} className="bg-red-600 hover:bg-red-700 text-white">
-              Suspend
+              {t("chatMod.suspend")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

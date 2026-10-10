@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bell, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import { deleteAnimal, updateAnimalLactationStatus, getAnimals } from "@/lib/actions"
 import AddAnimalForm from "@/components/dashboard/add-animal-form"
@@ -58,7 +59,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 }
 
 export default function AnimalsContent({ initialData, farmerId, openAdd }: AnimalsContentProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
 
   const [addOpen, setAddOpen] = useState(openAdd ?? false)
@@ -189,7 +190,7 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
       if (result.success) {
         await fetchData(page)
       } else {
-        toast({ title: t('farmer.actionFailed'), description: result.error, variant: "destructive" })
+        toast({ title: t('farmer.actionFailed'), description: localizeError(result.error, language), variant: "destructive" })
       }
     } catch (error) {
       console.error("Error updating lactation status:", error)
@@ -405,11 +406,11 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
           {data.pagination.totalPages > 1 && (
             <div className="flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-gray-100">
               <p className="text-sm text-gray-500">
-                Showing{" "}
+                {t("pagination.showing")}{" "}
                 <span className="font-medium">{(data.pagination.page - 1) * data.pagination.pageSize + 1}</span>
                 {" - "}
                 <span className="font-medium">{Math.min(data.pagination.page * data.pagination.pageSize, data.pagination.total)}</span>
-                {" "}of{" "}
+                {" "}{t("pagination.of")}{" "}
                 <span className="font-medium">{data.pagination.total}</span>
               </p>
               <div className="flex items-center gap-2">

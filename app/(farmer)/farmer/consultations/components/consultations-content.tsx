@@ -62,11 +62,11 @@ interface ConsultationsFilters {
 }
 
 const SORT_OPTIONS = [
-  { value: "createdAt_desc", sortBy: "createdAt", sortOrder: "desc", label: "Newest booked" },
-  { value: "createdAt_asc", sortBy: "createdAt", sortOrder: "asc", label: "Oldest booked" },
-  { value: "date_desc", sortBy: "date", sortOrder: "desc", label: "Appointment date (latest)" },
-  { value: "date_asc", sortBy: "date", sortOrder: "asc", label: "Appointment date (earliest)" },
-  { value: "status_asc", sortBy: "status", sortOrder: "asc", label: "Status (A–Z)" },
+  { value: "createdAt_desc", sortBy: "createdAt", sortOrder: "desc", label: "consultSort.newestBooked" },
+  { value: "createdAt_asc", sortBy: "createdAt", sortOrder: "asc", label: "consultSort.oldestBooked" },
+  { value: "date_desc", sortBy: "date", sortOrder: "desc", label: "consultSort.dateLatest" },
+  { value: "date_asc", sortBy: "date", sortOrder: "asc", label: "consultSort.dateEarliest" },
+  { value: "status_asc", sortBy: "status", sortOrder: "asc", label: "consultSort.statusAZ" },
 ] as const
 
 interface FilterOption { _id: string; name: string }
@@ -213,8 +213,8 @@ export default function ConsultationsContent({ consultations, pagination, filter
                   ...filterOptions.doctors.map(d => ({ value: d._id, label: d.name })),
                 ]}
                 placeholder={t('farmer.doctor')}
-                searchPlaceholder="Search doctors…"
-                emptyText="No doctors found."
+                searchPlaceholder={t("consultations.searchDoctors")}
+                emptyText={t("consultations.noDoctorsFound")}
               />
               <Select value={filters.status || "all"} onValueChange={(v) => setFilter({ status: v === "all" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder={t('farmer.status')} /></SelectTrigger>
@@ -223,7 +223,7 @@ export default function ConsultationsContent({ consultations, pagination, filter
                   <SelectItem value="pending">{t('farmer.pending')}</SelectItem>
                   <SelectItem value="accepted">{t('farmer.accepted')}</SelectItem>
                   <SelectItem value="rejected">{t('farmer.rejected')}</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="completed">{t("consultations.completed")}</SelectItem>
                 </SelectContent>
               </Select>
               <Input
@@ -235,13 +235,13 @@ export default function ConsultationsContent({ consultations, pagination, filter
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => setFilter({ startDate: e.target.value, month: "" })}
-                placeholder="Start date"
+                placeholder={t("consultations.startDate")}
               />
               <Input
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => setFilter({ endDate: e.target.value, month: "" })}
-                placeholder="End date"
+                placeholder={t("consultations.endDate")}
               />
             </div>
 
@@ -253,17 +253,17 @@ export default function ConsultationsContent({ consultations, pagination, filter
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="rounded-lg gap-1.5 shrink-0" title="Sort">
+                    <Button variant="outline" size="sm" className="rounded-lg gap-1.5 shrink-0" title={t("consultations.sort")}>
                       <ArrowUpDown className="h-3.5 w-3.5" />
-                      Sort
+                      {t("consultations.sort")}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t("common.sortBy")}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuRadioGroup value={currentSortValue} onValueChange={setSort}>
                       {SORT_OPTIONS.map(o => (
-                        <DropdownMenuRadioItem key={o.value} value={o.value}>{o.label}</DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem key={o.value} value={o.value}>{t(o.label)}</DropdownMenuRadioItem>
                       ))}
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
@@ -379,11 +379,11 @@ export default function ConsultationsContent({ consultations, pagination, filter
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-gray-100">
               <p className="text-sm text-gray-500">
-                Showing{" "}
+                {t("pagination.showing")}{" "}
                 <span className="font-medium">{(pagination.page - 1) * pagination.pageSize + 1}</span>
                 {" - "}
                 <span className="font-medium">{Math.min(pagination.page * pagination.pageSize, pagination.total)}</span>
-                {" "}of{" "}
+                {" "}{t("pagination.of")}{" "}
                 <span className="font-medium">{pagination.total}</span>
               </p>
               <div className="flex items-center gap-2">

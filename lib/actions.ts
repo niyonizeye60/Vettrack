@@ -7,6 +7,7 @@ import { ObjectId } from "mongodb"
 import { sendConsultationRequestEmail } from "./email"
 import { logActivity, logSystemError } from "./activity-log"
 import { deleteDocumentsForConsultation, getDocumentsByConsultation } from "./consultation-documents"
+import { notificationText } from "./notification-messages"
 
 // Animal-related actions
 export async function registerAnimal(formData: FormData, ownerId: string) {
@@ -279,8 +280,9 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
       if (doctorId && ObjectId.isValid(doctorId)) {
         // In-app notification so the vet's bell reflects the new request.
         await db.collection("notifications").insertOne({
-          title: "New consultation request",
-          message: `${consultation.fullName} requested a consultation${consultation.animalName ? ` for ${consultation.animalName}` : ""}.`,
+          ...(consultation.animalName
+            ? notificationText("consultationRequestedAnimal", { farmer: consultation.fullName, animal: consultation.animalName })
+            : notificationText("consultationRequested", { farmer: consultation.fullName })),
           type: "consultation",
           priority: "normal",
           read: false,
@@ -377,8 +379,13 @@ export async function createAppointment(formData: FormData) {
     try {
       if (ObjectId.isValid(farmerId)) {
         await db.collection("notifications").insertOne({
-          title: "Appointment scheduled",
-          message: `Your vet scheduled ${consultation.animalName ? `a visit for ${consultation.animalName}` : "an appointment"} on ${consultation.date} at ${consultation.time}.`,
+          ...(consultation.animalName
+            ? notificationText("appointmentScheduledAnimal", {
+                animal: consultation.animalName,
+                date: consultation.date,
+                time: consultation.time,
+              })
+            : notificationText("appointmentScheduled", { date: consultation.date, time: consultation.time })),
           type: "consultation",
           priority: "normal",
           read: false,
@@ -479,10 +486,15 @@ export async function updateConsultationStatus(
       const consultation = await db.collection("consultations").findOne({ _id: objectId });
       const farmerId = consultation?.farmerId as string | undefined;
       if (farmerId && ObjectId.isValid(farmerId)) {
-        const animalSuffix = consultation?.animalName ? ` for ${consultation.animalName}` : "";
+        // The status shows as its label in the reader's language (appointments.completed, ...).
+        const params = {
+          status: { keys: [`appointments.${status}`], text: status },
+          feedback: feedback ? feedback.slice(0, 80) : "",
+        };
         await db.collection("notifications").insertOne({
-          title: `Consultation ${status}`,
-          message: `Your consultation${animalSuffix} was marked ${status}${feedback ? ": " + feedback.slice(0, 80) : "."}`,
+          ...(consultation?.animalName
+            ? notificationText("consultationStatusAnimal", { ...params, animal: consultation.animalName })
+            : notificationText("consultationStatus", params)),
           type: "consultation",
           priority: "normal",
           read: false,

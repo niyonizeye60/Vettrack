@@ -122,7 +122,7 @@ export default function TestimonialsSection() {
           <button
             onClick={handlePrev}
             className="absolute top-1/2 left-0 -translate-y-1/2 -translate-x-4 bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors"
-            aria-label="Previous testimonial"
+            aria-label={t("testimonials.previous")}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -130,7 +130,7 @@ export default function TestimonialsSection() {
           <button
             onClick={handleNext}
             className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-4 bg-white rounded-full p-2 shadow-md hover:bg-gray-100 transition-colors"
-            aria-label="Next testimonial"
+            aria-label={t("testimonials.next")}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -146,7 +146,7 @@ export default function TestimonialsSection() {
                 className={`w-3 h-3 rounded-full transition-colors ${
                   index === currentIndex ? "bg-primary" : "bg-gray-300"
                 }`}
-                aria-label={`Go to testimonial ${index + 1}`}
+                aria-label={t("testimonials.goTo").replace("{n}", String(index + 1))}
               />
             ))}
           </div>

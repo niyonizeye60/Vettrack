@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { ObjectId } from "mongodb"
+import { notificationText } from "@/lib/notification-messages"
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,8 +35,7 @@ export async function GET(request: NextRequest) {
       notifications.push({
         id: notificationId,
         type: 'doctor_unavailable',
-        title: 'Doctor Unavailable',
-        message: `Dr. ${doctor.name} marked unavailable`,
+        ...notificationText("doctorUnavailable", { doctor: doctor.name }),
         time: new Date(doctor.updatedAt || doctor.createdAt).toLocaleString(),
         read: readNotificationIds.has(notificationId),
         createdAt: doctor.updatedAt || doctor.createdAt
@@ -57,8 +57,11 @@ export async function GET(request: NextRequest) {
       notifications.push({
         id: notificationId,
         type: 'support_ticket',
-        title: ticket.assignedTo ? 'Support ticket reply' : 'New support ticket',
-        message: `${ticket.requesterName} (${ticket.requesterRole}): ${ticket.subject}`,
+        ...notificationText(ticket.assignedTo ? "adminTicketReply" : "adminTicketNew", {
+          requester: ticket.requesterName,
+          role: { keys: [`admin.${ticket.requesterRole}`], text: ticket.requesterRole },
+          subject: ticket.subject,
+        }),
         time: new Date(ticket.lastMessageAt || ticket.createdAt).toLocaleString(),
         // Dismissible either by clicking it here (admin_read_notifications,
         // per-admin) or by actually opening the ticket (clears unreadByAdmin
@@ -81,8 +84,7 @@ export async function GET(request: NextRequest) {
       notifications.push({
         id: notificationId,
         type: 'new_user',
-        title: 'New User Registration',
-        message: `${user.role === 'farmer' ? 'Farmer' : 'Doctor'} ${user.name} registered`,
+        ...notificationText(user.role === "farmer" ? "newFarmer" : "newDoctor", { name: user.name }),
         time: new Date(user.createdAt).toLocaleString(),
         read: readNotificationIds.has(notificationId),
         createdAt: user.createdAt
@@ -101,8 +103,9 @@ export async function GET(request: NextRequest) {
       notifications.push({
         id: notificationId,
         type: 'consultation_status',
-        title: `Consultation ${consultation.status}`,
-        message: `Dr. ${doctor?.name || 'Unknown'} ${consultation.status} consultation`,
+        ...notificationText(`adminConsultation.${consultation.status as "accepted" | "rejected" | "completed"}`, {
+          doctor: doctor?.name || "Unknown",
+        }),
         time: new Date(consultation.updatedAt).toLocaleString(),
         read: readNotificationIds.has(notificationId),
         createdAt: consultation.updatedAt
@@ -122,8 +125,7 @@ export async function GET(request: NextRequest) {
       notifications.push({
         id: notificationId,
         type: 'response_time',
-        title: 'Response Time Alert',
-        message: `Dr. ${doctor?.name || 'Unknown'} exceeded 30-min target (${timeDiff} min)`,
+        ...notificationText("responseTimeAlert", { doctor: doctor?.name || "Unknown", minutes: timeDiff }),
         time: new Date(consultation.createdAt).toLocaleString(),
         read: readNotificationIds.has(notificationId),
         createdAt: consultation.createdAt
@@ -150,8 +152,7 @@ export async function GET(request: NextRequest) {
       notifications.push({
         id: notificationId,
         type: 'daily_summary',
-        title: 'Daily Performance Report',
-        message: `${completionRate}% consultation completion rate (Target: 90%)`,
+        ...notificationText("dailyPerformance", { rate: completionRate }),
         time: new Date().toLocaleString(),
         read: readNotificationIds.has(notificationId),
         createdAt: new Date()

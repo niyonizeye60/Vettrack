@@ -313,7 +313,7 @@ export default function SuperAdminProfilePage() {
         {/* Banner */}
         <div className="h-36">
           {bannerImage ? (
-            <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
+            <img src={bannerImage} alt={t("profile.banner")} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-r from-purple-600 to-purple-500" />
           )}

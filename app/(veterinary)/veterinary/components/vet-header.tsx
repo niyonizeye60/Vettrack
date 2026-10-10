@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeNotification } from "@/lib/notification-messages"
 import { LanguageSwitcher } from "@/components/LanguageSwitcher"
 import { PresenceHeartbeat } from "@/components/layout/presence-heartbeat"
 import { useMobileSidebar } from "./mobile-sidebar-context"
@@ -34,7 +35,7 @@ interface HeaderUser {
 }
 
 export default function VetHeader() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const router = useRouter()
   const { toggleMobileSidebar } = useMobileSidebar()
   const [user, setUser] = useState<HeaderUser | null>(null)
@@ -82,6 +83,7 @@ export default function VetHeader() {
           time: new Date(n.createdAt).toLocaleDateString(),
           read: n.read,
           type: "notification",
+          i18n: n.i18n,
         }))]
       }
       if (announcementsData.success && announcementsData.announcements) {
@@ -209,7 +211,7 @@ export default function VetHeader() {
                 {notifications.length === 0 ? (
                   <div className="p-4 text-center text-gray-500 text-sm">{t("vet.noNotifications")}</div>
                 ) : (
-                  notifications.map((notification, index) => (
+                  notifications.map((n) => localizeNotification(n, language, t)).map((notification, index) => (
                     <div
                       key={notification._id || index}
                       className={`p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors ${

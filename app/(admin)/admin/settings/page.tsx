@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -15,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { MapPin } from "lucide-react"
 
 export default function AdminSettingsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
@@ -78,10 +79,10 @@ export default function AdminSettingsPage() {
         setAvatarPreview(data.image)
         toast({ title: t("admin.profileUpdated") || "Profile updated", description: t("admin.profileUpdatedDesc") || "Your avatar has been changed." })
       } else {
-        toast({ title: t("common.error") || "Error", description: data.message ?? "Upload failed", variant: "destructive" })
+        toast({ title: t("common.error") || "Error", description: localizeError(data.message, language) ?? t("adminSettings.uploadFailed"), variant: "destructive" })
       }
     } catch {
-      toast({ title: t("common.error") || "Error", description: "Upload failed", variant: "destructive" })
+      toast({ title: t("common.error") || "Error", description: t("adminSettings.uploadFailed"), variant: "destructive" })
     } finally {
       setAvatarUploading(false)
       e.target.value = ""
@@ -114,7 +115,7 @@ export default function AdminSettingsPage() {
       const data = await res.json().catch(() => null)
 
       if (!res.ok || !data?.success) {
-        throw new Error(data?.message ?? "Save failed")
+        throw new Error(localizeError(data?.message, language) ?? t("adminSettings.saveFailed"))
       }
 
       toast({ title: t("admin.profileUpdated") || "Saved", description: t("admin.profileUpdatedDesc") || "Your profile has been updated." })
@@ -123,7 +124,7 @@ export default function AdminSettingsPage() {
       setConfirmPassword("")
       await loadProfile()
     } catch (err: any) {
-      toast({ title: t("common.error") || "Error", description: err?.message ?? "Failed to save", variant: "destructive" })
+      toast({ title: t("common.error") || "Error", description: err?.message ?? t("adminSettings.failedToSave"), variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -203,7 +204,7 @@ export default function AdminSettingsPage() {
                 disabled={avatarUploading}
                 onClick={() => avatarInputRef.current?.click()}
               >
-                {avatarUploading ? "Uploading…" : t("admin.changeAvatar") || "Change avatar"}
+                {avatarUploading ? t("adminSettings.uploading") : t("admin.changeAvatar") || "Change avatar"}
               </Button>
               <p className="text-xs text-gray-400 mt-1">
                 {t("admin.avatarHint") || "JPG, PNG or GIF. Max 2MB."}
@@ -272,13 +273,13 @@ export default function AdminSettingsPage() {
               <Label htmlFor="district">
                 <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.district") || "District"}</span>
               </Label>
-              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="e.g., Kigali" />
+              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder={t("adminSettings.eGKigali")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sector">
                 <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.sector") || "Sector"}</span>
               </Label>
-              <Input id="sector" value={sector} onChange={(e) => setSector(e.target.value)} placeholder="e.g., Nyarugenge" />
+              <Input id="sector" value={sector} onChange={(e) => setSector(e.target.value)} placeholder={t("adminSettings.eGNyarugenge")} />
             </div>
           </div>
 

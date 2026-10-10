@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { encryptText } from "@/lib/crypto"
 import { ObjectId } from "mongodb"
 import { logActivity } from "@/lib/activity-log"
+import { notificationText } from "@/lib/notification-messages"
 
 const DB = "ntdm_animal_hospital"
 const REQUESTER_ROLES = ["farmer", "doctor"]
@@ -117,8 +118,7 @@ export async function POST(request: NextRequest) {
     })
 
     await db.collection("notifications").insertOne({
-      title: "New support ticket",
-      message: `${currentUser.name} opened: ${trimmedSubject}`,
+      ...notificationText("supportTicketNew", { requester: currentUser.name, subject: trimmedSubject }),
       type: "support_ticket",
       priority: "normal",
       role: "superadmin",

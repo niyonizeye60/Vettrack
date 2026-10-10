@@ -191,11 +191,11 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
             >
               <span className="flex items-center gap-1.5 min-w-0">
                 <MapPin className="h-4 w-4 flex-shrink-0 opacity-60" />
-                <SelectValue placeholder="District" />
+                <SelectValue placeholder={t("content.district")} />
               </span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All districts</SelectItem>
+              <SelectItem value="all">{t("searchBar.allDistricts")}</SelectItem>
               {districts.map((d) => (
                 <SelectItem key={d} value={d}>{d}</SelectItem>
               ))}
@@ -212,7 +212,7 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
         >
           {results.length === 0 ? (
             <div className="p-6 text-center text-sm text-gray-400">
-              {query ? "No results found" : "Start typing to search..."}
+              {query ? t("searchBar.noResults") : t("searchBar.startTyping")}
             </div>
           ) : (
             <div className="py-2">
@@ -265,7 +265,7 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
               ))}
               {results.length > 15 && (
                 <div className="px-4 py-2 text-center text-xs text-gray-400 border-t border-gray-100">
-                  + {results.length - 15} more results
+                  {t("searchBar.moreResults").replace("{count}", String(results.length - 15))}
                 </div>
               )}
               {/* Jump to the full distance-sorted view on /services */}
@@ -275,7 +275,7 @@ export default function SearchBar({ variant = "default" }: { variant?: "default"
                   onClick={() => setShowResults(false)}
                   className="block text-center text-sm font-medium text-primary hover:underline"
                 >
-                  See all results
+                  {t("searchBar.seeAll")}
                 </Link>
               </div>
             </div>

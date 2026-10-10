@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { decryptText } from "@/lib/crypto"
 import { ObjectId } from "mongodb"
 import { logActivity } from "@/lib/activity-log"
+import { notificationText } from "@/lib/notification-messages"
 
 const DB = "ntdm_animal_hospital"
 const STAFF_ROLES = ["admin", "superadmin"]
@@ -127,10 +128,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // reply, so it should notify the same way.
     if (action === "resolve" || action === "reopen") {
       await db.collection("notifications").insertOne({
-        title: action === "resolve" ? "Support ticket resolved" : "Support ticket reopened",
-        message: action === "resolve"
-          ? `${currentUser.name} marked your ticket "${ticket.subject}" as resolved`
-          : `${currentUser.name} reopened your ticket "${ticket.subject}"`,
+        ...notificationText(action === "resolve" ? "supportResolved" : "supportReopened", {
+          staff: currentUser.name,
+          subject: ticket.subject,
+        }),
         type: "support_ticket",
         priority: "normal",
         read: false,

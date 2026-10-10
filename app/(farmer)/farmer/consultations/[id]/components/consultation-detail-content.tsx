@@ -187,7 +187,7 @@ export default function ConsultationDetailContent({ consultation, doctorName, fa
             
             <div>
               <dt className="text-sm font-medium text-gray-500">{t('farmer.doctor')}</dt>
-              <dd className="mt-1 text-sm text-gray-900">{doctorName}</dd>
+              <dd className="mt-1 text-sm text-gray-900">{doctorName || t("farmer.unknownDoctor")}</dd>
             </div>
             
             <div>

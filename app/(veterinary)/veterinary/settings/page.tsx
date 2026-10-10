@@ -58,10 +58,10 @@ export default function VeterinarySettingsPage() {
       if (res.ok) {
         toast({ title: t("vet.profileUpdated"), description: t("vet.manageAccountSettings") })
       } else {
-        toast({ title: t("common.error"), description: "Failed to update settings", variant: "destructive" })
+        toast({ title: t("common.error"), description: t("vetSettings.updateFailed"), variant: "destructive" })
       }
     } catch {
-      toast({ title: t("common.error"), description: "Failed to update settings", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("vetSettings.updateFailed"), variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -73,7 +73,7 @@ export default function VeterinarySettingsPage() {
       return
     }
     if (passwordForm.newPassword.length < 6) {
-      toast({ title: t("common.error"), description: "Password must be at least 6 characters", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("vetSettings.passwordTooShort"), variant: "destructive" })
       return
     }
     setChangingPassword(true)
@@ -90,10 +90,10 @@ export default function VeterinarySettingsPage() {
         toast({ title: t("vet.passwordChanged"), description: t("vet.passwordChangedDesc") })
         setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
       } else {
-        toast({ title: t("common.error"), description: "Failed to change password", variant: "destructive" })
+        toast({ title: t("common.error"), description: t("vetSettings.passwordChangeFailed"), variant: "destructive" })
       }
     } catch {
-      toast({ title: t("common.error"), description: "Failed to change password", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("vetSettings.passwordChangeFailed"), variant: "destructive" })
     } finally {
       setChangingPassword(false)
     }

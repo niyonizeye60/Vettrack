@@ -68,6 +68,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { Role } from "@/lib/roles"
 import { MARKETPLACE_CATEGORIES, type MarketplaceCategory } from "@/lib/marketplace-access"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 
 const MARKETPLACE_CATEGORY_LABEL_KEY: Record<MarketplaceCategory, string> = {
@@ -110,7 +111,7 @@ interface UsersManagementProps {
 }
 
 export default function UsersManagement({ users, currentUserId }: UsersManagementProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
@@ -157,14 +158,14 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
     try {
       const result = await updateUserStatus(userId, status)
       if (result.success) {
-        toast({ title: "Status updated", description: `User status changed to ${status}.` })
+        toast({ title: t("saUsers.statusUpdated"), description: t("saUsers.statusChanged").replace("{status}", translateStatus(status)) })
         router.refresh()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to update status", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saUsers.failedToUpdateStatus"), variant: "destructive" })
       }
     } catch (error) {
       console.error("Error updating user status:", error)
-      toast({ title: "Error", description: "Failed to update status", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saUsers.failedToUpdateStatus"), variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -177,14 +178,14 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
       if (result.success) {
         setIsDeleteDialogOpen(false)
         setSelectedUser(null)
-        toast({ title: "User deleted", description: "The user has been permanently deleted." })
+        toast({ title: t("saUsers.userDeleted"), description: t("saUsers.theUserHasBeenPermanentlyDeleted") })
         router.refresh()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to delete user", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saUsers.failedToDeleteUser"), variant: "destructive" })
       }
     } catch (error) {
       console.error("Error deleting user:", error)
-      toast({ title: "Error", description: "Failed to delete user", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saUsers.failedToDeleteUser"), variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -198,14 +199,14 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
         setIsPasswordDialogOpen(false)
         setNewPassword("")
         setSelectedUser(null)
-        toast({ title: "Password updated", description: "The user's password has been changed." })
+        toast({ title: t("saUsers.passwordUpdated"), description: t("saUsers.theUsersPasswordHasBeenChanged") })
         router.refresh()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to update password", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saUsers.failedToUpdatePassword"), variant: "destructive" })
       }
     } catch (error) {
       console.error("Error updating password:", error)
-      toast({ title: "Error", description: "Failed to update password", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saUsers.failedToUpdatePassword"), variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -218,14 +219,14 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
       if (result.success) {
         setIsLogoutDialogOpen(false)
         setSelectedUser(null)
-        toast({ title: "User logged out", description: "The user's active sessions have been terminated." })
+        toast({ title: t("saUsers.userLoggedOut"), description: t("saUsers.theUsersActiveSessionsHaveBeen") })
         router.refresh()
       } else {
-        toast({ title: "Error", description: result.error || "Failed to log out user", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.error, language) || t("saUsers.failedToLogOutUser"), variant: "destructive" })
       }
     } catch (error) {
       console.error("Error logging out user:", error)
-      toast({ title: "Error", description: "Failed to log out user", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saUsers.failedToLogOutUser"), variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -235,7 +236,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
     e.preventDefault()
 
     if (createUserData.role === "marketplace_admin" && createUserData.marketplaceAccess.length === 0) {
-      toast({ title: "Error", description: t('superadmin.marketplaceAccessRequired'), variant: "destructive" })
+      toast({ title: t("common.error"), description: t('superadmin.marketplaceAccessRequired'), variant: "destructive" })
       return
     }
 
@@ -274,14 +275,14 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
           sector: "",
           marketplaceAccess: []
         })
-        toast({ title: "User created", description: "The new user account has been created." })
+        toast({ title: t("saUsers.userCreated"), description: t("saUsers.theNewUserAccountHasBeen") })
         router.refresh()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to create user", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saUsers.failedToCreateUser"), variant: "destructive" })
       }
     } catch (error) {
       console.error("Error creating user:", error)
-      toast({ title: "Error", description: "Failed to create user", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saUsers.failedToCreateUser"), variant: "destructive" })
     } finally {
       setIsUpdating(false)
     }
@@ -350,7 +351,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
     switch (status) {
       case 'active': return t('superadmin.active')
       case 'suspended': return t('superadmin.suspended')
-      case 'inactive': return 'Inactive' // Add this key if needed
+      case 'inactive': return t("saUsers.inactive")
       case 'pending_verification': return t('superadmin.pendingVerification')
       case 'rejected': return t('superadmin.rejected')
       default: return status
@@ -919,7 +920,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                 <strong>{t('superadmin.name')}:</strong> {selectedUser.name}
               </p>
               <p className="text-sm text-gray-600">
-                <strong>Email:</strong> {selectedUser.email}
+                <strong>{t("saUsers.email")}</strong> {selectedUser.email}
               </p>
               <p className="text-sm text-gray-600">
                 <strong>{t('superadmin.role')}:</strong> {translateRole(selectedUser.role)}
@@ -963,7 +964,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
               </div>
               <div className="text-sm text-gray-600 space-y-1">
                 <p><strong>{t('superadmin.name')}:</strong> {selectedUser.name}</p>
-                <p><strong>Email:</strong> {selectedUser.email}</p>
+                <p><strong>{t("saUsers.email")}</strong> {selectedUser.email}</p>
               </div>
             </div>
           )}
@@ -1010,7 +1011,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                   <strong>{t('superadmin.name')}:</strong> {selectedUser.name}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <strong>Email:</strong> {selectedUser.email}
+                  <strong>{t("saUsers.email")}</strong> {selectedUser.email}
                 </p>
                 <p className="text-sm text-gray-600">
                   <strong>{t('superadmin.role')}:</strong> {selectedUser.role}
@@ -1058,7 +1059,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                 />
               </div>
               <div>
-                <Label htmlFor="create-email">Email</Label>
+                <Label htmlFor="create-email">{t('superadmin.email')}</Label>
                 <Input
                   id="create-email"
                   type="email"
@@ -1149,7 +1150,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                       id="create-specialization"
                       value={createUserData.specialization}
                       onChange={(e) => setCreateUserData({...createUserData, specialization: e.target.value})}
-                      placeholder="e.g., Large Animal Medicine"
+                      placeholder={t("saUsers.eGLargeAnimalMedicine")}
                       required
                     />
                   </div>
@@ -1192,7 +1193,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                       id="create-district"
                       value={createUserData.district}
                       onChange={(e) => setCreateUserData({...createUserData, district: e.target.value})}
-                      placeholder="e.g., Kigali"
+                      placeholder={t("saUsers.eGKigali")}
                       required
                     />
                   </div>
@@ -1202,7 +1203,7 @@ export default function UsersManagement({ users, currentUserId }: UsersManagemen
                       id="create-sector"
                       value={createUserData.sector}
                       onChange={(e) => setCreateUserData({...createUserData, sector: e.target.value})}
-                      placeholder="e.g., Nyarugenge"
+                      placeholder={t("saUsers.eGNyarugenge")}
                       required
                     />
                   </div>

@@ -10,34 +10,37 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Clock, AlertCircle, Smartphone, CheckCircle2, XCircle, Loader2 } from "lucide-react"
 import { sendBookingEmail, type BookingData } from "@/lib/actions/send-booking-email"
+import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 
-// Service categories for the form
+// Service categories for the form. The value is the English service name the server
+// prices the booking by; only the label is translated.
 const serviceCategories = [
   {
-    label: "Tracking Services",
+    labelKey: "booking.cat.tracking",
     options: [
-      { value: "Animal Health Tracking Device", label: "Animal Health Tracking Device" },
-      { value: "Advanced Health Monitoring", label: "Advanced Health Monitoring" },
-      { value: "Farm Management System", label: "Farm Management System" },
-      { value: "Pet Tracking Collar", label: "Pet Tracking Collar" },
+      { value: "Animal Health Tracking Device", labelKey: "booking.svc.trackingDevice" },
+      { value: "Advanced Health Monitoring", labelKey: "booking.svc.advancedMonitoring" },
+      { value: "Farm Management System", labelKey: "booking.svc.farmManagement" },
+      { value: "Pet Tracking Collar", labelKey: "booking.svc.petCollar" },
     ],
   },
   {
-    label: "Consultation Services",
+    labelKey: "booking.cat.consultation",
     options: [
-      { value: "General Veterinary Consultation", label: "General Veterinary Consultation" },
-      { value: "Virtual Consultation", label: "Virtual Consultation" },
-      { value: "Emergency Consultation", label: "Emergency Consultation" },
-      { value: "Farm Visit", label: "Farm Visit" },
+      { value: "General Veterinary Consultation", labelKey: "booking.svc.generalConsultation" },
+      { value: "Virtual Consultation", labelKey: "booking.svc.virtualConsultation" },
+      { value: "Emergency Consultation", labelKey: "booking.svc.emergencyConsultation" },
+      { value: "Farm Visit", labelKey: "booking.svc.farmVisit" },
     ],
   },
   {
-    label: "Monitoring Services",
+    labelKey: "booking.cat.monitoring",
     options: [
-      { value: "Disease Screening", label: "Disease Screening" },
-      { value: "Vaccination Program", label: "Vaccination Program" },
-      { value: "Parasite Control", label: "Parasite Control" },
-      { value: "Reproductive Health Monitoring", label: "Reproductive Health Monitoring" },
+      { value: "Disease Screening", labelKey: "booking.svc.diseaseScreening" },
+      { value: "Vaccination Program", labelKey: "booking.svc.vaccinationProgram" },
+      { value: "Parasite Control", labelKey: "booking.svc.parasiteControl" },
+      { value: "Reproductive Health Monitoring", labelKey: "booking.svc.reproductiveHealth" },
     ],
   },
 ]
@@ -72,6 +75,7 @@ const POLL_INTERVAL_MS = 3000
 const POLL_TIMEOUT_MS = 2 * 60 * 1000
 
 export default function BookingForm() {
+  const { t, language } = useLanguage()
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>("form")
   const [date, setDate] = useState<Date | undefined>(undefined)
@@ -102,7 +106,7 @@ export default function BookingForm() {
       // Find the matching service in our categories
       for (const category of serviceCategories) {
         const matchingService = category.options.find((option) =>
-          option.label.toLowerCase().includes(serviceParam.toLowerCase()),
+          option.value.toLowerCase().includes(serviceParam.toLowerCase()),
         )
         if (matchingService) {
           setSelectedService(matchingService.value)
@@ -219,14 +223,14 @@ export default function BookingForm() {
     })
     const data = await res.json()
     if (!res.ok) {
-      throw new Error(data.error || "Failed to initiate payment")
+      throw new Error(localizeError(data.error, language) || t("booking.paymentStartFailed"))
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!mobileMoneyPhone.trim()) {
-      setPayError("Enter the mobile money number to pay from")
+      setPayError(t("booking.enterMomoNumber"))
       return
     }
     setIsSubmitting(true)
@@ -258,7 +262,7 @@ export default function BookingForm() {
       })
       const data = await res.json()
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create booking")
+        throw new Error(localizeError(data.error, language) || t("booking.createFailed"))
       }
 
       // 2. Send the payment request to the phone (STK push). If this fails the
@@ -269,7 +273,7 @@ export default function BookingForm() {
       try {
         await initiatePayment(data.bookingId)
       } catch (payError) {
-        setPayError(payError instanceof Error ? payError.message : "Failed to initiate payment")
+        setPayError(payError instanceof Error ? payError.message : t("booking.paymentStartFailed"))
         setStep("failed")
         return
       }
@@ -278,7 +282,7 @@ export default function BookingForm() {
       setStep("awaiting")
     } catch (error) {
       console.error("Error submitting booking:", error)
-      setPayError(error instanceof Error ? error.message : "An unexpected error occurred. Please try again.")
+      setPayError(error instanceof Error ? error.message : t("booking.unexpectedError"))
     } finally {
       setIsSubmitting(false)
     }
@@ -292,7 +296,7 @@ export default function BookingForm() {
       await initiatePayment(bookingId)
       setStep("awaiting")
     } catch (error) {
-      setPayError(error instanceof Error ? error.message : "Failed to initiate payment. Please try again.")
+      setPayError(error instanceof Error ? error.message : t("booking.paymentStartFailedRetry"))
     } finally {
       setIsSubmitting(false)
     }
@@ -305,9 +309,9 @@ export default function BookingForm() {
     return (
       <Card className="max-w-3xl mx-auto shadow-salon border-0 hover:shadow-lg transition-all duration-300">
         <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg">
-          <CardTitle>Booking Confirmed!</CardTitle>
+          <CardTitle>{t("booking.confirmedTitle")}</CardTitle>
           <CardDescription className="text-white/90">
-            Your payment went through and your consultation is booked.
+            {t("booking.confirmedDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
@@ -315,21 +319,21 @@ export default function BookingForm() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-6">
               <CheckCircle2 className="h-10 w-10 text-green-600" />
             </div>
-            <h3 className="text-2xl font-bold mb-4 text-green-800">Payment Successful! 🎉</h3>
+            <h3 className="text-2xl font-bold mb-4 text-green-800">{t("booking.paymentSuccessful")} 🎉</h3>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 inline-block">
-              <p className="text-green-800 font-medium">✅ RWF {price?.toLocaleString()} paid successfully</p>
-              <p className="text-green-700 text-sm mt-1">Your booking has been confirmed.</p>
+              <p className="text-green-800 font-medium">✅ {t("booking.paidAmount").replace("{amount}", price?.toLocaleString() ?? "")}</p>
+              <p className="text-green-700 text-sm mt-1">{t("booking.bookingConfirmed")}</p>
             </div>
             <div className="space-y-2 text-sm text-gray-600 mb-6">
-              <p>📱 We will contact you at: {phone}</p>
-              <p>📅 Requested date: {date?.toLocaleDateString()}</p>
-              <p>🕐 Requested time: {selectedTimeSlot}</p>
+              <p>📱 {t("booking.contactAt")} {phone}</p>
+              <p>📅 {t("booking.requestedDate")} {date?.toLocaleDateString()}</p>
+              <p>🕐 {t("booking.requestedTime")} {selectedTimeSlot}</p>
             </div>
             <Button
               onClick={resetForm}
               className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full shadow-md"
             >
-              Book Another Consultation
+              {t("booking.bookAnother")}
             </Button>
           </div>
         </CardContent>
@@ -344,9 +348,9 @@ export default function BookingForm() {
     return (
       <Card className="max-w-3xl mx-auto shadow-salon border-0">
         <CardHeader className="bg-gradient-to-r from-primary to-primary/80 text-white rounded-t-lg">
-          <CardTitle>Approve the payment on your phone</CardTitle>
+          <CardTitle>{t("booking.approveTitle")}</CardTitle>
           <CardDescription className="text-white/90">
-            We sent a mobile money request for RWF {price?.toLocaleString()}.
+            {t("booking.requestSentFor").replace("{amount}", price?.toLocaleString() ?? "")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
@@ -355,18 +359,18 @@ export default function BookingForm() {
               <Smartphone className="h-16 w-16 text-primary" />
               <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-green-500 animate-ping" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Check your phone</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">{t("booking.checkPhone")}</h3>
             <p className="text-sm text-gray-600 max-w-sm mx-auto mb-6">
-              We sent a payment request to <span className="font-medium">{mobileMoneyPhone}</span>.
-              Enter your PIN to approve it and confirm your booking.
+              {t("booking.sentRequestTo")} <span className="font-medium">{mobileMoneyPhone}</span>.{" "}
+              {t("booking.enterPin")}
             </p>
             <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Waiting for approval...
+              {t("booking.waitingApproval")}
             </div>
             <Button variant="outline" className="mt-6" onClick={checkPayment} disabled={checking}>
               {checking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Check Again
+              {t("booking.checkAgain")}
             </Button>
           </div>
         </CardContent>
@@ -383,9 +387,9 @@ export default function BookingForm() {
     return (
       <Card className="max-w-3xl mx-auto shadow-salon border-0">
         <CardHeader className="bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-t-lg">
-          <CardTitle>Still waiting for approval</CardTitle>
+          <CardTitle>{t("booking.stillWaiting")}</CardTitle>
           <CardDescription className="text-white/90">
-            We haven't received the mobile money confirmation yet.
+            {t("booking.notReceived")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
@@ -393,24 +397,23 @@ export default function BookingForm() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-amber-100 mb-6">
               <Clock className="h-10 w-10 text-amber-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No payment detected yet</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">{t("booking.noPaymentYet")}</h3>
             <p className="text-sm text-gray-600 max-w-sm mx-auto mb-6">
-              Nothing arrived on <span className="font-medium">{mobileMoneyPhone}</span> within
-              the last two minutes. The request may have expired on your phone — resend it,
-              check again, or edit your booking.
+              {t("booking.nothingArrived")} <span className="font-medium">{mobileMoneyPhone}</span>{" "}
+              {t("booking.nothingArrivedRest")}
             </p>
             {payError && <p className="text-sm text-red-600 mb-4">{payError}</p>}
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button onClick={retryPayment} disabled={isSubmitting} className="rounded-full shadow-md">
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Resend Payment Request
+                {t("booking.resendRequest")}
               </Button>
               <Button variant="outline" onClick={checkAndResumeWaiting} disabled={checking}>
                 {checking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Check Payment Status
+                {t("booking.checkStatus")}
               </Button>
               <Button variant="outline" onClick={() => setStep("form")} disabled={isSubmitting}>
-                Edit Booking
+                {t("booking.edit")}
               </Button>
             </div>
           </div>
@@ -426,9 +429,9 @@ export default function BookingForm() {
     return (
       <Card className="max-w-3xl mx-auto shadow-salon border-0">
         <CardHeader className="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-t-lg">
-          <CardTitle>Payment Failed</CardTitle>
+          <CardTitle>{t("booking.paymentFailed")}</CardTitle>
           <CardDescription className="text-white/90">
-            The mobile money payment was not completed.
+            {t("booking.notCompletedDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
@@ -436,18 +439,18 @@ export default function BookingForm() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-100 mb-6">
               <XCircle className="h-10 w-10 text-red-600" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Payment wasn't completed</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">{t("booking.notCompleted")}</h3>
             <p className="text-sm text-gray-600 max-w-sm mx-auto mb-6">
-              You can retry the payment on {mobileMoneyPhone}, or go back and change your booking details.
+              {t("booking.retryOn").replace("{phone}", mobileMoneyPhone)}
             </p>
             {payError && <p className="text-sm text-red-600 mb-4">{payError}</p>}
             <div className="flex items-center justify-center gap-3">
               <Button onClick={retryPayment} disabled={isSubmitting} className="rounded-full shadow-md">
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Try Payment Again
+                {t("booking.tryAgain")}
               </Button>
               <Button variant="outline" onClick={() => setStep("form")} disabled={isSubmitting}>
-                Edit Booking
+                {t("booking.edit")}
               </Button>
             </div>
           </div>
@@ -462,9 +465,9 @@ export default function BookingForm() {
   return (
     <Card className="max-w-3xl mx-auto shadow-salon border-0 hover:shadow-lg transition-all duration-300">
       <CardHeader className="bg-gradient-to-r from-primary to-primary/80 text-white rounded-t-lg">
-        <CardTitle>Book Your Consultation</CardTitle>
+        <CardTitle>{t("booking.title")}</CardTitle>
         <CardDescription className="text-white/90">
-          Fill out the form below to schedule your consultation with NTDM Animal Hospital.
+          {t("booking.formDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-8">
@@ -473,7 +476,7 @@ export default function BookingForm() {
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center">
               <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              <p className="text-red-800 font-medium">Booking Failed</p>
+              <p className="text-red-800 font-medium">{t("booking.failed")}</p>
             </div>
             <p className="text-red-700 text-sm mt-1">{payError}</p>
           </div>
@@ -482,53 +485,53 @@ export default function BookingForm() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <div>
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name">{t("booking.fullName")}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your full name"
+                placeholder={t("booking.fullNamePlaceholder")}
                 required
                 className="border-gray-300 focus:border-primary focus:ring-primary"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">{t("booking.phone")}</Label>
                 <Input
                   id="phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Enter your phone number"
+                  placeholder={t("booking.phonePlaceholder")}
                   required
                   className="border-gray-300 focus:border-primary focus:ring-primary"
                 />
               </div>
               <div>
-                <Label htmlFor="email">Email (Optional)</Label>
+                <Label htmlFor="email">{t("booking.emailOptional")}</Label>
                 <Input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
+                  placeholder={t("booking.emailPlaceholder")}
                   className="border-gray-300 focus:border-primary focus:ring-primary"
                 />
               </div>
             </div>
             <div>
-              <Label htmlFor="service">Select Service</Label>
+              <Label htmlFor="service">{t("booking.selectService")}</Label>
               <Select value={selectedService} onValueChange={setSelectedService} required>
                 <SelectTrigger id="service" className="border-gray-300 focus:border-primary focus:ring-primary">
-                  <SelectValue placeholder="Choose a service" />
+                  <SelectValue placeholder={t("booking.chooseService")} />
                 </SelectTrigger>
                 <SelectContent>
                   {serviceCategories.map((category) => (
-                    <div key={category.label}>
-                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{category.label}</div>
+                    <div key={category.labelKey}>
+                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{t(category.labelKey)}</div>
                       {category.options.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                          {t(option.labelKey)}
                         </SelectItem>
                       ))}
                     </div>
@@ -538,24 +541,24 @@ export default function BookingForm() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="animalType">Animal Type</Label>
+                <Label htmlFor="animalType">{t("booking.animalType")}</Label>
                 <Select value={animalType} onValueChange={setAnimalType} required>
                   <SelectTrigger id="animalType" className="border-gray-300 focus:border-primary focus:ring-primary">
-                    <SelectValue placeholder="Select animal type" />
+                    <SelectValue placeholder={t("booking.selectAnimalType")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cow">Cow</SelectItem>
-                    <SelectItem value="goat">Goat</SelectItem>
-                    <SelectItem value="sheep">Sheep</SelectItem>
-                    <SelectItem value="chicken">Chicken</SelectItem>
-                    <SelectItem value="dog">Dog</SelectItem>
-                    <SelectItem value="cat">Cat</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="cow">{t("content.cow")}</SelectItem>
+                    <SelectItem value="goat">{t("content.goat")}</SelectItem>
+                    <SelectItem value="sheep">{t("content.sheep")}</SelectItem>
+                    <SelectItem value="chicken">{t("content.chicken")}</SelectItem>
+                    <SelectItem value="dog">{t("content.dog")}</SelectItem>
+                    <SelectItem value="cat">{t("content.cat")}</SelectItem>
+                    <SelectItem value="other">{t("booking.otherAnimal")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="animalCount">Number of Animals</Label>
+                <Label htmlFor="animalCount">{t("booking.animalCount")}</Label>
                 <Input
                   id="animalCount"
                   type="number"
@@ -567,19 +570,19 @@ export default function BookingForm() {
               </div>
             </div>
             <div>
-              <Label htmlFor="description">Description of Issue (Optional)</Label>
+              <Label htmlFor="description">{t("booking.issueOptional")}</Label>
               <textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Briefly describe the issue or reason for consultation"
+                placeholder={t("booking.issuePlaceholder")}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <Label>Select Date</Label>
+                <Label>{t("booking.selectDate")}</Label>
                 <div className="border rounded-md mt-1.5 border-gray-300">
                   <Calendar
                     mode="single"
@@ -596,7 +599,7 @@ export default function BookingForm() {
                 </div>
               </div>
               <div>
-                <Label>Select Time Slot</Label>
+                <Label>{t("booking.selectTime")}</Label>
                 <div className="grid grid-cols-2 gap-2 mt-1.5 h-[280px] overflow-y-auto border rounded-md p-2 border-gray-300">
                   {timeSlots.map((slot) => (
                     <Button
@@ -619,14 +622,14 @@ export default function BookingForm() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Smartphone className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-medium text-gray-900">Mobile Money (MTN / Airtel)</span>
+                  <span className="text-sm font-medium text-gray-900">{t("booking.mobileMoney")}</span>
                 </div>
                 <span className="text-sm font-bold text-gray-900">
-                  {priceLoading ? "Loading price..." : price ? `RWF ${price.toLocaleString()}` : "Price unavailable"}
+                  {priceLoading ? t("booking.loadingPrice") : price ? `RWF ${price.toLocaleString()}` : t("booking.priceUnavailable")}
                 </span>
               </div>
               <div>
-                <Label htmlFor="mobileMoneyPhone">Mobile Money Number</Label>
+                <Label htmlFor="mobileMoneyPhone">{t("booking.momoNumber")}</Label>
                 <Input
                   id="mobileMoneyPhone"
                   value={mobileMoneyPhone}
@@ -634,12 +637,12 @@ export default function BookingForm() {
                     mmPhoneTouched.current = true
                     setMobileMoneyPhone(e.target.value)
                   }}
-                  placeholder="e.g. 0790706170"
+                  placeholder={t("booking.momoPlaceholder")}
                   required
                   className="border-gray-300 focus:border-primary focus:ring-primary mt-1.5"
                 />
                 <p className="text-xs text-gray-500 mt-1.5">
-                  We'll send a payment request to this number — approve it with your PIN to confirm the booking.
+                  {t("booking.momoHint")}
                 </p>
               </div>
             </div>
@@ -653,10 +656,10 @@ export default function BookingForm() {
             {isSubmitting ? (
               <span className="flex items-center">
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Processing Payment...
+                {t("booking.processing")}
               </span>
             ) : (
-              price ? `Pay RWF ${price.toLocaleString()} & Book Consultation` : "Select a priced service to continue"
+              price ? t("booking.payAndBook").replace("{amount}", price.toLocaleString()) : t("booking.selectPricedService")
             )}
           </Button>
         </form>

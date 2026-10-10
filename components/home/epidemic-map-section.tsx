@@ -68,7 +68,7 @@ export default function EpidemicMapSection() {
         <div className="text-center max-w-2xl mx-auto mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-600 text-xs font-semibold uppercase tracking-wide mb-4">
             <Activity className="h-3.5 w-3.5" />
-            Live Epidemic Tracking
+            {t("home.epidemic.live")}
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
             {t("home.epidemic.title")}
@@ -117,10 +117,10 @@ export default function EpidemicMapSection() {
                   <button
                     onClick={fetchCases}
                     className="flex items-center gap-1 text-gray-500 hover:text-red-600 transition-colors"
-                    title="Refresh"
+                    title={t("home.epidemic.refresh")}
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                    Refresh
+                    {t("home.epidemic.refresh")}
                   </button>
                 </div>
               </div>
@@ -133,7 +133,7 @@ export default function EpidemicMapSection() {
               )}
               {!loading && cases.length === 0 && (
                 <p className="text-center text-sm text-gray-400 py-4">
-                  No active epidemic reports right now. Check back soon.
+                  {t("home.epidemic.noneActive")}
                 </p>
               )}
             </div>
@@ -144,7 +144,7 @@ export default function EpidemicMapSection() {
             <div className="rounded-2xl border border-gray-200 shadow-sm bg-white p-5">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">{t("home.epidemic.topDiseases")}</h3>
               {topDiseases.length === 0 ? (
-                <p className="text-sm text-gray-400">No data yet</p>
+                <p className="text-sm text-gray-400">{t("home.epidemic.noData")}</p>
               ) : (
                 <div className="space-y-2.5">
                   {topDiseases.map(([name, count]) => (
@@ -155,7 +155,7 @@ export default function EpidemicMapSection() {
                   ))}
                   <div className="h-px bg-gray-100 my-2" />
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Total animals affected</span>
+                    <span className="text-sm text-gray-500">{t("home.epidemic.totalAffected")}</span>
                     <span className="text-sm font-bold text-red-600">{stats.totalAffected.toLocaleString()}</span>
                   </div>
                 </div>

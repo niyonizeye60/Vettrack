@@ -78,8 +78,8 @@ export default function AppointmentsPageClient({ upcoming, missed, completed }: 
   }
 
   const typeBadge = (type: string) => type === "Virtual"
-    ? <Badge variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200 gap-1"><Video className="h-2.5 w-2.5" />{type}</Badge>
-    : <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 gap-1"><MapPin className="h-2.5 w-2.5" />{type}</Badge>
+    ? <Badge variant="outline" className="text-xs bg-violet-50 text-violet-700 border-violet-200 gap-1"><Video className="h-2.5 w-2.5" />{t("farmer.virtual")}</Badge>
+    : <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 gap-1"><MapPin className="h-2.5 w-2.5" />{type === "In-Person" ? t("farmer.inPerson") : type}</Badge>
 
   const AppointmentTable = ({ appointments, variant }: { appointments: Appointment[]; variant?: 'missed' }) => (
     <>

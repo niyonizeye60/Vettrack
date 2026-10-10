@@ -17,6 +17,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
+import { animalStatusLabel } from "@/lib/animal-status"
 
 type User = {
   _id: string
@@ -124,7 +126,7 @@ export default function AdminUsersManagement() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
 
   // Create user form state
   const [newUser, setNewUser] = useState({
@@ -172,7 +174,7 @@ export default function AdminUsersManagement() {
       if (response.ok) {
         setUsers(data.users)
       } else {
-        setError(data.error || t('admin.failedToFetchUsers'))
+        setError(localizeError(data.error, language) || t('admin.failedToFetchUsers'))
       }
     } catch (error) {
       setError(t('admin.failedToFetchUsers'))
@@ -200,10 +202,10 @@ export default function AdminUsersManagement() {
       const data = await response.json()
       
       if (response.ok) {
-        setSuccess(data.message)
+        setSuccess(localizeError(data.message, language) ?? "")
         fetchUsers()
       } else {
-        setError(data.error)
+        setError(localizeError(data.error, language) ?? "")
       }
     } catch (error) {
       setError(t('admin.failedToUpdateUserStatus'))
@@ -245,12 +247,12 @@ export default function AdminUsersManagement() {
       const data = await response.json()
 
       if (response.ok) {
-        setSuccess(data.message)
+        setSuccess(localizeError(data.message, language) ?? "")
         setIsEditDialogOpen(false)
         setSelectedUser(null)
         fetchUsers()
       } else {
-        setError(data.error || t('admin.failedToUpdateUser'))
+        setError(localizeError(data.error, language) || t('admin.failedToUpdateUser'))
       }
     } catch (error) {
       setError(t('admin.failedToUpdateUser'))
@@ -281,12 +283,12 @@ export default function AdminUsersManagement() {
       const data = await response.json()
 
       if (response.ok) {
-        setSuccess(data.message)
+        setSuccess(localizeError(data.message, language) ?? "")
         setIsPasswordDialogOpen(false)
         setSelectedUser(null)
         setNewPassword("")
       } else {
-        setError(data.error || t('admin.failedToUpdatePassword'))
+        setError(localizeError(data.error, language) || t('admin.failedToUpdatePassword'))
       }
     } catch (error) {
       setError(t('admin.failedToUpdatePassword'))
@@ -309,7 +311,7 @@ export default function AdminUsersManagement() {
       if (response.ok) {
         setUserDetails(data)
       } else {
-        setDetailsError(data.error || t('admin.failedToFetchUserDetails'))
+        setDetailsError(localizeError(data.error, language) || t('admin.failedToFetchUserDetails'))
       }
     } catch (error) {
       setDetailsError(t('admin.failedToFetchUserDetails'))
@@ -333,7 +335,7 @@ export default function AdminUsersManagement() {
       const data = await response.json()
       
       if (response.ok) {
-        setSuccess(data.message)
+        setSuccess(localizeError(data.message, language) ?? "")
         setIsCreateDialogOpen(false)
         setNewUser({
           name: "",
@@ -348,7 +350,7 @@ export default function AdminUsersManagement() {
         })
         fetchUsers()
       } else {
-        setError(data.error)
+        setError(localizeError(data.error, language) ?? "")
       }
     } catch (error) {
       setError(t('admin.failedToCreateUser'))
@@ -480,7 +482,7 @@ export default function AdminUsersManagement() {
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-40">
-                <SelectValue placeholder="All Roles" />
+                <SelectValue placeholder={t("adminUsers.allRoles")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('admin.allRoles')}</SelectItem>
@@ -490,7 +492,7 @@ export default function AdminUsersManagement() {
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-40">
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder={t("adminUsers.allStatus")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('admin.allStatus')}</SelectItem>
@@ -754,7 +756,7 @@ export default function AdminUsersManagement() {
                                 <p className="font-medium">{animal.name}</p>
                                 <p className="text-sm text-gray-500">{animal.type}{animal.breed ? ` · ${animal.breed}` : ""}</p>
                               </div>
-                              <Badge className={getAnimalStatusColor(animal.status)}>{animal.status}</Badge>
+                              <Badge className={getAnimalStatusColor(animal.status)}>{animalStatusLabel(animal.status, t)}</Badge>
                             </CardContent>
                           </Card>
                         ))
@@ -1148,7 +1150,7 @@ export default function AdminUsersManagement() {
                     <Label htmlFor="district">{t('admin.district')}</Label>
                     <Input
                       id="district"
-                      placeholder="e.g., Kigali"
+                      placeholder={t("adminUsers.eGKigali")}
                       value={newUser.district}
                       onChange={(e) => setNewUser({...newUser, district: e.target.value})}
                       required
@@ -1158,7 +1160,7 @@ export default function AdminUsersManagement() {
                     <Label htmlFor="sector">{t('admin.sector')}</Label>
                     <Input
                       id="sector"
-                      placeholder="e.g., Nyarugenge"
+                      placeholder={t("adminUsers.eGNyarugenge")}
                       value={newUser.sector}
                       onChange={(e) => setNewUser({...newUser, sector: e.target.value})}
                       required
@@ -1194,7 +1196,7 @@ export default function AdminUsersManagement() {
                     <Label htmlFor="specialization">{t('admin.specialization')}</Label>
                     <Input
                       id="specialization"
-                      placeholder="e.g., Large Animal Medicine"
+                      placeholder={t("adminUsers.eGLargeAnimalMedicine")}
                       value={newUser.specialization}
                       onChange={(e) => setNewUser({...newUser, specialization: e.target.value})}
                       required

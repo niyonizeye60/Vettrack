@@ -11,11 +11,12 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { User, Mail, Phone, BadgeCheck, Stethoscope, Camera, KeyRound, MapPin, Calendar } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useToast } from "@/hooks/use-toast"
 
 export default function VeterinaryProfilePage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
@@ -92,10 +93,10 @@ export default function VeterinaryProfilePage() {
         setAvatarPreview(data.image)
         toast({ title: t("vet.profileUpdated"), description: t("vet.profileUpdatedDesc") })
       } else {
-        toast({ title: t("common.error"), description: data.message ?? "Upload failed", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(data.message, language) ?? t("vetProfile.uploadFailed"), variant: "destructive" })
       }
     } catch {
-      toast({ title: t("common.error"), description: "Upload failed", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("vetProfile.uploadFailed"), variant: "destructive" })
     } finally {
       setAvatarUploading(false)
       e.target.value = ""
@@ -127,7 +128,7 @@ export default function VeterinaryProfilePage() {
       })
       const data = await res.json().catch(() => null)
 
-      if (!res.ok || !data?.success) throw new Error(data?.message ?? "Save failed")
+      if (!res.ok || !data?.success) throw new Error(localizeError(data?.message, language) ?? t("vetProfile.saveFailed"))
 
       toast({ title: t("vet.profileUpdated"), description: t("vet.profileUpdatedDesc") })
       setCurrentPassword("")
@@ -135,7 +136,7 @@ export default function VeterinaryProfilePage() {
       setConfirmPassword("")
       await loadProfile()
     } catch (err: any) {
-      toast({ title: t("common.error"), description: err?.message ?? "Failed to save", variant: "destructive" })
+      toast({ title: t("common.error"), description: err?.message ?? t("vetProfile.failedToSave"), variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -166,7 +167,7 @@ export default function VeterinaryProfilePage() {
         {/* Banner — avatar anchored to its bottom edge */}
         <div className="relative h-36">
           {bannerImage ? (
-            <img src={bannerImage} alt="Banner" className="w-full h-full object-cover" />
+            <img src={bannerImage} alt={t("vetProfile.banner")} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-gradient-to-r from-green-600 to-green-500" />
           )}
@@ -304,13 +305,13 @@ export default function VeterinaryProfilePage() {
               <Label htmlFor="district">
                 <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.district")}</span>
               </Label>
-              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="e.g., Kigali" />
+              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder={t("vetProfile.districtPlaceholder")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sector">
                 <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-gray-400" />{t("auth.sector")}</span>
               </Label>
-              <Input id="sector" value={sector} onChange={(e) => setSector(e.target.value)} placeholder="e.g., Nyarugenge" />
+              <Input id="sector" value={sector} onChange={(e) => setSector(e.target.value)} placeholder={t("vetProfile.sectorPlaceholder")} />
             </div>
           </div>
 

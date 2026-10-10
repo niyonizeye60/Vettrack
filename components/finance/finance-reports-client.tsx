@@ -65,10 +65,10 @@ export default function FinanceReportsClient({ canExport }: { canExport: boolean
       const doc = new jsPDF()
 
       doc.setFontSize(16)
-      doc.text("Vettrack — Income report", 14, 20)
+      doc.text(t("financeReport.vettrackIncomeReport"), 14, 20)
       doc.setFontSize(10)
-      doc.text(`${range.from}  to  ${range.to}`, 14, 27)
-      doc.text(`All amounts in RWF`, 14, 33)
+      doc.text(t("financeReport.rangeTo").replace("{from}", range.from).replace("{to}", range.to), 14, 27)
+      doc.text(t("financeReport.allAmountsInRwf"), 14, 33)
 
       let y = 45
       doc.setFontSize(11)
@@ -100,11 +100,11 @@ export default function FinanceReportsClient({ canExport }: { canExport: boolean
       doc.setFontSize(8)
       // Without this line a reader could mistake gross merchandise value for revenue.
       doc.text(
-        "Revenue is what Vettrack keeps. For brokered animal sales the gross value is",
+        t("financeReport.revenueIsWhatVettrackKeepsFor"),
         14,
         y
       )
-      doc.text("settled directly between buyer and seller and never reaches Vettrack.", 14, y + 4)
+      doc.text(t("financeReport.settledDirectlyBetweenBuyerAndSeller"), 14, y + 4)
 
       doc.save(`${fileStem}.pdf`)
     } finally {
@@ -119,16 +119,16 @@ export default function FinanceReportsClient({ canExport }: { canExport: boolean
       const XLSX = await import("xlsx")
       const wb = XLSX.utils.book_new()
       const sheet = XLSX.utils.aoa_to_sheet([
-        ["Vettrack — Income report"],
-        [`${range.from} to ${range.to}`],
-        ["All amounts in RWF"],
+        [t("financeReport.vettrackIncomeReport")],
+        [t("financeReport.rangeTo").replace("{from}", range.from).replace("{to}", range.to)],
+        [t("financeReport.allAmountsInRwf")],
         [],
         headers,
         ...buildRows(),
         [],
         [t("finance.total"), "", "", String(summary.total)],
       ])
-      XLSX.utils.book_append_sheet(wb, sheet, "Income")
+      XLSX.utils.book_append_sheet(wb, sheet, t("financeReport.income"))
       XLSX.writeFile(wb, `${fileStem}.xlsx`)
     } finally {
       setExporting(null)

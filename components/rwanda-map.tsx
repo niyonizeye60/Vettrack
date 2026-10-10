@@ -18,6 +18,7 @@ interface RwandaMapProps {
 
 export function RwandaMap({ locationPoints, animalName }: RwandaMapProps) {
   const { t } = useLanguage()
+  const capitalLabel = t("rwandaMap.capital")
   const mapRef = useRef<HTMLDivElement>(null)
   const [map, setMap] = useState<any>(null)
   const [selectedPoint, setSelectedPoint] = useState<LocationPoint | null>(null)
@@ -87,7 +88,7 @@ export function RwandaMap({ locationPoints, animalName }: RwandaMapProps) {
             fillOpacity: 0.8,
           }).addTo(mapInstance)
 
-          marker.bindPopup(`<strong>${city.name}</strong>${city.isCapital ? "<br/>Capital of Rwanda" : ""}`)
+          marker.bindPopup(`<strong>${city.name}</strong>${city.isCapital ? `<br/>${capitalLabel}` : ""}`)
         })
 
         setMap(mapInstance)
@@ -154,7 +155,7 @@ export function RwandaMap({ locationPoints, animalName }: RwandaMapProps) {
                   <span class="font-medium">${point.latitude.toFixed(6)}, ${point.longitude.toFixed(6)}</span>
                 </div>
                 <div class="text-xs text-gray-500 mt-2">
-                  Reading #${index + 1} of ${locationPoints.length}
+                  ${t("rwandaMap.readingOf").replace("{n}", String(index + 1)).replace("{total}", String(locationPoints.length))}
                 </div>
               </div>
             </div>

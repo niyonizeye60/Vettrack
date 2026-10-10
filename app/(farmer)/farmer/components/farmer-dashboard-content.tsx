@@ -676,7 +676,7 @@ export default function FarmerDashboardContent({
                         </div>
                       ))}
                       {group.items.length > 6 && (
-                        <p className="text-xs text-gray-400">+{group.items.length - 6} more</p>
+                        <p className="text-xs text-gray-400">{t("dashboard.moreCount").replace("{count}", String(group.items.length - 6))}</p>
                       )}
                     </div>
                   </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -74,7 +75,7 @@ const STATUS_BADGE: Record<string, string> = {
  * off the income figures and the seller's payout.
  */
 export default function FinanceRefundsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [tab, setTab] = useState<"waiting" | "history">("waiting")
   const [refunds, setRefunds] = useState<Refund[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -143,7 +144,7 @@ export default function FinanceRefundsPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setDecisionError(data.error || t("refund.decisionFailed"))
+        setDecisionError(localizeError(data.error, language) || t("refund.decisionFailed"))
         return false
       }
       await load()
@@ -193,7 +194,7 @@ export default function FinanceRefundsPage() {
       const res = await fetch(`/api/refunds/lookup?ref=${encodeURIComponent(lookupRef.trim())}`)
       const data = await res.json()
       if (!res.ok) {
-        setNewError(data.error || t("refund.orderNotFound"))
+        setNewError(localizeError(data.error, language) || t("refund.orderNotFound"))
         return
       }
       setFound(data)
@@ -228,7 +229,7 @@ export default function FinanceRefundsPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setNewError(data.error || t("refund.requestFailed"))
+        setNewError(localizeError(data.error, language) || t("refund.requestFailed"))
         return
       }
       setNewOpen(false)

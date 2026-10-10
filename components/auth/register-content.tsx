@@ -12,7 +12,7 @@ export default function RegisterContent() {
       <div className="hidden lg:block lg:w-1/2 relative">
         <Image
           src="https://images.unsplash.com/photo-1760895071337-4aac90164c56?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1yZWxhdGVkfDI1fHx8ZW58MHx8fHx8"
-          alt="Veterinarian with animals"
+          alt={t("alt.vetWithAnimals")}
           fill
           className="object-cover"
         />

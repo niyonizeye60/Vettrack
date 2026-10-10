@@ -30,13 +30,13 @@ export default function ForgotPasswordForm() {
       })
 
       if (!res.ok) {
-        throw new Error("Failed to send reset link")
+        throw new Error(t("auth.resetLinkFailed"))
       }
 
       setIsSubmitted(true)
     } catch (err) {
       console.error("Forgot password error:", err)
-      setError(err instanceof Error ? err.message : "Failed to send reset link")
+      setError(err instanceof Error ? err.message : t("auth.resetLinkFailed"))
     } finally {
       setIsLoading(false)
     }

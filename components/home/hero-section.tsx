@@ -20,7 +20,7 @@ export default function HeroSection() {
       <div className="absolute inset-0 z-0">
         <Image
           src="/cows-green-field-blue-sky.jpg?w=1920&h=1080&fit=crop&crop=focalpoint&auto=format&q=80"
-          alt="Veterinarian with animals"
+          alt={t("alt.vetWithAnimals")}
           fill
           className="object-cover"
           priority
@@ -61,7 +61,7 @@ export default function HeroSection() {
                 <div key={i} className="w-12 h-12 rounded-full border-2 border-white overflow-hidden">
                   <Image
                     src={src}
-                    alt={`Happy customer ${i + 1}`}
+                    alt={t("home.happyCustomer").replace("{n}", String(i + 1))}
                     width={48}
                     height={48}
                     className="w-full h-full object-cover"

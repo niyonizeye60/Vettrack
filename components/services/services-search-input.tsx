@@ -6,6 +6,7 @@ import { Search, MapPin, X, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { rwandaData } from "@/lib/rwanda-data"
 import { districtCenter } from "@/lib/rwanda-geo"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 const ALL_DISTRICTS = "all"
 
@@ -50,6 +51,7 @@ const builtInServices: SearchSuggestion[] = [
  * requested here; the results component detects location when needed.
  */
 export default function ServicesSearchInput({ defaultValue = "" }: { defaultValue?: string }) {
+  const { t } = useLanguage()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [query, setQuery] = useState(defaultValue)
@@ -60,6 +62,18 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
   const [location, setLocation] = useState({ lat: -1.9441, lng: 30.0619 })
   const district = searchParams.get("district") ?? ""
   const districts = Object.keys(rwandaData).sort()
+
+  // The built-in suggestions are English; their text shows in the reader's language.
+  const builtInText = (suggestion: SearchSuggestion, field: "name" | "description") => {
+    const key = `searchSuggest.${suggestion.id}.${field}`
+    const label = t(key)
+    return label === key ? suggestion[field] : label
+  }
+  const typeLabel = (type: string) => {
+    const key = `searchSuggest.type.${type}`
+    const label = t(key)
+    return label === key ? type : label
+  }
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
   // Stay in sync when the URL changes from elsewhere (deep link, clear link).
@@ -105,7 +119,11 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
         if (response.ok) {
           const remoteSuggestions = (data.results || []) as SearchSuggestion[]
           const localSuggestions = builtInServices.filter((suggestion) => {
-            const haystack = `${suggestion.name} ${suggestion.description} ${suggestion.type}`.toLowerCase()
+            // English and the reader's language, so either finds it.
+            const haystack = [
+              suggestion.name, suggestion.description, suggestion.type,
+              builtInText(suggestion, "name"), builtInText(suggestion, "description"), typeLabel(suggestion.type),
+            ].join(" ").toLowerCase()
             return haystack.includes(value.toLowerCase())
           })
           const merged = [...remoteSuggestions, ...localSuggestions].filter(
@@ -183,7 +201,7 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search services, products, or animals..."
+            placeholder={t("searchSuggest.placeholder")}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
@@ -199,7 +217,7 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
               {suggestionsLoading && suggestions.length === 0 ? (
                 <div className="flex items-center gap-2 px-4 py-3 text-sm text-gray-500">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  Searching...
+                  {t("searchSuggest.searching")}
                 </div>
               ) : (
                 suggestions.map((suggestion, index) => (
@@ -222,11 +240,11 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
                       <Search className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                     )}
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-gray-900">{suggestion.name}</span>
+                      <span className="block truncate text-sm font-bold text-gray-900">{builtInText(suggestion, "name")}</span>
                       <span className="block truncate text-xs text-gray-500">
-                        {suggestion.type}
-                        {suggestion.distance !== undefined && ` · ${formatDistance(suggestion.distance)} away`}
-                        {suggestion.description && ` · ${suggestion.description}`}
+                        {typeLabel(suggestion.type)}
+                        {suggestion.distance !== undefined && ` · ${t("searchSuggest.away").replace("{distance}", formatDistance(suggestion.distance))}`}
+                        {suggestion.description && ` · ${builtInText(suggestion, "description")}`}
                       </span>
                       {suggestion.price !== undefined && (
                         <span className="block text-xs font-semibold text-primary">
@@ -245,7 +263,7 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
             className="absolute right-1.5 top-1/2 -translate-y-1/2 h-9 px-4 rounded-lg bg-primary hover:bg-primary/90 text-white font-medium text-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
           >
             <Search className="h-4 w-4" />
-            <span>Search</span>
+            <span>{t("common.search")}</span>
           </button>
         </div>
 
@@ -253,10 +271,10 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
           <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10 pointer-events-none" />
           <Select value={district || ALL_DISTRICTS} onValueChange={onDistrictChange}>
             <SelectTrigger className="w-full h-12 pl-9 rounded-xl border-gray-200 bg-white shadow-sm text-sm">
-              <SelectValue placeholder="All districts" />
+              <SelectValue placeholder={t("searchSuggest.allDistricts")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ALL_DISTRICTS}>All districts</SelectItem>
+              <SelectItem value={ALL_DISTRICTS}>{t("searchSuggest.allDistricts")}</SelectItem>
               {districts.map((d) => (
                 <SelectItem key={d} value={d}>
                   {d}
@@ -268,7 +286,7 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
             <button
               onClick={() => onDistrictChange(ALL_DISTRICTS)}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
-              aria-label="Clear district filter"
+              aria-label={t("searchSuggest.clearDistrict")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -277,8 +295,8 @@ export default function ServicesSearchInput({ defaultValue = "" }: { defaultValu
       </div>
       <p className="text-xs text-gray-400 mt-1.5 text-center">
         {district
-          ? `Results anchored to ${district} — pick “All districts” to search from your live location`
-          : "Search by name, category, or product"}
+          ? t("searchSuggest.anchored").replace("{district}", district)
+          : t("searchSuggest.hint")}
       </p>
     </div>
   )

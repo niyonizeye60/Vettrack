@@ -3,6 +3,7 @@
 import { useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Download, CheckCircle, Store, User, Phone, CreditCard, Shield, FileText } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface ReceiptItem {
   name: string
@@ -49,10 +50,12 @@ export default function PaymentReceipt({
   paidAt,
   createdAt,
 }: ReceiptProps) {
+  const { t } = useLanguage()
   const receiptRef = useRef<HTMLDivElement>(null)
+  const methodLabel = paymentMethod === "intouchpay" ? t("receipt.momo") : t("receipt.card")
 
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "N/A"
+    if (!dateStr) return t("receipt.notAvailable")
     try {
       return new Date(dateStr).toLocaleDateString("en-RW", {
         year: "numeric",
@@ -78,7 +81,7 @@ export default function PaymentReceipt({
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Receipt - ${orderId}</title>
+        <title>${t("receipt.title")} - ${orderId}</title>
         <style>
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; max-width: 700px; margin: 0 auto; }
           .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 20px; }
@@ -104,35 +107,35 @@ export default function PaymentReceipt({
       <body>
         <div class="header">
           <h1>🐾 NTDM Animal Hospital</h1>
-          <p>Payment Receipt</p>
+          <p>${t("receipt.title")}</p>
         </div>
 
-        <div class="success-badge">✅ PAYMENT SUCCESSFUL</div>
+        <div class="success-badge">✅ ${t("receipt.successUpper")}</div>
 
         <div class="section">
-          <div class="section-title">Order Details</div>
-          <div class="row"><span class="label">Order ID:</span><span class="value">${orderId}</span></div>
-          <div class="row"><span class="label">Date:</span><span class="value">${formatDate(paidAt || createdAt)}</span></div>
-          <div class="row"><span class="label">Payment Method:</span><span class="value">${paymentMethod === "intouchpay" ? "Mobile Money (IntouchPay)" : "Card (Pesapal)"}</span></div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">Customer Information</div>
-          <div class="row"><span class="label">Name:</span><span class="value">${buyer.name}</span></div>
-          <div class="row"><span class="label">Phone:</span><span class="value">${buyer.phone}</span></div>
-          ${buyer.email ? `<div class="row"><span class="label">Email:</span><span class="value">${buyer.email}</span></div>` : ""}
-          ${buyer.district ? `<div class="row"><span class="label">Location:</span><span class="value">${[buyer.district, buyer.sector].filter(Boolean).join(", ")}</span></div>` : ""}
+          <div class="section-title">${t("receipt.orderDetails")}</div>
+          <div class="row"><span class="label">${t("receipt.orderId")}:</span><span class="value">${orderId}</span></div>
+          <div class="row"><span class="label">${t("receipt.date")}:</span><span class="value">${formatDate(paidAt || createdAt)}</span></div>
+          <div class="row"><span class="label">${t("receipt.paymentMethod")}:</span><span class="value">${methodLabel}</span></div>
         </div>
 
         <div class="section">
-          <div class="section-title">Items Purchased</div>
+          <div class="section-title">${t("receipt.customerInfo")}</div>
+          <div class="row"><span class="label">${t("receipt.name")}:</span><span class="value">${buyer.name}</span></div>
+          <div class="row"><span class="label">${t("receipt.phone")}:</span><span class="value">${buyer.phone}</span></div>
+          ${buyer.email ? `<div class="row"><span class="label">${t("receipt.email")}:</span><span class="value">${buyer.email}</span></div>` : ""}
+          ${buyer.district ? `<div class="row"><span class="label">${t("receipt.location")}:</span><span class="value">${[buyer.district, buyer.sector].filter(Boolean).join(", ")}</span></div>` : ""}
+        </div>
+
+        <div class="section">
+          <div class="section-title">${t("receipt.itemsPurchased")}</div>
           <table>
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Total</th>
+                <th>${t("receipt.item")}</th>
+                <th>${t("receipt.qty")}</th>
+                <th>${t("receipt.price")}</th>
+                <th>${t("receipt.total")}</th>
               </tr>
             </thead>
             <tbody>
@@ -152,31 +155,31 @@ export default function PaymentReceipt({
         </div>
 
         <div class="section">
-          <div class="section-title">Payment Summary</div>
-          <div class="row"><span class="label">Subtotal:</span><span class="value">RWF ${subtotal.toLocaleString()}</span></div>
+          <div class="section-title">${t("receipt.paymentSummary")}</div>
+          <div class="row"><span class="label">${t("receipt.subtotal")}:</span><span class="value">RWF ${subtotal.toLocaleString()}</span></div>
           ${commissionTotal > 0 ? `
-            <div class="row"><span class="label">Platform Commission (${commissionPercentage}%):</span><span class="value" style="color: #059669;">RWF ${commissionTotal.toLocaleString()}</span></div>
-            <div class="row"><span class="label">Seller Earnings:</span><span class="value" style="color: #2563eb;">RWF ${sellerTotal.toLocaleString()}</span></div>
+            <div class="row"><span class="label">${t("receipt.platformCommission").replace("{percent}", String(commissionPercentage))}:</span><span class="value" style="color: #059669;">RWF ${commissionTotal.toLocaleString()}</span></div>
+            <div class="row"><span class="label">${t("receipt.sellerEarnings")}:</span><span class="value" style="color: #2563eb;">RWF ${sellerTotal.toLocaleString()}</span></div>
           ` : ""}
-          <div class="row total-row"><span class="label">Amount Paid:</span><span class="value" style="color: #166534;">RWF ${total.toLocaleString()}</span></div>
+          <div class="row total-row"><span class="label">${t("receipt.amountPaid")}:</span><span class="value" style="color: #166534;">RWF ${total.toLocaleString()}</span></div>
         </div>
 
         <div class="section">
-          <div class="section-title">Seller Information</div>
+          <div class="section-title">${t("receipt.sellerInfo")}</div>
           ${items.filter(i => i.sellerName).map(item => `
             <div class="seller-badge">
               <span class="name">🏪 ${item.sellerName}</span>
               ${item.sellerPhone ? ` — 📱 ${item.sellerPhone}` : ""}
-              ${item.sellerAmount ? ` — 💰 Received: RWF ${item.sellerAmount.toLocaleString()}` : ""}
+              ${item.sellerAmount ? ` — 💰 ${t("receipt.received").replace("{amount}", item.sellerAmount.toLocaleString())}` : ""}
             </div>
           `).join("")}
-          ${items.every(i => !i.sellerName) ? '<p style="color: #999; font-size: 13px;">Sold by NTDM Animal Hospital</p>' : ""}
+          ${items.every(i => !i.sellerName) ? `<p style="color: #999; font-size: 13px;">${t("receipt.soldByNtdm")}</p>` : ""}
         </div>
 
         <div class="footer">
-          <p>Thank you for your purchase! 🐾</p>
-          <p>NTDM Animal Hospital | This is a computer-generated receipt</p>
-          <p>Generated on ${new Date().toLocaleDateString("en-RW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+          <p>${t("receipt.thanks")} 🐾</p>
+          <p>${t("receipt.computerGenerated")}</p>
+          <p>${t("receipt.generatedOn").replace("{date}", new Date().toLocaleDateString("en-RW", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</p>
         </div>
       </body>
       </html>
@@ -194,10 +197,10 @@ export default function PaymentReceipt({
           <h2 className="text-xl font-bold flex items-center justify-center gap-2">
             🐾 NTDM Animal Hospital
           </h2>
-          <p className="text-blue-100 text-sm mt-1">Payment Receipt</p>
+          <p className="text-blue-100 text-sm mt-1">{t("receipt.title")}</p>
           <div className="mt-3 inline-flex items-center gap-2 bg-green-500/20 text-green-100 px-4 py-1.5 rounded-full text-sm font-medium">
             <CheckCircle className="h-4 w-4" />
-            Payment Successful
+            {t("receipt.success")}
           </div>
         </div>
 
@@ -205,13 +208,13 @@ export default function PaymentReceipt({
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-2 text-sm text-gray-500 border-b border-gray-100 pb-3">
             <FileText className="h-4 w-4" />
-            <span className="font-mono text-xs">Order: {orderId.slice(-12)}</span>
+            <span className="font-mono text-xs">{t("receipt.order").replace("{id}", orderId.slice(-12))}</span>
             <span className="ml-auto text-gray-400">{formatDate(paidAt || createdAt)}</span>
           </div>
 
           {/* Items */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Items Purchased</h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{t("receipt.itemsPurchased")}</h3>
             <div className="space-y-3">
               {items.map((item, idx) => (
                 <div key={idx} className="bg-gray-50 rounded-lg p-4">
@@ -240,7 +243,7 @@ export default function PaymentReceipt({
                         <>
                           <span className="text-blue-300">·</span>
                           <span className="text-green-600 font-medium">
-                            Seller receives: RWF {item.sellerAmount.toLocaleString()}
+                            {t("receipt.sellerReceives").replace("{amount}", item.sellerAmount.toLocaleString())}
                           </span>
                         </>
                       )}
@@ -254,30 +257,30 @@ export default function PaymentReceipt({
           {/* Payment Summary */}
           <div className="border-t border-gray-200 pt-4 space-y-2">
             <div className="flex justify-between text-sm text-gray-600">
-              <span>Subtotal</span>
+              <span>{t("receipt.subtotal")}</span>
               <span>RWF {subtotal.toLocaleString()}</span>
             </div>
             {commissionTotal > 0 && (
               <>
                 <div className="flex justify-between text-sm text-green-600">
-                  <span>Platform Commission ({commissionPercentage}%)</span>
+                  <span>{t("receipt.platformCommission").replace("{percent}", String(commissionPercentage))}</span>
                   <span>RWF {commissionTotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-sm text-blue-600">
-                  <span>Total to Sellers</span>
+                  <span>{t("receipt.totalToSellers")}</span>
                   <span>RWF {sellerTotal.toLocaleString()}</span>
                 </div>
               </>
             )}
             <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t border-gray-200">
-              <span>Amount Paid</span>
+              <span>{t("receipt.amountPaid")}</span>
               <span className="text-green-600">RWF {total.toLocaleString()}</span>
             </div>
           </div>
 
           {/* Customer Info */}
           <div className="border-t border-gray-200 pt-4">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Customer</h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{t("receipt.customer")}</h3>
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <User className="h-4 w-4 text-gray-400" />
               <span>{buyer.name}</span>
@@ -293,7 +296,7 @@ export default function PaymentReceipt({
           {/* Payment Method */}
           <div className="flex items-center gap-2 text-xs text-gray-400 pt-2">
             <Shield className="h-3.5 w-3.5" />
-            <span>Paid via {paymentMethod === "intouchpay" ? "Mobile Money (IntouchPay)" : "Card (Pesapal)"}</span>
+            <span>{t("receipt.paidVia").replace("{method}", methodLabel)}</span>
           </div>
         </div>
       </div>
@@ -301,7 +304,7 @@ export default function PaymentReceipt({
       {/* Download Button */}
       <Button onClick={handleDownload} className="w-full" variant="outline">
         <Download className="h-4 w-4 mr-2" />
-        Download / Print Receipt
+        {t("receipt.download")}
       </Button>
     </div>
   )

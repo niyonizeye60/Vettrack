@@ -14,6 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeNotification } from "@/lib/notification-messages"
 import { getCurrentUser } from "@/lib/actions/auth"
 
 interface Notification {
@@ -25,15 +26,19 @@ interface Notification {
   read: boolean
   createdAt: string
   expiresAt?: string
+  /** Set on notifications that can show in the reader's language. */
+  i18n?: unknown
 }
 
-function getTimeLeft(expiresAt?: string) {
+function getTimeLeft(expiresAt: string | undefined, t: (key: string) => string) {
   if (!expiresAt) return null
   const diff = new Date(expiresAt).getTime() - Date.now()
-  if (diff <= 0) return "Expired"
+  if (diff <= 0) return t("notifications.expired")
   const h = Math.floor(diff / (1000 * 60 * 60))
   const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-  return h > 0 ? `${h}h ${m}m left` : `${m}m left`
+  return h > 0
+    ? t("notifications.hoursMinutesLeft").replace("{h}", String(h)).replace("{m}", String(m))
+    : t("notifications.minutesLeft").replace("{m}", String(m))
 }
 
 function priorityConfig(priority: string) {
@@ -55,7 +60,7 @@ function typeConfig(type: string) {
 }
 
 export default function VeterinaryNotificationsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -170,10 +175,11 @@ export default function VeterinaryNotificationsPage() {
   const unreadCount = notifications.filter(n => !n.read && !n._id.startsWith('announcement-')).length
   const readCount   = notifications.filter(n =>  n.read).length
 
-  const visibleNotifications =
+  const visibleNotifications = (
     activeTab === "unread" ? notifications.filter(n => !n.read) :
     activeTab === "read"   ? notifications.filter(n =>  n.read) :
     notifications
+  ).map(n => localizeNotification(n, language, t))
 
   // ── Loading skeleton ────────────────────────────────────────────────────────
   if (loading) {
@@ -285,7 +291,7 @@ export default function VeterinaryNotificationsPage() {
             <div className="divide-y divide-gray-100">
               {visibleNotifications.map(n => {
                 const pc = priorityConfig(n.priority)
-                const timeLeft = getTimeLeft(n.expiresAt)
+                const timeLeft = getTimeLeft(n.expiresAt, t)
                 const expiringSoon = n.expiresAt &&
                   (new Date(n.expiresAt).getTime() - Date.now()) < 6 * 60 * 60 * 1000
 

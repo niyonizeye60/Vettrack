@@ -12,7 +12,7 @@ export default function ForgotPasswordContent() {
       <div className="hidden lg:block lg:w-1/2 relative">
         <Image
           src="https://images.unsplash.com/photo-1527153857715-3908f2bae5e8?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y293c3xlbnwwfHwwfHx8MA%3D%3D"
-          alt="Veterinarian with animals"
+          alt={t("alt.vetWithAnimals")}
           fill
           className="object-cover"
         />

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { getCurrentUser } from "@/lib/auth"
 import { LifeBuoy, Plus, Loader2 } from "lucide-react"
 import TicketThread from "./ticket-thread"
@@ -33,7 +34,7 @@ function statusBadgeClass(status: string) {
 }
 
 export default function MyTickets() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const searchParams = useSearchParams()
 
@@ -90,7 +91,7 @@ export default function MyTickets() {
         body: JSON.stringify({ subject, message }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "failed")
+      if (!res.ok) throw new Error(localizeError(json.error, language) || "failed")
 
       toast({ title: t("support.ticketCreated"), description: t("support.ticketCreatedDesc") })
       setSubject("")

@@ -13,6 +13,7 @@ import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { PersonAvatar } from "@/components/ui/person-avatar"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import { updateConsultationStatus } from "@/lib/actions"
 import { getRecentMessagesData } from "@/lib/actions/veterinary-dashboard"
@@ -45,7 +46,7 @@ export default function VeterinaryDashboardClient({
   missedAppointments,
   recentPatients,
 }: VeterinaryDashboardClientProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
 
   const [pending, setPending] = useState(pendingConsultations.slice(0, 5))
@@ -77,7 +78,7 @@ export default function VeterinaryDashboardClient({
           variant: action === "accept" ? "default" : "destructive",
         })
       } else {
-        throw new Error(result.error || "Failed")
+        throw new Error(localizeError(result.error, language) || t("vetDashboard.actionFailed"))
       }
     } catch {
       toast({ title: t("common.error") || "Error", description: t("vet.statusUpdateFailed"), variant: "destructive" })

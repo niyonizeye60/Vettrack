@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Edit, Trash2, Eye, Megaphone, AlertTriangle, Info, Shield, Users } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { Skeleton } from "@/components/ui/skeleton"
 import RichTextEditor from "@/components/ui/rich-text-editor"
 import { useToast } from "@/hooks/use-toast"
@@ -103,7 +104,7 @@ function announcementPriorityBadgeVariant(priority: string): "destructive" | "se
 }
 
 export default function AdminContentManagement() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false)
   const [isEditPostOpen, setIsEditPostOpen] = useState(false)
@@ -155,22 +156,22 @@ export default function AdminContentManagement() {
 
   const handleCreateBlogPost = async () => {
     if (!blogFormData.title || !blogFormData.content) {
-      toast({ title: "Error", description: "Please fill in the title and content", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.pleaseFillInTheTitleAnd"), variant: "destructive" })
       return
     }
     setIsSubmittingPost(true)
     try {
       const result = await createBlogPost(blogFormData)
       if (result.success) {
-        toast({ title: "Success", description: "Blog post created successfully" })
+        toast({ title: t("adminContent.success"), description: t("adminContent.blogPostCreatedSuccessfully") })
         setIsCreatePostOpen(false)
         resetBlogForm()
         await fetchBlogPosts()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to create blog post", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("adminContent.failedToCreateBlogPost"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to create blog post", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.failedToCreateBlogPost"), variant: "destructive" })
     } finally {
       setIsSubmittingPost(false)
     }
@@ -192,23 +193,23 @@ export default function AdminContentManagement() {
 
   const handleUpdateBlogPost = async () => {
     if (!currentPost || !blogFormData.title || !blogFormData.content) {
-      toast({ title: "Error", description: "Please fill in the title and content", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.pleaseFillInTheTitleAnd"), variant: "destructive" })
       return
     }
     setIsSubmittingPost(true)
     try {
       const result = await updateBlogPost(currentPost.id, blogFormData)
       if (result.success) {
-        toast({ title: "Success", description: "Blog post updated successfully" })
+        toast({ title: t("adminContent.success"), description: t("adminContent.blogPostUpdatedSuccessfully") })
         setIsEditPostOpen(false)
         setCurrentPost(null)
         resetBlogForm()
         await fetchBlogPosts()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to update blog post", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("adminContent.failedToUpdateBlogPost"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update blog post", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.failedToUpdateBlogPost"), variant: "destructive" })
     } finally {
       setIsSubmittingPost(false)
     }
@@ -220,13 +221,13 @@ export default function AdminContentManagement() {
     try {
       const result = await deleteBlogPost(deleteBlogTarget.id)
       if (result.success) {
-        toast({ title: "Success", description: "Blog post deleted successfully" })
+        toast({ title: t("adminContent.success"), description: t("adminContent.blogPostDeletedSuccessfully") })
         setBlogPosts(prev => prev.filter(p => p.id !== deleteBlogTarget.id))
       } else {
-        toast({ title: "Error", description: result.message || "Failed to delete blog post", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("adminContent.failedToDeleteBlogPost"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to delete blog post", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.failedToDeleteBlogPost"), variant: "destructive" })
     } finally {
       setIsDeletingPost(false)
       setDeleteBlogTarget(null)
@@ -235,7 +236,7 @@ export default function AdminContentManagement() {
 
   const handleViewPost = (post: BlogPost) => {
     if (post.status !== 'published') {
-      toast({ title: "Draft post", description: "Publish this post before it can be viewed on the public blog" })
+      toast({ title: t("adminContent.draftPost"), description: t("adminContent.publishThisPostBeforeItCan") })
       return
     }
     window.open(`/blog/${post.id}`, '_blank')
@@ -269,15 +270,15 @@ export default function AdminContentManagement() {
 
   const validateAnnouncementTarget = () => {
     if (!announcementFormData.title || !announcementFormData.content) {
-      toast({ title: "Error", description: "Please fill in the title and content", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.pleaseFillInTheTitleAnd"), variant: "destructive" })
       return false
     }
     if (announcementFormData.targetType === 'role' && !announcementFormData.targetRole) {
-      toast({ title: "Error", description: "Please select a recipient role", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.pleaseSelectARecipientRole"), variant: "destructive" })
       return false
     }
     if (announcementFormData.targetType === 'user' && !announcementFormData.targetUserId) {
-      toast({ title: "Error", description: "Please select a recipient", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.pleaseSelectARecipient"), variant: "destructive" })
       return false
     }
     return true
@@ -289,15 +290,15 @@ export default function AdminContentManagement() {
     try {
       const result = await createAnnouncement(announcementFormData)
       if (result.success) {
-        toast({ title: "Success", description: "Announcement created successfully" })
+        toast({ title: t("adminContent.success"), description: t("adminContent.announcementCreatedSuccessfully") })
         setIsCreateAnnouncementOpen(false)
         resetAnnouncementForm()
         await fetchAnnouncements()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to create announcement", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("adminContent.failedToCreateAnnouncement"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to create announcement", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.failedToCreateAnnouncement"), variant: "destructive" })
     } finally {
       setIsSubmittingAnnouncement(false)
     }
@@ -325,16 +326,16 @@ export default function AdminContentManagement() {
     try {
       const result = await updateAnnouncement(currentAnnouncement.id, announcementFormData)
       if (result.success) {
-        toast({ title: "Success", description: "Announcement updated successfully" })
+        toast({ title: t("adminContent.success"), description: t("adminContent.announcementUpdatedSuccessfully") })
         setIsEditAnnouncementOpen(false)
         setCurrentAnnouncement(null)
         resetAnnouncementForm()
         await fetchAnnouncements()
       } else {
-        toast({ title: "Error", description: result.message || "Failed to update announcement", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("adminContent.failedToUpdateAnnouncement"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update announcement", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.failedToUpdateAnnouncement"), variant: "destructive" })
     } finally {
       setIsSubmittingAnnouncement(false)
     }
@@ -346,13 +347,13 @@ export default function AdminContentManagement() {
     try {
       const result = await deleteAnnouncement(deleteAnnouncementTarget.id)
       if (result.success) {
-        toast({ title: "Success", description: "Announcement deleted successfully" })
+        toast({ title: t("adminContent.success"), description: t("adminContent.announcementDeletedSuccessfully") })
         setAnnouncements(prev => prev.filter(a => a.id !== deleteAnnouncementTarget.id))
       } else {
-        toast({ title: "Error", description: result.message || "Failed to delete announcement", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("adminContent.failedToDeleteAnnouncement"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to delete announcement", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("adminContent.failedToDeleteAnnouncement"), variant: "destructive" })
     } finally {
       setIsDeletingAnnouncement(false)
       setDeleteAnnouncementTarget(null)

@@ -11,6 +11,7 @@ import {
   Calendar, Timer, BarChart3, TrendingDown, Target, FileText, Settings, Database, Shield, MessageSquare
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeNotification } from "@/lib/notification-messages"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -24,6 +25,8 @@ interface Notification {
   read: boolean
   createdAt: string
   time?: string
+  /** Set on notifications that can show in the reader's language. */
+  i18n?: unknown
 }
 
 function getTypeIcon(type: string) {
@@ -87,7 +90,7 @@ function priorityConfig(priority: string) {
 }
 
 export default function AdminNotificationsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -197,10 +200,11 @@ export default function AdminNotificationsPage() {
   const unreadCount = notifications.filter(n => !n.read).length
   const readCount = notifications.filter(n => n.read).length
 
-  const visibleNotifications =
+  const visibleNotifications = (
     activeTab === "unread" ? notifications.filter(n => !n.read) :
     activeTab === "read" ? notifications.filter(n => n.read) :
     notifications
+  ).map(n => localizeNotification(n, language, t))
 
   if (loading) {
     return (

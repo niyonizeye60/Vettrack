@@ -302,7 +302,7 @@ export default function RegisterForm() {
                     <Label htmlFor="specialization">{t('auth.specialization')}</Label>
                     <Input
                       id="specialization"
-                      placeholder="e.g., Large Animal Medicine"
+                      placeholder={t("register.specializationPlaceholder")}
                       value={specialization}
                       onChange={(e) => setSpecialization(e.target.value)}
                       required

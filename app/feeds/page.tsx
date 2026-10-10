@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, MapPin, Heart, Wheat, Tag } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { listingValueLabel } from "@/lib/validations/listing-request"
 import ServicesBanner from "@/components/services/services-banner"
 import ProductCard from "@/components/products/product-card"
 import { SHOW_UNITS_LEFT_AT } from "@/lib/product-rules"
@@ -56,6 +57,8 @@ export default function FeedsPage() {
   const searchParams = useSearchParams()
   const categoryId = searchParams.get('category')
   const { t } = useLanguage()
+  /** Stored listing values are English; show them in the reader's language. */
+  const valueLabel = (value?: string | null) => listingValueLabel(value, t)
 
   useEffect(() => {
     fetchData()
@@ -200,66 +203,66 @@ export default function FeedsPage() {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <Select value={selectedFeedType || "all"} onValueChange={(value) => setSelectedFeedType(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Feed Type" />
+                  <SelectValue placeholder={t("content.feedType")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="Hay">Hay</SelectItem>
-                  <SelectItem value="Concentrates">Concentrates</SelectItem>
-                  <SelectItem value="Minerals">Minerals</SelectItem>
-                  <SelectItem value="Supplements">Supplements</SelectItem>
+                  <SelectItem value="Hay">{valueLabel("Hay")}</SelectItem>
+                  <SelectItem value="Concentrates">{valueLabel("Concentrates")}</SelectItem>
+                  <SelectItem value="Minerals">{valueLabel("Minerals")}</SelectItem>
+                  <SelectItem value="Supplements">{valueLabel("Supplements")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={selectedQuality || "all"} onValueChange={(value) => setSelectedQuality(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Quality" />
+                  <SelectValue placeholder={t("content.quality")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="High">{valueLabel("High")}</SelectItem>
+                  <SelectItem value="Medium">{valueLabel("Medium")}</SelectItem>
+                  <SelectItem value="Low">{valueLabel("Low")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={selectedTargetAnimal || "all"} onValueChange={(value) => setSelectedTargetAnimal(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Target Animal" />
+                  <SelectValue placeholder={t("content.targetAnimal")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="Cattle">Cattle</SelectItem>
-                  <SelectItem value="Goats">Goats</SelectItem>
-                  <SelectItem value="Poultry">Poultry</SelectItem>
-                  <SelectItem value="Sheep">Sheep</SelectItem>
-                  <SelectItem value="Pigs">Pigs</SelectItem>
+                  <SelectItem value="Cattle">{valueLabel("Cattle")}</SelectItem>
+                  <SelectItem value="Goats">{valueLabel("Goats")}</SelectItem>
+                  <SelectItem value="Poultry">{valueLabel("Poultry")}</SelectItem>
+                  <SelectItem value="Sheep">{valueLabel("Sheep")}</SelectItem>
+                  <SelectItem value="Pigs">{valueLabel("Pigs")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={selectedDistrict || "all"} onValueChange={(value) => setSelectedDistrict(value === "all" ? "" : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="District" />
+                  <SelectValue placeholder={t("content.district")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('common.all')}</SelectItem>
-                  <SelectItem value="Kigali">Kigali</SelectItem>
-                  <SelectItem value="Northern">Northern</SelectItem>
-                  <SelectItem value="Southern">Southern</SelectItem>
-                  <SelectItem value="Eastern">Eastern</SelectItem>
-                  <SelectItem value="Western">Western</SelectItem>
+                  <SelectItem value="Kigali">{t("province.kigali")}</SelectItem>
+                  <SelectItem value="Northern">{t("province.northern")}</SelectItem>
+                  <SelectItem value="Southern">{t("province.southern")}</SelectItem>
+                  <SelectItem value="Eastern">{t("province.eastern")}</SelectItem>
+                  <SelectItem value="Western">{t("province.western")}</SelectItem>
                 </SelectContent>
               </Select>
 
               <div className="flex gap-2">
                 <Input
-                  placeholder="Min Price"
+                  placeholder={t("storefront.minPrice")}
                   type="number"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
                 />
                 <Input
-                  placeholder="Max Price"
+                  placeholder={t("storefront.maxPrice")}
                   type="number"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
@@ -272,12 +275,12 @@ export default function FeedsPage() {
             {loading ? (
               <Skeleton className="h-4 w-32" />
             ) : (
-              <p className="text-gray-600">{filteredFeeds.length} {t('feeds.title').toLowerCase()} found</p>
+              <p className="text-gray-600">{t("storefront.foundCount").replace("{count}", String(filteredFeeds.length)).replace("{items}", t('feeds.title').toLowerCase())}</p>
             )}
             {wishlist.length > 0 && (
               <p className="text-sm text-gray-500">
                 <Heart className="h-4 w-4 inline mr-1" />
-                {wishlist.length} in wishlist
+                {t("storefront.inWishlist").replace("{count}", String(wishlist.length))}
               </p>
             )}
           </div>
@@ -303,15 +306,15 @@ export default function FeedsPage() {
                       ? { label: t('pharmacy.onlyLeft').replace('{count}', String(feed.available)), className: "bg-orange-500 text-white" }
                       : { label: t('common.available'), className: "bg-green-600 text-white" },
                     ...(feed.quality
-                      ? [{ label: `${feed.quality} ${t('feeds.quality')}`, className: `${getQualityColor(feed.quality)} text-white` }]
+                      ? [{ label: `${t('feeds.quality')}: ${valueLabel(feed.quality)}`, className: `${getQualityColor(feed.quality)} text-white` }]
                       : []),
                   ]}
                   maxQuantity={feed.available ?? undefined}
                   wishlisted={wishlist.includes(feed.id)}
                   onToggleWishlist={() => toggleWishlist(feed.id)}
                   details={[
-                    ...(feed.feedType ? [{ icon: Wheat, text: feed.feedType }] : []),
-                    ...(feed.targetAnimal ? [{ icon: Tag, text: feed.targetAnimal }] : []),
+                    ...(feed.feedType ? [{ icon: Wheat, text: valueLabel(feed.feedType) }] : []),
+                    ...(feed.targetAnimal ? [{ icon: Tag, text: valueLabel(feed.targetAnimal) }] : []),
                     ...(feed.district
                       ? [{ icon: MapPin, text: [feed.district, feed.sector].filter(Boolean).join(', ') }]
                       : []),

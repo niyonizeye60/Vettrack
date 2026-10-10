@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 
 interface PayoutItem {
   _id: string
@@ -48,7 +49,7 @@ interface WithdrawalItem {
 }
 
 export default function SellerEarnings() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [payouts, setPayouts] = useState<PayoutItem[]>([])
   const [stats, setStats] = useState<PayoutStats | null>(null)
@@ -80,7 +81,7 @@ export default function SellerEarnings() {
         setPayouts(payoutData.payouts || [])
         setStats(payoutData.stats)
       } else {
-        setError(payoutData.error || "Failed to fetch earnings")
+        setError(payoutData.error || t("earnings.failedToFetchEarnings"))
       }
       if (withdrawRes.ok) {
         setWithdrawals(withdrawData.withdrawals || [])
@@ -88,7 +89,7 @@ export default function SellerEarnings() {
         setTotalEarned(withdrawData.totalEarned || 0)
       }
     } catch {
-      setError("Failed to fetch earnings")
+      setError(t("earnings.failedToFetchEarnings"))
     } finally {
       setLoading(false)
     }
@@ -115,11 +116,11 @@ export default function SellerEarnings() {
   const handleWithdraw = async () => {
     const amount = Number(withdrawAmount)
     if (!amount || amount <= 0) {
-      toast({ title: "Invalid amount", description: "Enter a valid amount to withdraw", variant: "destructive" })
+      toast({ title: t("earnings.invalidAmount"), description: t("earnings.enterAValidAmountToWithdraw"), variant: "destructive" })
       return
     }
     if (amount > availableBalance) {
-      toast({ title: "Insufficient balance", description: `Available: RWF ${availableBalance.toLocaleString()}`, variant: "destructive" })
+      toast({ title: t("earnings.insufficientBalance"), description: t("earnings.availableAmount").replace("{amount}", availableBalance.toLocaleString()), variant: "destructive" })
       return
     }
     setWithdrawing(true)
@@ -131,16 +132,16 @@ export default function SellerEarnings() {
       })
       const data = await res.json()
       if (res.ok) {
-        toast({ title: "✅ Withdrawal Submitted", description: data.message })
+        toast({ title: t("earnings.withdrawalSubmitted"), description: localizeError(data.message, language) })
         setWithdrawDialogOpen(false)
         setWithdrawAmount("")
         setWithdrawNote("")
         await fetchData()
       } else {
-        toast({ title: "Error", description: data.error || "Failed to submit withdrawal", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(data.error, language) || t("earnings.failedToSubmitWithdrawal"), variant: "destructive" })
       }
     } catch {
-      toast({ title: "Error", description: "Network error", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("earnings.networkError"), variant: "destructive" })
     } finally {
       setWithdrawing(false)
     }
@@ -156,12 +157,12 @@ export default function SellerEarnings() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "paid": return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" /> Paid</Badge>
-      case "pending": return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>
-      case "cancelled": return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" /> Cancelled</Badge>
-      case "approved": return <Badge className="bg-blue-100 text-blue-800"><CheckCircle className="h-3 w-3 mr-1" /> Approved</Badge>
-      case "completed": return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" /> Completed</Badge>
-      case "rejected": return <Badge className="bg-red-100 text-red-800"><AlertTriangle className="h-3 w-3 mr-1" /> Rejected</Badge>
+      case "paid": return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" /> {t("earnings.paid")}</Badge>
+      case "pending": return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" /> {t("earnings.pending")}</Badge>
+      case "cancelled": return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" /> {t("earnings.cancelled")}</Badge>
+      case "approved": return <Badge className="bg-blue-100 text-blue-800"><CheckCircle className="h-3 w-3 mr-1" /> {t("earnings.approved")}</Badge>
+      case "completed": return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" /> {t("earnings.completed")}</Badge>
+      case "rejected": return <Badge className="bg-red-100 text-red-800"><AlertTriangle className="h-3 w-3 mr-1" /> {t("earnings.rejected")}</Badge>
       default: return <Badge>{status}</Badge>
     }
   }
@@ -184,7 +185,7 @@ export default function SellerEarnings() {
         <AlertTriangle className="h-8 w-8 text-red-400 mx-auto mb-2" />
         <p className="text-sm text-red-600">{error}</p>
         <Button variant="outline" size="sm" onClick={fetchData} className="mt-3">
-          <RefreshCw className="h-3.5 w-3.5 mr-1" /> Retry
+          <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t("earnings.retry")}
         </Button>
       </div>
     )
@@ -196,9 +197,9 @@ export default function SellerEarnings() {
         <div>
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-green-500" />
-            My Earnings
+            {t("earnings.myEarnings")}
           </h2>
-          <p className="text-sm text-gray-500">Track your sales earnings and withdraw available balance</p>
+          <p className="text-sm text-gray-500">{t("earnings.trackYourSalesEarningsAndWithdraw")}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -207,7 +208,7 @@ export default function SellerEarnings() {
             onClick={() => { fetchWithdrawals(); setWithdrawHistoryOpen(true) }}
           >
             <History className="h-3.5 w-3.5 mr-1" />
-            Withdrawals
+            {t("earnings.withdrawals")}
           </Button>
         </div>
       </div>
@@ -216,7 +217,7 @@ export default function SellerEarnings() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-green-50 via-white to-white">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 font-medium">Total Earned</p>
+            <p className="text-xs text-gray-500 font-medium">{t("earnings.totalEarned")}</p>
             <p className="text-xl font-bold text-green-600 mt-1">
               RWF {totalEarned.toLocaleString()}
             </p>
@@ -224,7 +225,7 @@ export default function SellerEarnings() {
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-gradient-to-br from-blue-50 via-white to-white">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 font-medium">Available to Withdraw</p>
+            <p className="text-xs text-gray-500 font-medium">{t("earnings.availableToWithdraw")}</p>
             <p className="text-xl font-bold text-blue-600 mt-1">
               RWF {availableBalance.toLocaleString()}
             </p>
@@ -232,7 +233,7 @@ export default function SellerEarnings() {
         </Card>
         <Card className="border border-gray-200 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 font-medium">Paid Out</p>
+            <p className="text-xs text-gray-500 font-medium">{t("earnings.paidOut")}</p>
             <p className="text-xl font-bold text-blue-600 mt-1">
               RWF {(stats?.paidAmount || 0).toLocaleString()}
             </p>
@@ -240,7 +241,7 @@ export default function SellerEarnings() {
         </Card>
         <Card className="border border-gray-200 shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs text-gray-500 font-medium">Pending</p>
+            <p className="text-xs text-gray-500 font-medium">{t("earnings.pending")}</p>
             <p className="text-xl font-bold text-yellow-600 mt-1">
               RWF {(stats?.pendingAmount || 0).toLocaleString()}
             </p>
@@ -255,8 +256,8 @@ export default function SellerEarnings() {
             <div className="flex items-center gap-3">
               <Wallet className="h-8 w-8 text-green-600" />
               <div>
-                <p className="text-sm font-semibold text-gray-900">You have RWF {availableBalance.toLocaleString()} available to withdraw</p>
-                <p className="text-xs text-gray-500">Request a withdrawal to your mobile money account</p>
+                <p className="text-sm font-semibold text-gray-900">{t("earnings.youHaveAvailable").replace("{amount}", availableBalance.toLocaleString())}</p>
+                <p className="text-xs text-gray-500">{t("earnings.requestAWithdrawalToYourMobile")}</p>
               </div>
             </div>
             <Button
@@ -264,7 +265,7 @@ export default function SellerEarnings() {
               onClick={() => setWithdrawDialogOpen(true)}
             >
               <Send className="h-4 w-4 mr-2" />
-              Withdraw Now
+              {t("earnings.withdrawNow")}
             </Button>
           </CardContent>
         </Card>
@@ -275,14 +276,14 @@ export default function SellerEarnings() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
             <FileText className="h-4 w-4 text-gray-500" />
-            Payout History
+            {t("earnings.payoutHistory")}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {payouts.length === 0 ? (
             <div className="text-center py-12">
               <DollarSign className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">No earnings yet. Start selling to see your payouts here!</p>
+              <p className="text-sm text-gray-500">{t("earnings.noEarningsYetStartSellingTo")}</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -313,28 +314,28 @@ export default function SellerEarnings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5 text-green-500" />
-              Request Withdrawal
+              {t("earnings.requestWithdrawal")}
             </DialogTitle>
             <DialogDescription>
-              Available balance: <strong>RWF {availableBalance.toLocaleString()}</strong>
+              {t("earnings.availableBalance")} <strong>RWF {availableBalance.toLocaleString()}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium text-gray-700">Amount (RWF)</label>
+              <label className="text-sm font-medium text-gray-700">{t("earnings.amountRwf")}</label>
               <Input
                 type="number"
                 min="1"
                 max={availableBalance}
-                placeholder={`Max: ${availableBalance.toLocaleString()}`}
+                placeholder={t("earnings.max").replace("{amount}", availableBalance.toLocaleString())}
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Note (optional)</label>
+              <label className="text-sm font-medium text-gray-700">{t("earnings.noteOptional")}</label>
               <Textarea
-                placeholder="Any notes about this withdrawal..."
+                placeholder={t("earnings.anyNotesAboutThisWithdrawal")}
                 value={withdrawNote}
                 onChange={(e) => setWithdrawNote(e.target.value)}
                 rows={2}
@@ -343,20 +344,20 @@ export default function SellerEarnings() {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-800">
               <p className="font-medium flex items-center gap-1">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                Withdrawals require admin approval
+                {t("earnings.withdrawalsRequireAdminApproval")}
               </p>
-              <p className="mt-1">Your withdrawal request will be reviewed by an admin. Once approved, the money will be sent to your registered mobile money number.</p>
+              <p className="mt-1">{t("earnings.yourWithdrawalRequestWillBeReviewed")}</p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setWithdrawDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setWithdrawDialogOpen(false)}>{t("common.cancel")}</Button>
             <Button
               className="bg-green-600 hover:bg-green-700"
               onClick={handleWithdraw}
               disabled={withdrawing || !withdrawAmount || Number(withdrawAmount) <= 0}
             >
               {withdrawing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              {withdrawing ? "Submitting..." : `Withdraw RWF ${Number(withdrawAmount || 0).toLocaleString()}`}
+              {withdrawing ? t("earnings.submitting") : t("earnings.withdrawAmount").replace("{amount}", Number(withdrawAmount || 0).toLocaleString())}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -368,7 +369,7 @@ export default function SellerEarnings() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-gray-500" />
-              Withdrawal History
+              {t("earnings.withdrawalHistory")}
             </DialogTitle>
           </DialogHeader>
           {withdrawalsLoading ? (
@@ -378,7 +379,7 @@ export default function SellerEarnings() {
           ) : withdrawals.length === 0 ? (
             <div className="text-center py-8">
               <Send className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No withdrawal requests yet</p>
+              <p className="text-sm text-gray-500">{t("earnings.noWithdrawalRequestsYet")}</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -400,7 +401,7 @@ export default function SellerEarnings() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setWithdrawHistoryOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setWithdrawHistoryOpen(false)}>{t("common.close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

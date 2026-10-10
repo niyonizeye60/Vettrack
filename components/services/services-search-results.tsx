@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Navigation, MapPin, Loader2, Search } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { districtCenter, calcDistance } from "@/lib/rwanda-geo"
 import ServicesSearchInput from "@/components/services/services-search-input"
 
@@ -36,7 +37,7 @@ function formatDistance(km: number): string {
 }
 
 export default function ServicesSearchResults({ searchParams }: Props) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [results, setResults] = useState<ServiceResult[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -116,10 +117,10 @@ export default function ServicesSearchResults({ searchParams }: Props) {
 
         setResults(items)
       } else {
-        setError(data.error || "Failed to fetch services")
+        setError(localizeError(data.error, language) || t("searchResults.fetchFailed"))
       }
     } catch {
-      if (seq === searchSeqRef.current) setError("Failed to fetch services")
+      if (seq === searchSeqRef.current) setError(t("searchResults.fetchFailed"))
     } finally {
       if (seq === searchSeqRef.current) setLoading(false)
     }
@@ -152,7 +153,7 @@ export default function ServicesSearchResults({ searchParams }: Props) {
         className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 transition-colors"
       >
         <Search className="h-3.5 w-3.5 rotate-90" />
-        Clear search & browse all services
+        {t("searchResults.clearSearch")}
       </Link>
     </div>
   )
@@ -163,7 +164,7 @@ export default function ServicesSearchResults({ searchParams }: Props) {
         {searchHeader}
         <div className="flex flex-col items-center justify-center py-16" role="status" aria-live="polite">
           <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-          <p className="text-gray-500">Finding nearby services...</p>
+          <p className="text-gray-500">{t("searchResults.finding")}</p>
         </div>
       </div>
     )
@@ -175,10 +176,10 @@ export default function ServicesSearchResults({ searchParams }: Props) {
         {searchHeader}
         <div className="text-center py-16">
           <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">Could not load services</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">{t("searchResults.couldNotLoad")}</h3>
           <p className="text-sm text-gray-500">{error}</p>
           <Button variant="outline" onClick={fetchServices} className="mt-4">
-            Try Again
+            {t("common.tryAgain")}
           </Button>
         </div>
       </div>
@@ -198,22 +199,22 @@ export default function ServicesSearchResults({ searchParams }: Props) {
           <div>
             <p className="text-sm font-medium text-gray-900">
               {searchParams.district
-                ? `Showing services near ${searchParams.district}`
+                ? t("searchResults.near").replace("{place}", searchParams.district)
                 : hasLocation
-                  ? "Showing services near your location"
-                  : "Showing all services"}
+                  ? t("searchResults.nearYou")
+                  : t("searchResults.all")}
             </p>
             <p className="text-xs text-gray-500">
-              {sortedResults.length} service{sortedResults.length !== 1 ? "s" : ""} found
-              {searchParams.q && <> · searching &ldquo;{searchParams.q}&rdquo;</>}
-              {loading && <Loader2 className="inline-block ml-2 h-3 w-3 animate-spin text-primary align-[-2px]" aria-label="Updating results" />}
+              {t(sortedResults.length === 1 ? "searchResults.countOne" : "searchResults.countMany").replace("{count}", String(sortedResults.length))}
+              {searchParams.q && <> · {t("searchResults.searchingFor")} &ldquo;{searchParams.q}&rdquo;</>}
+              {loading && <Loader2 className="inline-block ml-2 h-3 w-3 animate-spin text-primary align-[-2px]" aria-label={t("searchResults.updating")} />}
             </p>
           </div>
         </div>
 
         {/* Sort Controls */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Sort by:</span>
+          <span className="text-xs text-gray-500">{t("searchResults.sortBy")}</span>
           <div className="flex rounded-lg border border-gray-200 bg-white overflow-hidden">
             {(["distance", "price", "name"] as const).map((option) => (
               <button
@@ -225,7 +226,7 @@ export default function ServicesSearchResults({ searchParams }: Props) {
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
-                {option === "distance" ? "Nearest" : option === "price" ? "Price" : "Name"}
+                {option === "distance" ? t("searchResults.nearest") : option === "price" ? t("common.price") : t("common.name")}
               </button>
             ))}
           </div>
@@ -236,14 +237,14 @@ export default function ServicesSearchResults({ searchParams }: Props) {
       {sortedResults.length === 0 ? (
         <div className="text-center py-16">
           <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No services found</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">{t("searchResults.noneFound")}</h3>
           <p className="text-sm text-gray-500 max-w-md mx-auto">
             {searchParams.q
-              ? `No services matching "${searchParams.q}" were found near your location. Try a different search or browse all services.`
-              : "No services available near your location yet. Try selecting a different district or browse all services."}
+              ? t("searchResults.noneMatching").replace("{q}", searchParams.q)
+              : t("searchResults.noneNear")}
           </p>
           <Button asChild variant="outline" className="mt-4">
-            <Link href="/services">Browse All Services</Link>
+            <Link href="/services">{t("searchResults.browseAll")}</Link>
           </Button>
         </div>
       ) : (
@@ -296,7 +297,7 @@ export default function ServicesSearchResults({ searchParams }: Props) {
 
                 <div className="flex justify-between items-center mb-4">
                   <div className="text-primary font-semibold">
-                    {service.price ? `RWF ${service.price.toLocaleString()}` : "Contact for price"}
+                    {service.price ? `RWF ${service.price.toLocaleString()}` : t("searchResults.contactForPrice")}
                   </div>
                 </div>
 
@@ -304,8 +305,8 @@ export default function ServicesSearchResults({ searchParams }: Props) {
                   <Link href={service.href}>
                     <MapPin className="h-4 w-4 mr-2" />
                     {service.distance !== undefined
-                      ? `${formatDistance(service.distance)} away — View`
-                      : "View Details"}
+                      ? t("searchResults.awayView").replace("{distance}", formatDistance(service.distance))
+                      : t("searchResults.viewDetails")}
                   </Link>
                 </Button>
               </div>

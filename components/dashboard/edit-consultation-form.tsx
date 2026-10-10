@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 
 interface Doctor {
@@ -41,7 +42,7 @@ interface EditConsultationFormProps {
 }
 
 export default function EditConsultationForm({ consultation, doctors, farmerId, onSuccess, onCancel }: EditConsultationFormProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -57,7 +58,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId, 
         toast({ title: t('farmer.consultationUpdated') || 'Consultation updated', description: t('farmer.consultationUpdatedDesc') || 'Your consultation has been updated successfully.' })
         onSuccess()
       } else {
-        toast({ title: t('common.error'), description: result.error || t('farmer.actionFailed'), variant: "destructive" })
+        toast({ title: t('common.error'), description: localizeError(result.error, language) || t('farmer.actionFailed'), variant: "destructive" })
       }
     } catch {
       toast({ title: t('common.error'), description: t('farmer.actionFailed'), variant: "destructive" })

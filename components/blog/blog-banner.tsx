@@ -11,7 +11,7 @@ export default function BlogBanner() {
       <div className="absolute inset-0 z-0">
         <Image
           src="https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?w=1920&h=600&fit=crop&crop=focalpoint&auto=format&q=80"
-          alt="Animal care blog"
+          alt={t("alt.animalCareBlog")}
           fill
           className="object-cover"
           priority

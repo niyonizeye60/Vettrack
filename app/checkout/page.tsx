@@ -6,6 +6,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Loader2, ShoppingCart, ChevronLeft, FileCheck, Upload } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useCart } from "@/contexts/CartContext"
 import { useToast } from "@/hooks/use-toast"
 import CartLineItem from "@/components/cart/cart-line-item"
@@ -18,7 +19,7 @@ import type { OrderPaymentMethod } from "@/lib/db-orders"
 type Step = "review" | "buyer" | "payment" | "intouchpay-poll"
 
 export default function CheckoutPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const { items, subtotal, clear } = useCart()
 
@@ -50,7 +51,7 @@ export default function CheckoutPage() {
       const res = await fetch("/api/prescriptions", { method: "POST", body })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setPrescriptionError(data.error || t('checkout.prescriptionUploadFailed'))
+        setPrescriptionError(localizeError(data.error, language) || t('checkout.prescriptionUploadFailed'))
         return
       }
       setPrescriptionId(data.prescriptionId)
@@ -84,7 +85,7 @@ export default function CheckoutPage() {
           setPrescriptionId(null)
           setPrescriptionName("")
         }
-        toast({ title: t('common.error'), description: orderData.error, variant: "destructive" })
+        toast({ title: t('common.error'), description: localizeError(orderData.error, language), variant: "destructive" })
         return
       }
       const orderId = orderData.orderId as string
@@ -97,7 +98,7 @@ export default function CheckoutPage() {
         })
         const initData = await initRes.json()
         if (!initRes.ok) {
-          toast({ title: t('common.error'), description: initData.error, variant: "destructive" })
+          toast({ title: t('common.error'), description: localizeError(initData.error, language), variant: "destructive" })
           return
         }
         clear()
@@ -113,7 +114,7 @@ export default function CheckoutPage() {
       })
       const initData = await initRes.json()
       if (!initRes.ok) {
-        toast({ title: t('common.error'), description: initData.error, variant: "destructive" })
+        toast({ title: t('common.error'), description: localizeError(initData.error, language), variant: "destructive" })
         return
       }
       clear()

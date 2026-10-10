@@ -11,6 +11,7 @@ import {
 import { Bell, Settings, AlertCircle, CheckCircle, Clock, UserX, UserPlus, Calendar, Timer, TrendingDown, BarChart3, Target, FileText, Database, Shield, MessageSquare, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeNotification } from "@/lib/notification-messages"
 import StaffHeader from "@/components/staff/staff-header"
 
 function stripHtml(html: string) {
@@ -24,7 +25,7 @@ function stripHtml(html: string) {
  * header's notifications slot.
  */
 export default function AdminHeader() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -177,12 +178,12 @@ export default function AdminHeader() {
         <div className="max-h-80 overflow-y-auto">
           {loading ? (
             <div className="p-4 text-center text-sm text-gray-500">
-              Loading notifications...
+              {t("adminHeader.loadingNotifications")}
             </div>
           ) : notifications.length === 0 ? (
             <div className="p-4 text-center text-gray-500 text-sm">{t('admin.noNotifications')}</div>
           ) : (
-            notifications.map((notification, index) => (
+            notifications.map((n) => localizeNotification(n, language, t)).map((notification, index) => (
               <div
                 key={notification._id || notification.id || index}
                 className={`p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors ${

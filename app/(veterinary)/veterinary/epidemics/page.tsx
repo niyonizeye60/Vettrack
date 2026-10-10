@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import EpidemicManagement from "@/components/epidemics/epidemic-management"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 const STAFF_ROLES = ["doctor", "admin", "superadmin"]
 
 export default function VeterinaryEpidemicsPage() {
+  const { t } = useLanguage()
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
@@ -16,7 +18,7 @@ export default function VeterinaryEpidemicsPage() {
   if (user && !STAFF_ROLES.includes(user.role)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-sm text-gray-500">Access restricted to veterinary staff.</p>
+        <p className="text-sm text-gray-500">{t("vetEpidemics.restricted")}</p>
       </div>
     )
   }

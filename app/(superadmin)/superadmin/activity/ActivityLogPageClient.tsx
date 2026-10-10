@@ -93,15 +93,15 @@ function formatActionLabel(action: string) {
   return words.replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function dayLabel(date: Date) {
+function dayLabel(date: Date, t: (key: string) => string) {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startOfYesterday = new Date(startOfToday)
   startOfYesterday.setDate(startOfYesterday.getDate() - 1)
   const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
-  if (startOfDay.getTime() === startOfToday.getTime()) return "Today"
-  if (startOfDay.getTime() === startOfYesterday.getTime()) return "Yesterday"
+  if (startOfDay.getTime() === startOfToday.getTime()) return t("common.today")
+  if (startOfDay.getTime() === startOfYesterday.getTime()) return t("activity.yesterday")
   return date.toLocaleDateString(undefined, {
     weekday: 'short', month: 'short', day: 'numeric',
     year: startOfDay.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
@@ -110,6 +110,11 @@ function dayLabel(date: Date) {
 
 export default function ActivityLogPageClient({ initialData, initialCounts }: ActivityLogPageClientProps) {
   const { t } = useLanguage()
+  // t hands back the key for a category with no translation; fall back to its English label.
+  const categoryLabel = (key: string) => {
+    const label = t(`superadmin.category.${key}`)
+    return label === `superadmin.category.${key}` ? (CATEGORY_META[key] ?? DEFAULT_META).label : label
+  }
   const roleLabel = (role: string) => t(ROLE_LABEL_KEY[role] || "") || (role.charAt(0).toUpperCase() + role.slice(1))
   const [data, setData] = useState<ActivityData>(initialData)
   const [counts, setCounts] = useState<CategoryCounts>(initialCounts)
@@ -186,7 +191,7 @@ export default function ActivityLogPageClient({ initialData, initialCounts }: Ac
   const countFor = (cat: string) => counts.byCategory.find(c => c.category === cat)?.count || 0
   const panelTitle = category === "all"
     ? (t('superadmin.allActivity') || 'All Activity')
-    : (t(`superadmin.category.${category}`) || CATEGORY_META[category]?.label)
+    : categoryLabel(category)
 
   let lastDay: string | null = null
 
@@ -207,7 +212,7 @@ export default function ActivityLogPageClient({ initialData, initialCounts }: Ac
             if (count === 0 && category !== key) return null
             return (
               <TabsTrigger key={key} value={key}>
-                {t(`superadmin.category.${key}`) || meta.label}
+                {categoryLabel(key)}
               </TabsTrigger>
             )
           })}
@@ -288,7 +293,7 @@ export default function ActivityLogPageClient({ initialData, initialCounts }: Ac
                 const meta = CATEGORY_META[cat] || DEFAULT_META
                 const Icon = meta.icon
                 const created = new Date(log.createdAt)
-                const label = dayLabel(created)
+                const label = dayLabel(created, t)
                 const showHeader = label !== lastDay
                 lastDay = label
 
@@ -385,7 +390,7 @@ export default function ActivityLogPageClient({ initialData, initialCounts }: Ac
                     </div>
                     <div className="min-w-0">
                       <DialogTitle className="leading-tight">{formatActionLabel(selectedLog.action)}</DialogTitle>
-                      <DialogDescription>{t(`superadmin.category.${cat}`) || meta.label}</DialogDescription>
+                      <DialogDescription>{categoryLabel(cat)}</DialogDescription>
                     </div>
                   </div>
                 </DialogHeader>

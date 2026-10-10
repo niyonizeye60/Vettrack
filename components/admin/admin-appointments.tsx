@@ -281,7 +281,7 @@ export default function AdminAppointments() {
                   {doctorFilter && (
                     <Badge variant="outline" className="flex items-center gap-1">
                       {doctors.find((d) => d.id === doctorFilter)?.name}
-                      <button onClick={() => setDoctorFilter(null)} aria-label="Clear filter">
+                      <button onClick={() => setDoctorFilter(null)} aria-label={t("staff.clearFilter")}>
                         <X className="h-3 w-3" />
                       </button>
                     </Badge>

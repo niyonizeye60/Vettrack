@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MapPin } from "lucide-react"
 
 export default function FarmerSettingsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
@@ -77,10 +78,10 @@ export default function FarmerSettingsPage() {
         setAvatarPreview(data.image)
         toast({ title: t("farmer.profileUpdated") || "Profile updated", description: t("farmer.profileUpdatedDesc") || "Your avatar has been changed." })
       } else {
-        toast({ title: t("common.error") || "Error", description: data.message ?? "Upload failed", variant: "destructive" })
+        toast({ title: t("common.error") || "Error", description: localizeError(data.message, language) ?? t("farmerSettings.uploadFailed"), variant: "destructive" })
       }
     } catch {
-      toast({ title: t("common.error") || "Error", description: "Upload failed", variant: "destructive" })
+      toast({ title: t("common.error") || "Error", description: t("farmerSettings.uploadFailed"), variant: "destructive" })
     } finally {
       setAvatarUploading(false)
       e.target.value = ""
@@ -117,7 +118,7 @@ export default function FarmerSettingsPage() {
       const data = await res.json().catch(() => null)
 
       if (!res.ok || !data?.success) {
-        throw new Error(data?.message ?? "Save failed")
+        throw new Error(localizeError(data?.message, language) ?? t("farmerSettings.saveFailed"))
       }
 
       toast({ title: t("farmer.profileUpdated") || "Saved", description: t("farmer.profileUpdatedDesc") || "Your profile has been updated." })
@@ -126,7 +127,7 @@ export default function FarmerSettingsPage() {
       setConfirmPassword("")
       await loadProfile()
     } catch (err: any) {
-      toast({ title: t("common.error") || "Error", description: err?.message ?? "Failed to save", variant: "destructive" })
+      toast({ title: t("common.error") || "Error", description: err?.message ?? t("farmerSettings.failedToSave"), variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -171,7 +172,7 @@ export default function FarmerSettingsPage() {
                 disabled={avatarUploading}
                 onClick={() => avatarInputRef.current?.click()}
               >
-                {avatarUploading ? "Uploading…" : t("farmer.changeAvatar") || "Change avatar"}
+                {avatarUploading ? t("farmerSettings.uploading") : t("farmer.changeAvatar") || "Change avatar"}
               </Button>
               <p className="text-xs text-gray-400 mt-1">
                 {t("farmer.avatarHint") || "JPG, PNG or GIF. Max 2MB."}
@@ -248,7 +249,7 @@ export default function FarmerSettingsPage() {
                 value={district}
                 disabled={!user?.isTestAccount}
                 onChange={(e) => setDistrict(e.target.value)}
-                placeholder="e.g., Kigali"
+                placeholder={t("farmerSettings.eGKigali")}
               />
             </div>
             <div className="space-y-1.5">
@@ -260,7 +261,7 @@ export default function FarmerSettingsPage() {
                 value={sector}
                 disabled={!user?.isTestAccount}
                 onChange={(e) => setSector(e.target.value)}
-                placeholder="e.g., Nyarugenge"
+                placeholder={t("farmerSettings.eGNyarugenge")}
               />
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 export interface EpidemicMapCase {
   _id: string
@@ -36,6 +37,7 @@ export default function EpidemicMap({
   selectedCaseId,
   onSelect,
 }: EpidemicMapProps) {
+  const { t } = useLanguage()
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const layersRef = useRef<any[]>([])
@@ -120,10 +122,10 @@ export default function EpidemicMap({
         const rows = [
           `<div class="flex items-center gap-1.5"><span class="epidemic-dot" style="background:${color}"></span><span class="font-bold text-gray-900">${c.diseaseName}</span></div>`,
           c.animalName ? `<div class="text-gray-600">${c.animalName}${c.animalType ? ` · ${c.animalType}` : ""}</div>` : c.animalType ? `<div class="text-gray-600">${c.animalType}</div>` : "",
-          c.farmerName ? `<div class="text-gray-500">Reported by ${c.farmerName}</div>` : "",
+          c.farmerName ? `<div class="text-gray-500">${t("epidemicMap.reportedBy").replace("{name}", c.farmerName)}</div>` : "",
           c.district ? `<div class="text-gray-600"><strong>${c.district}</strong>${c.sector ? ` · ${c.sector}` : ""}</div>` : "",
           `<div class="text-gray-500">${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)}</div>`,
-          c.affectedCount ? `<div class="text-gray-600">${c.affectedCount} animal(s) affected</div>` : "",
+          c.affectedCount ? `<div class="text-gray-600">${t("epidemicMap.affected").replace("{count}", String(c.affectedCount))}</div>` : "",
           c.reportedAt ? `<div class="text-xs text-gray-400">${new Date(c.reportedAt).toLocaleString()}</div>` : "",
         ].filter(Boolean).join("")
 
@@ -149,7 +151,7 @@ export default function EpidemicMap({
         map.setView([-1.9403, 29.8739], 8)
       }
     })
-  }, [mapReady, cases, onSelect])
+  }, [mapReady, cases, onSelect, t])
 
   // Restyle the selected pin in place so open popups are never destroyed.
   // Also lift the selected marker above neighbouring pins so it never hides
@@ -175,7 +177,7 @@ export default function EpidemicMap({
         <div className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center">
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <Loader2 className="h-5 w-5 animate-spin text-green-600" />
-            Loading map…
+            {t("epidemicMap.loading")}
           </div>
         </div>
       )}

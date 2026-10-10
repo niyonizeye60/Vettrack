@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { encryptText } from "@/lib/crypto"
 import { ObjectId } from "mongodb"
 import { logActivity } from "@/lib/activity-log"
+import { notificationText } from "@/lib/notification-messages"
 
 const DB = "ntdm_animal_hospital"
 const STAFF_ROLES = ["admin", "superadmin"]
@@ -80,8 +81,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // already polls the generic notifications collection by userId.
     if (isStaff) {
       await db.collection("notifications").insertOne({
-        title: "Support ticket reply",
-        message: `${currentUser.name} replied: ${trimmed.slice(0, 80)}`,
+        ...notificationText("supportReply", { staff: currentUser.name, preview: trimmed.slice(0, 80) }),
         type: "support_ticket",
         priority: "normal",
         read: false,

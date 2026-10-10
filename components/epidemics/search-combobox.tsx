@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
 import { cn } from "@/lib/utils"
 import { Check, Loader2, Plus, Search } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 interface SearchComboboxProps {
   /** Current value — also doubles as the search query while typing. */
@@ -45,6 +46,7 @@ export default function SearchCombobox({
   secondaryOnCreate,
   secondaryCreateBusy = false,
 }: SearchComboboxProps) {
+  const { t } = useLanguage()
   const [open, setOpen] = useState(false)
 
   const q = value.trim().toLowerCase()
@@ -115,7 +117,7 @@ export default function SearchCombobox({
             {canCreate && (
               <>
                 {matches.length > 0 && <CommandSeparator />}
-                <CommandGroup heading="Not found — add new">
+                <CommandGroup heading={t("searchCombobox.notFound")}>
                   <CommandItem value={value} onSelect={runCreate} disabled={createBusy} className="gap-2 text-green-700">
                     {createBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                     {createLabel(value.trim())}

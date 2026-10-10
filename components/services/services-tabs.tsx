@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ServiceCard from "@/components/services/service-card"
 import CategoryCard from "@/components/services/category-card"
 import { Activity, Video, ShieldAlert, ShoppingBag, Pill, Wheat, FileText, MapPin, Stethoscope, Shield, DollarSign, Brain } from "lucide-react"
+import { useLanguage } from "@/contexts/LanguageContext"
 
 const TAB_VALUES = ["tracking", "consultations", "monitoring", "sales", "drugs", "feeds", "Ai"]
 
@@ -235,6 +236,7 @@ const services = {
 }
 
 export default function ServicesTabs() {
+  const { t } = useLanguage()
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
@@ -284,31 +286,31 @@ export default function ServicesTabs() {
             <TabsList className="bg-muted/50 flex-nowrap min-w-max px-2">
               <TabsTrigger value="tracking" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <MapPin className="h-4 w-4" />
-                <span className="hidden sm:inline">Tracking</span>
+                <span className="hidden sm:inline">{t("servicesTabs.tracking")}</span>
               </TabsTrigger>
               <TabsTrigger value="consultations" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <Stethoscope className="h-4 w-4" />
-                <span className="hidden sm:inline">Consultations</span>
+                <span className="hidden sm:inline">{t("servicesTabs.consultations")}</span>
               </TabsTrigger>
               <TabsTrigger value="monitoring" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline">Monitoring</span>
+                <span className="hidden sm:inline">{t("servicesTabs.monitoring")}</span>
               </TabsTrigger>
               <TabsTrigger value="sales" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <DollarSign className="h-4 w-4" />
-                <span className="hidden sm:inline">Animal Sales</span>
+                <span className="hidden sm:inline">{t("servicesTabs.animalSales")}</span>
               </TabsTrigger>
               <TabsTrigger value="drugs" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <Pill className="h-4 w-4" />
-                <span className="hidden sm:inline">Pharmacy</span>
+                <span className="hidden sm:inline">{t("servicesTabs.pharmacy")}</span>
               </TabsTrigger>
               <TabsTrigger value="feeds" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <Wheat className="h-4 w-4" />
-                <span className="hidden sm:inline">Feeds</span>
+                <span className="hidden sm:inline">{t("servicesTabs.feeds")}</span>
               </TabsTrigger>
               <TabsTrigger value="Ai" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap min-w-[44px] sm:min-w-auto">
                 <Brain className="h-4 w-4" />
-                <span className="hidden sm:inline">AI Disease Prediction</span>
+                <span className="hidden sm:inline">{t("servicesTabs.aiDiseasePrediction")}</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -316,7 +318,7 @@ export default function ServicesTabs() {
 
         {/* Mobile hint */}
         <div className="text-center text-sm text-gray-500 mb-4 sm:hidden">
-          👈 Swipe to see more services 👉
+          {t("servicesTabs.swipeToSeeMoreServices")}
         </div>
 
         <TabsContent value="tracking" className="mt-0">
@@ -393,11 +395,8 @@ export default function ServicesTabs() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-6">
               <Brain className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-xl font-bold mb-3">AI Disease Prediction</h3>
-            <p className="text-gray-600 max-w-md">
-              We're building AI-powered disease prediction for livestock and pets. This feature is coming soon —
-              check back or contact us to be notified when it launches.
-            </p>
+            <h3 className="text-xl font-bold mb-3">{t("servicesTabs.aiDiseasePrediction")}</h3>
+            <p className="text-gray-600 max-w-md">{t("servicesTabs.aiComingSoon")}</p>
           </div>
         </TabsContent>
       </Tabs>

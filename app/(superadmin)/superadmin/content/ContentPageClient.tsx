@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
 import {
   getAdminAnnouncements,
@@ -54,7 +55,7 @@ const emptyFormData: AnnouncementInput = {
 }
 
 export default function ContentPageClient({ initialAnnouncements, initialTargetableUsers }: ContentPageClientProps) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { toast } = useToast()
   const [announcements, setAnnouncements] = useState(initialAnnouncements)
   const [targetableUsers, setTargetableUsers] = useState(initialTargetableUsers)
@@ -84,15 +85,15 @@ export default function ContentPageClient({ initialAnnouncements, initialTargeta
 
   const validateTarget = () => {
     if (!formData.title || !formData.content) {
-      toast({ title: "Error", description: "Please fill in all required fields", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saContent.pleaseFillInAllRequiredFields"), variant: "destructive" })
       return false
     }
     if (formData.targetType === "role" && !formData.targetRole) {
-      toast({ title: "Error", description: "Please select a recipient role", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saContent.pleaseSelectARecipientRole"), variant: "destructive" })
       return false
     }
     if (formData.targetType === "user" && !formData.targetUserId) {
-      toast({ title: "Error", description: "Please select a recipient", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saContent.pleaseSelectARecipient"), variant: "destructive" })
       return false
     }
     return true
@@ -105,15 +106,15 @@ export default function ContentPageClient({ initialAnnouncements, initialTargeta
     try {
       const result = await createAnnouncement(formData)
       if (result.success) {
-        toast({ title: "Success", description: "Announcement created successfully" })
+        toast({ title: t("saContent.success"), description: t("saContent.announcementCreatedSuccessfully") })
         setIsCreateOpen(false)
         resetForm()
         setAnnouncements(await getAdminAnnouncements())
       } else {
-        toast({ title: "Error", description: result.message || "Failed to create announcement", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saContent.failedToCreateAnnouncement"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to create announcement", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saContent.failedToCreateAnnouncement"), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -126,15 +127,15 @@ export default function ContentPageClient({ initialAnnouncements, initialTargeta
     try {
       const result = await updateAnnouncement(editingAnnouncement.id, formData)
       if (result.success) {
-        toast({ title: "Success", description: "Announcement updated successfully" })
+        toast({ title: t("saContent.success"), description: t("saContent.announcementUpdatedSuccessfully") })
         setEditingAnnouncement(null)
         resetForm()
         setAnnouncements(await getAdminAnnouncements())
       } else {
-        toast({ title: "Error", description: result.message || "Failed to update announcement", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saContent.failedToUpdateAnnouncement"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to update announcement", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saContent.failedToUpdateAnnouncement"), variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -146,13 +147,13 @@ export default function ContentPageClient({ initialAnnouncements, initialTargeta
     try {
       const result = await deleteAnnouncement(announcementToDelete.id)
       if (result.success) {
-        toast({ title: "Success", description: "Announcement deleted successfully" })
+        toast({ title: t("saContent.success"), description: t("saContent.announcementDeletedSuccessfully") })
         setAnnouncements(prev => prev.filter(a => a.id !== announcementToDelete.id))
       } else {
-        toast({ title: "Error", description: result.message || "Failed to delete announcement", variant: "destructive" })
+        toast({ title: t("common.error"), description: localizeError(result.message, language) || t("saContent.failedToDeleteAnnouncement"), variant: "destructive" })
       }
     } catch (error) {
-      toast({ title: "Error", description: "Failed to delete announcement", variant: "destructive" })
+      toast({ title: t("common.error"), description: t("saContent.failedToDeleteAnnouncement"), variant: "destructive" })
     } finally {
       setDeleteDialogOpen(false)
       setAnnouncementToDelete(null)

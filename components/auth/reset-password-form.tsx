@@ -9,13 +9,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { CheckCircle, Loader2, XCircle } from "lucide-react"
 import Link from "next/link"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { localizeError } from "@/lib/error-messages"
 
 type ValidationState = "validating" | "valid" | "invalid"
 
 const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/
 
 export default function ResetPasswordForm() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
@@ -97,13 +98,13 @@ export default function ResetPasswordForm() {
       const data = await res.json()
 
       if (!data.success) {
-        throw new Error(data.message || "Failed to reset password")
+        throw new Error(localizeError(data.message, language) || t("auth.resetFailed"))
       }
 
       setIsSuccess(true)
     } catch (err) {
       console.error("Reset password error:", err)
-      setError(err instanceof Error ? err.message : "Failed to reset password")
+      setError(err instanceof Error ? err.message : t("auth.resetFailed"))
     } finally {
       setIsLoading(false)
     }
