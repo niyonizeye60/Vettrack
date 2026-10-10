@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Inbox, Store, Tag } from "lucide-react"
+import { Bell, Home, Inbox, Store, Tag } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import StaffLayoutClient from "@/components/staff/staff-layout-client"
 import StaffSidebar from "@/components/staff/staff-sidebar"
@@ -28,6 +28,7 @@ export default function MarketplaceLayoutClient({
       ? [{ href: "/marketplace/requests", label: t("marketplace.requests"), icon: <Inbox className="h-4 w-4 sm:h-5 sm:w-5" /> }]
       : []),
     { href: "/marketplace/listings", label: t("marketplace.listings"), icon: <Tag className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/marketplace/notifications", label: t("notifications.title"), icon: <Bell className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ]
 
   return (
@@ -47,7 +48,7 @@ export default function MarketplaceLayoutClient({
           homeHref="/marketplace"
           brandIcon={<Store className="h-6 w-6 sm:h-7 sm:w-7" />}
           // Stock and expiry alerts on Vettrack's own products arrive here.
-          notifications={<NotificationBell role="marketplace_admin" viewAllHref="/marketplace/listings" />}
+          notifications={<NotificationBell role="marketplace_admin" viewAllHref="/marketplace/notifications" />}
         />
       }
     >

@@ -16,7 +16,8 @@ import { useNotificationsFeed, type FeedItem } from "@/components/staff/use-noti
 
 /**
  * Everything a seller (pharmacy or feed supplier) has been told: review decisions on its
- * products, sales, changes staff made to a live listing, and announcements.
+ * products, sales, changes staff made to a live listing, and announcements. The
+ * marketplace portal reuses it for stock and expiry alerts on Vettrack's own products.
  *
  * `role` keys the announcements this browser has read or dismissed, so it must match
  * the NotificationBell in the same portal's header.
