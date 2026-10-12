@@ -20,6 +20,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeColumns } from "@/lib/export-columns"
 import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 
 interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null; status?: string | null }
 interface Vet { _id: string; name: string; specialization: string }
@@ -271,13 +273,21 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     init()
   }, [farmerId])
 
+  const recordsRequest = useLatestRequest()
+  const historyRequest = useLatestRequest()
+  const reportsRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchRecords = async (id: string) => {
+    const isLatest = recordsRequest()
     const res = await fetch(`/api/insemination?farmerId=${id}`)
     const data = await res.json()
+    if (!isLatest()) return
     setRecords(Array.isArray(data) ? data : [])
   }
 
   const fetchHistoryPage = async (id: string, page: number, animalId: string, month: string) => {
+    const isLatest = historyRequest()
     setHistoryLoading(true)
     try {
       const params = new URLSearchParams({ farmerId: id, page: String(page), limit: String(PAGE_SIZE) })
@@ -285,6 +295,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       if (month) params.set("month", month)
       const res = await fetch(`/api/insemination?${params.toString()}`)
       const data = await res.json()
+      if (!isLatest()) return
       const pagination: Pagination = data?.pagination || emptyPagination
       if (pagination.total > 0 && page > pagination.totalPages) {
         await fetchHistoryPage(id, pagination.totalPages, animalId, month)
@@ -293,16 +304,18 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       setHistoryRecords(Array.isArray(data?.records) ? data.records : [])
       setHistoryPagination(pagination)
     } finally {
-      setHistoryLoading(false)
+      if (isLatest()) setHistoryLoading(false)
     }
   }
 
   const fetchReportsPage = async (id: string, page: number) => {
+    const isLatest = reportsRequest()
     setReportsLoading(true)
     try {
       const params = new URLSearchParams({ farmerId: id, page: String(page), limit: String(PAGE_SIZE), view: "summary" })
       const res = await fetch(`/api/insemination?${params.toString()}`)
       const data = await res.json()
+      if (!isLatest()) return
       const pagination: Pagination = data?.pagination || emptyPagination
       if (pagination.total > 0 && page > pagination.totalPages) {
         await fetchReportsPage(id, pagination.totalPages)
@@ -311,7 +324,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       setReportsSummary(Array.isArray(data?.summary) ? data.summary : [])
       setReportsPagination(pagination)
     } finally {
-      setReportsLoading(false)
+      if (isLatest()) setReportsLoading(false)
     }
   }
 
@@ -379,28 +392,31 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       pregnancyFailed: editRecord ? !!editRecord.pregnancyFailed : false,
     }
 
-    if (editRecord) {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/insemination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
-      )
-    } else {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/insemination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
-      )
+    const res = await submitWithLocationGate((loc) =>
+      editRecord
+        ? fetch("/api/insemination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
+        : fetch("/api/insemination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+    ).catch(() => null)
+    // Keep the form on a failure (wrong location included) so nothing has to be retyped.
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchRecords(farmerId)
-    if (wasAdd && historyPage !== 1) setHistoryPage(1)
-    else await fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth)
-    await fetchReportsPage(farmerId, reportsPage)
+    // Saved - free the form now and let the tables catch up in the background, all at once.
     resetForm()
     setSaving(false)
+    const refreshes = [fetchRecords(farmerId), fetchReportsPage(farmerId, reportsPage)]
+    if (wasAdd && historyPage !== 1) setHistoryPage(1)
+    else refreshes.push(fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth))
+    Promise.all(refreshes).catch(() => {})
   }
 
   // Mark the previous attempt as a failed pregnancy (keeping it in history) and
   // pre-fill a fresh insemination record for the same animal.
   const handleReinseminate = async (r: InseminationRecord) => {
-    await submitWithLocationGate((loc) =>
+    const res = await submitWithLocationGate((loc) =>
       fetch("/api/insemination", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -415,12 +431,18 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
           ...loc,
         }),
       })
-    )
-    await fetchRecords(farmerId)
-    await Promise.all([
+    ).catch(() => null)
+    // Only start the new attempt once the old one is really marked failed - otherwise the
+    // new record would point back at an attempt that still reads as a live pregnancy.
+    if (!res?.ok) {
+      reportError(res)
+      return
+    }
+    Promise.all([
+      fetchRecords(farmerId),
       fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth),
       fetchReportsPage(farmerId, reportsPage),
-    ])
+    ]).catch(() => {})
 
     resetForm()
     setReinseminateFrom(r)
@@ -449,17 +471,22 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     setNotes(r.notes || "")
   }
 
+  // Deletes take the row off straight away; the reload afterwards corrects the reports
+  // and paging, and brings the row back if the delete didn't go through.
   const handleDelete = async (id: string) => {
-    await submitWithLocationGate((loc) => {
+    setDeleteId(null)
+    setRecords(prev => prev.filter(r => r._id !== id))
+    setHistoryRecords(prev => prev.filter(r => r._id !== id))
+    const res = await submitWithLocationGate((loc) => {
       const params = new URLSearchParams({ id, ...toQueryFields(loc) })
       return fetch(`/api/insemination?${params.toString()}`, { method: "DELETE" })
-    })
-    await fetchRecords(farmerId)
-    await Promise.all([
+    }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    Promise.all([
+      fetchRecords(farmerId),
       fetchHistoryPage(farmerId, historyPage, filterAnimal, filterMonth),
       fetchReportsPage(farmerId, reportsPage),
-    ])
-    setDeleteId(null)
+    ]).catch(() => {})
   }
 
   const totalCost = useMemo(() =>

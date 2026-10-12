@@ -211,10 +211,11 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             body: JSON.stringify(payload),
           })
       if (res.ok) {
-        await loadAll()
+        // Close the dialog now - the list catches up in the background.
         setCreateOpen(false)
         setEditTarget(null)
         setForm(emptyForm)
+        loadAll()
       } else {
         const body = await res.json().catch(() => ({}))
         setFormError(localizeError(body.error, language) || t("marketplace.saveFailed"))
@@ -231,7 +232,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
     setBusy(true)
     try {
       await fetch(`/api/services?id=${deleteTarget.id}&category=${deleteTarget.category}`, { method: "DELETE" })
-      await loadAll()
+      loadAll()
     } finally {
       setBusy(false)
       setDeleteTarget(null)
@@ -356,10 +357,10 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
             body: JSON.stringify({ ...categoryForm, type: activeCat }),
           })
       if (res.ok) {
-        await loadAll()
         setCreateCategoryOpen(false)
         setEditCategoryTarget(null)
         setCategoryForm({ name: "", description: "", image: "" })
+        loadAll()
       }
     } finally {
       setBusy(false)
@@ -371,7 +372,7 @@ export default function ListingsManager({ allowedCategories }: { allowedCategori
     setBusy(true)
     try {
       await fetch(`/api/categories?id=${deleteCategoryTarget.id}&type=${deleteCategoryTarget.type}`, { method: "DELETE" })
-      await loadAll()
+      loadAll()
     } finally {
       setBusy(false)
       setDeleteCategoryTarget(null)

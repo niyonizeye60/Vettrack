@@ -167,7 +167,8 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
     try {
       const result = await deleteAnimal(deleteAnimalTarget._id, farmerId)
       if (result.success) {
-        await fetchData(page)
+        // Close the dialog now - the table catches up in the background.
+        fetchData(page).catch(() => {})
       } else {
         toast({ title: t('farmer.actionFailed'), variant: "destructive" })
       }

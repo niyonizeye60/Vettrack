@@ -19,6 +19,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeColumns } from "@/lib/export-columns"
 import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 
 type SubjectType = "animal" | "calf"
 
@@ -233,9 +235,14 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
     init()
   }, [farmerId])
 
+  const recordsRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchRecords = async (id: string) => {
+    const isLatest = recordsRequest()
     const res = await fetch(`/api/vaccination?farmerId=${id}`)
     const data = await res.json()
+    if (!isLatest()) return
     setRecords(Array.isArray(data) ? data : [])
   }
 
@@ -377,19 +384,22 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       vaccinator, nextVaccinationDate, notes,
     }
 
-    if (editRecord) {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/vaccination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
-      )
-    } else {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/vaccination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
-      )
+    const res = await submitWithLocationGate((loc) =>
+      editRecord
+        ? fetch("/api/vaccination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
+        : fetch("/api/vaccination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+    ).catch(() => null)
+    // Keep the form on a failure (wrong location included) so nothing has to be retyped.
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchRecords(farmerId)
+    // Saved - free the form now and let the table catch up in the background.
     resetForm()
     setSaving(false)
+    fetchRecords(farmerId).catch(() => {})
   }
 
   const handleEdit = (r: VaccinationRecord) => {
@@ -417,13 +427,17 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
     setActiveTab("record")
   }
 
+  // Deletes take the row off straight away; the reload afterwards brings it back if the
+  // delete didn't go through (e.g. refused for being off the farm).
   const handleDelete = async (id: string) => {
-    await submitWithLocationGate((loc) => {
+    setDeleteId(null)
+    setRecords(prev => prev.filter(r => r._id !== id))
+    const res = await submitWithLocationGate((loc) => {
       const params = new URLSearchParams({ id, ...toQueryFields(loc) })
       return fetch(`/api/vaccination?${params.toString()}`, { method: "DELETE" })
-    })
-    await fetchRecords(farmerId)
-    setDeleteId(null)
+    }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchRecords(farmerId).catch(() => {})
   }
 
   /** Per-vaccine rollup used by both the Reports tab and the exports. */

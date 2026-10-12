@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -92,15 +94,23 @@ export default function EmployeesPage() {
     init()
   }, [])
 
+  const employeesRequest = useLatestRequest()
+  const paymentsRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchEmployees = async (farmerId: string) => {
+    const isLatest = employeesRequest()
     const res = await fetch(`/api/employees?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setEmployees(Array.isArray(data) ? data : [])
   }
 
   const fetchPayments = async (farmerId: string) => {
+    const isLatest = paymentsRequest()
     const res = await fetch(`/api/employee-payments?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setPayments(Array.isArray(data) ? data : [])
   }
 
@@ -145,15 +155,20 @@ export default function EmployeesPage() {
     setSaving(true)
     const body = { farmerId: user._id.toString(), name, position, phone, nationalId, hireDate, wageType, wageAmount, status, notes: empNotes }
 
-    if (editEmployee) {
-      await fetch("/api/employees", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editEmployee._id, name, position, phone, nationalId, hireDate, wageType, wageAmount, status, notes: empNotes }) })
-    } else {
-      await fetch("/api/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editEmployee
+      ? fetch("/api/employees", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editEmployee._id, name, position, phone, nationalId, hireDate, wageType, wageAmount, status, notes: empNotes }) })
+      : fetch("/api/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchEmployees(user._id.toString())
+    // Saved - free the form now and let the table catch up in the background.
     resetEmployeeForm()
     setSaving(false)
+    fetchEmployees(user._id.toString()).catch(() => {})
   }
 
   const handleEmployeeEdit = (e: Employee) => {
@@ -163,10 +178,14 @@ export default function EmployeesPage() {
     setStatus(e.status); setEmpNotes(e.notes || "")
   }
 
+  // Deletes take the row off straight away; the reload afterwards brings it back if the
+  // delete didn't go through.
   const handleEmployeeDelete = async (id: string) => {
-    await fetch(`/api/employees?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchEmployees(user._id.toString()), fetchPayments(user._id.toString())])
     setDeleteEmployeeId(null)
+    setEmployees(prev => prev.filter(e => e._id !== id))
+    const res = await fetch(`/api/employees?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    Promise.all([fetchEmployees(user._id.toString()), fetchPayments(user._id.toString())]).catch(() => {})
   }
 
   // ---- Payment CRUD ----
@@ -191,15 +210,19 @@ export default function EmployeesPage() {
     const employee = employees.find(e => e._id === payEmployeeId)
     const body = { farmerId: user._id.toString(), employeeId: payEmployeeId, employeeName: employee?.name, amount, paymentDate, period, method, notes: payNotes }
 
-    if (editPayment) {
-      await fetch("/api/employee-payments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editPayment._id, amount, paymentDate, period, method, notes: payNotes }) })
-    } else {
-      await fetch("/api/employee-payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editPayment
+      ? fetch("/api/employee-payments", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editPayment._id, amount, paymentDate, period, method, notes: payNotes }) })
+      : fetch("/api/employee-payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchPayments(user._id.toString())
     resetPaymentForm()
     setSaving(false)
+    fetchPayments(user._id.toString()).catch(() => {})
   }
 
   const handlePaymentEdit = (p: PaymentRecord) => {
@@ -209,9 +232,11 @@ export default function EmployeesPage() {
   }
 
   const handlePaymentDelete = async (id: string) => {
-    await fetch(`/api/employee-payments?id=${id}`, { method: "DELETE" })
-    await fetchPayments(user._id.toString())
     setDeletePaymentId(null)
+    setPayments(prev => prev.filter(p => p._id !== id))
+    const res = await fetch(`/api/employee-payments?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchPayments(user._id.toString()).catch(() => {})
   }
 
   const methodLabel = (m: string) => m === "cash" ? t('farmer.cash') : m === "mobile_money" ? t('farmer.mobileMoney') : t('farmer.bankTransfer')

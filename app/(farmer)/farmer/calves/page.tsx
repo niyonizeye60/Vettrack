@@ -6,6 +6,8 @@ import { getAnimals } from "@/lib/actions"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeError } from "@/lib/error-messages"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 import { ageInMonths, isReadyToGraduate, CALF_GRADUATION_AGE_MONTHS } from "@/lib/calf-age"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -206,34 +208,53 @@ export default function CalvesPage() {
     init()
   }, [])
 
+  const calvesRequest = useLatestRequest()
+  const weightsRequest = useLatestRequest()
+  const expensesRequest = useLatestRequest()
+  const balanceRequest = useLatestRequest()
+  const calvesPageRequest = useLatestRequest()
+  const weightsPageRequest = useLatestRequest()
+  const expensesPageRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchCalves = async (farmerId: string) => {
+    const isLatest = calvesRequest()
     const res = await fetch(`/api/calves?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setCalves(Array.isArray(data) ? data : [])
   }
   const fetchWeights = async (farmerId: string) => {
+    const isLatest = weightsRequest()
     const res = await fetch(`/api/calf-weights?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setWeights(Array.isArray(data) ? data : [])
   }
   const fetchExpenses = async (farmerId: string) => {
+    const isLatest = expensesRequest()
     const res = await fetch(`/api/calf-expenses?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setExpenses(Array.isArray(data) ? data : [])
   }
   const fetchHomeConsumptionBalance = async (farmerId: string) => {
+    const isLatest = balanceRequest()
     const res = await fetch(`/api/milk/home-consumption?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
 
   const fetchCalvesPage = async (farmerId: string, page: number, search: string) => {
+    const isLatest = calvesPageRequest()
     setCalvesTableLoading(true)
     try {
       const params = new URLSearchParams({ farmerId, page: String(page), limit: String(PAGE_SIZE) })
       if (search) params.set("search", search)
       const res = await fetch(`/api/calves?${params.toString()}`)
       const data = await res.json()
+      if (!isLatest()) return
       const pagination: Pagination = data?.pagination || emptyPagination
       if (pagination.total > 0 && page > pagination.totalPages) {
         await fetchCalvesPage(farmerId, pagination.totalPages, search)
@@ -242,16 +263,18 @@ export default function CalvesPage() {
       setCalvesTableRows(Array.isArray(data?.calves) ? data.calves : [])
       setCalvesPagination(pagination)
     } finally {
-      setCalvesTableLoading(false)
+      if (isLatest()) setCalvesTableLoading(false)
     }
   }
 
   const fetchWeightsPage = async (farmerId: string, page: number) => {
+    const isLatest = weightsPageRequest()
     setWeightsTableLoading(true)
     try {
       const params = new URLSearchParams({ farmerId, page: String(page), limit: String(PAGE_SIZE) })
       const res = await fetch(`/api/calf-weights?${params.toString()}`)
       const data = await res.json()
+      if (!isLatest()) return
       const pagination: Pagination = data?.pagination || emptyPagination
       if (pagination.total > 0 && page > pagination.totalPages) {
         await fetchWeightsPage(farmerId, pagination.totalPages)
@@ -260,11 +283,12 @@ export default function CalvesPage() {
       setWeightsTableRows(Array.isArray(data?.weights) ? data.weights : [])
       setWeightsPagination(pagination)
     } finally {
-      setWeightsTableLoading(false)
+      if (isLatest()) setWeightsTableLoading(false)
     }
   }
 
   const fetchExpensesPage = async (farmerId: string, page: number, calfId: string, expType: string) => {
+    const isLatest = expensesPageRequest()
     setExpensesTableLoading(true)
     try {
       const params = new URLSearchParams({ farmerId, page: String(page), limit: String(PAGE_SIZE) })
@@ -272,6 +296,7 @@ export default function CalvesPage() {
       if (expType) params.set("expenseType", expType)
       const res = await fetch(`/api/calf-expenses?${params.toString()}`)
       const data = await res.json()
+      if (!isLatest()) return
       const pagination: Pagination = data?.pagination || emptyPagination
       if (pagination.total > 0 && page > pagination.totalPages) {
         await fetchExpensesPage(farmerId, pagination.totalPages, calfId, expType)
@@ -280,7 +305,7 @@ export default function CalvesPage() {
       setExpensesTableRows(Array.isArray(data?.expenses) ? data.expenses : [])
       setExpensesPagination(pagination)
     } finally {
-      setExpensesTableLoading(false)
+      if (isLatest()) setExpensesTableLoading(false)
     }
   }
 
@@ -351,17 +376,22 @@ export default function CalvesPage() {
     const wasAdd = !editCalf
     const body = { farmerId, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }
 
-    if (editCalf) {
-      await fetch("/api/calves", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editCalf._id, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }) })
-    } else {
-      await fetch("/api/calves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editCalf
+      ? fetch("/api/calves", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editCalf._id, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }) })
+      : fetch("/api/calves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchCalves(farmerId)
-    if (wasAdd && calvesPage !== 1) setCalvesPage(1)
-    else await fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch)
+    // Saved - free the form now and let the tables catch up in the background.
     resetCalfForm()
     setSaving(false)
+    fetchCalves(farmerId).catch(() => {})
+    if (wasAdd && calvesPage !== 1) setCalvesPage(1)
+    else fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch).catch(() => {})
   }
 
   const handleCalfEdit = (c: Calf) => {
@@ -372,18 +402,23 @@ export default function CalvesPage() {
     setCalfFormUnlocked(true)
   }
 
+  // Deletes take the row off straight away; the reload afterwards corrects totals and
+  // paging, and brings the row back if the delete didn't go through.
   const handleCalfDelete = async (id: string) => {
     const farmerId = user._id.toString()
-    await fetch(`/api/calves?id=${id}`, { method: "DELETE" })
+    setDeleteCalfId(null)
+    setCalves(prev => prev.filter(c => c._id !== id))
+    setCalvesTableRows(prev => prev.filter(c => c._id !== id))
+    const res = await fetch(`/api/calves?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
     // Deleting a calf cascades to its weight and expense records server-side, so
     // both of those tables need refreshing too, not just the calves table.
-    await Promise.all([
+    Promise.all([
       fetchCalves(farmerId), fetchWeights(farmerId), fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId),
       fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch),
       fetchWeightsPage(farmerId, weightPage),
       fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType),
-    ])
-    setDeleteCalfId(null)
+    ]).catch(() => {})
   }
 
   // ---- Graduate a calf into the animals herd ----
@@ -456,17 +491,21 @@ export default function CalvesPage() {
     const wasAdd = !editWeight
     const body = { farmerId, calfId: weightCalfId, calfName: calf?.name, weight: weightValue, date: weightDate, notes: weightNotes }
 
-    if (editWeight) {
-      await fetch("/api/calf-weights", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editWeight._id, weight: weightValue, date: weightDate, notes: weightNotes }) })
-    } else {
-      await fetch("/api/calf-weights", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editWeight
+      ? fetch("/api/calf-weights", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editWeight._id, weight: weightValue, date: weightDate, notes: weightNotes }) })
+      : fetch("/api/calf-weights", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchWeights(farmerId)
-    if (wasAdd && weightPage !== 1) setWeightPage(1)
-    else await fetchWeightsPage(farmerId, weightPage)
     resetWeightForm()
     setSaving(false)
+    fetchWeights(farmerId).catch(() => {})
+    if (wasAdd && weightPage !== 1) setWeightPage(1)
+    else fetchWeightsPage(farmerId, weightPage).catch(() => {})
   }
 
   const handleWeightEdit = (w: WeightRecord) => {
@@ -475,9 +514,12 @@ export default function CalvesPage() {
 
   const handleWeightDelete = async (id: string) => {
     const farmerId = user._id.toString()
-    await fetch(`/api/calf-weights?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchWeights(farmerId), fetchWeightsPage(farmerId, weightPage)])
     setDeleteWeightId(null)
+    setWeights(prev => prev.filter(w => w._id !== id))
+    setWeightsTableRows(prev => prev.filter(w => w._id !== id))
+    const res = await fetch(`/api/calf-weights?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    Promise.all([fetchWeights(farmerId), fetchWeightsPage(farmerId, weightPage)]).catch(() => {})
   }
 
   const chartData = useMemo(() => {
@@ -521,9 +563,16 @@ export default function CalvesPage() {
     const wasAdd = !editExpense
     const body = { farmerId, calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }
 
-    const res = editExpense
-      ? await fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }) })
-      : await fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editExpense
+      ? fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }) })
+      : fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+
+    if (!res) {
+      setSaving(false)
+      reportError(null)
+      return
+    }
 
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: t("calves.failedToSaveExpense") }))
@@ -532,11 +581,13 @@ export default function CalvesPage() {
       return
     }
 
-    await Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId)])
-    if (wasAdd && expensePage !== 1) setExpensePage(1)
-    else await fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType)
+    // The milk balance shown on the form may lag a moment behind; the server re-checks
+    // it on every save, so a stale figure can't let an over-draw through.
     resetExpenseForm()
     setSaving(false)
+    Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId)]).catch(() => {})
+    if (wasAdd && expensePage !== 1) setExpensePage(1)
+    else fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType).catch(() => {})
   }
 
   const handleExpenseEdit = (e: CalfExpense) => {
@@ -550,9 +601,12 @@ export default function CalvesPage() {
 
   const handleExpenseDelete = async (id: string) => {
     const farmerId = user._id.toString()
-    await fetch(`/api/calf-expenses?id=${id}`, { method: "DELETE" })
-    await Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId), fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType)])
     setDeleteExpenseId(null)
+    setExpenses(prev => prev.filter(e => e._id !== id))
+    setExpensesTableRows(prev => prev.filter(e => e._id !== id))
+    const res = await fetch(`/api/calf-expenses?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId), fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType)]).catch(() => {})
   }
 
   const statusLabel = (s: string) => s === "active" ? t('farmer.active') : s === "weaned" ? t('farmer.weaned') : s === "sold" ? t('farmer.calfSold') : s === "graduated" ? t('farmer.graduated') : t('farmer.deceased')

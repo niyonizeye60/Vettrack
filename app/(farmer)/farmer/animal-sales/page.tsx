@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals } from "@/lib/actions"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -63,9 +65,14 @@ export default function AnimalSalesPage() {
     init()
   }, [])
 
+  const transactionsRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchTransactions = async (farmerId: string) => {
+    const isLatest = transactionsRequest()
     const res = await fetch(`/api/animal-transactions?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setTransactions(Array.isArray(data) ? data : [])
   }
 
@@ -114,15 +121,20 @@ export default function AnimalSalesPage() {
     setSaving(true)
     const body = { farmerId: user._id.toString(), animalId: animalId || null, animalName, animalType, transactionType, quantity, amount, party, date, notes }
 
-    if (editTx) {
-      await fetch("/api/animal-transactions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editTx._id, animalId: animalId || null, animalName, animalType, transactionType, quantity, amount, party, date, notes }) })
-    } else {
-      await fetch("/api/animal-transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editTx
+      ? fetch("/api/animal-transactions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editTx._id, animalId: animalId || null, animalName, animalType, transactionType, quantity, amount, party, date, notes }) })
+      : fetch("/api/animal-transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchTransactions(user._id.toString())
+    // Saved - free the form now and let the table catch up in the background.
     resetForm()
     setSaving(false)
+    fetchTransactions(user._id.toString()).catch(() => {})
   }
 
   const handleEdit = (tx: AnimalTransaction) => {
@@ -138,10 +150,14 @@ export default function AnimalSalesPage() {
     setNotes(tx.notes || "")
   }
 
+  // Deletes take the row off straight away; the reload afterwards brings it back if the
+  // delete didn't go through.
   const handleDelete = async (id: string) => {
-    await fetch(`/api/animal-transactions?id=${id}`, { method: "DELETE" })
-    await fetchTransactions(user._id.toString())
     setDeleteId(null)
+    setTransactions(prev => prev.filter(tx => tx._id !== id))
+    const res = await fetch(`/api/animal-transactions?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchTransactions(user._id.toString()).catch(() => {})
   }
 
   if (loading) return (

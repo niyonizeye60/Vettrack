@@ -17,6 +17,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 import { localizeColumns } from "@/lib/export-columns"
 
 interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null; status?: string | null }
@@ -182,19 +184,29 @@ export default function MilkProductionPage() {
     init()
   }, [])
 
+  const recordsRequest = useLatestRequest()
+  const balanceRequest = useLatestRequest()
+  const historyRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchRecords = async (farmerId: string) => {
+    const isLatest = recordsRequest()
     const res = await fetch(`/api/milk?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setRecords(Array.isArray(data) ? data : [])
   }
 
   const fetchHomeConsumptionBalance = async (farmerId: string) => {
+    const isLatest = balanceRequest()
     const res = await fetch(`/api/milk/home-consumption?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setHomeConsumptionBalance(typeof data?.balance === "number" ? data.balance : 0)
   }
 
   const fetchHistoryRecords = async (farmerId: string, page: number) => {
+    const isLatest = historyRequest()
     setHistoryLoading(true)
     try {
       const params = new URLSearchParams({ farmerId, page: String(page), limit: String(HISTORY_PAGE_SIZE) })
@@ -207,6 +219,7 @@ export default function MilkProductionPage() {
       }
       const res = await fetch(`/api/milk?${params.toString()}`)
       const data = await res.json()
+      if (!isLatest()) return
       const pagination = data?.pagination || { page: 1, pageSize: HISTORY_PAGE_SIZE, total: 0, totalPages: 1 }
       if (pagination.total > 0 && page > pagination.totalPages) {
         setHistoryPage(pagination.totalPages)
@@ -215,7 +228,7 @@ export default function MilkProductionPage() {
       setHistoryRecords(Array.isArray(data.records) ? data.records : [])
       setHistoryPagination(pagination)
     } finally {
-      setHistoryLoading(false)
+      if (isLatest()) setHistoryLoading(false)
     }
   }
 
@@ -279,9 +292,18 @@ export default function MilkProductionPage() {
     const soldLiters = Math.max(0, Number(liters) - Number(homeConsumption || 0))
     const body = { farmerId: user._id.toString(), cowId, cowName: cow?.name, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }
 
-    const res = editRecord
-      ? await fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }) })
-      : await fetch("/api/milk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    // A dropped connection resolves to null rather than throwing - otherwise the button
+    // would stay on "Saving…" for good.
+    const res = await (editRecord
+      ? fetch("/api/milk", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, liters, homeConsumption, soldLiters, pricePerLiter, totalAmount, session, date, time, waterLiters, foodType, foodKg, foodCost, saltKg, saltCost, notes }) })
+      : fetch("/api/milk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+
+    if (!res) {
+      setSaving(false)
+      reportError(null)
+      return
+    }
 
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: t("milk.failedToSaveMilkRecord") }))
@@ -297,17 +319,22 @@ export default function MilkProductionPage() {
         : { title: t('farmer.milkRecordSaved'), description: t('farmer.milkRecordSavedDesc') }
     )
 
+    // The record is saved - free the form for the next entry now and let the totals and
+    // tables catch up in the background, all at once, instead of holding the Save button
+    // through three more round trips.
+    const farmerId = user._id.toString()
     const wasEditing = !!editRecord
-    await Promise.all([fetchRecords(user._id.toString()), fetchHomeConsumptionBalance(user._id.toString())])
-    if (wasEditing) {
-      await fetchHistoryRecords(user._id.toString(), historyPage)
-    } else if (historyPage !== 1) {
-      setHistoryPage(1)
-    } else {
-      await fetchHistoryRecords(user._id.toString(), 1)
-    }
     resetForm()
     setSaving(false)
+
+    const refreshes = [fetchRecords(farmerId), fetchHomeConsumptionBalance(farmerId)]
+    if (!wasEditing && historyPage !== 1) {
+      setHistoryPage(1) // the history effect fetches page 1
+    } else {
+      refreshes.push(fetchHistoryRecords(farmerId, historyPage))
+    }
+    // A failed refresh only leaves a list stale until the next one; the save itself succeeded.
+    Promise.all(refreshes).catch(() => {})
   }
 
   const handleEdit = (r: MilkRecord) => {
@@ -328,14 +355,20 @@ export default function MilkProductionPage() {
     setNotes(r.notes || "")
   }
 
+  // The row goes straight away; the reload afterwards corrects the totals and paging,
+  // and brings the row back if the delete didn't go through.
   const handleDelete = async (id: string) => {
-    await fetch(`/api/milk?id=${id}`, { method: "DELETE" })
-    await Promise.all([
-      fetchRecords(user._id.toString()),
-      fetchHomeConsumptionBalance(user._id.toString()),
-      fetchHistoryRecords(user._id.toString(), historyPage),
-    ])
+    const farmerId = user._id.toString()
     setDeleteId(null)
+    setRecords(prev => prev.filter(r => r._id !== id))
+    setHistoryRecords(prev => prev.filter(r => r._id !== id))
+    const res = await fetch(`/api/milk?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    Promise.all([
+      fetchRecords(farmerId),
+      fetchHomeConsumptionBalance(farmerId),
+      fetchHistoryRecords(farmerId, historyPage),
+    ]).catch(() => {})
   }
 
   const clearFilters = () => {

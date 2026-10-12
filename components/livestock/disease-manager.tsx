@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 
 interface Animal { _id: string; name: string; type: string; insuranceId?: string | null; earTagId?: string | null }
 interface Doctor { _id: string; name: string; specialization: string }
@@ -163,15 +165,23 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
     init()
   }, [farmerId])
 
+  const recordsRequest = useLatestRequest()
+  const dosesRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchRecords = async (id: string) => {
+    const isLatest = recordsRequest()
     const res = await fetch(`/api/diseases?farmerId=${id}`)
     const data = await res.json()
+    if (!isLatest()) return
     setRecords(Array.isArray(data) ? data : [])
   }
 
   const fetchDoses = async (id: string) => {
+    const isLatest = dosesRequest()
     const res = await fetch(`/api/treatment-doses?farmerId=${id}`)
     const data = await res.json()
+    if (!isLatest()) return
     setDoses(Array.isArray(data) ? data : [])
   }
 
@@ -266,18 +276,22 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       diagnosedDate, resolvedDate: resolvedDate || null,
       status, notes, veterinarianName, vetOrigin,
     }
-    if (editRecord) {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/diseases", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
-      )
-    } else {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/diseases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
-      )
+    const res = await submitWithLocationGate((loc) =>
+      editRecord
+        ? fetch("/api/diseases", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
+        : fetch("/api/diseases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+    ).catch(() => null)
+    // Keep the form on a failure (wrong location included) so nothing has to be retyped.
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
-    await fetchRecords(farmerId)
+
+    // Saved - free the form now and let the table catch up in the background.
     resetForm()
     setSaving(false)
+    fetchRecords(farmerId).catch(() => {})
   }
 
   const handleDoseSubmit = async () => {
@@ -300,18 +314,20 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       })),
       vetCost, notes: doseNotes,
     }
-    if (editDose) {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/treatment-doses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editDose._id, ...body, ...loc }) })
-      )
-    } else {
-      await submitWithLocationGate((loc) =>
-        fetch("/api/treatment-doses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
-      )
+    const res = await submitWithLocationGate((loc) =>
+      editDose
+        ? fetch("/api/treatment-doses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editDose._id, ...body, ...loc }) })
+        : fetch("/api/treatment-doses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSavingDose(false)
+      reportError(res)
+      return
     }
-    await fetchDoses(farmerId)
+
     resetDoseForm()
     setSavingDose(false)
+    fetchDoses(farmerId).catch(() => {})
   }
 
   const handleEdit = (r: DiseaseRecord) => {
@@ -344,22 +360,28 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
     setDoseNotes(d.notes || "")
   }
 
+  // Deletes take the row off straight away; the reload afterwards brings it back if the
+  // delete didn't go through (e.g. refused for being off the farm).
   const handleDelete = async (id: string) => {
-    await submitWithLocationGate((loc) => {
+    setDeleteId(null)
+    setRecords(prev => prev.filter(r => r._id !== id))
+    const res = await submitWithLocationGate((loc) => {
       const params = new URLSearchParams({ id, ...toQueryFields(loc) })
       return fetch(`/api/diseases?${params.toString()}`, { method: "DELETE" })
-    })
-    await fetchRecords(farmerId)
-    setDeleteId(null)
+    }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchRecords(farmerId).catch(() => {})
   }
 
   const handleDeleteDose = async (id: string) => {
-    await submitWithLocationGate((loc) => {
+    setDeleteDoseId(null)
+    setDoses(prev => prev.filter(d => d._id !== id))
+    const res = await submitWithLocationGate((loc) => {
       const params = new URLSearchParams({ id, ...toQueryFields(loc) })
       return fetch(`/api/treatment-doses?${params.toString()}`, { method: "DELETE" })
-    })
-    await fetchDoses(farmerId)
-    setDeleteDoseId(null)
+    }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchDoses(farmerId).catch(() => {})
   }
 
   // Stats

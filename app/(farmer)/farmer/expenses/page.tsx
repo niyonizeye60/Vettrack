@@ -17,6 +17,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Receipt, Plus, Pencil, Trash2, History, Droplet, SprayCan, PawPrint, Download, FileText, Wheat } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 
 interface MilkingExpense {
   _id: string; farmerId: string
@@ -164,14 +166,22 @@ export default function ExpensesPage() {
     init()
   }, [])
 
+  const expensesRequest = useLatestRequest()
+  const animalExpensesRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchExpenses = async (farmerId: string) => {
+    const isLatest = expensesRequest()
     const res = await fetch(`/api/milking-expenses?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setExpenses(Array.isArray(data) ? data : [])
   }
   const fetchAnimalExpenses = async (farmerId: string) => {
+    const isLatest = animalExpensesRequest()
     const res = await fetch(`/api/animal-expenses?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setAExpenses(Array.isArray(data) ? data : [])
   }
 
@@ -318,15 +328,20 @@ export default function ExpensesPage() {
     setSaving(true)
     const body = { farmerId: user._id.toString(), expenseType, quantity, unit, pricePerUnit, amount, date, notes }
 
-    if (editExpense) {
-      await fetch("/api/milking-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, quantity, unit, pricePerUnit, amount, date, notes }) })
-    } else {
-      await fetch("/api/milking-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editExpense
+      ? fetch("/api/milking-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, quantity, unit, pricePerUnit, amount, date, notes }) })
+      : fetch("/api/milking-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchExpenses(user._id.toString())
+    // Saved - free the form now and let the table catch up in the background.
     resetForm()
     setSaving(false)
+    fetchExpenses(user._id.toString()).catch(() => {})
   }
 
   const handleEdit = (e: MilkingExpense) => {
@@ -335,10 +350,14 @@ export default function ExpensesPage() {
     setAmount(String(e.amount)); setDate(e.date); setNotes(e.notes || "")
   }
 
+  // Deletes take the row off straight away; the reload afterwards brings it back if the
+  // delete didn't go through.
   const handleDelete = async (id: string) => {
-    await fetch(`/api/milking-expenses?id=${id}`, { method: "DELETE" })
-    await fetchExpenses(user._id.toString())
     setDeleteId(null)
+    setExpenses(prev => prev.filter(e => e._id !== id))
+    const res = await fetch(`/api/milking-expenses?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchExpenses(user._id.toString()).catch(() => {})
   }
 
   // ---- Animal expenses (feed/water/health/other, dry/non-lactating animals only -
@@ -577,15 +596,19 @@ export default function ExpensesPage() {
       time: aTime, foodKg: aFoodKg, foodCost: aFoodCost, waterLiters: aWaterLiters, waterCost: aWaterCost, saltKg: aSaltKg, saltCost: aSaltCost,
     }
 
-    if (editAExpense) {
-      await fetch("/api/animal-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editAExpense._id, ...body }) })
-    } else {
-      await fetch("/api/animal-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editAExpense
+      ? fetch("/api/animal-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editAExpense._id, ...body }) })
+      : fetch("/api/animal-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchAnimalExpenses(user._id.toString())
     resetAForm()
     setSaving(false)
+    fetchAnimalExpenses(user._id.toString()).catch(() => {})
   }
 
   const handleAEdit = (e: AnimalExpense) => {
@@ -598,9 +621,11 @@ export default function ExpensesPage() {
   }
 
   const handleADelete = async (id: string) => {
-    await fetch(`/api/animal-expenses?id=${id}`, { method: "DELETE" })
-    await fetchAnimalExpenses(user._id.toString())
     setDeleteAExpenseId(null)
+    setAExpenses(prev => prev.filter(e => e._id !== id))
+    const res = await fetch(`/api/animal-expenses?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchAnimalExpenses(user._id.toString()).catch(() => {})
   }
 
   if (loading) return (

@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals, logPortalExport } from "@/lib/actions"
+import { useLatestRequest } from "@/hooks/use-latest-request"
+import { useActionError } from "@/hooks/use-action-error"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -93,9 +95,14 @@ export default function WasteManagementPage() {
     init()
   }, [])
 
+  const recordsRequest = useLatestRequest()
+  const reportError = useActionError()
+
   const fetchRecords = async (farmerId: string) => {
+    const isLatest = recordsRequest()
     const res = await fetch(`/api/waste?farmerId=${farmerId}`)
     const data = await res.json()
+    if (!isLatest()) return
     setRecords(Array.isArray(data) ? data : [])
   }
 
@@ -150,15 +157,20 @@ export default function WasteManagementPage() {
       disposalMethod: disposalMethod || null, date, notes,
     }
 
-    if (editRecord) {
-      await fetch("/api/waste", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body }) })
-    } else {
-      await fetch("/api/waste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const res = await (editRecord
+      ? fetch("/api/waste", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body }) })
+      : fetch("/api/waste", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ).catch(() => null)
+    if (!res?.ok) {
+      setSaving(false)
+      reportError(res)
+      return
     }
 
-    await fetchRecords(user._id.toString())
+    // Saved - free the form now and let the table catch up in the background.
     resetForm()
     setSaving(false)
+    fetchRecords(user._id.toString()).catch(() => {})
   }
 
   const handleEdit = (r: WasteRecord) => {
@@ -176,10 +188,14 @@ export default function WasteManagementPage() {
     setNotes(r.notes || "")
   }
 
+  // Deletes take the row off straight away; the reload afterwards brings it back if the
+  // delete didn't go through.
   const handleDelete = async (id: string) => {
-    await fetch(`/api/waste?id=${id}`, { method: "DELETE" })
-    await fetchRecords(user._id.toString())
     setDeleteId(null)
+    setRecords(prev => prev.filter(r => r._id !== id))
+    const res = await fetch(`/api/waste?id=${id}`, { method: "DELETE" }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    fetchRecords(user._id.toString()).catch(() => {})
   }
 
   // Summary stats
