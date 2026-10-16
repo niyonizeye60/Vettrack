@@ -13,30 +13,56 @@ export interface ActivitySummaryItem {
 }
 
 export interface ActivitySummaryGroup {
+  /** Stable id for the UI to translate the heading by; `category` is the English label the email uses. */
+  key: string
   category: string
   count: number
   items: ActivitySummaryItem[]
 }
 
+// Session/account bookkeeping (login, logout, password changes, avatar
+// uploads, vet-access grants...) isn't a farm activity - only these domains
+// represent something done on the farm.
+const TRACKED_DOMAINS = ["livestock", "consultation", "employee", "marketplace", "support"]
+
 const CATEGORY_LABELS: Record<string, string> = {
-  livestock: "Livestock & Farm Records",
+  milk: "Milk Production",
+  health: "Animal Health",
+  breeding: "Breeding & Calves",
+  animals: "Animals",
+  finance: "Sales & Expenses",
+  livestock: "Other Farm Records",
   consultation: "Consultations",
   employee: "Employees",
   marketplace: "Marketplace",
   support: "Support",
 }
 
-// Session/account bookkeeping (login, logout, password changes, avatar
-// uploads, vet-access grants...) isn't a farm activity - only the domains
-// listed in CATEGORY_LABELS above represent something done on the farm.
+// "livestock.*" covers most of the farm, so it is split by record type. First
+// prefix match wins - "milking_expense" has to come before "milk", and
+// "animal_expense" before "animal".
+const LIVESTOCK_CATEGORIES: [prefix: string, key: string][] = [
+  ["milking_expense", "milk"],
+  ["milk", "milk"],
+  ["disease", "health"],
+  ["vaccination", "health"],
+  ["treatment", "health"],
+  ["insemination", "breeding"],
+  ["calf", "breeding"],
+  ["animal_expense", "finance"],
+  ["animal", "animals"],
+  ["transaction", "finance"],
+  ["waste", "finance"],
+]
+
 export function isTrackedActivity(action: string): boolean {
-  const domain = action.split(".")[0]
-  return domain in CATEGORY_LABELS
+  return TRACKED_DOMAINS.includes(action.split(".")[0])
 }
 
-function categoryLabel(action: string): string {
-  const domain = action.split(".")[0]
-  return CATEGORY_LABELS[domain] || "Other"
+function categoryKey(action: string): string {
+  const [domain, subject = ""] = action.split(".")
+  if (domain !== "livestock") return domain
+  return LIVESTOCK_CATEGORIES.find(([prefix]) => subject.startsWith(prefix))?.[1] ?? "livestock"
 }
 
 // logActivity() actions follow a "domain.subject_verb" convention (e.g.
@@ -63,19 +89,26 @@ export function currentRwandaHour(): number {
   return new Date(Date.now() + 2 * 60 * 60 * 1000).getUTCHours()
 }
 
+/** yyyy-mm-dd shifted by whole days - for "yesterday" comparisons against record dates. */
+export function shiftDateString(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00.000Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().split("T")[0]
+}
+
 export function buildActivitySummaryGroups(logs: ActivityLogEntry[]): ActivitySummaryGroup[] {
   const byCategory = new Map<string, ActivitySummaryItem[]>()
   for (const log of logs) {
     if (!isTrackedActivity(log.action)) continue
-    const category = categoryLabel(log.action)
-    if (!byCategory.has(category)) byCategory.set(category, [])
-    byCategory.get(category)!.push({
+    const key = categoryKey(log.action)
+    if (!byCategory.has(key)) byCategory.set(key, [])
+    byCategory.get(key)!.push({
       label: actionLabel(log.action),
       details: log.details || "",
       time: new Date(log.createdAt).toISOString(),
     })
   }
   return Array.from(byCategory.entries())
-    .map(([category, items]) => ({ category, count: items.length, items }))
+    .map(([key, items]) => ({ key, category: CATEGORY_LABELS[key] || "Other", count: items.length, items }))
     .sort((a, b) => b.count - a.count)
 }
