@@ -10,10 +10,11 @@ import { useToast } from "@/hooks/use-toast"
 import BuyerInfoForm from "@/components/checkout/buyer-info-form"
 import PaymentMethodSelector from "@/components/checkout/payment-method-selector"
 import IntouchPayPoll from "@/components/checkout/intouchpay-poll"
+import PesapalFrame from "@/components/checkout/pesapal-frame"
 import type { Buyer } from "@/lib/validations/checkout"
 import type { OrderPaymentMethod } from "@/lib/db-orders"
 
-type Step = "intro" | "buyer" | "payment" | "intouchpay-poll"
+type Step = "intro" | "buyer" | "payment" | "intouchpay-poll" | "pesapal"
 
 const CONNECT_BG_URL =
   "https://images.unsplash.com/photo-1440428099904-c6d459a7e7b5?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
@@ -50,6 +51,7 @@ export default function ConnectPage() {
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod | null>(null)
   const [placing, setPlacing] = useState(false)
   const [pollOrderId, setPollOrderId] = useState<string | null>(null)
+  const [pesapalUrl, setPesapalUrl] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/listings/${listingId}/connect`)
@@ -86,7 +88,9 @@ export default function ConnectPage() {
           toast({ title: t("common.error"), description: initData.error, variant: "destructive" })
           return
         }
-        window.location.href = initData.redirectUrl
+        setPollOrderId(orderId)
+        setPesapalUrl(initData.redirectUrl)
+        setStep("pesapal")
         return
       }
 
@@ -144,8 +148,10 @@ export default function ConnectPage() {
           {quote.name}
         </Link>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          {step === "intouchpay-poll" && pollOrderId ? (
+        <div className={`bg-white rounded-xl border border-gray-200 shadow-sm ${step === "pesapal" ? "p-3 sm:p-6" : "p-6"}`}>
+          {step === "pesapal" && pollOrderId && pesapalUrl ? (
+            <PesapalFrame orderId={pollOrderId} redirectUrl={pesapalUrl} />
+          ) : step === "intouchpay-poll" && pollOrderId ? (
             <IntouchPayPoll orderId={pollOrderId} phone={buyer.phone} total={quote.feeAmount} />
           ) : !quote.available ? (
             <div className="text-center py-10">

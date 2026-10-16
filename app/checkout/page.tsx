@@ -13,10 +13,11 @@ import CartLineItem from "@/components/cart/cart-line-item"
 import BuyerInfoForm from "@/components/checkout/buyer-info-form"
 import PaymentMethodSelector from "@/components/checkout/payment-method-selector"
 import IntouchPayPoll from "@/components/checkout/intouchpay-poll"
+import PesapalFrame from "@/components/checkout/pesapal-frame"
 import type { Buyer } from "@/lib/validations/checkout"
 import type { OrderPaymentMethod } from "@/lib/db-orders"
 
-type Step = "review" | "buyer" | "payment" | "intouchpay-poll"
+type Step = "review" | "buyer" | "payment" | "intouchpay-poll" | "pesapal"
 
 export default function CheckoutPage() {
   const { t, language } = useLanguage()
@@ -28,6 +29,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod | null>(null)
   const [placingOrder, setPlacingOrder] = useState(false)
   const [pollOrderId, setPollOrderId] = useState<string | null>(null)
+  const [pesapalUrl, setPesapalUrl] = useState<string | null>(null)
 
   // A prescription-only drug in the cart needs the vet's prescription before paying.
   // The server can also ask for one (a cart saved before the drug became
@@ -102,7 +104,9 @@ export default function CheckoutPage() {
           return
         }
         clear()
-        window.location.href = initData.redirectUrl
+        setPollOrderId(orderId)
+        setPesapalUrl(initData.redirectUrl)
+        setStep("pesapal")
         return
       }
 
@@ -142,7 +146,13 @@ export default function CheckoutPage() {
         <div className="absolute inset-0 bg-black/60" />
       </div>
 
-      {step === "intouchpay-poll" && pollOrderId ? (
+      {step === "pesapal" && pollOrderId && pesapalUrl ? (
+        <div className="container-custom max-w-2xl">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 sm:p-6">
+            <PesapalFrame orderId={pollOrderId} redirectUrl={pesapalUrl} />
+          </div>
+        </div>
+      ) : step === "intouchpay-poll" && pollOrderId ? (
         <div className="container-custom max-w-lg">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <IntouchPayPoll orderId={pollOrderId} phone={buyer.phone} total={subtotal} />

@@ -14,6 +14,18 @@ export default function CheckoutCallbackPage() {
   const [sellerContact, setSellerContact] = useState<SellerContact | null>(null)
 
   useEffect(() => {
+    // Checkout shows Pesapal inside a frame. If Pesapal loads this page in that frame
+    // rather than the whole tab, move it out so the result isn't shown in a box on
+    // the checkout page - the whole tab will load this page again and verify there.
+    if (window.self !== window.top) {
+      try {
+        window.top!.location.replace(window.location.href)
+        return
+      } catch {
+        // Framed by another site: carry on and show the result here.
+      }
+    }
+
     const orderId = searchParams.get("OrderMerchantReference")
     if (!orderId) {
       setStatus("failed")
