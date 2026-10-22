@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Home, Pill, Receipt } from "lucide-react"
+import { Bell, Home, Pill, Receipt, Wallet } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import StaffLayoutClient from "@/components/staff/staff-layout-client"
 import StaffSidebar from "@/components/staff/staff-sidebar"
@@ -20,6 +20,7 @@ export default function PharmacyLayoutClient({ children }: { children: React.Rea
     { href: "/pharmacy-portal", label: t("pharmacy.dashboard"), icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/pharmacy-portal/listings", label: t("pharmacy.myListings"), icon: <Pill className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/pharmacy-portal/sales", label: t("pharmacy.sales"), icon: <Receipt className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/pharmacy-portal/earnings", label: t("earnings.myEarnings"), icon: <Wallet className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/pharmacy-portal/notifications", label: t("notifications.title"), icon: <Bell className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ]
 

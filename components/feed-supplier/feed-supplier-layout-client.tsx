@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Home, Receipt, Wheat } from "lucide-react"
+import { Bell, Home, Receipt, Wallet, Wheat } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import StaffLayoutClient from "@/components/staff/staff-layout-client"
 import StaffSidebar from "@/components/staff/staff-sidebar"
@@ -20,6 +20,7 @@ export default function FeedSupplierLayoutClient({ children }: { children: React
     { href: "/feed-supplier", label: t("pharmacy.dashboard"), icon: <Home className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/feed-supplier/listings", label: t("feedSupplier.myListings"), icon: <Wheat className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/feed-supplier/sales", label: t("pharmacy.sales"), icon: <Receipt className="h-4 w-4 sm:h-5 sm:w-5" /> },
+    { href: "/feed-supplier/earnings", label: t("earnings.myEarnings"), icon: <Wallet className="h-4 w-4 sm:h-5 sm:w-5" /> },
     { href: "/feed-supplier/notifications", label: t("notifications.title"), icon: <Bell className="h-4 w-4 sm:h-5 sm:w-5" /> },
   ]
 
