@@ -11,6 +11,8 @@ import BodyWrapper from "@/components/layout/body-wrapper"
 import { LanguageProvider } from "@/contexts/LanguageContext"
 import { CartProvider } from "@/contexts/CartContext"
 import { Toaster } from "@/components/ui/toaster"
+import RegisterServiceWorker from "@/components/pwa/register-service-worker"
+import InstallPrompt from "@/components/pwa/install-prompt"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -34,6 +36,12 @@ export const metadata = {
     type: "website",
     locale: "en_RW",
   },
+  // iPhones read these when the site is added to the home screen (see app/manifest.ts).
+  appleWebApp: {
+    capable: true,
+    title: "VetTrack",
+    statusBarStyle: "default",
+  },
   generator: 'v0.dev'
 }
 
@@ -50,7 +58,9 @@ export default function RootLayout({
           <CartProvider>
             <BodyWrapper>{children}</BodyWrapper>
           </CartProvider>
+          <InstallPrompt />
         </LanguageProvider>
+        <RegisterServiceWorker />
         <Toaster />
       </body>
     </html>

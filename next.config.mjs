@@ -15,15 +15,25 @@ const NOINDEX_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/maintenance",
+  // Shown by the service worker when a phone has no connection.
+  "/offline.html",
 ]
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
-    return NOINDEX_PATHS.map((source) => ({
-      source,
-      headers: [{ key: "X-Robots-Tag", value: "noindex" }],
-    }))
+    return [
+      ...NOINDEX_PATHS.map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }],
+      })),
+      // Browsers check for a new service worker on each visit; make sure no cache on
+      // the way hands them the old one.
+      {
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }],
+      },
+    ]
   },
   eslint: {
     ignoreDuringBuilds: true,
