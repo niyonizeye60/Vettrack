@@ -84,6 +84,16 @@ export function mapIntouchResponseCode(responsecode?: string): "completed" | "pe
   return "failed"
 }
 
+/**
+ * The gateway expects 2507XXXXXXXX, but our forms accept 07..., 2507... and
+ * +2507... (lib/validations/checkout.ts). Normalize here, where every number
+ * leaves the app, so a buyer typing the usual 07... isn't declined.
+ */
+function toIntouchPhone(phone: string) {
+  const digits = phone.replace(/[\s-]/g, "").replace(/^\+/, "")
+  return digits.startsWith("0") ? `250${digits.slice(1)}` : digits
+}
+
 export async function initiateIntouchPayment(amount: number, mobilePhone: string) {
   const callbackUrl = `${getCallbackBaseUrl()}/api/payments/intouchpay/callback`
 
@@ -96,7 +106,7 @@ export async function initiateIntouchPayment(amount: number, mobilePhone: string
   const client = getClient()
   return client.requestPayment({
     amount,
-    mobilePhone,
+    mobilePhone: toIntouchPhone(mobilePhone),
     callbackUrl,
   })
 }
@@ -119,7 +129,7 @@ export async function requestIntouchDeposit(
   const client = getClient()
   return client.requestDeposit({
     amount,
-    mobilePhone,
+    mobilePhone: toIntouchPhone(mobilePhone),
     reason: reason ?? "Deposit request",
   })
 }
