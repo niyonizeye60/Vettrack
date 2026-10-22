@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import {
-  createWithdrawalRequest,
   getWithdrawalsBySeller,
   getAllWithdrawals,
   getPendingWithdrawals,
@@ -10,8 +9,6 @@ import {
   getWithdrawalStats,
 } from "@/lib/db-withdrawals"
 import { getPayoutStats } from "@/lib/db-payouts"
-import { markPayoutAsPaid } from "@/lib/db-payouts"
-import { requestIntouchDeposit } from "@/lib/payments/intouchpay"
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,53 +56,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const sellerId = user._id?.toString()
-    if (!sellerId) return NextResponse.json({ error: "User ID not found" }, { status: 400 })
-
-    const body = await request.json()
-    const { amount, note } = body
-
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: "Invalid withdrawal amount" }, { status: 400 })
-    }
-
-    // Check that seller has enough balance (paid payouts - already withdrawn)
-    const payoutStats = await getPayoutStats(sellerId)
-    const withdrawalStats = await getWithdrawalStats(sellerId)
-    const alreadyWithdrawn = (withdrawalStats.completedAmount || 0) + (withdrawalStats.approvedAmount || 0)
-    const availableBalance = (payoutStats.paidAmount || 0) - alreadyWithdrawn
-
-    if (amount > availableBalance) {
-      return NextResponse.json({
-        error: `Insufficient balance. Available: RWF ${availableBalance.toLocaleString()}, Requested: RWF ${amount.toLocaleString()}`
-      }, { status: 400 })
-    }
-
-    const sellerName = user.name || "Unknown Seller"
-    const sellerPhone = (user as any).phone || (user as any).paymentPhone || ""
-
-    const withdrawalId = await createWithdrawalRequest({
-      sellerId,
-      sellerName,
-      sellerPhone,
-      amount,
-      note,
-    })
-
-    return NextResponse.json({
-      success: true,
-      withdrawalId,
-      message: `Withdrawal request of RWF ${amount.toLocaleString()} submitted successfully. Awaiting admin approval.`,
-    })
-  } catch (error) {
-    console.error("Error creating withdrawal:", error)
-    return NextResponse.json({ error: "Failed to create withdrawal" }, { status: 500 })
-  }
+// Sellers are paid only through payouts, which superadmin sends from Commissions.
+// Withdrawals counted those same paid payouts as a withdrawable balance, so
+// accepting new requests would pay sellers twice. Old records stay readable.
+export async function POST() {
+  return NextResponse.json(
+    { error: "Withdrawals are turned off. Vettrack sends what you're owed for each sale straight to your mobile money number." },
+    { status: 410 }
+  )
 }
 
 export async function PUT(request: NextRequest) {
@@ -116,7 +74,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { withdrawalId, status, adminNote, sendMoney } = body
+    const { withdrawalId, status, adminNote } = body
 
     if (!withdrawalId || !status) {
       return NextResponse.json({ error: "Missing withdrawalId or status" }, { status: 400 })
@@ -126,29 +84,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
-    if (status === "approved" && sendMoney) {
-      // Get withdrawal details to send money
-      const { getAllWithdrawals } = await import("@/lib/db-withdrawals")
-      const allWithdrawals = await getAllWithdrawals()
-      const withdrawal = allWithdrawals.find(w => w._id.toString() === withdrawalId)
-      if (!withdrawal) return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 })
-
-      if (withdrawal.sellerPhone) {
-        try {
-          await requestIntouchDeposit(
-            withdrawal.amount,
-            withdrawal.sellerPhone,
-            `Withdrawal payout for ${withdrawal.sellerName}`
-          )
-        } catch (depositError) {
-          console.error("IntouchPay deposit failed, marking as approved only:", depositError)
-        }
-      }
-
-      await updateWithdrawalStatus(withdrawalId, "completed", adminNote, user.name || "Admin")
-    } else {
-      await updateWithdrawalStatus(withdrawalId, status, adminNote, user.name || "Admin")
-    }
+    // Closing out old requests only: no money moves here (sellers are paid through payouts).
+    await updateWithdrawalStatus(withdrawalId, status, adminNote, user.name || "Admin")
 
     return NextResponse.json({ success: true, message: `Withdrawal ${status} successfully` })
   } catch (error) {

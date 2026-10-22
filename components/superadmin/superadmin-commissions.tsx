@@ -364,15 +364,16 @@ export default function SuperAdminCommissions() {
     }
   }, [])
 
-  const handleApproveWithdrawal = async (withdrawalId: string, sendMoney: boolean = true) => {
+  // Old withdrawal requests can only be closed out; sellers are paid through payouts.
+  const handleApproveWithdrawal = async (withdrawalId: string) => {
     try {
       const res = await fetch("/api/withdrawals", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ withdrawalId, status: "completed", sendMoney }),
+        body: JSON.stringify({ withdrawalId, status: "completed" }),
       })
       if (res.ok) {
-        toast({ title: t("commissions.withdrawalApproved"), description: t("commissions.sellerWithdrawalHasBeenApprovedAnd") })
+        toast({ title: t("commissions.withdrawalApproved"), description: t("commissions.withdrawalMarkedCompletedNoMoneySent") })
         await fetchWithdrawals()
       } else {
         const data = await res.json()
@@ -1399,10 +1400,10 @@ export default function SuperAdminCommissions() {
                             <Button
                               size="sm"
                               className="bg-green-600 hover:bg-green-700 text-xs"
-                              onClick={() => handleApproveWithdrawal(w._id, true)}
+                              onClick={() => handleApproveWithdrawal(w._id)}
                             >
                               <ThumbsUp className="h-3 w-3 mr-1" />
-                              {t("commissions.approveSend")}
+                              {t("commissions.markCompleted")}
                             </Button>
                             <Button
                               size="sm"
@@ -1723,10 +1724,10 @@ export default function SuperAdminCommissions() {
                   <div className="flex gap-2">
                     <Button
                       className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={() => { setWithdrawalDetailOpen(false); handleApproveWithdrawal(selectedWithdrawal._id, true) }}
+                      onClick={() => { setWithdrawalDetailOpen(false); handleApproveWithdrawal(selectedWithdrawal._id) }}
                     >
                       <ThumbsUp className="h-4 w-4 mr-2" />
-                      {t("commissions.approveSend")}
+                      {t("commissions.markCompleted")}
                     </Button>
                     <Button
                       className="flex-1 bg-red-600 hover:bg-red-700"
