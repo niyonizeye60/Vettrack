@@ -33,7 +33,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    if (!user || !["superadmin", "admin"].includes(user.role)) {
+    // direct_send and withdraw move real money through IntouchPay: superadmin only.
+    if (!user || user.role !== "superadmin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

@@ -34,6 +34,17 @@ export interface Payout {
   refundedAmount?: number
   /** Refunded after this payout had already been paid - the seller owes that share back. */
   clawbackAmount?: number
+  /** Set while an IntouchPay transfer for this payout is in flight (claimPayoutForSending). */
+  sendingAt?: Date
+  /** Intouch's record of the transfer, for matching against its transaction logs. Absent when marked paid by hand. */
+  intouch?: PayoutTransfer
+}
+
+export interface PayoutTransfer {
+  requestTransactionId?: string
+  transactionId?: string
+  referenceNo?: string
+  responseCode?: string
 }
 
 async function getPayoutsCollection() {
@@ -109,12 +120,45 @@ export async function getAllPayouts(limit = 100): Promise<Payout[]> {
     .toArray()
 }
 
-export async function markPayoutAsPaid(payoutId: string): Promise<void> {
+export async function markPayoutAsPaid(payoutId: string, transfer?: PayoutTransfer): Promise<void> {
   const collection = await getPayoutsCollection()
   await collection.updateOne(
     { _id: new ObjectId(payoutId) },
-    { $set: { status: "paid", paidAt: new Date() } }
+    {
+      $set: { status: "paid", paidAt: new Date(), ...(transfer && { intouch: transfer }) },
+      $unset: { sendingAt: "" },
+    }
   )
+}
+
+/**
+ * Longer than one send can run (the IntouchPay client's worst case is about 1.5
+ * minutes of retries), so an older claim belongs to a request that has died.
+ */
+const SEND_CLAIM_MS = 5 * 60 * 1000
+
+/**
+ * Reserve a pending payout for an IntouchPay transfer, atomically, so a double
+ * click or two admins sending at once can't move the money twice. Returns the
+ * payout as claimed, or null when it isn't pending or another send holds it.
+ */
+export async function claimPayoutForSending(payoutId: string): Promise<Payout | null> {
+  const collection = await getPayoutsCollection()
+  return collection.findOneAndUpdate(
+    {
+      _id: new ObjectId(payoutId),
+      status: "pending",
+      $or: [{ sendingAt: { $exists: false } }, { sendingAt: { $lt: new Date(Date.now() - SEND_CLAIM_MS) } }],
+    },
+    { $set: { sendingAt: new Date() } },
+    { returnDocument: "after" }
+  )
+}
+
+/** Free a claimed payout after Intouch refused the transfer, so it can be retried. */
+export async function releasePayoutClaim(payoutId: string): Promise<void> {
+  const collection = await getPayoutsCollection()
+  await collection.updateOne({ _id: new ObjectId(payoutId) }, { $unset: { sendingAt: "" } })
 }
 
 export async function getPayoutStats(sellerId?: string) {
