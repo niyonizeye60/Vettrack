@@ -24,6 +24,9 @@ import EditAnimalForm from "@/components/dashboard/edit-animal-form"
 
 const ANIMALS_PAGE_SIZE = 10
 
+// Phones: smaller text that can wrap inside its third of the bar. sm and up: the default single-line tab.
+const tabTriggerClass = "h-full whitespace-normal px-2 text-center text-xs leading-tight sm:whitespace-nowrap sm:px-3 sm:text-sm"
+
 interface AnimalsPagination {
   page: number
   pageSize: number
@@ -240,13 +243,14 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
           </div>
           {(data.counts.lactating + data.counts.dry) > 0 && (
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "all" | "lactating" | "dry")} className="mt-4">
-              <TabsList>
-                <TabsTrigger value="all">{t('farmer.allAnimals')} ({data.counts.all})</TabsTrigger>
-                <TabsTrigger value="lactating" className="flex items-center gap-1.5">
-                  <Droplets className="h-3.5 w-3.5" />
+              {/* On phones the three labels don't fit on one line, so they share the width equally and wrap */}
+              <TabsList className="grid h-auto w-full grid-cols-3 sm:inline-flex sm:h-10 sm:w-auto">
+                <TabsTrigger value="all" className={tabTriggerClass}>{t('farmer.allAnimals')} ({data.counts.all})</TabsTrigger>
+                <TabsTrigger value="lactating" className={`${tabTriggerClass} gap-1.5`}>
+                  <Droplets className="hidden h-3.5 w-3.5 shrink-0 sm:block" />
                   {t('farmer.lactatingCows')} ({data.counts.lactating})
                 </TabsTrigger>
-                <TabsTrigger value="dry">{t('farmer.dryCows')} ({data.counts.dry})</TabsTrigger>
+                <TabsTrigger value="dry" className={tabTriggerClass}>{t('farmer.dryCows')} ({data.counts.dry})</TabsTrigger>
               </TabsList>
             </Tabs>
           )}
