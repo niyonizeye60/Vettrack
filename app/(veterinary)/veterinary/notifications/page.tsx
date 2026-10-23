@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeNotification } from "@/lib/notification-messages"
+import PushToggle from "@/components/pwa/push-toggle"
 import { getCurrentUser } from "@/lib/actions/auth"
 
 interface Notification {
@@ -220,6 +221,8 @@ export default function VeterinaryNotificationsPage() {
           )}
         </div>
       </div>
+
+      <PushToggle />
 
       {/* Unread stat card — only show when there are unread */}
       {unreadCount > 0 && (

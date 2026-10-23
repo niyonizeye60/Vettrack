@@ -16,6 +16,7 @@ import {
 import { useLanguage } from "@/contexts/LanguageContext"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { localizeNotification } from "@/lib/notification-messages"
+import PushToggle from "@/components/pwa/push-toggle"
 
 interface Notification {
   _id: string
@@ -218,6 +219,8 @@ export default function FarmerNotificationsPage() {
           )}
         </div>
       </div>
+
+      <PushToggle />
 
       {/* Unread stat card */}
       {unreadCount > 0 && (

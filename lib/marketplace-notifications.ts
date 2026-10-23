@@ -1,6 +1,7 @@
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import type { NotificationText } from "@/lib/notification-messages"
+import { insertNotification } from "@/lib/notify"
 
 const DB_NAME = "ntdm_animal_hospital"
 
@@ -40,7 +41,7 @@ export function sellerSalesPath(category: unknown): string {
 export async function notifyFarmer(farmerId: string, text: NotificationText, actionUrl: string) {
   try {
     const client = await clientPromise
-    await client.db(DB_NAME).collection("notifications").insertOne({
+    await insertNotification(client.db(DB_NAME), {
       ...text,
       type: "marketplace",
       priority: "normal",
@@ -61,7 +62,7 @@ export async function notifyFarmer(farmerId: string, text: NotificationText, act
 export async function notifySuperadmin(text: NotificationText, actionUrl: string) {
   try {
     const client = await clientPromise
-    await client.db(DB_NAME).collection("notifications").insertOne({
+    await insertNotification(client.db(DB_NAME), {
       ...text,
       type: "marketplace",
       priority: "normal",
@@ -85,7 +86,7 @@ export async function notifySuperadmin(text: NotificationText, actionUrl: string
 export async function notifyRole(role: string, text: NotificationText, actionUrl: string) {
   try {
     const client = await clientPromise
-    await client.db(DB_NAME).collection("notifications").insertOne({
+    await insertNotification(client.db(DB_NAME), {
       ...text,
       type: "marketplace",
       priority: "normal",

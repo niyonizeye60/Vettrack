@@ -12,7 +12,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext"
 import { CartProvider } from "@/contexts/CartContext"
 import { Toaster } from "@/components/ui/toaster"
 import RegisterServiceWorker from "@/components/pwa/register-service-worker"
-import InstallPrompt from "@/components/pwa/install-prompt"
+import AppPrompts from "@/components/pwa/app-prompts"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -58,7 +58,7 @@ export default function RootLayout({
           <CartProvider>
             <BodyWrapper>{children}</BodyWrapper>
           </CartProvider>
-          <InstallPrompt />
+          <AppPrompts />
         </LanguageProvider>
         <RegisterServiceWorker />
         <Toaster />

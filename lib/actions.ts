@@ -8,6 +8,7 @@ import { sendConsultationRequestEmail } from "./email"
 import { logActivity, logSystemError } from "./activity-log"
 import { deleteDocumentsForConsultation, getDocumentsByConsultation } from "./consultation-documents"
 import { notificationText } from "./notification-messages"
+import { insertNotification } from "./notify"
 
 // Animal-related actions
 export async function registerAnimal(formData: FormData, ownerId: string) {
@@ -279,7 +280,7 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
       const doctorId = consultation.doctor as string | null
       if (doctorId && ObjectId.isValid(doctorId)) {
         // In-app notification so the vet's bell reflects the new request.
-        await db.collection("notifications").insertOne({
+        await insertNotification(db, {
           ...(consultation.animalName
             ? notificationText("consultationRequestedAnimal", { farmer: consultation.fullName, animal: consultation.animalName })
             : notificationText("consultationRequested", { farmer: consultation.fullName })),
@@ -378,7 +379,7 @@ export async function createAppointment(formData: FormData) {
     // Let the farmer know their vet scheduled this for them.
     try {
       if (ObjectId.isValid(farmerId)) {
-        await db.collection("notifications").insertOne({
+        await insertNotification(db, {
           ...(consultation.animalName
             ? notificationText("appointmentScheduledAnimal", {
                 animal: consultation.animalName,
@@ -491,7 +492,7 @@ export async function updateConsultationStatus(
           status: { keys: [`appointments.${status}`], text: status },
           feedback: feedback ? feedback.slice(0, 80) : "",
         };
-        await db.collection("notifications").insertOne({
+        await insertNotification(db, {
           ...(consultation?.animalName
             ? notificationText("consultationStatusAnimal", { ...params, animal: consultation.animalName })
             : notificationText("consultationStatus", params)),

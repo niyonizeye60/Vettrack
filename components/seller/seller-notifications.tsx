@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { useNotificationsFeed, type FeedItem } from "@/components/staff/use-notifications-feed"
+import PushToggle from "@/components/pwa/push-toggle"
 
 /**
  * Everything a seller (pharmacy or feed supplier) has been told: review decisions on its
@@ -51,6 +52,8 @@ export default function SellerNotifications({ role, descKey }: { role: string; d
           )}
         </div>
       </div>
+
+      <PushToggle />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "unread")}>
         <TabsList>

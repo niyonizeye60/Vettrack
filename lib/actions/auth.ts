@@ -9,6 +9,7 @@ import { checkRateLimit, getRateLimitKey } from "../rate-limit"
 import { isRole, isPrivilegedRole, canSelfRegister, homePathForRole } from "../roles"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
 import { notificationText } from "../notification-messages"
+import { insertNotification } from "../notify"
 
 // Ensured once per warm process, not on every registration - createIndex is a
 // no-op after the first call, but there's no need to pay even that round trip
@@ -160,7 +161,7 @@ export async function registerUser(formData: FormData) {
     // superadmin (checked above) - still worth an audit trail of who was granted
     // elevated access and when.
     if (isPrivilegedRole(role)) {
-      await db.collection("notifications").insertOne({
+      await insertNotification(db, {
         ...notificationText("privilegedAccount", {
           role: { keys: [`admin.${role}`], text: role },
           email: String(userData.email),
@@ -241,7 +242,7 @@ export async function loginUser(formData: FormData) {
       createdAt: { $gt: new Date(Date.now() - LOGIN_LOCKOUT_WINDOW_MS) },
     })
     if (recentFailures >= LOGIN_LOCKOUT_THRESHOLD) {
-      await db.collection("notifications").insertOne({
+      await insertNotification(db, {
         ...notificationText("accountLockedOut", { email, count: recentFailures }),
         type: "security",
         priority: "high",

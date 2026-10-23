@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth"
 import clientPromise from "@/lib/db"
 import { logActivity } from "@/lib/activity-log"
 import { notificationText } from "@/lib/notification-messages"
+import { insertNotification } from "@/lib/notify"
 import {
   DOCUMENT_MAX_PER_CONSULTATION,
   DOCUMENT_UPLOAD_STATUSES,
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     try {
       const farmerId = record.farmerId
       if (farmerId && ObjectId.isValid(farmerId)) {
-        await db.collection("notifications").insertOne({
+        await insertNotification(db, {
           ...(consultation.animalName
             ? notificationText("consultationDocumentAnimal", { name, animal: consultation.animalName })
             : notificationText("consultationDocument", { name })),

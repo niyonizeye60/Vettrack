@@ -2,6 +2,7 @@ import clientPromise from "./db"
 import { ObjectId } from "mongodb"
 import { CALF_GRADUATION_AGE_MONTHS, isReadyToGraduate } from "./calf-age"
 import { notificationText } from "./notification-messages"
+import { insertNotification } from "./notify"
 
 const DB = "ntdm_animal_hospital"
 
@@ -56,7 +57,7 @@ async function notifyDueCalves(scope: { farmerId?: string }) {
     if (names.length === 0) continue
 
     const months = CALF_GRADUATION_AGE_MONTHS
-    await db.collection("notifications").insertOne({
+    await insertNotification(db, {
       ...(names.length === 1
         ? notificationText("calfReady", { names: names[0], months })
         : names.length > 5

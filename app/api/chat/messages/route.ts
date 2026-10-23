@@ -9,6 +9,7 @@ import { sendNewMessageAlertEmail } from "@/lib/email"
 import { isPresenceOnline } from "@/lib/presence"
 import { ObjectId } from "mongodb"
 import { notificationText } from "@/lib/notification-messages"
+import { insertNotification } from "@/lib/notify"
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000
 
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
     if (otherParticipantId) {
       const recipientRole = currentUser.role === "farmer" ? "doctor" : "farmer"
       const dashboardSegment = recipientRole === "doctor" ? "veterinary" : "farmer"
-      db.collection("notifications").insertOne({
+      insertNotification(db, {
         ...notificationText("chatMessage", { sender: currentUser.name, preview: trimmedContent.slice(0, 80) }),
         type: "chat",
         priority: "normal",

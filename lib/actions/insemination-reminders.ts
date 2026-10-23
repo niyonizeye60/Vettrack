@@ -4,6 +4,7 @@ import clientPromise from "../db"
 import { ObjectId } from "mongodb"
 import { sendInseminationReminderEmail } from "../email"
 import { notificationText } from "../notification-messages"
+import { insertNotification } from "../notify"
 
 const DB = "ntdm_animal_hospital"
 
@@ -39,7 +40,7 @@ async function sendReminder(db: any, record: any, daysLeft: 7 | 14, farmer: { na
   const sentField = daysLeft === 14 ? "reminder14SentAt" : "reminder7SentAt"
   await db.collection("insemination_records").updateOne({ _id: record._id }, { $set: { [sentField]: new Date() } })
 
-  await db.collection("notifications").insertOne({
+  await insertNotification(db, {
     ...(record.animalName
       ? notificationText(`calving.${daysLeft}`, { animal: record.animalName })
       : notificationText(`calvingUnnamed.${daysLeft}`)),

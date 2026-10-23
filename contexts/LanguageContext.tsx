@@ -4835,6 +4835,13 @@ const translations = {
     'pwa.installDesc': 'Open it in one tap, without the browser bar, like any other app.',
     'pwa.install': 'Install',
     'pwa.iosHint': 'Tap the Share button {icon}, then “Add to Home Screen”.',
+    'pwa.pushTitle': 'Get alerts on this device',
+    'pwa.pushDesc': 'Get an alert when something needs you, even when VetTrack is closed.',
+    'pwa.pushTurnOn': 'Turn on',
+    'pwa.pushFailed': "Alerts couldn't be turned on. Please try again.",
+    'pwa.pushToggleTitle': 'Alerts on this device',
+    'pwa.pushBlocked': 'Alerts are blocked for VetTrack. Allow notifications for this site in your browser or phone settings, then come back here.',
+    'pwa.pushIosInstall': 'On iPhone, first add VetTrack to your home screen (Share, then “Add to Home Screen”), then open it from there to turn alerts on.',
   },
   rw: {
     'finance.sourceAnimal': 'Kugurisha amatungo',
@@ -9654,6 +9661,13 @@ const translations = {
     'pwa.installDesc': "Uzajya uyifungura ukanze rimwe gusa, nk'izindi porogaramu.",
     'pwa.install': 'Shyiraho',
     'pwa.iosHint': 'Kanda kuri Share {icon}, hanyuma uhitemo “Add to Home Screen”.',
+    'pwa.pushTitle': 'Akira imenyesha kuri iki gikoresho',
+    'pwa.pushDesc': "Menyeshwa igihe hari ikigukeneye, kabone n'iyo VetTrack ifunze.",
+    'pwa.pushTurnOn': 'Emera',
+    'pwa.pushFailed': 'Ntibyakunze gufungura imenyesha. Ongera ugerageze.',
+    'pwa.pushToggleTitle': 'Imenyesha kuri iki gikoresho',
+    'pwa.pushBlocked': 'Imenyesha rya VetTrack ryarahagaritswe. Ryemerere mu igenamiterere rya telefoni cyangwa rya mudasobwa yawe, hanyuma ugaruke hano.',
+    'pwa.pushIosInstall': 'Kuri iPhone, banza ushyire VetTrack ahabanza (kanda Share, hanyuma “Add to Home Screen”), hanyuma uyifungurireyo kugira ngo wemere imenyesha.',
   }
 }
 

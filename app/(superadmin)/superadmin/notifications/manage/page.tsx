@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeNotification, notificationTypeLabel, notificationPriorityLabel } from "@/lib/notification-messages"
+import PushToggle from "@/components/pwa/push-toggle"
 interface Notification {
   _id: string
   title: string
@@ -116,6 +117,8 @@ export default function SuperAdminNotificationsManagePage() {
           <p className="text-gray-500 mt-1 text-sm">{t("saNotifsManage.viewRestoreOrPermanentlyDeleteAll")}</p>
         </div>
       </div>
+
+      <PushToggle />
 
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

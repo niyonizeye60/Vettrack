@@ -6,6 +6,7 @@ import { logUserActivity } from "@/lib/actions/superadmin"
 import { logSystemError } from "@/lib/activity-log"
 import { ObjectId } from "mongodb"
 import { notificationText } from "@/lib/notification-messages"
+import { insertNotification } from "@/lib/notify"
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
       details: otherParticipantId
     }).catch(() => {})
 
-    await db.collection("notifications").insertOne({
+    await insertNotification(db, {
       ...notificationText("chatReported", { reporter: currentUser.name, reason: reason.trim().slice(0, 80) }),
       type: "chat",
       priority: "normal",

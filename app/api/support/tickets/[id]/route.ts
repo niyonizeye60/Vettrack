@@ -7,6 +7,7 @@ import { decryptText } from "@/lib/crypto"
 import { ObjectId } from "mongodb"
 import { logActivity } from "@/lib/activity-log"
 import { notificationText } from "@/lib/notification-messages"
+import { insertNotification } from "@/lib/notify"
 
 const DB = "ntdm_animal_hospital"
 const STAFF_ROLES = ["admin", "superadmin"]
@@ -127,7 +128,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // status change carries the same "you need to know this" weight as a
     // reply, so it should notify the same way.
     if (action === "resolve" || action === "reopen") {
-      await db.collection("notifications").insertOne({
+      await insertNotification(db, {
         ...notificationText(action === "resolve" ? "supportResolved" : "supportReopened", {
           staff: currentUser.name,
           subject: ticket.subject,

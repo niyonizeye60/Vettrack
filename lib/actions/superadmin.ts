@@ -9,6 +9,7 @@ import { logActivity, logSystemError as recordSystemError } from "../activity-lo
 import { isPresenceOnline, type PresenceDoc } from "../presence"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
 import { notificationText } from "../notification-messages"
+import { insertNotification, insertNotifications } from "../notify"
 import { CAPABILITIES, ROLES, isRole, type Role } from "../roles"
 import {
   FARM_LOCATION_RESTRICTION_FIELDS,
@@ -1337,7 +1338,7 @@ export async function generateSystemNotifications() {
         (n): n is NonNullable<typeof n> => n !== null
       )
       if (toInsert.length > 0) {
-        await db.collection("notifications").insertMany(toInsert)
+        await insertNotifications(db, toInsert)
       }
     }
 
@@ -1356,7 +1357,7 @@ export async function notifyCronFailure(jobName: string, error: unknown) {
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
-    await db.collection("notifications").insertOne({
+    await insertNotification(db, {
       ...notificationText("cronFailed", { job: jobName, error: error instanceof Error ? error.message : String(error) }),
       type: "system",
       priority: "high",
@@ -2108,7 +2109,7 @@ export async function createSystemNotification(data: {
       createdAt: new Date()
     }
 
-    await db.collection("notifications").insertOne(notification)
+    await insertNotification(db, notification)
     await logAdminAction("admin.notification.created", data.title)
     return { success: true }
   } catch (error) {
@@ -2202,7 +2203,7 @@ export async function sendBulkNotification(templateId: string, targetUsers: stri
       createdAt: new Date()
     }))
 
-    await db.collection("notifications").insertMany(notifications)
+    await insertNotifications(db, notifications)
     await logAdminAction("admin.notification.bulkSent", `${notifications.length} recipients: ${template.title}`)
     return { success: true, count: notifications.length }
   } catch (error) {

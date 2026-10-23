@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeNotification } from "@/lib/notification-messages"
+import PushToggle from "@/components/pwa/push-toggle"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -275,6 +276,8 @@ export default function AdminNotificationsPage() {
           )}
         </div>
       </div>
+
+      <PushToggle />
 
       {/* Unread stat card */}
       {unreadCount > 0 && (
