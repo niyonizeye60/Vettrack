@@ -9,22 +9,33 @@
     Shown by the service worker (public/sw.js) when a page can't load because there's
     no connection. Everything is inline: nothing else is cached, so this page can't
     load any other file.
+
+    For a signed-in farmer it shows the copy of their records that
+    components/pwa/offline-records-sync.tsx keeps (read-only). Everyone else gets the
+    plain "You're offline" message.
   -->
   <style>
     * { box-sizing: border-box; }
+    html, body { margin: 0; }
     body {
-      margin: 0;
+      background: #f9fafb;
+      color: #111827;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    [hidden] { display: none !important; }
+    /* Until we know whether there's a saved copy, so the plain message doesn't flash. */
+    .checking .plain { visibility: hidden; }
+
+    .plain {
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 16px;
-      background: #f9fafb;
-      color: #111827;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-    main { max-width: 360px; text-align: center; }
-    .icon {
+    .plain main { max-width: 360px; text-align: center; }
+    .plain .icon {
       width: 72px;
       height: 72px;
       margin: 0 auto;
@@ -35,10 +46,9 @@
       align-items: center;
       justify-content: center;
     }
-    h1 { font-size: 20px; margin: 20px 0 8px; }
-    p { margin: 0; color: #6b7280; font-size: 15px; line-height: 1.5; }
-    button {
-      margin-top: 24px;
+    .plain h1 { font-size: 20px; margin: 20px 0 8px; }
+    .plain p { margin: 0; color: #6b7280; font-size: 15px; line-height: 1.5; }
+    .btn {
       background: #16a34a;
       color: #fff;
       border: 0;
@@ -49,36 +59,787 @@
       font-weight: 600;
       cursor: pointer;
     }
-    button:hover { background: #15803d; }
+    .btn:hover { background: #15803d; }
+    .plain .btn { margin-top: 24px; }
+
+    /* The saved records */
+    .wrap { max-width: 720px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
+    .top { position: sticky; top: 0; z-index: 1; background: #fff; border-bottom: 1px solid #e5e7eb; }
+    .top-inner { display: flex; align-items: center; gap: 12px; padding-top: 12px; padding-bottom: 8px; }
+    .top-icon {
+      flex: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #fef3c7;
+      color: #b45309;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .top-text { flex: 1; min-width: 0; }
+    .top-title { font-weight: 600; font-size: 15px; }
+    .top-sub { color: #6b7280; font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
+    .btn-sm { flex: none; padding: 8px 12px; font-size: 13px; }
+    .tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      flex: none;
+      background: none;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      padding: 10px 8px;
+      font: inherit;
+      font-size: 14px;
+      color: #6b7280;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tab[aria-selected="true"] { color: #15803d; border-bottom-color: #16a34a; font-weight: 600; }
+    .count {
+      display: inline-block;
+      margin-left: 6px;
+      min-width: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: #f3f4f6;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 20px;
+      text-align: center;
+    }
+    .tab[aria-selected="true"] .count { background: #dcfce7; color: #15803d; }
+
+    .panel { padding-top: 16px; padding-bottom: 32px; }
+    .note { margin: 0 0 12px; color: #6b7280; font-size: 13px; line-height: 1.5; }
+    .search {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+      color: inherit;
+      font: inherit;
+      font-size: 16px; /* smaller makes iPhones zoom in */
+    }
+    .search:focus { outline: 2px solid #16a34a; outline-offset: -1px; }
+    .list { margin-top: 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+    .item { border-top: 1px solid #f3f4f6; }
+    .item:first-child { border-top: 0; }
+    .row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; }
+    summary.row { cursor: pointer; list-style: none; }
+    summary.row::-webkit-details-marker { display: none; }
+    summary.row:focus-visible { outline: 2px solid #16a34a; outline-offset: -2px; }
+    .row-main { flex: 1; min-width: 0; }
+    .row-title { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+    .row-sub { color: #6b7280; font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
+    .row-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; font-size: 14px; }
+    .chev { flex: none; color: #9ca3af; margin-top: 2px; transition: transform 0.15s; }
+    details[open] > summary .chev { transform: rotate(180deg); }
+    .badge {
+      display: inline-block;
+      padding: 1px 8px;
+      border: 1px solid;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .green { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+    .red { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+    .amber { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .blue { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .purple { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
+    .gray { background: #f9fafb; color: #4b5563; border-color: #e5e7eb; }
+    .body { padding: 0 16px 16px; }
+    .facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+    .facts dt { color: #6b7280; }
+    .facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+    .sub-h { margin: 16px 0 4px; color: #374151; font-size: 13px; font-weight: 600; }
+    .mini { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+    .mini li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid #f3f4f6; }
+    .mini li:first-child { border-top: 0; }
+    .mini li > :last-child { text-align: right; }
+    .muted { color: #6b7280; }
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+    .stat-label { color: #6b7280; font-size: 12px; }
+    .stat-value { margin-top: 4px; font-size: 20px; font-weight: 700; }
+    .day-h {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 16px;
+      background: #f9fafb;
+      color: #374151;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .more {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #fff;
+      color: inherit;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .empty { padding: 32px 16px; color: #6b7280; font-size: 14px; text-align: center; }
   </style>
 </head>
 <body>
-  <main>
-    <div class="icon" aria-hidden="true">
-      <!-- lucide "wifi-off" -->
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/>
-      </svg>
+  <script>document.body.className = "checking"</script>
+
+  <div class="plain">
+    <main>
+      <div class="icon" aria-hidden="true">
+        <!-- lucide "wifi-off" -->
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/>
+        </svg>
+      </div>
+      <h1 id="title">You're offline</h1>
+      <p id="desc">Check your internet connection, then try again.</p>
+      <button class="btn" id="retry" type="button">Try again</button>
+    </main>
+  </div>
+
+  <div id="records" hidden>
+    <header class="top">
+      <div class="wrap top-inner">
+        <div class="top-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/>
+          </svg>
+        </div>
+        <div class="top-text">
+          <div class="top-title" id="r-title"></div>
+          <div class="top-sub" id="r-saved"></div>
+        </div>
+        <button class="btn btn-sm" id="r-retry" type="button"></button>
+      </div>
+      <div class="wrap tabs" id="r-tabs" role="tablist"></div>
+    </header>
+    <div class="wrap panel" id="r-panel" role="tabpanel">
+      <p class="note" id="r-note"></p>
+      <input class="search" id="r-search" type="search" autocomplete="off">
+      <div id="r-content"></div>
     </div>
-    <h1 id="title">You're offline</h1>
-    <p id="desc">Check your internet connection, then try again.</p>
-    <button id="retry" type="button">Try again</button>
-  </main>
+  </div>
+
   <script>
-    // Same choice the site stores in LanguageContext.
-    try {
-      if (localStorage.getItem("language") === "rw") {
-        document.documentElement.lang = "rw"
-        document.title = "Nta interineti - VetTrack"
-        document.getElementById("title").textContent = "Nta interineti ufite"
-        document.getElementById("desc").textContent = "Reba interineti yawe hanyuma wongere ugerageze."
-        document.getElementById("retry").textContent = "Ongera ugerageze"
+  (function () {
+    "use strict"
+
+    // Where components/pwa/offline-records-sync.tsx keeps the copy. Keep in step.
+    var CACHE = "vettrack-records"
+    var KEY = "/offline/records.json"
+
+    var STRINGS = {
+      en: {
+        pageTitle: "Offline - VetTrack",
+        offline: "You're offline",
+        checkConnection: "Check your internet connection, then try again.",
+        tryAgain: "Try again",
+        saved: "Saved {time}",
+        readOnly: "This is the copy saved on this phone. You can add or change records once you're back online.",
+        search: "Search animals…",
+        noRecords: "No records found",
+        showMore: "Show more",
+        animals: "Animals",
+        milk: "Milk",
+        diseases: "Diseases",
+        vaccination: "Vaccination",
+        insemination: "Insemination",
+        calves: "Calves",
+        milkProduction: "Milk Production",
+        diseaseCases: "Disease Cases",
+        today: "Today",
+        last7: "Last 7 days",
+        last90: "Last 90 days",
+        morning: "Morning",
+        evening: "Evening",
+        type: "Type",
+        class: "Class",
+        breed: "Breed",
+        gender: "Gender",
+        earTag: "Ear Tag ID",
+        insurance: "Insurance ID",
+        weight: "Weight",
+        male: "Male",
+        female: "Female",
+        lactating: "Lactating",
+        dry: "Dry",
+        healthy: "Healthy",
+        sick: "Sick",
+        underTreatment: "Under Treatment",
+        deceased: "Deceased",
+        cow: "Cow", goat: "Goat", sheep: "Sheep", chicken: "Chicken", dog: "Dog", cat: "Cat", other: "Other",
+        dairy: "Dairy", meat: "Meat", poultry: "Poultry", pet: "Pet",
+        diagnosed: "Diagnosed",
+        resolved: "Resolved",
+        symptoms: "Symptoms",
+        treatment: "Treatment",
+        vet: "Vet",
+        treatmentDoses: "Treatment Doses",
+        diseaseActive: "Active",
+        doseOne: "{count} dose",
+        doseMany: "{count} doses",
+        vaccine: "Vaccine",
+        dose: "Dose",
+        route: "Route",
+        next: "Next",
+        diseasePrevented: "Disease Prevented",
+        semenType: "Semen Type",
+        expBirth: "Exp. Birth",
+        delivered: "Delivered",
+        babies: "Babies",
+        notPregnant: "Not Pregnant",
+        dueToday: "Due today",
+        daysLeft: "{days} days left",
+        daysOverdue: "{days}d overdue",
+        mother: "Mother",
+        birthDate: "Birth Date",
+        lastWeight: "Last weight",
+        calfActive: "Active",
+        weaned: "Weaned",
+        calfSold: "Sold",
+        graduated: "Moved to animals",
+        ageDays: "{n} days",
+        ageMonths: "{n} months"
+      },
+      rw: {
+        pageTitle: "Nta interineti - VetTrack",
+        offline: "Nta interineti ufite",
+        checkConnection: "Reba interineti yawe hanyuma wongere ugerageze.",
+        tryAgain: "Ongera ugerageze",
+        saved: "Byabitswe {time}",
+        readOnly: "Aya ni amakuru yabitswe kuri iyi telefoni. Uzabasha kongeramo cyangwa guhindura amakuru umaze kubona interineti.",
+        search: "Shakisha amatungo…",
+        noRecords: "Nta makuru abonetse",
+        showMore: "Reba ibindi",
+        animals: "Amatungo",
+        milk: "Amata",
+        diseases: "Indwara",
+        vaccination: "Inkingo",
+        insemination: "Guterwa intanga",
+        calves: "Inyana",
+        milkProduction: "Umusaruro w'Amata",
+        diseaseCases: "Indwara zanditswe",
+        today: "Uyu munsi",
+        last7: "Iminsi 7 ishize",
+        last90: "Iminsi 90 ishize",
+        morning: "Mu gitondo",
+        evening: "Nimugoroba",
+        type: "Ubwoko",
+        class: "Icyiciro",
+        breed: "Ubwoko bw'Itungo",
+        gender: "Igitsina",
+        earTag: "ID y'Agatambi k'amatwi",
+        insurance: "ID y'Ubwishingizi",
+        weight: "Ibiro",
+        male: "Gabo",
+        female: "Gore",
+        lactating: "Itanga amata",
+        dry: "Ntitanga amata",
+        healthy: "Ifite ubuzima bwiza",
+        sick: "Irarwaye",
+        underTreatment: "Iri kuvurwa",
+        deceased: "Yapfuye",
+        cow: "Inka", goat: "Ihene", sheep: "Intama", chicken: "Inkoko", dog: "Imbwa", cat: "Injangwe", other: "Ikindi",
+        dairy: "Amata", meat: "Inyama", poultry: "Inkoko", pet: "Itungo ryo mu rugo",
+        diagnosed: "Yasuzumwe",
+        resolved: "Yakize",
+        symptoms: "Ibimenyetso",
+        treatment: "Ubuvuzi",
+        vet: "Muganga",
+        treatmentDoses: "Imiti yatanzwe",
+        diseaseActive: "Iracyariho",
+        doseOne: "inshuro {count}",
+        doseMany: "inshuro {count}",
+        vaccine: "Urukingo",
+        dose: "Ingano",
+        route: "Inzira",
+        next: "Ubutaha",
+        diseasePrevented: "Indwara rurinda",
+        semenType: "Ubwoko bw'intanga",
+        expBirth: "Igihe cyo kubyara",
+        delivered: "Yabyaye",
+        babies: "Ibyana",
+        notPregnant: "Ntihaka",
+        dueToday: "Ni uyu munsi",
+        daysLeft: "hasigaye iminsi {days}",
+        daysOverdue: "yarengejeho iminsi {days}",
+        mother: "Nyina",
+        birthDate: "Itariki y'Amavuko",
+        lastWeight: "Ibiro bya nyuma",
+        calfActive: "Arakora",
+        weaned: "Yamenywe",
+        calfSold: "Yagurishijwe",
+        graduated: "Yimuriwe mu matungo",
+        ageDays: "iminsi {n}",
+        ageMonths: "amezi {n}"
       }
+    }
+
+    // Same choice the site stores in LanguageContext.
+    var lang = "en"
+    try {
+      if (localStorage.getItem("language") === "rw") lang = "rw"
     } catch (e) {}
 
+    function t(key, vars) {
+      var s = STRINGS[lang][key]
+      if (s == null) s = STRINGS.en[key]
+      if (s == null) return key
+      if (vars) Object.keys(vars).forEach(function (k) { s = s.split("{" + k + "}").join(vars[k]) })
+      return s
+    }
+
+    document.documentElement.lang = lang
+    document.title = t("pageTitle")
+    document.getElementById("title").textContent = t("offline")
+    document.getElementById("desc").textContent = t("checkConnection")
+    document.getElementById("retry").textContent = t("tryAgain")
+
     // This page is served in place of the one that failed, so reloading opens that page.
-    document.getElementById("retry").addEventListener("click", function () { location.reload() })
-    window.addEventListener("online", function () { location.reload() })
+    function reload() { location.reload() }
+    document.getElementById("retry").addEventListener("click", reload)
+    document.getElementById("r-retry").addEventListener("click", reload)
+    window.addEventListener("online", reload)
+
+    function showPlain() { document.body.className = "" }
+    setTimeout(showPlain, 1500)
+
+    loadCopy()
+      .then(function (copy) {
+        if (copy) showRecords(copy)
+        else showPlain()
+      })
+      .catch(showPlain)
+
+    async function loadCopy() {
+      if (!("caches" in window) || !(await caches.has(CACHE))) return null
+      var res = await (await caches.open(CACHE)).match(KEY)
+      if (!res) return null
+      var copy = await res.json()
+      // No longer than the sign-in it was saved under would have lasted.
+      if (!copy || !copy.userId || !(Date.parse(copy.expiresAt) > Date.now())) {
+        await caches.delete(CACHE)
+        return null
+      }
+      copy.savedAt = res.headers.get("X-Saved-At")
+      return copy
+    }
+
+    // ---- Formatting ----
+
+    var locale = "en-GB"
+    try {
+      if (lang === "rw" && Intl.DateTimeFormat.supportedLocalesOf(["rw"]).length) locale = "rw"
+    } catch (e) {}
+    var dayFormat = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+    var weekdayFormat = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+    var savedFormat = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+
+    function pad(n) { return n < 10 ? "0" + n : String(n) }
+    var now = new Date()
+    var todayStr = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate())
+
+    // Records keep dates as "YYYY-MM-DD".
+    function toUtc(s) { return Date.parse(String(s).slice(0, 10) + "T00:00:00Z") }
+    function day(s, format) {
+      if (!s) return ""
+      var ms = toUtc(s)
+      return isNaN(ms) ? String(s) : (format || dayFormat).format(new Date(ms))
+    }
+    function daysFromToday(s) { return Math.round((toUtc(s) - toUtc(todayStr)) / 86400000) }
+    function liters(n) { return (Math.round((Number(n) || 0) * 10) / 10) + "\u00a0L" }
+    function norm(s) { return String(s == null ? "" : s).toLowerCase() }
+    // Animal types and classes the app labels; anything else is shown as typed.
+    var KNOWN_LABELS = ["cow", "goat", "sheep", "chicken", "dog", "cat", "other", "dairy", "meat", "poultry", "pet"]
+    function label(value) { return KNOWN_LABELS.indexOf(value) !== -1 ? t(value) : value }
+
+    function h(tag, props, children) {
+      var el = document.createElement(tag)
+      if (props) {
+        Object.keys(props).forEach(function (k) {
+          var v = props[k]
+          if (v == null || v === false) return
+          if (k === "class") el.className = v
+          else if (k === "text") el.textContent = v
+          else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), v)
+          else el.setAttribute(k, v === true ? "" : v)
+        })
+      }
+      ;(children || []).forEach(function (c) {
+        if (c == null || c === false || c === "") return
+        el.appendChild(typeof c === "object" ? c : document.createTextNode(String(c)))
+      })
+      return el
+    }
+    function badge(text, color) { return h("span", { class: "badge " + color, text: text }) }
+    function chevron() {
+      var span = h("span", { class: "chev", "aria-hidden": "true" })
+      span.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+      return span
+    }
+    function joinDot(parts) { return parts.filter(function (p) { return p }).join(" · ") }
+    function facts(rows) {
+      var dl = h("dl", { class: "facts" })
+      rows.forEach(function (r) {
+        if (r[1] == null || r[1] === "") return
+        dl.appendChild(h("dt", { text: r[0] }))
+        dl.appendChild(h("dd", { text: String(r[1]) }))
+      })
+      return dl
+    }
+    function mini(title, items) {
+      if (!items.length) return null
+      return h("div", null, [
+        h("div", { class: "sub-h", text: title }),
+        h("ul", { class: "mini" }, items.map(function (cols) {
+          return h("li", null, [h("span", null, [cols[0]]), h("span", { class: "muted" }, [cols[1]])])
+        })),
+      ])
+    }
+    // A list that grows in steps, so a big farm doesn't build thousands of rows at once.
+    function paged(items, renderItem, size) {
+      var wrap = h("div")
+      if (!items.length) {
+        wrap.appendChild(h("div", { class: "list" }, [h("div", { class: "empty", text: t("noRecords") })]))
+        return wrap
+      }
+      var list = h("div", { class: "list" })
+      var shown = 0
+      var more = h("button", { class: "more", type: "button", text: t("showMore"), onclick: next })
+      function next() {
+        items.slice(shown, shown + size).forEach(function (item) { list.appendChild(renderItem(item)) })
+        shown = Math.min(items.length, shown + size)
+        more.hidden = shown >= items.length
+      }
+      wrap.appendChild(list)
+      wrap.appendChild(more)
+      next()
+      return wrap
+    }
+    function groupBy(items, field) {
+      var map = {}
+      items.forEach(function (r) {
+        var k = r[field]
+        if (!k) return
+        ;(map[k] = map[k] || []).push(r)
+      })
+      return map
+    }
+
+    // Stored in English; these label them in the reader's language (as in the app).
+    var ANIMAL_STATUS = { Healthy: ["healthy", "green"], Sick: ["sick", "red"], "Under Treatment": ["underTreatment", "amber"], Deceased: ["deceased", "gray"] }
+    var DISEASE_STATUS = { Active: ["diseaseActive", "red"], "Under Treatment": ["underTreatment", "amber"], Resolved: ["resolved", "green"] }
+    var CALF_STATUS = { active: ["calfActive", "green"], weaned: ["weaned", "blue"], sold: ["calfSold", "amber"], graduated: ["graduated", "purple"], deceased: ["deceased", "gray"] }
+    function statusBadge(map, status) {
+      var s = map[status]
+      return s ? badge(t(s[0]), s[1]) : status ? badge(String(status), "gray") : null
+    }
+    function sessionLabel(s) { return s === "Morning" ? t("morning") : s === "Evening" ? t("evening") : s || "" }
+    function genderLabel(g) { return g === "male" ? t("male") : g === "female" ? t("female") : g || "" }
+    function medicines(dose) {
+      return (dose.medicines || []).map(function (m) {
+        var count = Number(m.doseCount) || 0
+        return m.medicineName + " (" + t(count === 1 ? "doseOne" : "doseMany", { count: count }) + (m.volumeMl ? ", " + m.volumeMl + "\u00a0mL" : "") + ")"
+      }).join(", ")
+    }
+
+    // ---- The records ----
+
+    function showRecords(copy) {
+      ;["animals", "milk", "diseases", "doses", "vaccinations", "inseminations", "calves", "calfWeights"].forEach(function (k) {
+        if (!Array.isArray(copy[k])) copy[k] = []
+      })
+      copy.animals.sort(function (a, b) { return norm(a.name).localeCompare(norm(b.name)) })
+
+      var animalsById = {}
+      copy.animals.forEach(function (a) { animalsById[a.id] = a })
+      var milkByAnimal = groupBy(copy.milk, "cowId")
+      var diseasesByAnimal = groupBy(copy.diseases, "animalId")
+      var vaccinationsByAnimal = groupBy(copy.vaccinations, "animalId")
+      var inseminationsByAnimal = groupBy(copy.inseminations, "animalId")
+      var dosesByDisease = groupBy(copy.doses, "diseaseRecordId")
+      var weightsByCalf = groupBy(copy.calfWeights, "calfId")
+      function animalName(id, fallback) { return (animalsById[id] && animalsById[id].name) || fallback || "" }
+
+      // Only the newest record says what's next: an older one's "next" date has
+      // usually been dealt with by a later record.
+      var latestVaccination = {}
+      copy.vaccinations.forEach(function (v) {
+        var k = v.animalId + "|" + norm(v.vaccineName)
+        if (!latestVaccination[k]) latestVaccination[k] = v.id
+      })
+      var latestInsemination = {}
+      copy.inseminations.forEach(function (r) {
+        if (r.animalId && !latestInsemination[r.animalId]) latestInsemination[r.animalId] = r.id
+      })
+
+      function nextVaccinationBadge(v) {
+        if (!v.nextVaccinationDate) return null
+        var text = t("next") + ": " + day(v.nextVaccinationDate)
+        if (latestVaccination[v.animalId + "|" + norm(v.vaccineName)] !== v.id) return h("span", { class: "muted", text: text })
+        var d = daysFromToday(v.nextVaccinationDate)
+        return badge(text, d < 0 ? "red" : d <= 14 ? "amber" : "gray")
+      }
+      function inseminationBadge(r) {
+        if (Number(r.deliveredBabies) > 0) return badge(t("delivered") + " (" + r.deliveredBabies + ")", "green")
+        if (r.pregnancyFailed) return badge(t("notPregnant"), "gray")
+        if (!r.expectedBirthDate || latestInsemination[r.animalId] !== r.id) return null
+        var d = daysFromToday(r.expectedBirthDate)
+        if (d > 0) return badge(t("daysLeft", { days: d }), "blue")
+        if (d === 0) return badge(t("dueToday"), "amber")
+        return badge(t("daysOverdue", { days: -d }), "red")
+      }
+
+      function animalCard(a) {
+        var cow = a.type === "cow" && a.gender === "female"
+        var details = h("details", { class: "item" }, [
+          h("summary", { class: "row" }, [
+            h("div", { class: "row-main" }, [
+              h("div", { class: "row-title" }, [a.name || "—"]),
+              h("div", { class: "row-sub", text: joinDot([a.earTagId, label(a.type), a.breed, genderLabel(a.gender)]) }),
+            ]),
+            h("div", { class: "row-side" }, [
+              statusBadge(ANIMAL_STATUS, a.status || "Healthy"),
+              cow ? badge(t(a.lactationStatus === "lactating" ? "lactating" : "dry"), a.lactationStatus === "lactating" ? "blue" : "gray") : null,
+            ]),
+            chevron(),
+          ]),
+        ])
+        // Filled in when opened, so a long list stays quick.
+        var filled = false
+        details.addEventListener("toggle", function () {
+          if (!details.open || filled) return
+          filled = true
+          details.appendChild(h("div", { class: "body" }, [
+            facts([
+              [t("type"), label(a.type)],
+              [t("class"), label(a["class"])],
+              [t("breed"), a.breed],
+              [t("gender"), genderLabel(a.gender)],
+              [t("earTag"), a.earTagId],
+              [t("insurance"), a.insuranceId],
+              [t("weight"), a.weight ? a.weight + "\u00a0kg" : ""],
+            ]),
+            mini(t("diseaseCases"), (diseasesByAnimal[a.id] || []).map(function (r) {
+              var s = DISEASE_STATUS[r.status]
+              return [r.diseaseName || "", joinDot([day(r.diagnosedDate), s ? t(s[0]) : r.status])]
+            })),
+            mini(t("vaccination"), (vaccinationsByAnimal[a.id] || []).map(function (v) {
+              return [v.vaccineName || "", joinDot([day(v.date), v.nextVaccinationDate ? t("next") + ": " + day(v.nextVaccinationDate) : ""])]
+            })),
+            mini(t("insemination"), (inseminationsByAnimal[a.id] || []).map(function (r) {
+              return [day(r.date), joinDot([(r.semenTypes || []).join(", "), r.expectedBirthDate ? t("expBirth") + ": " + day(r.expectedBirthDate) : ""])]
+            })),
+            mini(t("milkProduction"), (milkByAnimal[a.id] || []).slice(0, 10).map(function (m) {
+              return [joinDot([day(m.date), sessionLabel(m.session)]), liters(m.liters)]
+            })),
+          ]))
+        })
+        return details
+      }
+
+      function renderAnimals(q) {
+        var items = copy.animals.filter(function (a) {
+          return !q || [a.name, a.earTagId, a.insuranceId, a.breed, a.type].some(function (v) { return norm(v).indexOf(q) !== -1 })
+        })
+        return paged(items, animalCard, 50)
+      }
+
+      function renderMilk(q) {
+        var records = copy.milk.filter(function (m) {
+          return !q || norm(animalName(m.cowId, m.cowName)).indexOf(q) !== -1
+        })
+        var weekAgo = new Date(toUtc(todayStr) - 6 * 86400000).toISOString().slice(0, 10)
+        function total(list) { return list.reduce(function (sum, m) { return sum + (Number(m.liters) || 0) }, 0) }
+
+        var days = []
+        var byDay = {}
+        records.forEach(function (m) {
+          if (!byDay[m.date]) {
+            byDay[m.date] = []
+            days.push(m.date)
+          }
+          byDay[m.date].push(m)
+        })
+
+        var wrap = h("div", null, [
+          h("div", { class: "stats" }, [
+            [t("today"), total(byDay[todayStr] || [])],
+            [t("last7"), total(records.filter(function (m) { return m.date >= weekAgo }))],
+            [t("last90"), total(records)],
+          ].map(function (s) {
+            return h("div", { class: "stat" }, [h("div", { class: "stat-label", text: s[0] }), h("div", { class: "stat-value", text: liters(s[1]) })])
+          })),
+        ])
+        wrap.appendChild(paged(days, function (date) {
+          var list = byDay[date]
+          return h("div", { class: "item" }, [
+            h("div", { class: "day-h" }, [h("span", { text: day(date, weekdayFormat) }), h("span", { text: liters(total(list)) })]),
+          ].concat(list.map(function (m) {
+            return h("div", { class: "row" }, [
+              h("div", { class: "row-main" }, [
+                h("div", { class: "row-title", text: animalName(m.cowId, m.cowName) || "—" }),
+                h("div", { class: "row-sub", text: sessionLabel(m.session) }),
+              ]),
+              h("div", { class: "row-side", text: liters(m.liters) }),
+            ])
+          })))
+        }, 14))
+        return wrap
+      }
+
+      function renderDiseases(q) {
+        var items = copy.diseases.filter(function (r) {
+          return !q || [animalName(r.animalId, r.animalName), r.diseaseName].some(function (v) { return norm(v).indexOf(q) !== -1 })
+        })
+        // Cases still open come first.
+        items = items.filter(function (r) { return r.status !== "Resolved" }).concat(items.filter(function (r) { return r.status === "Resolved" }))
+        return paged(items, function (r) {
+          var doses = dosesByDisease[r.id] || []
+          var details = h("details", { class: "item" }, [
+            h("summary", { class: "row" }, [
+              h("div", { class: "row-main" }, [
+                h("div", { class: "row-title", text: joinDot([animalName(r.animalId, r.animalName), r.diseaseName]) }),
+                h("div", { class: "row-sub", text: joinDot([t("diagnosed") + ": " + day(r.diagnosedDate), r.resolvedDate ? t("resolved") + ": " + day(r.resolvedDate) : ""]) }),
+              ]),
+              h("div", { class: "row-side" }, [statusBadge(DISEASE_STATUS, r.status)]),
+              chevron(),
+            ]),
+            h("div", { class: "body" }, [
+              facts([[t("symptoms"), r.symptoms], [t("treatment"), r.treatment], [t("vet"), r.veterinarianName]]),
+              mini(t("treatmentDoses"), doses.map(function (d) {
+                return [joinDot([day(d.date), sessionLabel(d.session)]), medicines(d)]
+              })),
+            ]),
+          ])
+          return details
+        }, 50)
+      }
+
+      function renderVaccination(q) {
+        var items = copy.vaccinations.filter(function (v) {
+          return !q || [animalName(v.animalId, v.animalName), v.vaccineName, v.diseasePrevented].some(function (x) { return norm(x).indexOf(q) !== -1 })
+        })
+        return paged(items, function (v) {
+          return h("div", { class: "item row" }, [
+            h("div", { class: "row-main" }, [
+              h("div", { class: "row-title", text: joinDot([animalName(v.animalId, v.animalName), v.vaccineName]) }),
+              h("div", { class: "row-sub", text: joinDot([day(v.date), v.dose ? v.dose + " " + (v.doseUnit || "") : "", v.route, v.diseasePrevented]) }),
+            ]),
+            h("div", { class: "row-side" }, [nextVaccinationBadge(v)]),
+          ])
+        }, 50)
+      }
+
+      function renderInsemination(q) {
+        var items = copy.inseminations.filter(function (r) {
+          return !q || norm(animalName(r.animalId, r.animalName)).indexOf(q) !== -1
+        })
+        return paged(items, function (r) {
+          return h("div", { class: "item row" }, [
+            h("div", { class: "row-main" }, [
+              h("div", { class: "row-title", text: animalName(r.animalId, r.animalName) || "—" }),
+              h("div", { class: "row-sub", text: joinDot([day(r.date), (r.semenTypes || []).join(", "), r.vetName]) }),
+              r.expectedBirthDate ? h("div", { class: "row-sub", text: t("expBirth") + ": " + day(r.expectedBirthDate) }) : null,
+            ]),
+            h("div", { class: "row-side" }, [inseminationBadge(r)]),
+          ])
+        }, 50)
+      }
+
+      function renderCalves(q) {
+        var items = copy.calves.filter(function (c) {
+          return !q || [c.name, c.motherName, c.breed].some(function (v) { return norm(v).indexOf(q) !== -1 })
+        })
+        return paged(items, function (c) {
+          var age = ""
+          if (c.birthDate && c.status !== "deceased") {
+            var days = -daysFromToday(c.birthDate)
+            if (days >= 0) age = days < 60 ? t("ageDays", { n: days }) : t("ageMonths", { n: Math.floor(days / 30.44) })
+          }
+          var weight = (weightsByCalf[c.id] || [])[0]
+          return h("div", { class: "item row" }, [
+            h("div", { class: "row-main" }, [
+              h("div", { class: "row-title", text: c.name || "—" }),
+              h("div", { class: "row-sub", text: joinDot([genderLabel(c.gender), c.breed, age]) }),
+              h("div", { class: "row-sub", text: joinDot([
+                c.motherName ? t("mother") + ": " + animalName(c.motherAnimalId, c.motherName) : "",
+                c.birthDate ? t("birthDate") + ": " + day(c.birthDate) : "",
+              ]) }),
+              weight ? h("div", { class: "row-sub", text: t("lastWeight") + ": " + weight.weight + "\u00a0kg · " + day(weight.date) }) : null,
+            ]),
+            h("div", { class: "row-side" }, [statusBadge(CALF_STATUS, c.status)]),
+          ])
+        }, 50)
+      }
+
+      // Opens on the part of the app the farmer was trying to reach.
+      var TABS = [
+        { id: "animals", count: copy.animals.length, render: renderAnimals, path: "/farmer/animals" },
+        { id: "milk", count: copy.milk.length, render: renderMilk, path: "/farmer/milk" },
+        { id: "diseases", count: copy.diseases.length, render: renderDiseases, path: "/farmer/diseases" },
+        { id: "vaccination", count: copy.vaccinations.length, render: renderVaccination, path: "/farmer/vaccination" },
+        { id: "insemination", count: copy.inseminations.length, render: renderInsemination, path: "/farmer/insemination" },
+        { id: "calves", count: copy.calves.length, render: renderCalves, path: "/farmer/calves" },
+      ]
+      var current = TABS[0]
+      TABS.forEach(function (tab) {
+        if (location.pathname === tab.path || location.pathname.indexOf(tab.path + "/") === 0) current = tab
+      })
+
+      var tabBar = document.getElementById("r-tabs")
+      var content = document.getElementById("r-content")
+      var search = document.getElementById("r-search")
+      TABS.forEach(function (tab) {
+        tab.button = h("button", { class: "tab", type: "button", role: "tab", "aria-controls": "r-panel", onclick: function () { select(tab) } }, [
+          t(tab.id),
+          h("span", { class: "count", text: String(tab.count) }),
+        ])
+        tabBar.appendChild(tab.button)
+      })
+      function draw() {
+        content.textContent = ""
+        content.appendChild(current.render(norm(search.value.trim())))
+      }
+      function select(tab) {
+        current = tab
+        TABS.forEach(function (x) { x.button.setAttribute("aria-selected", x === tab ? "true" : "false") })
+        tab.button.scrollIntoView({ block: "nearest", inline: "nearest" })
+        draw()
+      }
+
+      document.getElementById("r-title").textContent = t("offline")
+      var savedAt = copy.savedAt ? new Date(copy.savedAt) : null
+      document.getElementById("r-saved").textContent = joinDot([
+        copy.name,
+        savedAt && !isNaN(savedAt) ? t("saved", { time: savedFormat.format(savedAt) }) : "",
+      ])
+      document.getElementById("r-retry").textContent = t("tryAgain")
+      document.getElementById("r-note").textContent = t("readOnly")
+      search.placeholder = t("search")
+      search.setAttribute("aria-label", t("search"))
+      search.addEventListener("input", draw)
+
+      document.querySelector(".plain").hidden = true
+      document.getElementById("records").hidden = false
+      document.body.className = ""
+      select(current)
+    }
+  })()
   </script>
 </body>
 </html>

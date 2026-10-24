@@ -2,12 +2,15 @@
 // /offline.html instead of the browser's error page when a page can't load because
 // there's no connection, and shows the alerts lib/push.ts sends.
 //
-// It never caches pages or data: those always come from the network, so nobody is
-// shown out-of-date records, or what the last person signed in on this phone saw.
+// It never caches pages: those always come from the network, so nobody is shown an
+// out-of-date page, or what the last person signed in on this phone saw. The one
+// exception is a signed-in farmer's own records, which offline.html shows while
+// there's no connection; components/pwa/offline-records-sync.tsx keeps that copy,
+// in its own cache, and deletes it when they sign out.
 // Bump CACHE_NAME whenever offline.html changes, so phones fetch the new copy.
 
 const CACHE_PREFIX = "vettrack-offline-"
-const CACHE_NAME = `${CACHE_PREFIX}v1`
+const CACHE_NAME = `${CACHE_PREFIX}v2`
 const OFFLINE_URL = "/offline.html"
 
 self.addEventListener("install", (event) => {

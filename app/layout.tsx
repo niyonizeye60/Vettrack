@@ -13,6 +13,7 @@ import { CartProvider } from "@/contexts/CartContext"
 import { Toaster } from "@/components/ui/toaster"
 import RegisterServiceWorker from "@/components/pwa/register-service-worker"
 import AppPrompts from "@/components/pwa/app-prompts"
+import OfflineRecordsSync from "@/components/pwa/offline-records-sync"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -61,6 +62,7 @@ export default function RootLayout({
           <AppPrompts />
         </LanguageProvider>
         <RegisterServiceWorker />
+        <OfflineRecordsSync />
         <Toaster />
       </body>
     </html>
