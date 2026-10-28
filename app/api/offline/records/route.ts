@@ -1,9 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { createHash } from "crypto"
 import type { Db, Document } from "mongodb"
 import clientPromise, { withDbRetry } from "@/lib/db"
+import { getOfflineFarmer } from "@/lib/offline-farmer"
+import { isFarmLocationRestrictionEnabled } from "@/lib/farm-location-restriction"
+import { sectorCoordinates } from "@/lib/rwanda-coordinates"
+import { gadmSectorName } from "@/lib/rwanda-geo"
 
 const DB = "ntdm_animal_hospital"
 // Enough for day-to-day work on the farm, without filling up the phone.
@@ -20,29 +23,18 @@ const MAX_RECORDS = 1000
  */
 export async function GET(request: NextRequest) {
   try {
-    const sessionId = cookies().get("session")?.value
-    if (!sessionId) return refuse(401)
-
     const db = (await clientPromise).db(DB)
-    // Looked up here rather than with getCurrentUser, which returns null on a
-    // database error too - that would delete the copy.
-    const session = await withDbRetry(() =>
-      db.collection("sessions").findOne({ sessionId, expiresAt: { $gt: new Date() } })
-    )
-    if (!session) return refuse(401)
-    const user = await withDbRetry(() =>
-      db.collection("users").findOne({ _id: session.userId }, { projection: { name: 1, role: 1, status: 1 } })
-    )
-    if (!user) return refuse(401)
-    // Same accounts that may sign in (lib/actions/auth.ts loginUser).
-    if (user.role !== "farmer" || (user.status && user.status !== "active")) return refuse(403)
+    const farmer = await getOfflineFarmer(db, ["name", "isTestAccount", "district", "sector"])
+    if (farmer.status !== 200) return refuse(farmer.status)
+    const { user, session } = farmer
 
-    const records = await loadRecords(db, user._id.toString())
+    const [records, location] = await Promise.all([loadRecords(db, user._id.toString()), locationRule(user)])
     const body = JSON.stringify({
       userId: user._id.toString(),
       name: user.name || "",
       // The copy is shown no longer than the sign-in it came from would last.
       expiresAt: session.expiresAt,
+      location,
       ...records,
     })
 
@@ -64,6 +56,33 @@ function refuse(status: 401 | 403) {
     { error: status === 401 ? "Unauthorized" : "Forbidden" },
     { status, headers: { "Cache-Control": "private, no-store" } }
   )
+}
+
+/**
+ * What the phone needs to apply the on-farm location rule (verifyOnFarmLocation in
+ * lib/farm-access.ts) to a health record made with no connection: every sector centre,
+ * in the order lib/geofence.ts compares them, and which one is the farm's. The nearest
+ * centre has to be the farm's, as on the server. The server checks again when the
+ * record arrives, so this only spares the farmer a record that would be refused.
+ */
+async function locationRule(user: Document) {
+  const district = typeof user.district === "string" ? user.district.trim() : ""
+  const sector = typeof user.sector === "string" ? user.sector.trim() : ""
+  // The same accounts and farms the server lets through without a location.
+  if (user.isTestAccount || !district || !sector || !(await isFarmLocationRestrictionEnabled())) {
+    return { required: false }
+  }
+
+  const farmSector = gadmSectorName(district, sector) ?? sector
+  const centres: [number, number][] = []
+  let farm = -1
+  for (const [d, sectors] of Object.entries(sectorCoordinates)) {
+    for (const [s, point] of Object.entries(sectors)) {
+      if (d === district && s === farmSector) farm = centres.length
+      centres.push([point.lat, point.lng])
+    }
+  }
+  return { required: true, sector, farm, centres }
 }
 
 async function loadRecords(db: Db, farmerId: string) {
@@ -107,7 +126,8 @@ async function loadRecords(db: Db, farmerId: string) {
       "vaccination_records",
       { farmerId },
       { date: -1, createdAt: -1 },
-      ["animalId", "animalName", "vaccineName", "diseasePrevented", "date", "dose", "doseUnit", "route", "vaccinator", "nextVaccinationDate"]
+      // subject*: an animal or a calf. Older records name an animal with animalId.
+      ["subjectType", "subjectId", "subjectName", "animalId", "animalName", "vaccineName", "diseasePrevented", "date", "dose", "doseUnit", "route", "vaccinator", "nextVaccinationDate"]
     ),
     find(
       "insemination_records",

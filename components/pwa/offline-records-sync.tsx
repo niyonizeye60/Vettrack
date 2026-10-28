@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { homePathForRole, isPortalPath } from "@/lib/roles"
+import { dropSent, sendOutbox } from "./offline-outbox"
 
 /**
  * Keeps a copy of a signed-in farmer's records on the phone, which public/offline.html
@@ -12,6 +13,10 @@ import { homePathForRole, isPortalPath } from "@/lib/roles"
  * else signing in on this phone. The login page only renders for someone signed out
  * (app/login/page.tsx sends everyone else to their portal), so it is the one place
  * every way of signing out passes through.
+ *
+ * Also sends the records the farmer made with no connection (./offline-outbox.ts)
+ * whenever the portal opens or the connection comes back, then updates the copy so it
+ * includes them.
  *
  * Stored with the Cache API so offline.html can read it with no other file:
  * CACHE / KEY below hold the server's JSON, with ETag and X-Saved-At headers.
@@ -45,6 +50,7 @@ function refresh(force = false): Promise<void> {
   if (!force && Date.now() - lastCheck < MIN_GAP_MS) return Promise.resolve()
   lastCheck = Date.now()
   const startedIn = generation
+  const startedAt = Date.now()
 
   running = (async () => {
     try {
@@ -78,6 +84,8 @@ function refresh(force = false): Promise<void> {
           },
         })
       )
+      // Records sent before this check started are in the copy now.
+      await dropSent(startedAt)
     } catch {
       // No connection, or the phone is out of space: keep the copy it has.
     } finally {
@@ -91,9 +99,19 @@ async function clear() {
   generation++
   try {
     await caches.delete(CACHE)
+    // Records not sent yet stay, for when this farmer signs in again.
+    await dropSent()
   } catch {
     // Storage blocked - there's nothing saved then either.
   }
+}
+
+/** Sends what's waiting, after the copy is checked: it names the farmer to send for. */
+function refreshAndSend() {
+  return refresh().then(async () => {
+    const result = await sendOutbox()
+    if (result && result.sent > 0) await refresh(true)
+  })
 }
 
 export default function OfflineRecordsSync() {
@@ -102,11 +120,20 @@ export default function OfflineRecordsSync() {
   useEffect(() => {
     if (!("caches" in window)) return
     if (isFarmerPath(pathname)) {
-      if (supported()) refresh()
+      if (supported()) refreshAndSend()
     } else if (pathname === "/login" || isPortalPath(pathname)) {
       clear()
     }
   }, [pathname])
+
+  useEffect(() => {
+    if (!supported()) return
+    const onOnline = () => {
+      if (isFarmerPath(window.location.pathname)) refreshAndSend()
+    }
+    window.addEventListener("online", onOnline)
+    return () => window.removeEventListener("online", onOnline)
+  }, [])
 
   // Also when the app is closed or put in the background, so a record saved just
   // before the signal went is in the copy.

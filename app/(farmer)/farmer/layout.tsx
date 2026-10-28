@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import UserStatusChecker from "./components/user-status-checker";
 import { MobileSidebarProvider } from "./components/mobile-sidebar-context";
+import OfflineStatus from "@/components/pwa/offline-status";
 
 export default function FarmerLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,7 @@ export default function FarmerLayout({ children }: { children: React.ReactNode }
         <FarmerSidebar />
         <div className="flex-1 flex flex-col min-w-0 print:block">
           <FarmerHeader />
+          <OfflineStatus />
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 print:p-0 print:overflow-visible">{children}</main>
         </div>
       </div>

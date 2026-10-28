@@ -21,6 +21,7 @@ import { localizeColumns } from "@/lib/export-columns"
 import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
+import { useSaveOffline } from "@/hooks/use-save-offline"
 
 type SubjectType = "animal" | "calf"
 
@@ -237,6 +238,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
 
   const recordsRequest = useLatestRequest()
   const reportError = useActionError()
+  const saveOffline = useSaveOffline()
 
   const fetchRecords = async (id: string) => {
     const isLatest = recordsRequest()
@@ -384,11 +386,19 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       vaccinator, nextVaccinationDate, notes,
     }
 
-    const res = await submitWithLocationGate((loc) =>
-      editRecord
+    let located = {}
+    const res = await submitWithLocationGate((loc) => {
+      located = loc
+      return editRecord
         ? fetch("/api/vaccination", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
         : fetch("/api/vaccination", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
-    ).catch(() => null)
+    }).catch(() => null)
+    // No connection: a new record is kept on the phone, with where it was made.
+    if (!res && !editRecord && (await saveOffline("vaccination", { ...body, ...located }))) {
+      resetForm()
+      setSaving(false)
+      return
+    }
     // Keep the form on a failure (wrong location included) so nothing has to be retyped.
     if (!res?.ok) {
       setSaving(false)

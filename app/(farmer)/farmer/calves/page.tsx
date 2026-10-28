@@ -8,6 +8,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeError } from "@/lib/error-messages"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
+import { useSaveOffline } from "@/hooks/use-save-offline"
 import { ageInMonths, isReadyToGraduate, CALF_GRADUATION_AGE_MONTHS } from "@/lib/calf-age"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -216,6 +217,7 @@ export default function CalvesPage() {
   const weightsPageRequest = useLatestRequest()
   const expensesPageRequest = useLatestRequest()
   const reportError = useActionError()
+  const saveOffline = useSaveOffline()
 
   const fetchCalves = async (farmerId: string) => {
     const isLatest = calvesRequest()
@@ -380,6 +382,12 @@ export default function CalvesPage() {
       ? fetch("/api/calves", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editCalf._id, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }) })
       : fetch("/api/calves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     ).catch(() => null)
+    // No connection: a new calf is kept on the phone and sent once there is one.
+    if (!res && wasAdd && (await saveOffline("calf", body))) {
+      resetCalfForm()
+      setSaving(false)
+      return
+    }
     if (!res?.ok) {
       setSaving(false)
       reportError(res)
@@ -495,6 +503,11 @@ export default function CalvesPage() {
       ? fetch("/api/calf-weights", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editWeight._id, weight: weightValue, date: weightDate, notes: weightNotes }) })
       : fetch("/api/calf-weights", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     ).catch(() => null)
+    if (!res && wasAdd && (await saveOffline("calfWeight", body))) {
+      resetWeightForm()
+      setSaving(false)
+      return
+    }
     if (!res?.ok) {
       setSaving(false)
       reportError(res)

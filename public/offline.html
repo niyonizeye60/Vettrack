@@ -11,8 +11,12 @@
     load any other file.
 
     For a signed-in farmer it shows the copy of their records that
-    components/pwa/offline-records-sync.tsx keeps (read-only). Everyone else gets the
-    plain "You're offline" message.
+    components/pwa/offline-records-sync.tsx keeps, and lets them add new ones. Those
+    wait on the phone (components/pwa/offline-outbox.ts describes how) until sw.js
+    sends them. Everyone else gets the plain "You're offline" message.
+
+    The forms follow the app's own (app/(farmer)/farmer/milk, components/livestock/*,
+    app/(farmer)/farmer/calves) and post the same fields, so keep them in step.
   -->
   <style>
     * { box-sizing: border-box; }
@@ -60,7 +64,10 @@
       cursor: pointer;
     }
     .btn:hover { background: #15803d; }
+    .btn[disabled] { opacity: 0.6; cursor: default; }
     .plain .btn { margin-top: 24px; }
+    .btn-light { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+    .btn-light:hover { background: #f9fafb; }
 
     /* The saved records */
     .wrap { max-width: 720px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
@@ -81,6 +88,19 @@
     .top-title { font-weight: 600; font-size: 15px; }
     .top-sub { color: #6b7280; font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
     .btn-sm { flex: none; padding: 8px 12px; font-size: 13px; }
+    .chip {
+      margin-top: 6px;
+      padding: 2px 10px;
+      border: 1px solid #fde68a;
+      border-radius: 999px;
+      background: #fffbeb;
+      color: #b45309;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .chip.red { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
     .tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
     .tabs::-webkit-scrollbar { display: none; }
     .tab {
@@ -113,6 +133,23 @@
 
     .panel { padding-top: 16px; padding-bottom: 32px; }
     .note { margin: 0 0 12px; color: #6b7280; font-size: 13px; line-height: 1.5; }
+    .adds { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .add {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      background: #f0fdf4;
+      color: #15803d;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .add:hover { background: #dcfce7; }
+    .add-sm { padding: 6px 10px; font-size: 13px; }
     .search {
       width: 100%;
       padding: 10px 12px;
@@ -123,7 +160,7 @@
       font: inherit;
       font-size: 16px; /* smaller makes iPhones zoom in */
     }
-    .search:focus { outline: 2px solid #16a34a; outline-offset: -1px; }
+    .search:focus, .input:focus { outline: 2px solid #16a34a; outline-offset: -1px; }
     .list { margin-top: 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
     .item { border-top: 1px solid #f3f4f6; }
     .item:first-child { border-top: 0; }
@@ -134,6 +171,7 @@
     .row-main { flex: 1; min-width: 0; }
     .row-title { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
     .row-sub { color: #6b7280; font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
+    .row-err { color: #b91c1c; font-size: 13px; margin-top: 4px; overflow-wrap: anywhere; }
     .row-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; font-size: 14px; }
     .chev { flex: none; color: #9ca3af; margin-top: 2px; transition: transform 0.15s; }
     details[open] > summary .chev { transform: rotate(180deg); }
@@ -154,6 +192,7 @@
     .purple { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
     .gray { background: #f9fafb; color: #4b5563; border-color: #e5e7eb; }
     .body { padding: 0 16px 16px; }
+    .body .adds { margin: 12px 0 0; }
     .facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
     .facts dt { color: #6b7280; }
     .facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
@@ -192,6 +231,137 @@
       cursor: pointer;
     }
     .empty { padding: 32px 16px; color: #6b7280; font-size: 14px; text-align: center; }
+
+    /* Forms and the list of records not sent yet, in a sheet over the page */
+    .sheet-back {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      background: rgba(17, 24, 39, 0.5);
+    }
+    .sheet {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 560px;
+      max-height: 92vh;
+      background: #fff;
+      border-radius: 16px 16px 0 0;
+    }
+    @media (min-width: 640px) {
+      .sheet-back { align-items: center; padding: 16px; }
+      .sheet { border-radius: 16px; }
+    }
+    .sheet-head { display: flex; align-items: center; gap: 8px; padding: 12px 8px 12px 16px; border-bottom: 1px solid #e5e7eb; }
+    .sheet-title { flex: 1; min-width: 0; font-weight: 600; font-size: 16px; outline: none; }
+    .icon-btn {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 8px;
+      background: none;
+      color: #6b7280;
+      cursor: pointer;
+    }
+    .icon-btn:hover { background: #f3f4f6; }
+    .sheet-body { flex: 1; overflow-y: auto; padding: 16px; }
+    .sheet-foot {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+      padding: 12px 16px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid #e5e7eb;
+    }
+    .sheet-foot .btn { flex: 1; max-width: 220px; padding: 12px 16px; }
+    .form-error {
+      flex-basis: 100%;
+      margin: 0 0 4px;
+      padding: 10px 12px;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      background: #fef2f2;
+      color: #b91c1c;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .form-error strong { display: block; margin-bottom: 2px; }
+    .field { margin-bottom: 14px; }
+    .field > label, .field-label { display: block; margin-bottom: 6px; color: #374151; font-size: 14px; font-weight: 500; }
+    .opt { color: #9ca3af; font-size: 12px; font-weight: 400; }
+    .input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #fff;
+      color: inherit;
+      font: inherit;
+      font-size: 16px;
+    }
+    select.input { appearance: auto; }
+    textarea.input { resize: vertical; }
+    .input.bad, .checks.bad, .meds.bad .med { border-color: #ef4444; }
+    .err { margin-top: 4px; color: #dc2626; font-size: 13px; }
+    .hint { margin-top: 4px; color: #6b7280; font-size: 12px; }
+    .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+    .checks { padding: 4px 12px; border: 1px solid #d1d5db; border-radius: 8px; }
+    .checks label { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 15px; }
+    .checks input { width: 18px; height: 18px; accent-color: #16a34a; }
+    .med { margin-bottom: 8px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
+    .med-top { display: flex; gap: 4px; }
+    .med-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+    .med-grid label { display: block; margin-bottom: 4px; color: #6b7280; font-size: 12px; }
+    .link {
+      padding: 6px 0;
+      border: 0;
+      background: none;
+      color: #15803d;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    details.extra { margin-bottom: 14px; border-top: 1px solid #f3f4f6; }
+    details.extra > summary { padding: 12px 0; color: #15803d; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .unsent-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid #f3f4f6; }
+    .unsent-row:first-child { border-top: 0; }
+    .remove {
+      flex: none;
+      padding: 6px 10px;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      background: #fff;
+      color: #b91c1c;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toast {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      z-index: 20;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #111827;
+      color: #fff;
+      font-size: 14px;
+      line-height: 1.4;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -222,6 +392,7 @@
         <div class="top-text">
           <div class="top-title" id="r-title"></div>
           <div class="top-sub" id="r-saved"></div>
+          <button class="chip" id="r-waiting" type="button" hidden></button>
         </div>
         <button class="btn btn-sm" id="r-retry" type="button"></button>
       </div>
@@ -229,6 +400,7 @@
     </header>
     <div class="wrap panel" id="r-panel" role="tabpanel">
       <p class="note" id="r-note"></p>
+      <div class="adds" id="r-adds"></div>
       <input class="search" id="r-search" type="search" autocomplete="off">
       <div id="r-content"></div>
     </div>
@@ -238,9 +410,16 @@
   (function () {
     "use strict"
 
-    // Where components/pwa/offline-records-sync.tsx keeps the copy. Keep in step.
+    // Where components/pwa/offline-records-sync.tsx keeps the copy, and where records
+    // made here wait to be sent (components/pwa/offline-outbox.ts). Keep in step.
     var CACHE = "vettrack-records"
     var KEY = "/offline/records.json"
+    var OUTBOX = "vettrack-outbox"
+    var OUTBOX_PREFIX = "/offline/outbox/"
+    var OUTBOX_SYNC = "vettrack-outbox"
+    // A record made here for another one made here (a dose for a new disease case)
+    // points at it as "offline:<its id>"; app/api/offline/outbox swaps in the real id.
+    var REF_PREFIX = "offline:"
 
     var STRINGS = {
       en: {
@@ -249,7 +428,7 @@
         checkConnection: "Check your internet connection, then try again.",
         tryAgain: "Try again",
         saved: "Saved {time}",
-        readOnly: "This is the copy saved on this phone. You can add or change records once you're back online.",
+        note: "This is the copy saved on this phone. Records you add now are kept here and sent when you're back online. Changing or deleting a record needs a connection.",
         search: "Search animals…",
         noRecords: "No records found",
         showMore: "Show more",
@@ -313,7 +492,123 @@
         calfSold: "Sold",
         graduated: "Moved to animals",
         ageDays: "{n} days",
-        ageMonths: "{n} months"
+        ageMonths: "{n} months",
+        calfSuffix: "(calf)",
+
+        notSent: "Not sent yet",
+        notSaved: "Not saved",
+        waitingCount: "{count} not sent yet",
+        unsentNote: "These records are kept on this phone and will be sent when you're back online.",
+        savedOnPhone: "Saved on this phone. It will be sent when you're back online.",
+        saveFailed: "This phone couldn't keep the record. Free up some space and try again.",
+        locating: "Getting your location…",
+        wrongLocation: "Wrong location",
+        locationRequired: "Location is required to do this - enable location access and try again",
+        sectorOnly: "This action can only be done in the {sector} sector",
+        alreadyMilked: "{animal} was already milked during the {session} session on this date",
+        remove: "Remove",
+        removeConfirm: "Remove this record? It will be deleted from this phone and won't be saved.",
+        removeAlsoOne: "1 more record made for it will be removed too.",
+        removeAlsoMany: "{count} more records made for it will be removed too.",
+        parentFailed: "It was made for a disease case or calf that couldn't be saved.",
+        actionFailed: "Action failed. Please try again.",
+        close: "Close",
+        cancel: "Cancel",
+        optional: "Optional",
+        moreDetails: "More details",
+        saveRecord: "Save Record",
+        saveCalf: "Save Calf",
+        newMilk: "New Milk Record",
+        newDisease: "New Disease Record",
+        newDose: "Log Treatment Dose",
+        newVaccination: "New Vaccination Record",
+        newInsemination: "New Insemination Record",
+        newCalf: "New Calf",
+        newWeight: "Record Weight",
+        kindMilk: "Milk",
+        kindDisease: "Disease",
+        kindDose: "Treatment dose",
+        kindVaccination: "Vaccination",
+        kindInsemination: "Insemination",
+        kindCalf: "New calf",
+        kindCalfWeight: "Calf weight",
+        fieldCow: "Cow",
+        fieldAnimal: "Animal",
+        fieldSubject: "Animal or Calf",
+        fieldCalf: "Calf",
+        session: "Session",
+        date: "Date",
+        time: "Time",
+        milkLiters: "Milk Quantity (Liters)",
+        homeLiters: "Home Consumption (Liters)",
+        pricePerLiter: "Price per Liter (RWF)",
+        water: "Water Intake (Liters)",
+        feedType: "Feed Type",
+        feedKg: "Feed Eaten (KGs)",
+        feedCost: "Feed Cost (RWF)",
+        saltKg: "Salt Consumed (KG)",
+        saltCost: "Salt Cost (RWF)",
+        notes: "Notes",
+        disease: "Disease",
+        diseasePlaceholder: "Type or select a disease...",
+        status: "Status",
+        diagnosedDate: "Diagnosed Date",
+        veterinarian: "Veterinarian",
+        diseaseCase: "Disease Case",
+        medicines: "Medicines Administered",
+        addMedicine: "Add Medicine",
+        medicineName: "Medicine name, e.g. Oxytetracycline",
+        doses: "Doses",
+        volMl: "Vol (mL)",
+        costRwf: "Cost (RWF)",
+        vetCost: "Vet Cost (RWF)",
+        vaccineName: "Vaccine Name",
+        dateGiven: "Date Given",
+        vaccinator: "Vaccinator",
+        nextVaccination: "Next Vaccination",
+        routeSubcutaneous: "Subcutaneous",
+        routeIntramuscular: "Intramuscular",
+        routeIntranasal: "Intranasal",
+        routeOral: "Oral",
+        routeIntradermal: "Intradermal",
+        routeIntravenous: "Intravenous",
+        routeOther: "Other",
+        unit: "Unit",
+        unitDoses: "doses",
+        semenTypes: "Types of Semen",
+        expectedBirth: "Expected Birth Date",
+        autoEstimated: "Auto-estimated: AI date + 283 days",
+        vetName: "Name of the Vet",
+        injectionTime: "Time of Injection",
+        semenPrice: "Price of Semen",
+        vetPrice: "Vet Price",
+        calfName: "Calf Name",
+        birthWeight: "Birth Weight (kg)",
+        weightKg: "Weight (kg)",
+        selectCow: "Please select a cow",
+        validLiters: "Enter valid liters",
+        selectSession: "Select a session",
+        selectDate: "Select a date",
+        selectAnimal: "Select an animal",
+        enterDisease: "Enter the disease name",
+        selectCase: "Select a disease case",
+        medicineError: "Each medicine needs a name, a dose count greater than 0, and a non-negative cost",
+        selectSubject: "Select an animal or calf",
+        enterVaccine: "Enter the vaccine name",
+        selectDateGiven: "Select the date given",
+        validDose: "Enter a valid dose",
+        nextBeforeGiven: "Next dose cannot be before the date given",
+        selectSemen: "Select at least one semen type",
+        genderMissing: "The animal {animal} does not have a gender defined. Please go to the Animals page and set its gender to Female before recording an insemination.",
+        enterCalfName: "Enter a calf name",
+        selectGender: "Select gender",
+        selectBirthDate: "Select a birth date",
+        selectCalf: "Select a calf",
+        validWeight: "Enter a valid weight",
+        noAnimals: "No animals registered",
+        noOpenCases: "No disease cases being treated",
+        noCalves: "Please add a calf first",
+        allPregnant: "All animals are pregnant"
       },
       rw: {
         pageTitle: "Nta interineti - VetTrack",
@@ -321,7 +616,7 @@
         checkConnection: "Reba interineti yawe hanyuma wongere ugerageze.",
         tryAgain: "Ongera ugerageze",
         saved: "Byabitswe {time}",
-        readOnly: "Aya ni amakuru yabitswe kuri iyi telefoni. Uzabasha kongeramo cyangwa guhindura amakuru umaze kubona interineti.",
+        note: "Aya ni amakuru yabitswe kuri iyi telefoni. Amakuru wongeyeho ubu abikwa hano, akoherezwa umaze kubona interineti. Guhindura cyangwa gusiba amakuru bisaba interineti.",
         search: "Shakisha amatungo…",
         noRecords: "Nta makuru abonetse",
         showMore: "Reba ibindi",
@@ -385,9 +680,161 @@
         calfSold: "Yagurishijwe",
         graduated: "Yimuriwe mu matungo",
         ageDays: "iminsi {n}",
-        ageMonths: "amezi {n}"
+        ageMonths: "amezi {n}",
+        calfSuffix: "(inyana)",
+
+        notSent: "Ntibiroherezwa",
+        notSaved: "Ntibyabitswe",
+        waitingCount: "{count} ntibiroherezwa",
+        unsentNote: "Aya makuru abitswe kuri iyi telefoni, azoherezwa umaze kubona interineti.",
+        savedOnPhone: "Byabitswe kuri iyi telefoni. Bizoherezwa umaze kubona interineti.",
+        saveFailed: "Iyi telefoni ntiyashoboye kubika aya makuru. Bohora umwanya hanyuma wongere ugerageze.",
+        locating: "Turimo kureba aho uri…",
+        wrongLocation: "Ntabwo uri ahantu hakwiye",
+        locationRequired: "Aho uri harakenewe kugira ngo ukore ibi - emerera kumenya aho uri hanyuma wongere ugerageze",
+        sectorOnly: "Iki gikorwa gishobora gukorerwa mu murenge wa {sector} gusa",
+        alreadyMilked: "{animal} yamaze gukamwa {session} kuri iyi tariki",
+        remove: "Kuraho",
+        removeConfirm: "Gukuraho iyi nyandiko? Izasibwa kuri iyi telefoni kandi ntizabikwa.",
+        removeAlsoOne: "Indi nyandiko 1 yayikorewe na yo izakurwaho.",
+        removeAlsoMany: "Izindi nyandiko {count} zayikorewe na zo zizakurwaho.",
+        parentFailed: "Yakorewe indwara cyangwa inyana itarabitswe.",
+        actionFailed: "Igikorwa cyanze. Ongera ugerageze.",
+        close: "Funga",
+        cancel: "Hagarika",
+        optional: "Kubushake",
+        moreDetails: "Ibindi bisobanuro",
+        saveRecord: "Bika amakuru",
+        saveCalf: "Bika Inyana",
+        newMilk: "Amakuru mashya y'amata",
+        newDisease: "Amakuru mashya y'indwara",
+        newDose: "Andika imiti itangwa",
+        newVaccination: "Inyandiko nshya y'urukingo",
+        newInsemination: "Amakuru mashya y'itera",
+        newCalf: "Inyana Nshya",
+        newWeight: "Andika Ibiro",
+        kindMilk: "Amata",
+        kindDisease: "Indwara",
+        kindDose: "Imiti yatanzwe",
+        kindVaccination: "Urukingo",
+        kindInsemination: "Guterwa intanga",
+        kindCalf: "Inyana nshya",
+        kindCalfWeight: "Ibiro by'inyana",
+        fieldCow: "Inka",
+        fieldAnimal: "Itungo",
+        fieldSubject: "Itungo cyangwa inyana",
+        fieldCalf: "Inyana",
+        session: "Igihe cy'umunsi",
+        date: "Itariki",
+        time: "Igihe",
+        milkLiters: "Ingano y'amata (Litiro)",
+        homeLiters: "Ikoreshwa mu rugo (Litiro)",
+        pricePerLiter: "Igiciro kuri litiro (RWF)",
+        water: "Amazi yanyweye (Litiro)",
+        feedType: "Ubwoko bw'ibiribwa",
+        feedKg: "Ibiribwa yariye (KG)",
+        feedCost: "Igiciro cy'ibiribwa (RWF)",
+        saltKg: "Umunyu Uriwe (KG)",
+        saltCost: "Igiciro cy'Umunyu (RWF)",
+        notes: "Ibisobanuro",
+        disease: "Indwara",
+        diseasePlaceholder: "Andika cyangwa uhitemo indwara...",
+        status: "Uko imeze",
+        diagnosedDate: "Itariki y'isuzuma",
+        veterinarian: "Muganga w'Amatungo",
+        diseaseCase: "Ikibazo cy'indwara",
+        medicines: "Imiti yahawe",
+        addMedicine: "Ongeraho umuti",
+        medicineName: "Izina ry'umuti, urugero Oxytetracycline",
+        doses: "Inshuro",
+        volMl: "Ingano (mL)",
+        costRwf: "Igiciro (RWF)",
+        vetCost: "Igiciro cya vete (RWF)",
+        vaccineName: "Izina ry'urukingo",
+        dateGiven: "Itariki yatanzweho",
+        vaccinator: "Uwatanze urukingo",
+        nextVaccination: "Urukingo rukurikira",
+        routeSubcutaneous: "Munsi y'uruhu",
+        routeIntramuscular: "Mu mutsi",
+        routeIntranasal: "Mu mazuru",
+        routeOral: "Mu kanwa",
+        routeIntradermal: "Mu ruhu",
+        routeIntravenous: "Mu mitsi y'amaraso",
+        routeOther: "Ubundi",
+        unit: "Igipimo",
+        unitDoses: "inshuro",
+        semenTypes: "Ubwoko bw'imbuto",
+        expectedBirth: "Itariki y'inzarana iteganijwe",
+        autoEstimated: "Byabazwe: itariki yo guterwa intanga + iminsi 283",
+        vetName: "Izina rya vete",
+        injectionTime: "Igihe cyo gutera",
+        semenPrice: "Igiciro cy'imbuto",
+        vetPrice: "Igiciro cy'umuganga",
+        calfName: "Izina ry'Inyana",
+        birthWeight: "Ibiro ku Mavuko (kg)",
+        weightKg: "Ibiro (kg)",
+        selectCow: "Hitamo inka",
+        validLiters: "Andika litiro ziboneye",
+        selectSession: "Hitamo igihe",
+        selectDate: "Hitamo itariki",
+        selectAnimal: "Hitamo itungo",
+        enterDisease: "Andika izina ry'indwara",
+        selectCase: "Hitamo indwara yanditswe",
+        medicineError: "Buri muti ukeneye izina, umubare w'inshuro uruta 0, n'igiciro kitari munsi ya zeru",
+        selectSubject: "Hitamo itungo cyangwa inyana",
+        enterVaccine: "Andika izina ry'urukingo",
+        selectDateGiven: "Hitamo itariki rwatanzweho",
+        validDose: "Andika ingano iboneye",
+        nextBeforeGiven: "Urukingo rukurikira ntirushobora kuba mbere y'itariki rwatanzweho",
+        selectSemen: "Hitamo nibura ubwoko bumwe bw'intanga",
+        genderMissing: "Itungo {animal} ntirifite igitsina cyanditswe. Jya ku rupapuro rw'Amatungo urishyireho igitsina Gore mbere yo kwandika guterwa intanga.",
+        enterCalfName: "Andika izina ry'inyana",
+        selectGender: "Hitamo igitsina",
+        selectBirthDate: "Hitamo itariki y'amavuko",
+        selectCalf: "Hitamo inyana",
+        validWeight: "Andika ibiro biboneye",
+        noAnimals: "Nta matungo yanditswe",
+        noOpenCases: "Nta ndwara iri kuvurwa",
+        noCalves: "Nyamuneka ongeraho inyana mbere",
+        allPregnant: "Amatungo yose arahaka"
       }
     }
+
+    // The server's messages a record can come back with, in Kinyarwanda
+    // (lib/error-messages.ts has them all; these are the ones a farmer meets here).
+    var SERVER_ERRORS_RW = [
+      [/^This action can only be done in the (.+) sector$/, "Iki gikorwa gishobora gukorerwa mu murenge wa $1 gusa"],
+      [/^Location is required to do this/, STRINGS.rw.locationRequired],
+      [/^(.+) was already milked during the (.+) session on this date$/, "$1 yamaze gukamwa $2 kuri iyi tariki"],
+      [/^That animal is not on this farm$/, "Iryo tungo ntiri kuri iyi farumu"],
+      [/^That calf is not on this farm$/, "Iyo nyana ntiri kuri iyi farumu"],
+      [/^That disease case is not on this farm$/, "Iyo ndwara yanditswe ntiri kuri iyi farumu"]
+    ]
+
+    // The app's own choices (components/livestock/*). Stored in English.
+    var COMMON_DISEASES = [
+      "Foot and Mouth Disease", "Mastitis", "Bovine Respiratory Disease",
+      "Brucellosis", "Tuberculosis", "Lumpy Skin Disease", "East Coast Fever",
+      "Trypanosomiasis", "Newcastle Disease", "Anthrax", "Blackleg"
+    ]
+    var COMMON_VACCINES = [
+      ["FMD Vaccine", "Foot-and-Mouth Disease", "Inactivated"],
+      ["Lumpy Skin Disease Vaccine", "Lumpy Skin Disease", "Live attenuated"],
+      ["Brucella S19", "Brucellosis", "Live attenuated"],
+      ["Blackleg Vaccine", "Blackleg", "Toxoid"],
+      ["Anthrax Spore Vaccine", "Anthrax", "Live attenuated"],
+      ["East Coast Fever (ITM)", "East Coast Fever", "Live attenuated"],
+      ["Rabies Vaccine", "Rabies", "Inactivated"],
+      ["Newcastle Disease Vaccine", "Newcastle Disease", "Live attenuated"],
+      ["PPR Vaccine", "Peste des Petits Ruminants", "Live attenuated"],
+      ["CBPP Vaccine", "Contagious Bovine Pleuropneumonia", "Live attenuated"]
+    ]
+    var ROUTES = ["Subcutaneous", "Intramuscular", "Intranasal", "Oral", "Intradermal", "Intravenous", "Other"]
+    var DOSE_UNITS = ["ml", "cc", "doses"]
+    var SEMEN_TYPES = ["Sexed Freisian", "Sexed Jersey", "Ordinary Freisian", "Ordinary Jersey", "Fleckv", "Girolando"]
+    var MILK_TYPES = ["cow", "goat", "sheep"]
+    var ROUTINE_FIELDS = ["liters", "homeConsumption", "pricePerLiter", "waterLiters", "foodType", "foodKg", "foodCost", "saltKg", "saltCost"]
+    var GESTATION_DAYS = 283
 
     // Same choice the site stores in LanguageContext.
     var lang = "en"
@@ -402,6 +849,14 @@
       if (vars) Object.keys(vars).forEach(function (k) { s = s.split("{" + k + "}").join(vars[k]) })
       return s
     }
+    function serverError(message) {
+      if (!message) return t("actionFailed")
+      if (lang !== "rw") return message
+      for (var i = 0; i < SERVER_ERRORS_RW.length; i++) {
+        if (SERVER_ERRORS_RW[i][0].test(message)) return message.replace(SERVER_ERRORS_RW[i][0], SERVER_ERRORS_RW[i][1])
+      }
+      return message
+    }
 
     document.documentElement.lang = lang
     document.title = t("pageTitle")
@@ -410,18 +865,24 @@
     document.getElementById("retry").textContent = t("tryAgain")
 
     // This page is served in place of the one that failed, so reloading opens that page.
+    // Not while a form is open, though: that would lose what the farmer is typing.
+    var sheet = null
+    var reloadWhenClosed = false
     function reload() { location.reload() }
     document.getElementById("retry").addEventListener("click", reload)
     document.getElementById("r-retry").addEventListener("click", reload)
-    window.addEventListener("online", reload)
+    window.addEventListener("online", function () {
+      if (sheet) reloadWhenClosed = true
+      else reload()
+    })
 
     function showPlain() { document.body.className = "" }
     setTimeout(showPlain, 1500)
 
     loadCopy()
       .then(function (copy) {
-        if (copy) showRecords(copy)
-        else showPlain()
+        if (!copy) return showPlain()
+        return readOutbox(copy.userId).then(function (entries) { showRecords(copy, entries) })
       })
       .catch(showPlain)
 
@@ -437,6 +898,79 @@
       }
       copy.savedAt = res.headers.get("X-Saved-At")
       return copy
+    }
+
+    // ---- Records waiting to be sent ----
+
+    async function readOutbox(userId) {
+      if (!(await caches.has(OUTBOX))) return []
+      var cache = await caches.open(OUTBOX)
+      var keys = await cache.keys()
+      var entries = []
+      for (var i = 0; i < keys.length; i++) {
+        if (new URL(keys[i].url).pathname.indexOf(OUTBOX_PREFIX) !== 0) continue
+        var res = await cache.match(keys[i])
+        var entry = res ? await res.json().catch(function () { return null }) : null
+        if (entry && entry.id && entry.userId === userId) entries.push(entry)
+      }
+      return entries.sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0 })
+    }
+    async function putEntry(entry) {
+      var cache = await caches.open(OUTBOX)
+      await cache.put(OUTBOX_PREFIX + entry.id, new Response(JSON.stringify(entry), { headers: { "Content-Type": "application/json" } }))
+    }
+    async function deleteEntries(ids) {
+      var cache = await caches.open(OUTBOX)
+      await Promise.all(ids.map(function (id) { return cache.delete(OUTBOX_PREFIX + id) }))
+    }
+    // Android sends them once the phone is back online, even with the app closed;
+    // elsewhere the app sends them the next time it opens with a connection.
+    function requestSend() {
+      try {
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {})
+        if (!("serviceWorker" in navigator)) return
+        navigator.serviceWorker.ready
+          .then(function (registration) { if (registration.sync) return registration.sync.register(OUTBOX_SYNC) })
+          .catch(function () {})
+      } catch (e) {}
+    }
+    function newId() {
+      if (window.crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID()
+      return Array.prototype.map.call(crypto.getRandomValues(new Uint8Array(16)), function (b) { return (b < 16 ? "0" : "") + b.toString(16) }).join("")
+    }
+
+    // ---- Location ----
+
+    // The on-farm rule for health records (lib/farm-access.ts verifyOnFarmLocation):
+    // the nearest sector centre must be the farm's, measured as lib/rwanda-geo.ts does.
+    // The server checks again when the record arrives.
+    function locate() {
+      return new Promise(function (resolve) {
+        if (!navigator.geolocation) return resolve(null)
+        navigator.geolocation.getCurrentPosition(
+          function (p) { resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy == null ? null : p.coords.accuracy }) },
+          function () { resolve(null) },
+          // A phone with no data can take a while to find itself. A reading up to 30
+          // seconds old will do, as in the app (hooks/use-current-location.ts).
+          { enableHighAccuracy: true, timeout: 30000, maximumAge: 30000 }
+        )
+      })
+    }
+    function distanceKm(lat1, lng1, lat2, lng2) {
+      var toRad = function (deg) { return (deg * Math.PI) / 180 }
+      var dLat = toRad(lat2 - lat1)
+      var dLng = toRad(lng2 - lng1)
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+      return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    }
+    function onFarm(rule, pos) {
+      var nearest = -1
+      var best = Infinity
+      ;(rule.centres || []).forEach(function (c, i) {
+        var d = distanceKm(pos.lat, pos.lng, c[0], c[1])
+        if (d < best) { best = d; nearest = i }
+      })
+      return nearest !== -1 && nearest === rule.farm
     }
 
     // ---- Formatting ----
@@ -460,12 +994,17 @@
       var ms = toUtc(s)
       return isNaN(ms) ? String(s) : (format || dayFormat).format(new Date(ms))
     }
+    function addDays(s, n) { return new Date(toUtc(s) + n * 86400000).toISOString().slice(0, 10) }
     function daysFromToday(s) { return Math.round((toUtc(s) - toUtc(todayStr)) / 86400000) }
-    function liters(n) { return (Math.round((Number(n) || 0) * 10) / 10) + "\u00a0L" }
+    function liters(n) { return (Math.round((Number(n) || 0) * 10) / 10) + " L" }
     function norm(s) { return String(s == null ? "" : s).toLowerCase() }
     // Animal types and classes the app labels; anything else is shown as typed.
     var KNOWN_LABELS = ["cow", "goat", "sheep", "chicken", "dog", "cat", "other", "dairy", "meat", "poultry", "pet"]
     function label(value) { return KNOWN_LABELS.indexOf(value) !== -1 ? t(value) : value }
+    function plural(key, n) { return t(n === 1 ? key + "One" : key + "Many", { count: n }) }
+
+    var X_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+    var PLUS = "+ "
 
     function h(tag, props, children) {
       var el = document.createElement(tag)
@@ -486,10 +1025,13 @@
       return el
     }
     function badge(text, color) { return h("span", { class: "badge " + color, text: text }) }
-    function chevron() {
-      var span = h("span", { class: "chev", "aria-hidden": "true" })
-      span.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
+    function icon(svg, className) {
+      var span = h("span", { class: className, "aria-hidden": "true" })
+      span.innerHTML = svg
       return span
+    }
+    function chevron() {
+      return icon('<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>', "chev")
     }
     function joinDot(parts) { return parts.filter(function (p) { return p }).join(" · ") }
     function facts(rows) {
@@ -539,6 +1081,19 @@
       })
       return map
     }
+    function byDateDesc(field) {
+      return function (a, b) { return a[field] < b[field] ? 1 : a[field] > b[field] ? -1 : 0 }
+    }
+
+    var toastTimer = null
+    function toast(text) {
+      var old = document.querySelector(".toast")
+      if (old) old.remove()
+      clearTimeout(toastTimer)
+      var el = h("div", { class: "toast", role: "status", text: text })
+      document.body.appendChild(el)
+      toastTimer = setTimeout(function () { el.remove() }, 4000)
+    }
 
     // Stored in English; these label them in the reader's language (as in the app).
     var ANIMAL_STATUS = { Healthy: ["healthy", "green"], Sick: ["sick", "red"], "Under Treatment": ["underTreatment", "amber"], Deceased: ["deceased", "gray"] }
@@ -553,44 +1108,110 @@
     function medicines(dose) {
       return (dose.medicines || []).map(function (m) {
         var count = Number(m.doseCount) || 0
-        return m.medicineName + " (" + t(count === 1 ? "doseOne" : "doseMany", { count: count }) + (m.volumeMl ? ", " + m.volumeMl + "\u00a0mL" : "") + ")"
+        return m.medicineName + " (" + t(count === 1 ? "doseOne" : "doseMany", { count: count }) + (m.volumeMl ? ", " + m.volumeMl + " mL" : "") + ")"
       }).join(", ")
     }
 
     // ---- The records ----
 
-    function showRecords(copy) {
+    function showRecords(copy, outbox) {
       ;["animals", "milk", "diseases", "doses", "vaccinations", "inseminations", "calves", "calfWeights"].forEach(function (k) {
         if (!Array.isArray(copy[k])) copy[k] = []
       })
       copy.animals.sort(function (a, b) { return norm(a.name).localeCompare(norm(b.name)) })
-
-      var animalsById = {}
-      copy.animals.forEach(function (a) { animalsById[a.id] = a })
-      var milkByAnimal = groupBy(copy.milk, "cowId")
-      var diseasesByAnimal = groupBy(copy.diseases, "animalId")
-      var vaccinationsByAnimal = groupBy(copy.vaccinations, "animalId")
-      var inseminationsByAnimal = groupBy(copy.inseminations, "animalId")
-      var dosesByDisease = groupBy(copy.doses, "diseaseRecordId")
-      var weightsByCalf = groupBy(copy.calfWeights, "calfId")
-      function animalName(id, fallback) { return (animalsById[id] && animalsById[id].name) || fallback || "" }
-
-      // Only the newest record says what's next: an older one's "next" date has
-      // usually been dealt with by a later record.
-      var latestVaccination = {}
+      // A vaccination is given to an animal or a calf; older records name an animal only.
       copy.vaccinations.forEach(function (v) {
-        var k = v.animalId + "|" + norm(v.vaccineName)
-        if (!latestVaccination[k]) latestVaccination[k] = v.id
+        v.subjectType = v.subjectType || "animal"
+        v.subjectId = v.subjectId || v.animalId
+        v.subjectName = v.subjectName || v.animalName
       })
-      var latestInsemination = {}
-      copy.inseminations.forEach(function (r) {
-        if (r.animalId && !latestInsemination[r.animalId]) latestInsemination[r.animalId] = r.id
-      })
+      var rule = copy.location || { required: false }
+
+      // The copy with the records made here added in, rebuilt whenever those change.
+      var data, animalsById, calvesById, milkByAnimal, diseasesByAnimal, vaccinationsByAnimal, inseminationsByAnimal
+      var dosesByDisease, weightsByCalf, latestVaccination, latestInsemination, pregnant
+      var TARGET = { milk: "milk", disease: "diseases", dose: "doses", vaccination: "vaccinations", insemination: "inseminations", calf: "calves", calfWeight: "calfWeights" }
+
+      function rebuild() {
+        data = {}
+        Object.keys(copy).forEach(function (k) { if (Array.isArray(copy[k])) data[k] = copy[k].slice() })
+        var inCopy = {}
+        Object.keys(TARGET).forEach(function (kind) { data[TARGET[kind]].forEach(function (r) { inCopy[r.id] = true }) })
+        // A record sent already is known by its real id from then on.
+        var sentAs = {}
+        outbox.forEach(function (e) { if (e.status === "sent" && e.recordId) sentAs[REF_PREFIX + e.id] = e.recordId })
+        function ref(v) { return sentAs[v] || v }
+
+        var added = {}
+        outbox.slice().reverse().forEach(function (e) {
+          if (!TARGET[e.kind] || (e.status === "sent" && e.recordId && inCopy[e.recordId])) return
+          var r = Object.assign({}, e.body)
+          r.id = e.status === "sent" && e.recordId ? e.recordId : REF_PREFIX + e.id
+          r.entry = e.status === "sent" ? null : e
+          ;["diseaseRecordId", "subjectId", "calfId"].forEach(function (f) { if (r[f]) r[f] = ref(r[f]) })
+          if (e.kind === "disease") r.status = r.status || "Active"
+          if (e.kind === "calf") r.status = r.status || "active"
+          ;(added[TARGET[e.kind]] = added[TARGET[e.kind]] || []).push(r)
+        })
+        // Newest first, the records made here ahead of those from the same day.
+        var SORT = { milk: "date", diseases: "diagnosedDate", doses: "date", vaccinations: "date", inseminations: "date", calfWeights: "date" }
+        Object.keys(added).forEach(function (k) {
+          data[k] = added[k].concat(data[k])
+          if (SORT[k]) data[k].sort(byDateDesc(SORT[k]))
+        })
+
+        animalsById = {}
+        data.animals.forEach(function (a) { animalsById[a.id] = a })
+        calvesById = {}
+        data.calves.forEach(function (c) { calvesById[c.id] = c })
+        milkByAnimal = groupBy(data.milk, "cowId")
+        diseasesByAnimal = groupBy(data.diseases, "animalId")
+        vaccinationsByAnimal = groupBy(data.vaccinations.filter(function (v) { return v.subjectType !== "calf" }), "subjectId")
+        inseminationsByAnimal = groupBy(data.inseminations, "animalId")
+        dosesByDisease = groupBy(data.doses, "diseaseRecordId")
+        weightsByCalf = groupBy(data.calfWeights, "calfId")
+
+        // Only the newest record says what's next: an older one's "next" date has
+        // usually been dealt with by a later record.
+        latestVaccination = {}
+        data.vaccinations.forEach(function (v) {
+          var k = v.subjectId + "|" + norm(v.vaccineName)
+          if (!latestVaccination[k]) latestVaccination[k] = v.id
+        })
+        latestInsemination = {}
+        data.inseminations.forEach(function (r) {
+          if (r.animalId && !latestInsemination[r.animalId]) latestInsemination[r.animalId] = r.id
+        })
+        // As the insemination form decides who can't be inseminated now.
+        pregnant = {}
+        data.inseminations.forEach(function (r) {
+          if (r.animalId && r.expectedBirthDate && r.expectedBirthDate >= todayStr && !r.deliveredBabies && !r.pregnancyFailed) pregnant[r.animalId] = true
+        })
+      }
+      function animalName(id, fallback) { return (animalsById[id] && animalsById[id].name) || fallback || "" }
+      function subjectName(v) {
+        if (v.subjectType !== "calf") return animalName(v.subjectId, v.subjectName)
+        return ((calvesById[v.subjectId] && calvesById[v.subjectId].name) || v.subjectName || "") + " " + t("calfSuffix")
+      }
+      function animalOption(a) { return [a.id, a.name + (a.type ? " (" + label(a.type) + ")" : "")] }
+      function routeLabel(r) { return ROUTES.indexOf(r) !== -1 ? t("route" + r) : r }
+      function unsent() { return outbox.filter(function (e) { return e.status === "pending" || e.status === "failed" }) }
+
+      // A record made here shows whether it's still waiting, or was refused and why.
+      function entryBadge(r) {
+        if (!r.entry) return null
+        return r.entry.status === "failed" ? badge(t("notSaved"), "red") : badge(t("notSent"), "amber")
+      }
+      function entryError(r) {
+        if (!r.entry || r.entry.status !== "failed") return null
+        return h("div", { class: "row-err", text: failure(r.entry) })
+      }
+      function failure(entry) { return entry.code === "PARENT_FAILED" ? t("parentFailed") : serverError(entry.error) }
 
       function nextVaccinationBadge(v) {
         if (!v.nextVaccinationDate) return null
         var text = t("next") + ": " + day(v.nextVaccinationDate)
-        if (latestVaccination[v.animalId + "|" + norm(v.vaccineName)] !== v.id) return h("span", { class: "muted", text: text })
+        if (latestVaccination[v.subjectId + "|" + norm(v.vaccineName)] !== v.id) return h("span", { class: "muted", text: text })
         var d = daysFromToday(v.nextVaccinationDate)
         return badge(text, d < 0 ? "red" : d <= 14 ? "amber" : "gray")
       }
@@ -604,9 +1225,19 @@
         return badge(t("daysOverdue", { days: -d }), "red")
       }
 
+      function milkable(a) {
+        if (a.status === "Deceased") return false
+        var type = norm(a.type)
+        if (MILK_TYPES.indexOf(type) === -1) return false
+        if (a.gender && a.gender !== "female") return false
+        return type !== "cow" || a.lactationStatus === "lactating"
+      }
+      function alive(a) { return a.status !== "Deceased" }
+      function femaleAlive(a) { return a.gender !== "male" && a.status !== "Deceased" }
+
       function animalCard(a) {
         var cow = a.type === "cow" && a.gender === "female"
-        var details = h("details", { class: "item" }, [
+        var details = h("details", { class: "item", "data-key": "animal:" + a.id }, [
           h("summary", { class: "row" }, [
             h("div", { class: "row-main" }, [
               h("div", { class: "row-title" }, [a.name || "—"]),
@@ -632,11 +1263,17 @@
               [t("gender"), genderLabel(a.gender)],
               [t("earTag"), a.earTagId],
               [t("insurance"), a.insuranceId],
-              [t("weight"), a.weight ? a.weight + "\u00a0kg" : ""],
+              [t("weight"), a.weight ? a.weight + " kg" : ""],
             ]),
+            alive(a) ? h("div", { class: "adds" }, [
+              milkable(a) ? addButton("kindMilk", function () { milkForm({ cowId: a.id }) }, true) : null,
+              addButton("kindDisease", function () { diseaseForm({ animalId: a.id }) }, true),
+              addButton("kindVaccination", function () { vaccinationForm({ subject: "animal:" + a.id }) }, true),
+              femaleAlive(a) && !pregnant[a.id] ? addButton("kindInsemination", function () { inseminationForm({ animalId: a.id }) }, true) : null,
+            ]) : null,
             mini(t("diseaseCases"), (diseasesByAnimal[a.id] || []).map(function (r) {
               var s = DISEASE_STATUS[r.status]
-              return [r.diseaseName || "", joinDot([day(r.diagnosedDate), s ? t(s[0]) : r.status])]
+              return [r.diseaseName || "", joinDot([day(r.diagnosedDate), s ? t(s[0]) : r.status, r.entry ? t(r.entry.status === "failed" ? "notSaved" : "notSent") : ""])]
             })),
             mini(t("vaccination"), (vaccinationsByAnimal[a.id] || []).map(function (v) {
               return [v.vaccineName || "", joinDot([day(v.date), v.nextVaccinationDate ? t("next") + ": " + day(v.nextVaccinationDate) : ""])]
@@ -653,14 +1290,14 @@
       }
 
       function renderAnimals(q) {
-        var items = copy.animals.filter(function (a) {
+        var items = data.animals.filter(function (a) {
           return !q || [a.name, a.earTagId, a.insuranceId, a.breed, a.type].some(function (v) { return norm(v).indexOf(q) !== -1 })
         })
         return paged(items, animalCard, 50)
       }
 
       function renderMilk(q) {
-        var records = copy.milk.filter(function (m) {
+        var records = data.milk.filter(function (m) {
           return !q || norm(animalName(m.cowId, m.cowName)).indexOf(q) !== -1
         })
         var weekAgo = new Date(toUtc(todayStr) - 6 * 86400000).toISOString().slice(0, 10)
@@ -694,8 +1331,9 @@
               h("div", { class: "row-main" }, [
                 h("div", { class: "row-title", text: animalName(m.cowId, m.cowName) || "—" }),
                 h("div", { class: "row-sub", text: sessionLabel(m.session) }),
+                entryError(m),
               ]),
-              h("div", { class: "row-side", text: liters(m.liters) }),
+              h("div", { class: "row-side" }, [liters(m.liters), entryBadge(m)]),
             ])
           })))
         }, 14))
@@ -703,27 +1341,29 @@
       }
 
       function renderDiseases(q) {
-        var items = copy.diseases.filter(function (r) {
+        var items = data.diseases.filter(function (r) {
           return !q || [animalName(r.animalId, r.animalName), r.diseaseName].some(function (v) { return norm(v).indexOf(q) !== -1 })
         })
         // Cases still open come first.
         items = items.filter(function (r) { return r.status !== "Resolved" }).concat(items.filter(function (r) { return r.status === "Resolved" }))
         return paged(items, function (r) {
           var doses = dosesByDisease[r.id] || []
-          var details = h("details", { class: "item" }, [
+          var details = h("details", { class: "item", "data-key": "disease:" + r.id }, [
             h("summary", { class: "row" }, [
               h("div", { class: "row-main" }, [
                 h("div", { class: "row-title", text: joinDot([animalName(r.animalId, r.animalName), r.diseaseName]) }),
                 h("div", { class: "row-sub", text: joinDot([t("diagnosed") + ": " + day(r.diagnosedDate), r.resolvedDate ? t("resolved") + ": " + day(r.resolvedDate) : ""]) }),
+                entryError(r),
               ]),
-              h("div", { class: "row-side" }, [statusBadge(DISEASE_STATUS, r.status)]),
+              h("div", { class: "row-side" }, [statusBadge(DISEASE_STATUS, r.status), entryBadge(r)]),
               chevron(),
             ]),
             h("div", { class: "body" }, [
               facts([[t("symptoms"), r.symptoms], [t("treatment"), r.treatment], [t("vet"), r.veterinarianName]]),
               mini(t("treatmentDoses"), doses.map(function (d) {
-                return [joinDot([day(d.date), sessionLabel(d.session)]), medicines(d)]
+                return [joinDot([day(d.date), sessionLabel(d.session), d.entry ? t(d.entry.status === "failed" ? "notSaved" : "notSent") : ""]), medicines(d)]
               })),
+              r.status !== "Resolved" ? h("div", { class: "adds" }, [addButton("newDose", function () { doseForm({ diseaseRecordId: r.id }) }, true)]) : null,
             ]),
           ])
           return details
@@ -731,22 +1371,23 @@
       }
 
       function renderVaccination(q) {
-        var items = copy.vaccinations.filter(function (v) {
-          return !q || [animalName(v.animalId, v.animalName), v.vaccineName, v.diseasePrevented].some(function (x) { return norm(x).indexOf(q) !== -1 })
+        var items = data.vaccinations.filter(function (v) {
+          return !q || [subjectName(v), v.vaccineName, v.diseasePrevented].some(function (x) { return norm(x).indexOf(q) !== -1 })
         })
         return paged(items, function (v) {
           return h("div", { class: "item row" }, [
             h("div", { class: "row-main" }, [
-              h("div", { class: "row-title", text: joinDot([animalName(v.animalId, v.animalName), v.vaccineName]) }),
-              h("div", { class: "row-sub", text: joinDot([day(v.date), v.dose ? v.dose + " " + (v.doseUnit || "") : "", v.route, v.diseasePrevented]) }),
+              h("div", { class: "row-title", text: joinDot([subjectName(v), v.vaccineName]) }),
+              h("div", { class: "row-sub", text: joinDot([day(v.date), v.dose ? v.dose + " " + (v.doseUnit === "doses" ? t("unitDoses") : v.doseUnit || "") : "", routeLabel(v.route), v.diseasePrevented]) }),
+              entryError(v),
             ]),
-            h("div", { class: "row-side" }, [nextVaccinationBadge(v)]),
+            h("div", { class: "row-side" }, [nextVaccinationBadge(v), entryBadge(v)]),
           ])
         }, 50)
       }
 
       function renderInsemination(q) {
-        var items = copy.inseminations.filter(function (r) {
+        var items = data.inseminations.filter(function (r) {
           return !q || norm(animalName(r.animalId, r.animalName)).indexOf(q) !== -1
         })
         return paged(items, function (r) {
@@ -755,14 +1396,15 @@
               h("div", { class: "row-title", text: animalName(r.animalId, r.animalName) || "—" }),
               h("div", { class: "row-sub", text: joinDot([day(r.date), (r.semenTypes || []).join(", "), r.vetName]) }),
               r.expectedBirthDate ? h("div", { class: "row-sub", text: t("expBirth") + ": " + day(r.expectedBirthDate) }) : null,
+              entryError(r),
             ]),
-            h("div", { class: "row-side" }, [inseminationBadge(r)]),
+            h("div", { class: "row-side" }, [inseminationBadge(r), entryBadge(r)]),
           ])
         }, 50)
       }
 
       function renderCalves(q) {
-        var items = copy.calves.filter(function (c) {
+        var items = data.calves.filter(function (c) {
           return !q || [c.name, c.motherName, c.breed].some(function (v) { return norm(v).indexOf(q) !== -1 })
         })
         return paged(items, function (c) {
@@ -780,21 +1422,679 @@
                 c.motherName ? t("mother") + ": " + animalName(c.motherAnimalId, c.motherName) : "",
                 c.birthDate ? t("birthDate") + ": " + day(c.birthDate) : "",
               ]) }),
-              weight ? h("div", { class: "row-sub", text: t("lastWeight") + ": " + weight.weight + "\u00a0kg · " + day(weight.date) }) : null,
+              weight ? h("div", { class: "row-sub", text: joinDot([t("lastWeight") + ": " + weight.weight + " kg", day(weight.date), weight.entry ? t(weight.entry.status === "failed" ? "notSaved" : "notSent") : ""]) }) : null,
+              entryError(c),
             ]),
-            h("div", { class: "row-side" }, [statusBadge(CALF_STATUS, c.status)]),
+            h("div", { class: "row-side" }, [statusBadge(CALF_STATUS, c.status), entryBadge(c)]),
           ])
         }, 50)
       }
 
+      // ---- Adding records ----
+
+      function addButton(key, onclick, small) {
+        return h("button", { class: small ? "add add-sm" : "add", type: "button", onclick: onclick }, [PLUS + t(key)])
+      }
+
+      function openSheet(title, content, foot) {
+        closeSheet(true)
+        var lastToast = document.querySelector(".toast")
+        if (lastToast) lastToast.remove()
+        var back = h("div", { class: "sheet-back" })
+        back.addEventListener("click", function (e) { if (e.target === back) closeSheet() })
+        var heading = h("div", { class: "sheet-title", id: "sheet-title", tabindex: "-1", text: title })
+        var close = h("button", { class: "icon-btn", type: "button", "aria-label": t("close"), onclick: function () { closeSheet() } }, [icon(X_ICON)])
+        back.appendChild(h("div", { class: "sheet", role: "dialog", "aria-modal": "true", "aria-labelledby": "sheet-title" }, [
+          h("div", { class: "sheet-head" }, [heading, close]),
+          h("div", { class: "sheet-body" }, [content]),
+          foot ? h("div", { class: "sheet-foot" }, foot) : null,
+        ]))
+        document.body.appendChild(back)
+        document.body.style.overflow = "hidden"
+        sheet = back
+        heading.focus()
+      }
+      function closeSheet(replacing) {
+        if (!sheet) return
+        sheet.remove()
+        sheet = null
+        document.body.style.overflow = ""
+        if (!replacing && reloadWhenClosed) reload()
+      }
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && sheet) closeSheet() })
+
+      // One form field. `def`: name, label, type (select, number, text, date, time,
+      // textarea, checks, medicines), and as needed options() -> [[value, label]],
+      // required, optional, placeholder, list (suggestions), step, hint, value.
+      function control(def, onChange) {
+        var id = "f-" + def.name
+        var err = h("div", { class: "err", id: id + "-err", hidden: true })
+        var input, get, set
+        var labelEl = h(def.type === "checks" || def.type === "medicines" ? "div" : "label", { class: "field-label", for: def.type === "checks" || def.type === "medicines" ? null : id, id: id + "-l" }, [
+          t(def.label),
+          def.required ? " *" : null,
+          def.optional ? h("span", { class: "opt", text: " (" + t("optional") + ")" }) : null,
+        ])
+        // A field's error goes once it's changed; Save checks again.
+        function changed() {
+          showError(null)
+          onChange(def.name)
+        }
+        function showError(message) {
+          err.textContent = message || ""
+          err.hidden = !message
+          input.classList.toggle("bad", !!message)
+          if (input.id) input.setAttribute("aria-invalid", message ? "true" : "false")
+        }
+
+        if (def.type === "select") {
+          input = h("select", { class: "input", id: id, onchange: changed })
+          var options = def.options()
+          input.appendChild(h("option", { value: "", text: options.length ? "—" : t(def.empty || "noRecords") }))
+          options.forEach(function (o) { input.appendChild(h("option", { value: o[0], text: o[1] })) })
+          get = function () { return input.value }
+          set = function (v) { input.value = v == null ? "" : v }
+        } else if (def.type === "checks") {
+          input = h("div", { class: "checks", role: "group", "aria-labelledby": id + "-l" }, def.options().map(function (o) {
+            return h("label", null, [h("input", { type: "checkbox", value: o[0], onchange: changed }), o[1]])
+          }))
+          get = function () {
+            return Array.prototype.filter.call(input.querySelectorAll("input"), function (c) { return c.checked }).map(function (c) { return c.value })
+          }
+          set = function (v) { Array.prototype.forEach.call(input.querySelectorAll("input"), function (c) { c.checked = (v || []).indexOf(c.value) !== -1 }) }
+        } else if (def.type === "medicines") {
+          var rows = []
+          var list = h("div")
+          var addRow = function () {
+            var row = {
+              name: h("input", { class: "input", placeholder: t("medicineName"), "aria-label": t("medicineName"), autocomplete: "off" }),
+              count: h("input", { class: "input", type: "number", inputmode: "decimal", min: "0", step: "1", value: "1" }),
+              volume: h("input", { class: "input", type: "number", inputmode: "decimal", min: "0", step: "0.1" }),
+              cost: h("input", { class: "input", type: "number", inputmode: "decimal", min: "0" }),
+            }
+            var box = h("div", { class: "med" }, [
+              h("div", { class: "med-top" }, [
+                row.name,
+                h("button", { class: "icon-btn", type: "button", "aria-label": t("remove"), onclick: function () {
+                  if (rows.length === 1) return
+                  rows.splice(rows.indexOf(row), 1)
+                  box.remove()
+                } }, [icon(X_ICON)]),
+              ]),
+              h("div", { class: "med-grid" }, [["doses", row.count], ["volMl", row.volume], ["costRwf", row.cost]].map(function (pair) {
+                var fieldId = id + "-" + rows.length + "-" + pair[0]
+                pair[1].id = fieldId
+                return h("div", null, [h("label", { for: fieldId, text: t(pair[0]) }), pair[1]])
+              })),
+            ])
+            rows.push(row)
+            list.appendChild(box)
+          }
+          addRow()
+          input = h("div", { class: "meds" }, [list, h("button", { class: "link", type: "button", onclick: addRow }, [PLUS + t("addMedicine")])])
+          get = function () {
+            return rows.map(function (r) { return { medicineName: r.name.value.trim(), doseCount: r.count.value, volumeMl: r.volume.value, cost: r.cost.value } })
+          }
+          set = function () {}
+        } else {
+          input = h(def.type === "textarea" ? "textarea" : "input", {
+            class: "input",
+            id: id,
+            type: def.type === "textarea" ? null : def.type,
+            rows: def.type === "textarea" ? "2" : null,
+            inputmode: def.type === "number" ? "decimal" : null,
+            min: def.type === "number" ? "0" : null,
+            step: def.step,
+            placeholder: def.placeholder ? t(def.placeholder) : null,
+            list: def.list ? id + "-list" : null,
+            autocomplete: "off",
+            oninput: changed,
+          })
+          get = function () { return input.value.trim() }
+          set = function (v) { input.value = v == null ? "" : v }
+        }
+        if (def.value != null) set(def.value)
+        var hint = def.hint ? h("div", { class: "hint", text: t(def.hint) }) : null
+        var wrap = h("div", { class: "field" }, [
+          labelEl,
+          input,
+          def.list ? h("datalist", { id: id + "-list" }, def.list.map(function (v) { return h("option", { value: v }) })) : null,
+          hint,
+          err,
+        ])
+        if (input.id) input.setAttribute("aria-describedby", id + "-err")
+        return {
+          el: wrap,
+          get: get,
+          set: set,
+          focus: function () { (input.querySelector ? input.querySelector("input, select") || input : input).focus() },
+          error: showError,
+        }
+      }
+
+      // A form for one kind of record. `spec`: title, kind, fields (field defs, [a, b]
+      // for two side by side, or { extra: [...] } for "More details"), validate(v),
+      // body(v), and optionally change(name, v, set), gated (the on-farm rule applies),
+      // saveLabel.
+      function openForm(spec) {
+        var controls = {}
+        var form = h("form", { id: "sheet-form", novalidate: true })
+        function values() {
+          var v = {}
+          Object.keys(controls).forEach(function (k) { v[k] = controls[k].get() })
+          return v
+        }
+        function set(name, value) { if (controls[name]) controls[name].set(value) }
+        function changed(name) { if (spec.change) spec.change(name, values(), set) }
+        function layout(fields, parent) {
+          fields.forEach(function (f) {
+            if (Array.isArray(f)) {
+              var pair = h("div", { class: "pair" })
+              layout(f, pair)
+              parent.appendChild(pair)
+            } else if (f.extra) {
+              var extra = h("details", { class: "extra" }, [h("summary", { text: t("moreDetails") })])
+              layout(f.extra, extra)
+              parent.appendChild(extra)
+            } else {
+              var c = control(f, changed)
+              controls[f.name] = c
+              parent.appendChild(c.el)
+            }
+          })
+        }
+        layout(spec.fields, form)
+        // Pre-filled from where the form was opened (an animal's card, a disease case).
+        if (spec.preset) Object.keys(spec.preset).forEach(function (k) { set(k, spec.preset[k]); changed(k) })
+
+        var formError = h("div", { class: "form-error", role: "alert", hidden: true })
+        var saveText = t(spec.saveLabel || "saveRecord")
+        var save = h("button", { class: "btn", type: "submit", form: "sheet-form", text: saveText })
+        var cancel = h("button", { class: "btn btn-light", type: "button", text: t("cancel"), onclick: function () { closeSheet() } })
+        function fail(title, message) {
+          formError.textContent = ""
+          if (title) formError.appendChild(h("strong", { text: title }))
+          formError.appendChild(document.createTextNode(message))
+          formError.hidden = false
+        }
+
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault()
+          if (save.disabled) return
+          formError.hidden = true
+          var v = values()
+          var errors = spec.validate(v) || {}
+          Object.keys(controls).forEach(function (k) { controls[k].error(errors[k]) })
+          var bad = Object.keys(errors).filter(function (k) { return errors[k] })
+          if (bad.length) {
+            if (controls[bad[0]]) controls[bad[0]].focus()
+            else fail(null, errors[bad[0]])
+            return
+          }
+          var body = spec.body(v)
+          body.farmerId = copy.userId
+          save.disabled = true
+          try {
+            if (spec.gated && rule.required) {
+              save.textContent = t("locating")
+              var pos = await locate()
+              if (!pos) return fail(t("wrongLocation"), t("locationRequired"))
+              if (!onFarm(rule, pos)) return fail(t("wrongLocation"), t("sectorOnly", { sector: rule.sector }))
+              body.lat = pos.lat
+              body.lng = pos.lng
+              body.accuracy = pos.accuracy
+            }
+            await addEntry(spec.kind, body)
+            closeSheet()
+            toast(t("savedOnPhone"))
+          } catch (error) {
+            fail(null, t("saveFailed"))
+          } finally {
+            save.disabled = false
+            save.textContent = saveText
+          }
+        })
+
+        openSheet(t(spec.title), form, [formError, cancel, save])
+      }
+
+      async function addEntry(kind, body) {
+        var entry = { id: newId(), userId: copy.userId, kind: kind, body: body, createdAt: new Date().toISOString(), status: "pending" }
+        await putEntry(entry)
+        outbox.push(entry)
+        refresh()
+        requestSend()
+      }
+
+      function nameSorted(list) {
+        return list.slice().sort(function (a, b) { return norm(a.name).localeCompare(norm(b.name)) })
+      }
+      function num(v) { return v === "" ? "" : Number(v) }
+
+      // As app/(farmer)/farmer/milk/page.tsx: the session fills in the farmer's
+      // defaults for it, saved by that page on this phone.
+      function milkForm(preset) {
+        var routine = null
+        try { routine = JSON.parse(localStorage.getItem("vettrack_milk_routine_" + copy.userId) || "null") } catch (e) {}
+        openForm({
+          title: "newMilk",
+          kind: "milk",
+          preset: preset,
+          fields: [
+            { name: "cowId", label: "fieldCow", type: "select", required: true, empty: "noAnimals", options: function () {
+              return nameSorted(data.animals.filter(milkable)).map(animalOption)
+            } },
+            [
+              { name: "session", label: "session", type: "select", required: true, options: function () { return [["Morning", t("morning")], ["Evening", t("evening")]] } },
+              { name: "date", label: "date", type: "date", required: true, value: todayStr },
+            ],
+            [
+              { name: "liters", label: "milkLiters", type: "number", required: true, step: "0.1" },
+              { name: "homeConsumption", label: "homeLiters", type: "number", optional: true, step: "0.1" },
+            ],
+            { name: "pricePerLiter", label: "pricePerLiter", type: "number", optional: true },
+            { extra: [
+              { name: "time", label: "time", type: "time", optional: true },
+              { name: "waterLiters", label: "water", type: "number", optional: true, step: "0.5" },
+              { name: "foodType", label: "feedType", type: "text", optional: true },
+              [
+                { name: "foodKg", label: "feedKg", type: "number", optional: true, step: "0.1" },
+                { name: "foodCost", label: "feedCost", type: "number", optional: true },
+              ],
+              [
+                { name: "saltKg", label: "saltKg", type: "number", optional: true, step: "0.1" },
+                { name: "saltCost", label: "saltCost", type: "number", optional: true },
+              ],
+              { name: "notes", label: "notes", type: "textarea", optional: true },
+            ] },
+          ],
+          change: function (name, v, set) {
+            var defaults = name === "session" && routine && routine[v.session]
+            if (!defaults || !ROUTINE_FIELDS.some(function (k) { return defaults[k] })) return
+            ROUTINE_FIELDS.forEach(function (k) { set(k, defaults[k]) })
+          },
+          validate: function (v) {
+            var e = {}
+            if (!v.cowId) e.cowId = t("selectCow")
+            if (!v.liters || !(Number(v.liters) > 0)) e.liters = t("validLiters")
+            if (!v.session) e.session = t("selectSession")
+            if (!v.date) e.date = t("selectDate")
+            // The milk route refuses a second record for the same cow, session and day.
+            var cow = animalsById[v.cowId]
+            if (!e.cowId && !e.session && !e.date && data.milk.some(function (m) {
+              return m.cowId === v.cowId && m.date === v.date && m.session === v.session && !(m.entry && m.entry.status === "failed")
+            })) {
+              e.session = t("alreadyMilked", { animal: cow ? cow.name : "", session: sessionLabel(v.session) })
+            }
+            return e
+          },
+          body: function (v) {
+            var cow = animalsById[v.cowId]
+            var sold = Math.max(0, Number(v.liters) - Number(v.homeConsumption || 0))
+            return {
+              cowId: v.cowId, cowName: cow ? cow.name : undefined,
+              liters: v.liters, homeConsumption: v.homeConsumption, soldLiters: sold,
+              pricePerLiter: v.pricePerLiter, totalAmount: v.pricePerLiter ? (sold * Number(v.pricePerLiter)).toFixed(2) : "",
+              session: v.session, date: v.date, time: v.time,
+              waterLiters: v.waterLiters, foodType: v.foodType, foodKg: v.foodKg, foodCost: v.foodCost,
+              saltKg: v.saltKg, saltCost: v.saltCost, notes: v.notes,
+            }
+          },
+        })
+      }
+
+      function diseaseForm(preset) {
+        openForm({
+          title: "newDisease",
+          kind: "disease",
+          gated: true,
+          preset: preset,
+          fields: [
+            { name: "animalId", label: "fieldAnimal", type: "select", required: true, empty: "noAnimals", options: function () {
+              return nameSorted(data.animals.filter(alive)).map(animalOption)
+            } },
+            { name: "diseaseName", label: "disease", type: "text", required: true, placeholder: "diseasePlaceholder", list: COMMON_DISEASES },
+            [
+              { name: "diagnosedDate", label: "diagnosedDate", type: "date", required: true, value: todayStr },
+              // A case that's over can be marked resolved in the app, with its date.
+              { name: "status", label: "status", type: "select", value: "Active", options: function () {
+                return [["Active", t("diseaseActive")], ["Under Treatment", t("underTreatment")]]
+              } },
+            ],
+            { name: "symptoms", label: "symptoms", type: "textarea", optional: true },
+            { name: "treatment", label: "treatment", type: "textarea", optional: true },
+            { extra: [
+              { name: "veterinarianName", label: "veterinarian", type: "text", optional: true },
+              { name: "notes", label: "notes", type: "textarea", optional: true },
+            ] },
+          ],
+          validate: function (v) {
+            var e = {}
+            if (!v.animalId) e.animalId = t("selectAnimal")
+            if (!v.diseaseName) e.diseaseName = t("enterDisease")
+            if (!v.diagnosedDate) e.diagnosedDate = t("selectDate")
+            return e
+          },
+          body: function (v) {
+            var animal = animalsById[v.animalId]
+            return {
+              animalId: v.animalId, animalName: animal ? animal.name : null,
+              diseaseName: v.diseaseName, symptoms: v.symptoms, treatment: v.treatment,
+              diagnosedDate: v.diagnosedDate, resolvedDate: null,
+              status: v.status || "Active", notes: v.notes, veterinarianName: v.veterinarianName, vetOrigin: "",
+            }
+          },
+        })
+      }
+
+      function doseForm(preset) {
+        var cases = data.diseases.filter(function (r) { return r.status !== "Resolved" })
+        var casesById = {}
+        cases.forEach(function (r) { casesById[r.id] = r })
+        openForm({
+          title: "newDose",
+          kind: "dose",
+          gated: true,
+          preset: preset,
+          fields: [
+            { name: "diseaseRecordId", label: "diseaseCase", type: "select", required: true, empty: "noOpenCases", options: function () {
+              return cases.map(function (r) { return [r.id, joinDot([animalName(r.animalId, r.animalName), r.diseaseName, day(r.diagnosedDate)])] })
+            } },
+            [
+              { name: "date", label: "date", type: "date", required: true, value: todayStr },
+              { name: "session", label: "session", type: "select", required: true, options: function () { return [["Morning", t("morning")], ["Evening", t("evening")]] } },
+            ],
+            { name: "medicines", label: "medicines", type: "medicines", required: true },
+            { name: "vetCost", label: "vetCost", type: "number", optional: true },
+            { name: "notes", label: "notes", type: "textarea", optional: true },
+          ],
+          validate: function (v) {
+            var e = {}
+            if (!v.diseaseRecordId) e.diseaseRecordId = t("selectCase")
+            if (!v.session) e.session = t("selectSession")
+            if (!v.date) e.date = t("selectDate")
+            if (v.medicines.some(function (m) { return !m.medicineName || !(Number(m.doseCount) > 0) || m.cost === "" || Number(m.cost) < 0 })) {
+              e.medicines = t("medicineError")
+            }
+            return e
+          },
+          body: function (v) {
+            var r = casesById[v.diseaseRecordId]
+            return {
+              // A case made here is pointed at as "offline:<id>" until it's been sent.
+              diseaseRecordId: v.diseaseRecordId,
+              animalId: r ? r.animalId : "", animalName: r ? r.animalName || animalName(r.animalId) : null,
+              diseaseName: r ? r.diseaseName : null,
+              date: v.date, session: v.session,
+              medicines: v.medicines.map(function (m) {
+                return { medicineName: m.medicineName, doseCount: Number(m.doseCount) || 0, volumeMl: m.volumeMl ? Number(m.volumeMl) : null, cost: Number(m.cost) || 0 }
+              }),
+              vetCost: v.vetCost, notes: v.notes,
+            }
+          },
+        })
+      }
+
+      function vaccinationForm(preset) {
+        var subjects = {}
+        nameSorted(data.animals.filter(alive)).forEach(function (a) { subjects["animal:" + a.id] = { type: "animal", id: a.id, name: a.name, text: animalOption(a)[1] } })
+        nameSorted(data.calves.filter(function (c) { return c.status === "active" || c.status === "weaned" })).forEach(function (c) {
+          subjects["calf:" + c.id] = { type: "calf", id: c.id, name: c.name, text: c.name + " " + t("calfSuffix") }
+        })
+        openForm({
+          title: "newVaccination",
+          kind: "vaccination",
+          gated: true,
+          preset: preset,
+          fields: [
+            { name: "subject", label: "fieldSubject", type: "select", required: true, empty: "noAnimals", options: function () {
+              return Object.keys(subjects).map(function (k) { return [k, subjects[k].text] })
+            } },
+            { name: "vaccineName", label: "vaccineName", type: "text", required: true, list: COMMON_VACCINES.map(function (v) { return v[0] }) },
+            { name: "diseasePrevented", label: "diseasePrevented", type: "text", optional: true, list: COMMON_VACCINES.map(function (v) { return v[1] }) },
+            { name: "date", label: "dateGiven", type: "date", required: true, value: todayStr },
+            [
+              { name: "dose", label: "dose", type: "number", optional: true, step: "0.1" },
+              { name: "doseUnit", label: "unit", type: "select", value: "ml", options: function () {
+                return DOSE_UNITS.map(function (u) { return [u, u === "doses" ? t("unitDoses") : u] })
+              } },
+            ],
+            { name: "route", label: "route", type: "select", optional: true, options: function () {
+              return ROUTES.map(function (r) { return [r, t("route" + r)] })
+            } },
+            { name: "vaccinator", label: "vaccinator", type: "text", optional: true },
+            { name: "nextVaccinationDate", label: "nextVaccination", type: "date", optional: true },
+            { extra: [{ name: "notes", label: "notes", type: "textarea", optional: true }] },
+          ],
+          // Picking one of the usual vaccines fills in what it prevents, as in the app.
+          change: function (name, v, set) {
+            if (name !== "vaccineName") return
+            var known = COMMON_VACCINES.filter(function (c) { return norm(c[0]) === norm(v.vaccineName) })[0]
+            if (known && !v.diseasePrevented) set("diseasePrevented", known[1])
+          },
+          validate: function (v) {
+            var e = {}
+            if (!v.subject) e.subject = t("selectSubject")
+            if (!v.vaccineName) e.vaccineName = t("enterVaccine")
+            if (!v.date) e.date = t("selectDateGiven")
+            if (v.dose && !(Number(v.dose) > 0)) e.dose = t("validDose")
+            if (v.nextVaccinationDate && v.date && v.nextVaccinationDate < v.date) e.nextVaccinationDate = t("nextBeforeGiven")
+            return e
+          },
+          body: function (v) {
+            var s = subjects[v.subject]
+            var known = COMMON_VACCINES.filter(function (c) { return norm(c[0]) === norm(v.vaccineName) })[0]
+            return {
+              subjectType: s.type, subjectId: s.id, subjectName: s.name,
+              vaccineName: v.vaccineName, diseasePrevented: v.diseasePrevented, vaccineType: known ? known[2] : "",
+              date: v.date, dose: v.dose, doseUnit: v.doseUnit, route: v.route, site: "",
+              batchNumber: "", manufacturer: "", expiryDate: "", vaccinePrice: "", vetPrice: "",
+              vaccinator: v.vaccinator, nextVaccinationDate: v.nextVaccinationDate, notes: v.notes,
+            }
+          },
+        })
+      }
+
+      function inseminationForm(preset) {
+        var choices = nameSorted(data.animals.filter(function (a) { return femaleAlive(a) && !pregnant[a.id] }))
+        openForm({
+          title: "newInsemination",
+          kind: "insemination",
+          gated: true,
+          preset: preset,
+          fields: [
+            { name: "animalId", label: "fieldAnimal", type: "select", required: true, empty: data.animals.some(femaleAlive) ? "allPregnant" : "noAnimals", options: function () {
+              return choices.map(animalOption)
+            } },
+            { name: "date", label: "date", type: "date", required: true, value: todayStr },
+            { name: "semenTypes", label: "semenTypes", type: "checks", required: true, options: function () {
+              return SEMEN_TYPES.map(function (s) { return [s, s] })
+            } },
+            { name: "expectedBirthDate", label: "expectedBirth", type: "date", optional: true, hint: "autoEstimated" },
+            { name: "vetName", label: "vetName", type: "text", optional: true },
+            { extra: [
+              { name: "injectionTime", label: "injectionTime", type: "time", optional: true },
+              [
+                { name: "semenPrice", label: "semenPrice", type: "number", optional: true },
+                { name: "vetPrice", label: "vetPrice", type: "number", optional: true },
+              ],
+              { name: "notes", label: "notes", type: "textarea", optional: true },
+            ] },
+          ],
+          // A cow's calving date is estimated from the day, as in the app.
+          change: function (name, v, set) {
+            if (name !== "animalId" && name !== "date") return
+            var animal = animalsById[v.animalId]
+            if (animal && norm(animal.type) === "cow" && v.date) set("expectedBirthDate", addDays(v.date, GESTATION_DAYS))
+          },
+          validate: function (v) {
+            var e = {}
+            var animal = animalsById[v.animalId]
+            if (!v.animalId) e.animalId = t("selectAnimal")
+            else if (animal && !animal.gender) e.animalId = t("genderMissing", { animal: animal.name })
+            if (!v.semenTypes.length) e.semenTypes = t("selectSemen")
+            if (!v.date) e.date = t("selectDate")
+            return e
+          },
+          body: function (v) {
+            var animal = animalsById[v.animalId]
+            return {
+              animalId: v.animalId, animalName: animal ? animal.name : null,
+              semenTypes: v.semenTypes, semenPrice: v.semenPrice, vetPrice: v.vetPrice, injectionTime: v.injectionTime,
+              expectedBirthDate: v.expectedBirthDate, deliveredBabies: null,
+              vetName: v.vetName, vetOrigin: "", date: v.date, notes: v.notes,
+              previousRecordId: null, pregnancyFailed: false,
+            }
+          },
+        })
+      }
+
+      function calfForm() {
+        openForm({
+          title: "newCalf",
+          kind: "calf",
+          saveLabel: "saveCalf",
+          fields: [
+            { name: "name", label: "calfName", type: "text", required: true },
+            { name: "motherAnimalId", label: "mother", type: "select", optional: true, options: function () {
+              return nameSorted(data.animals.filter(femaleAlive)).map(animalOption)
+            } },
+            [
+              { name: "gender", label: "gender", type: "select", required: true, options: function () { return [["male", t("male")], ["female", t("female")]] } },
+              { name: "birthDate", label: "birthDate", type: "date", required: true, value: todayStr },
+            ],
+            [
+              { name: "breed", label: "breed", type: "text", optional: true },
+              { name: "birthWeight", label: "birthWeight", type: "number", optional: true, step: "0.1" },
+            ],
+            { name: "notes", label: "notes", type: "textarea", optional: true },
+          ],
+          validate: function (v) {
+            var e = {}
+            if (!v.name) e.name = t("enterCalfName")
+            if (!v.gender) e.gender = t("selectGender")
+            if (!v.birthDate) e.birthDate = t("selectBirthDate")
+            return e
+          },
+          body: function (v) {
+            var mother = animalsById[v.motherAnimalId]
+            return {
+              name: v.name, motherAnimalId: v.motherAnimalId || null, motherName: mother ? mother.name : null,
+              gender: v.gender, breed: v.breed, birthDate: v.birthDate, birthWeight: v.birthWeight,
+              status: "active", notes: v.notes,
+            }
+          },
+        })
+      }
+
+      function weightForm(preset) {
+        var calves = nameSorted(data.calves.filter(function (c) { return c.status === "active" || c.status === "weaned" }))
+        openForm({
+          title: "newWeight",
+          kind: "calfWeight",
+          preset: preset,
+          fields: [
+            { name: "calfId", label: "fieldCalf", type: "select", required: true, empty: "noCalves", options: function () {
+              return calves.map(function (c) { return [c.id, c.name] })
+            } },
+            [
+              { name: "weight", label: "weightKg", type: "number", required: true, step: "0.1" },
+              { name: "date", label: "date", type: "date", required: true, value: todayStr },
+            ],
+            { name: "notes", label: "notes", type: "textarea", optional: true },
+          ],
+          validate: function (v) {
+            var e = {}
+            if (!v.calfId) e.calfId = t("selectCalf")
+            if (!v.weight || !(Number(v.weight) > 0)) e.weight = t("validWeight")
+            if (!v.date) e.date = t("selectDate")
+            return e
+          },
+          body: function (v) {
+            var calf = calvesById[v.calfId]
+            return { calfId: v.calfId, calfName: calf ? calf.name : undefined, weight: v.weight, date: v.date, notes: v.notes }
+          },
+        })
+      }
+
+      // ---- Records not sent yet ----
+
+      function describe(entry) {
+        var b = entry.body || {}
+        var KIND = { milk: "kindMilk", disease: "kindDisease", dose: "kindDose", vaccination: "kindVaccination", insemination: "kindInsemination", calf: "kindCalf", calfWeight: "kindCalfWeight" }
+        var parts = {
+          milk: [b.cowName, [day(b.date), sessionLabel(b.session), b.liters ? liters(b.liters) : ""]],
+          disease: [b.animalName, [b.diseaseName, day(b.diagnosedDate)]],
+          dose: [b.animalName, [b.diseaseName, day(b.date), sessionLabel(b.session)]],
+          vaccination: [b.subjectName, [b.vaccineName, day(b.date)]],
+          insemination: [b.animalName, [day(b.date), (b.semenTypes || []).join(", ")]],
+          calf: [b.name, [day(b.birthDate)]],
+          calfWeight: [b.calfName, [b.weight ? b.weight + " kg" : "", day(b.date)]],
+        }[entry.kind] || ["", []]
+        return { title: joinDot([t(KIND[entry.kind] || entry.kind), parts[0]]), detail: joinDot(parts[1]) }
+      }
+      // Records made here for this one, which can't be saved without it.
+      function dependents(entry) {
+        return outbox.filter(function (other) {
+          return Object.keys(other.body || {}).some(function (k) { return other.body[k] === REF_PREFIX + entry.id })
+        })
+      }
+      function unsentList() {
+        var list = h("div")
+        var entries = unsent().slice().reverse()
+        if (!entries.length) list.appendChild(h("div", { class: "empty", text: t("noRecords") }))
+        entries.forEach(function (entry) {
+          var d = describe(entry)
+          list.appendChild(h("div", { class: "unsent-row" }, [
+            h("div", { class: "row-main" }, [
+              h("div", { class: "row-title", text: d.title }),
+              d.detail ? h("div", { class: "row-sub", text: d.detail }) : null,
+              entry.status === "failed" ? h("div", { class: "row-err", text: failure(entry) }) : null,
+            ]),
+            h("div", { class: "row-side" }, [
+              entry.status === "failed" ? badge(t("notSaved"), "red") : badge(t("notSent"), "amber"),
+              h("button", { class: "remove", type: "button", text: t("remove"), onclick: function () { remove(entry) } }),
+            ]),
+          ]))
+        })
+        return h("div", null, [h("p", { class: "note", text: t("unsentNote") }), list])
+      }
+      function showUnsent() {
+        openSheet(t("notSent"), unsentList(), [h("button", { class: "btn btn-light", type: "button", text: t("close"), onclick: function () { closeSheet() } })])
+      }
+      async function remove(entry) {
+        var also = dependents(entry)
+        if (!window.confirm(t("removeConfirm") + (also.length ? " " + plural("removeAlso", also.length) : ""))) return
+        var ids = [entry.id].concat(also.map(function (e) { return e.id }))
+        await deleteEntries(ids)
+        outbox = outbox.filter(function (e) { return ids.indexOf(e.id) === -1 })
+        refresh()
+        if (sheet) {
+          var body = sheet.querySelector(".sheet-body")
+          body.textContent = ""
+          body.appendChild(unsentList())
+        }
+      }
+
+      // The service worker sent some (the connection came back while this page is open).
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.addEventListener("message", function (event) {
+          if (!event.data || event.data.type !== "outbox-changed") return
+          readOutbox(copy.userId).then(function (entries) {
+            outbox = entries
+            refresh()
+          }).catch(function () {})
+        })
+      }
+
       // Opens on the part of the app the farmer was trying to reach.
       var TABS = [
-        { id: "animals", count: copy.animals.length, render: renderAnimals, path: "/farmer/animals" },
-        { id: "milk", count: copy.milk.length, render: renderMilk, path: "/farmer/milk" },
-        { id: "diseases", count: copy.diseases.length, render: renderDiseases, path: "/farmer/diseases" },
-        { id: "vaccination", count: copy.vaccinations.length, render: renderVaccination, path: "/farmer/vaccination" },
-        { id: "insemination", count: copy.inseminations.length, render: renderInsemination, path: "/farmer/insemination" },
-        { id: "calves", count: copy.calves.length, render: renderCalves, path: "/farmer/calves" },
+        { id: "animals", key: "animals", render: renderAnimals, path: "/farmer/animals", adds: [] },
+        { id: "milk", key: "milk", render: renderMilk, path: "/farmer/milk", adds: [["newMilk", function () { milkForm() }]] },
+        { id: "diseases", key: "diseases", render: renderDiseases, path: "/farmer/diseases", adds: [["newDisease", function () { diseaseForm() }], ["newDose", function () { doseForm() }]] },
+        { id: "vaccination", key: "vaccinations", render: renderVaccination, path: "/farmer/vaccination", adds: [["newVaccination", function () { vaccinationForm() }]] },
+        { id: "insemination", key: "inseminations", render: renderInsemination, path: "/farmer/insemination", adds: [["newInsemination", function () { inseminationForm() }]] },
+        { id: "calves", key: "calves", render: renderCalves, path: "/farmer/calves", adds: [["newCalf", function () { calfForm() }], ["newWeight", function () { weightForm() }]] },
       ]
       var current = TABS[0]
       TABS.forEach(function (tab) {
@@ -803,24 +2103,47 @@
 
       var tabBar = document.getElementById("r-tabs")
       var content = document.getElementById("r-content")
+      var adds = document.getElementById("r-adds")
       var search = document.getElementById("r-search")
+      var waiting = document.getElementById("r-waiting")
       TABS.forEach(function (tab) {
+        tab.countEl = h("span", { class: "count" })
         tab.button = h("button", { class: "tab", type: "button", role: "tab", "aria-controls": "r-panel", onclick: function () { select(tab) } }, [
           t(tab.id),
-          h("span", { class: "count", text: String(tab.count) }),
+          tab.countEl,
         ])
         tabBar.appendChild(tab.button)
       })
+      // Cards that were open stay open, so adding a dose to a case doesn't close it.
       function draw() {
+        var open = {}
+        Array.prototype.forEach.call(content.querySelectorAll("details[open][data-key]"), function (d) { open[d.getAttribute("data-key")] = true })
         content.textContent = ""
         content.appendChild(current.render(norm(search.value.trim())))
+        Array.prototype.forEach.call(content.querySelectorAll("details[data-key]"), function (d) {
+          if (open[d.getAttribute("data-key")]) d.open = true
+        })
       }
       function select(tab) {
         current = tab
         TABS.forEach(function (x) { x.button.setAttribute("aria-selected", x === tab ? "true" : "false") })
         tab.button.scrollIntoView({ block: "nearest", inline: "nearest" })
+        adds.textContent = ""
+        tab.adds.forEach(function (a) { adds.appendChild(addButton(a[0], a[1])) })
+        adds.hidden = !tab.adds.length
         draw()
       }
+      // After records are added or removed here, or sent.
+      function refresh() {
+        rebuild()
+        TABS.forEach(function (tab) { tab.countEl.textContent = String(data[tab.key].length) })
+        var list = unsent()
+        waiting.hidden = !list.length
+        waiting.textContent = t("waitingCount", { count: list.length })
+        waiting.classList.toggle("red", list.some(function (e) { return e.status === "failed" }))
+        draw()
+      }
+      waiting.addEventListener("click", showUnsent)
 
       document.getElementById("r-title").textContent = t("offline")
       var savedAt = copy.savedAt ? new Date(copy.savedAt) : null
@@ -829,7 +2152,7 @@
         savedAt && !isNaN(savedAt) ? t("saved", { time: savedFormat.format(savedAt) }) : "",
       ])
       document.getElementById("r-retry").textContent = t("tryAgain")
-      document.getElementById("r-note").textContent = t("readOnly")
+      document.getElementById("r-note").textContent = t("note")
       search.placeholder = t("search")
       search.setAttribute("aria-label", t("search"))
       search.addEventListener("input", draw)
@@ -837,6 +2160,7 @@
       document.querySelector(".plain").hidden = true
       document.getElementById("records").hidden = false
       document.body.className = ""
+      refresh()
       select(current)
     }
   })()

@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
+import { useSaveOffline } from "@/hooks/use-save-offline"
 import { localizeColumns } from "@/lib/export-columns"
 
 interface Animal { _id: string; name: string; type: string; insuranceId?: string; earTagId?: string | null; gender?: string | null; lactationStatus?: string | null; status?: string | null }
@@ -188,6 +189,7 @@ export default function MilkProductionPage() {
   const balanceRequest = useLatestRequest()
   const historyRequest = useLatestRequest()
   const reportError = useActionError()
+  const saveOffline = useSaveOffline()
 
   const fetchRecords = async (farmerId: string) => {
     const isLatest = recordsRequest()
@@ -300,6 +302,12 @@ export default function MilkProductionPage() {
     ).catch(() => null)
 
     if (!res) {
+      // A new record is kept on the phone and sent once there's a connection.
+      if (!editRecord && (await saveOffline("milk", body))) {
+        resetForm()
+        setSaving(false)
+        return
+      }
       setSaving(false)
       reportError(null)
       return

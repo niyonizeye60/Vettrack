@@ -20,6 +20,7 @@ import { useLanguage } from "@/contexts/LanguageContext"
 import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/location-gate"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
+import { useSaveOffline } from "@/hooks/use-save-offline"
 
 interface Animal { _id: string; name: string; type: string; insuranceId?: string | null; earTagId?: string | null }
 interface Doctor { _id: string; name: string; specialization: string }
@@ -168,6 +169,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
   const recordsRequest = useLatestRequest()
   const dosesRequest = useLatestRequest()
   const reportError = useActionError()
+  const saveOffline = useSaveOffline()
 
   const fetchRecords = async (id: string) => {
     const isLatest = recordsRequest()
@@ -276,11 +278,19 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       diagnosedDate, resolvedDate: resolvedDate || null,
       status, notes, veterinarianName, vetOrigin,
     }
-    const res = await submitWithLocationGate((loc) =>
-      editRecord
+    let located = {}
+    const res = await submitWithLocationGate((loc) => {
+      located = loc
+      return editRecord
         ? fetch("/api/diseases", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editRecord._id, ...body, ...loc }) })
         : fetch("/api/diseases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
-    ).catch(() => null)
+    }).catch(() => null)
+    // No connection: a new record is kept on the phone, with where it was made.
+    if (!res && !editRecord && (await saveOffline("disease", { ...body, ...located }))) {
+      resetForm()
+      setSaving(false)
+      return
+    }
     // Keep the form on a failure (wrong location included) so nothing has to be retyped.
     if (!res?.ok) {
       setSaving(false)
@@ -314,11 +324,18 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       })),
       vetCost, notes: doseNotes,
     }
-    const res = await submitWithLocationGate((loc) =>
-      editDose
+    let located = {}
+    const res = await submitWithLocationGate((loc) => {
+      located = loc
+      return editDose
         ? fetch("/api/treatment-doses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editDose._id, ...body, ...loc }) })
         : fetch("/api/treatment-doses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, ...loc }) })
-    ).catch(() => null)
+    }).catch(() => null)
+    if (!res && !editDose && (await saveOffline("dose", { ...body, ...located }))) {
+      resetDoseForm()
+      setSavingDose(false)
+      return
+    }
     if (!res?.ok) {
       setSavingDose(false)
       reportError(res)
