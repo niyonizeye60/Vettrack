@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { getDoctorsList, logPortalExport } from "@/lib/actions"
 import type { RecordCapabilities } from "@/components/livestock/capabilities"
 import { canModify } from "@/components/livestock/capabilities"
+import { INJECTION_SITES, injectionSiteLabel, injectionSiteValue } from "@/components/livestock/injection-sites"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -79,7 +80,6 @@ interface VaccinationManagerProps {
 const VACCINE_TYPES = ["Inactivated", "Live attenuated", "Toxoid", "Subunit", "Recombinant", "Vector", "Other"]
 const ROUTES = ["Subcutaneous", "Intramuscular", "Intranasal", "Oral", "Intradermal", "Intravenous", "Other"]
 const DOSE_UNITS = ["ml", "cc", "doses"]
-const SITES = ["Neck", "Shoulder", "Rump / Hip", "Thigh", "Ear base", "Brisket", "Tail fold"]
 
 // Selecting one of these fills in the disease it prevents - the pairing is a property
 // of the vaccine, not something the farmer should have to remember on every dose.
@@ -380,7 +380,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       subjectName: selectedSubject?.name || null,
       vaccineName: vaccineName.trim(),
       diseasePrevented, vaccineType, date,
-      dose, doseUnit, route, site,
+      dose, doseUnit, route, site: injectionSiteValue(t, site),
       batchNumber, manufacturer, expiryDate,
       vaccinePrice, vetPrice,
       vaccinator, nextVaccinationDate, notes,
@@ -425,7 +425,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
     setDose(r.dose != null ? String(r.dose) : "")
     setDoseUnit(r.doseUnit || "ml")
     setRoute(r.route || "")
-    setSite(r.site || "")
+    setSite(injectionSiteLabel(t, r.site))
     setBatchNumber(r.batchNumber || "")
     setManufacturer(r.manufacturer || "")
     setExpiryDate(r.expiryDate || "")
@@ -583,7 +583,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         const preventsLines = doc.splitTextToSize(r.diseasePrevented || "—", cols.prevents.width)
         const typeLines = doc.splitTextToSize(optionLabel("type", r.vaccineType) || "—", cols.type.width)
         const routeLines = doc.splitTextToSize(optionLabel("route", r.route) || "—", cols.route.width)
-        const siteLines = doc.splitTextToSize(r.site || "—", cols.site.width)
+        const siteLines = doc.splitTextToSize(injectionSiteLabel(t, r.site) || "—", cols.site.width)
         const batchLines = doc.splitTextToSize(r.batchNumber || "—", cols.batch.width)
 
         const rowHeight = Math.max(
@@ -722,7 +722,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
         "Vaccine Type": optionLabel("type", r.vaccineType) || "—",
         Dose: r.dose != null ? `${r.dose}${r.doseUnit ? ` ${unitLabel(r.doseUnit)}` : ""}` : "—",
         Route: optionLabel("route", r.route) || "—",
-        "Vaccination Site": r.site || "—",
+        "Vaccination Site": injectionSiteLabel(t, r.site) || "—",
         "Batch/Lot Number": r.batchNumber || "—",
         Manufacturer: r.manufacturer || "—",
         "Expiry Date": r.expiryDate || "—",
@@ -1032,7 +1032,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                       onChange={e => setSite(e.target.value)}
                     />
                     <datalist id="site-suggestions">
-                      {SITES.map(s => <option key={s} value={s} />)}
+                      {INJECTION_SITES.map(s => <option key={s} value={injectionSiteLabel(t, s)} />)}
                     </datalist>
                   </div>
 
@@ -1258,7 +1258,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                         </TableCell>
                         <TableCell className="text-sm">{r.dose != null ? `${r.dose} ${r.doseUnit || ""}`.trim() : <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell className="text-sm">{optionLabel("route", r.route) || <span className="text-gray-400">—</span>}</TableCell>
-                        <TableCell className="text-sm">{r.site || <span className="text-gray-400">—</span>}</TableCell>
+                        <TableCell className="text-sm">{injectionSiteLabel(t, r.site) || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell className="text-sm font-mono text-xs">{r.batchNumber || <span className="text-gray-400 font-sans">—</span>}</TableCell>
                         <TableCell className="text-sm">
                           {r.expiryDate

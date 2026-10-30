@@ -10,6 +10,7 @@ import {
   Stethoscope, Activity, Pill, PawPrint, AlertCircle
 } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
+import { injectionSiteLabel } from "@/components/livestock/injection-sites"
 
 interface ConsultationEntry {
   type: "consultation"
@@ -47,7 +48,7 @@ interface TreatmentDoseEntry {
   date: string | null
   diseaseName: string | null
   session: string | null
-  medicines: { medicineName: string; doseCount: number; volumeMl: number | null; cost: number }[]
+  medicines: { medicineName: string; doseCount: number; volumeMl: number | null; injectionSite?: string | null; cost: number }[]
   vetCost: number
   totalCost: number
   notes: string | null
@@ -257,7 +258,7 @@ export default function AnimalHistoryPanel({ animalId, open, onOpenChange }: Ani
                   <div className="pl-8 space-y-1">
                     {entry.medicines.map((m, i) => (
                       <p key={i} className="text-xs text-gray-600">
-                        {m.medicineName} — {m.doseCount}{m.volumeMl ? ` × ${m.volumeMl}ml` : ""}
+                        {m.medicineName} — {m.doseCount}{m.volumeMl ? ` × ${m.volumeMl}ml` : ""}{m.injectionSite ? `, ${t("disease.injectionSiteValue").replace("{site}", injectionSiteLabel(t, m.injectionSite))}` : ""}
                       </p>
                     ))}
                   </div>

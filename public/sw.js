@@ -11,7 +11,7 @@
 // Bump CACHE_NAME whenever offline.html changes, so phones fetch the new copy.
 
 const CACHE_PREFIX = "vettrack-offline-"
-const CACHE_NAME = `${CACHE_PREFIX}v3`
+const CACHE_NAME = `${CACHE_PREFIX}v4`
 const OFFLINE_URL = "/offline.html"
 
 // Records made with no connection, in offline.html or by the app's own forms, wait in

@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       medicineName: m.medicineName,
       doseCount: Number(m.doseCount) || 0,
       volumeMl: m.volumeMl ? Number(m.volumeMl) : null,
+      injectionSite: typeof m.injectionSite === "string" && m.injectionSite.trim() ? m.injectionSite.trim() : null,
       cost: Number(m.cost) || 0,
     }))
     const medicineCost = normalizedMedicines.reduce((s, m) => s + m.cost, 0)
@@ -162,6 +163,7 @@ export async function PUT(req: NextRequest) {
       medicineName: m.medicineName,
       doseCount: Number(m.doseCount) || 0,
       volumeMl: m.volumeMl ? Number(m.volumeMl) : null,
+      injectionSite: typeof m.injectionSite === "string" && m.injectionSite.trim() ? m.injectionSite.trim() : null,
       cost: Number(m.cost) || 0,
     }))
     const medicineCost = normalizedMedicines.reduce((s, m) => s + m.cost, 0)

@@ -319,7 +319,8 @@
     .med { margin-bottom: 8px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
     .med-top { display: flex; gap: 4px; }
     .med-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
-    .med-grid label { display: block; margin-bottom: 4px; color: #6b7280; font-size: 12px; }
+    .med-site { margin-top: 8px; }
+    .med-grid label, .med-site label { display: block; margin-bottom: 4px; color: #6b7280; font-size: 12px; }
     .link {
       padding: 6px 0;
       border: 0;
@@ -560,6 +561,8 @@
         medicineName: "Medicine name, e.g. Oxytetracycline",
         doses: "Doses",
         volMl: "Vol (mL)",
+        injectionSite: "Injection site, e.g. neck",
+        siteValue: "site: {site}",
         costRwf: "Cost (RWF)",
         vetCost: "Vet Cost (RWF)",
         vaccineName: "Vaccine Name",
@@ -573,6 +576,13 @@
         routeIntradermal: "Intradermal",
         routeIntravenous: "Intravenous",
         routeOther: "Other",
+        siteNeck: "Neck",
+        siteShoulder: "Shoulder",
+        siteRumpHip: "Rump / Hip",
+        siteThigh: "Thigh",
+        siteEarBase: "Ear base",
+        siteBrisket: "Brisket",
+        siteTailFold: "Tail fold",
         unit: "Unit",
         unitDoses: "doses",
         semenTypes: "Types of Semen",
@@ -748,6 +758,8 @@
         medicineName: "Izina ry'umuti, urugero Oxytetracycline",
         doses: "Inshuro",
         volMl: "Ingano (mL)",
+        injectionSite: "Aho batereye urushinge, urugero ijosi",
+        siteValue: "aho yatewe: {site}",
         costRwf: "Igiciro (RWF)",
         vetCost: "Igiciro cya vete (RWF)",
         vaccineName: "Izina ry'urukingo",
@@ -761,6 +773,13 @@
         routeIntradermal: "Mu ruhu",
         routeIntravenous: "Mu mitsi y'amaraso",
         routeOther: "Ubundi",
+        siteNeck: "Ijosi",
+        siteShoulder: "Urutugu",
+        siteRumpHip: "Ikibuno",
+        siteThigh: "Ikibero",
+        siteEarBase: "Inyuma y'ugutwi",
+        siteBrisket: "Igituza",
+        siteTailFold: "Munsi y'umurizo",
         unit: "Igipimo",
         unitDoses: "inshuro",
         semenTypes: "Ubwoko bw'imbuto",
@@ -831,6 +850,8 @@
     ]
     var ROUTES = ["Subcutaneous", "Intramuscular", "Intranasal", "Oral", "Intradermal", "Intravenous", "Other"]
     var DOSE_UNITS = ["ml", "cc", "doses"]
+    // Same list as components/livestock/injection-sites.ts: stored in English, shown translated.
+    var SITES = { Neck: "siteNeck", Shoulder: "siteShoulder", "Rump / Hip": "siteRumpHip", Thigh: "siteThigh", "Ear base": "siteEarBase", Brisket: "siteBrisket", "Tail fold": "siteTailFold" }
     var SEMEN_TYPES = ["Sexed Freisian", "Sexed Jersey", "Ordinary Freisian", "Ordinary Jersey", "Fleckv", "Girolando"]
     var MILK_TYPES = ["cow", "goat", "sheep"]
     var ROUTINE_FIELDS = ["liters", "homeConsumption", "pricePerLiter", "waterLiters", "foodType", "foodKg", "foodCost", "saltKg", "saltCost"]
@@ -1105,10 +1126,16 @@
     }
     function sessionLabel(s) { return s === "Morning" ? t("morning") : s === "Evening" ? t("evening") : s || "" }
     function genderLabel(g) { return g === "male" ? t("male") : g === "female" ? t("female") : g || "" }
+    function siteLabel(s) { return SITES[s] ? t(SITES[s]) : s }
+    function siteValue(typed) {
+      var lower = typed.trim().toLowerCase()
+      var known = Object.keys(SITES).filter(function (s) { return s.toLowerCase() === lower || t(SITES[s]).toLowerCase() === lower })[0]
+      return known || typed.trim()
+    }
     function medicines(dose) {
       return (dose.medicines || []).map(function (m) {
         var count = Number(m.doseCount) || 0
-        return m.medicineName + " (" + t(count === 1 ? "doseOne" : "doseMany", { count: count }) + (m.volumeMl ? ", " + m.volumeMl + " mL" : "") + ")"
+        return m.medicineName + " (" + t(count === 1 ? "doseOne" : "doseMany", { count: count }) + (m.volumeMl ? ", " + m.volumeMl + " mL" : "") + (m.injectionSite ? ", " + t("siteValue", { site: siteLabel(m.injectionSite) }) : "") + ")"
       }).join(", ")
     }
 
@@ -1510,6 +1537,7 @@
               name: h("input", { class: "input", placeholder: t("medicineName"), "aria-label": t("medicineName"), autocomplete: "off" }),
               count: h("input", { class: "input", type: "number", inputmode: "decimal", min: "0", step: "1", value: "1" }),
               volume: h("input", { class: "input", type: "number", inputmode: "decimal", min: "0", step: "0.1" }),
+              site: h("input", { class: "input", id: id + "-" + rows.length + "-site", list: id + "-sites", autocomplete: "off" }),
               cost: h("input", { class: "input", type: "number", inputmode: "decimal", min: "0" }),
             }
             var box = h("div", { class: "med" }, [
@@ -1526,14 +1554,16 @@
                 pair[1].id = fieldId
                 return h("div", null, [h("label", { for: fieldId, text: t(pair[0]) }), pair[1]])
               })),
+              h("div", { class: "med-site" }, [h("label", { for: row.site.id, text: t("injectionSite") }), row.site]),
             ])
             rows.push(row)
             list.appendChild(box)
           }
           addRow()
-          input = h("div", { class: "meds" }, [list, h("button", { class: "link", type: "button", onclick: addRow }, [PLUS + t("addMedicine")])])
+          var sites = h("datalist", { id: id + "-sites" }, Object.keys(SITES).map(function (s) { return h("option", { value: siteLabel(s) }) }))
+          input = h("div", { class: "meds" }, [list, sites, h("button", { class: "link", type: "button", onclick: addRow }, [PLUS + t("addMedicine")])])
           get = function () {
-            return rows.map(function (r) { return { medicineName: r.name.value.trim(), doseCount: r.count.value, volumeMl: r.volume.value, cost: r.cost.value } })
+            return rows.map(function (r) { return { medicineName: r.name.value.trim(), doseCount: r.count.value, volumeMl: r.volume.value, injectionSite: siteValue(r.site.value), cost: r.cost.value } })
           }
           set = function () {}
         } else {
@@ -1827,7 +1857,7 @@
               diseaseName: r ? r.diseaseName : null,
               date: v.date, session: v.session,
               medicines: v.medicines.map(function (m) {
-                return { medicineName: m.medicineName, doseCount: Number(m.doseCount) || 0, volumeMl: m.volumeMl ? Number(m.volumeMl) : null, cost: Number(m.cost) || 0 }
+                return { medicineName: m.medicineName, doseCount: Number(m.doseCount) || 0, volumeMl: m.volumeMl ? Number(m.volumeMl) : null, injectionSite: m.injectionSite || null, cost: Number(m.cost) || 0 }
               }),
               vetCost: v.vetCost, notes: v.notes,
             }

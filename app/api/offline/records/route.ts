@@ -120,7 +120,7 @@ async function loadRecords(db: Db, farmerId: string) {
       "treatment_doses",
       { farmerId },
       { date: -1, session: 1 },
-      ["diseaseRecordId", "animalId", "date", "session", "medicines.medicineName", "medicines.doseCount", "medicines.volumeMl"]
+      ["diseaseRecordId", "animalId", "date", "session", "medicines.medicineName", "medicines.doseCount", "medicines.volumeMl", "medicines.injectionSite"]
     ),
     find(
       "vaccination_records",

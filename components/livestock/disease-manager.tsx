@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { getDoctorsList, logPortalExport } from "@/lib/actions"
 import type { RecordCapabilities } from "@/components/livestock/capabilities"
 import { canModify } from "@/components/livestock/capabilities"
+import { INJECTION_SITES, injectionSiteLabel, injectionSiteValue } from "@/components/livestock/injection-sites"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,7 +40,7 @@ interface DiseaseManagerProps {
   showHeader?: boolean
 }
 interface Medicine {
-  medicineId?: string; medicineName: string; doseCount: number; volumeMl: number | null; cost: number
+  medicineId?: string; medicineName: string; doseCount: number; volumeMl: number | null; injectionSite?: string | null; cost: number
 }
 interface TreatmentDose {
   _id: string; diseaseRecordId: string; animalId: string; animalName: string | null
@@ -48,9 +49,9 @@ interface TreatmentDose {
   createdById?: string | null; createdByName?: string | null
 }
 interface MedicineRow {
-  medicineId?: string; medicineName: string; doseCount: string; volumeMl: string; cost: string
+  medicineId?: string; medicineName: string; doseCount: string; volumeMl: string; injectionSite: string; cost: string
 }
-const emptyMedicineRow = (): MedicineRow => ({ medicineName: "", doseCount: "1", volumeMl: "", cost: "" })
+const emptyMedicineRow = (): MedicineRow => ({ medicineName: "", doseCount: "1", volumeMl: "", injectionSite: "", cost: "" })
 const doseTotalCount = (d: TreatmentDose) => (d.medicines || []).reduce((s, m) => s + (m.doseCount || 0), 0)
 const doseMedicineCost = (d: TreatmentDose) => (d.medicines || []).reduce((s, m) => s + (m.cost || 0), 0)
 
@@ -87,8 +88,9 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
   const statusLabel = (s?: string | null) => (s && STATUS_LABEL_KEYS[s] ? t(STATUS_LABEL_KEYS[s]) : s || "")
   const sessionLabel = (s?: string | null) => (s && SESSION_LABEL_KEYS[s] ? t(SESSION_LABEL_KEYS[s]) : s || "")
   const doseCountLabel = (n: number) => t(n === 1 ? "disease.doseOne" : "disease.doseMany").replace("{count}", String(n))
-  const medicineSummary = (m: { medicineName: string; doseCount: number; volumeMl?: number | null; cost: number }, withZeroCost = false) =>
-    `${m.medicineName} (${doseCountLabel(m.doseCount)}${m.volumeMl ? `, ${m.volumeMl}mL` : ''}${m.cost > 0 || withZeroCost ? `, RWF ${m.cost.toLocaleString()}` : ''})`
+  const siteSummary = (site: string) => t("disease.injectionSiteValue").replace("{site}", injectionSiteLabel(t, site))
+  const medicineSummary = (m: { medicineName: string; doseCount: number; volumeMl?: number | null; injectionSite?: string | null; cost: number }, withZeroCost = false) =>
+    `${m.medicineName} (${doseCountLabel(m.doseCount)}${m.volumeMl ? `, ${m.volumeMl}mL` : ''}${m.injectionSite ? `, ${siteSummary(m.injectionSite)}` : ''}${m.cost > 0 || withZeroCost ? `, RWF ${m.cost.toLocaleString()}` : ''})`
   const { submitWithLocationGate, dialog: locationGateDialog } = useLocationGatedRequest()
   const [animals, setAnimals] = useState<Animal[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -320,6 +322,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         medicineName: m.medicineName.trim(),
         doseCount: Number(m.doseCount) || 0,
         volumeMl: m.volumeMl ? Number(m.volumeMl) : null,
+        injectionSite: injectionSiteValue(t, m.injectionSite) || null,
         cost: Number(m.cost) || 0,
       })),
       vetCost, notes: doseNotes,
@@ -370,7 +373,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
     setDoseSession(d.session)
     setMedicines(
       d.medicines && d.medicines.length > 0
-        ? d.medicines.map(m => ({ medicineId: m.medicineId, medicineName: m.medicineName, doseCount: String(m.doseCount), volumeMl: m.volumeMl ? String(m.volumeMl) : "", cost: String(m.cost) }))
+        ? d.medicines.map(m => ({ medicineId: m.medicineId, medicineName: m.medicineName, doseCount: String(m.doseCount), volumeMl: m.volumeMl ? String(m.volumeMl) : "", injectionSite: injectionSiteLabel(t, m.injectionSite), cost: String(m.cost) }))
         : [emptyMedicineRow()]
     )
     setVetCost(d.vetCost ? String(d.vetCost) : "")
@@ -1311,12 +1314,14 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         <Plus className="h-3 w-3" /> {t("disease.addMedicine")}
                       </Button>
                     </div>
+                    {/* Below xl the name gets its own line, so the other fields keep a usable width. */}
                     <div className="space-y-2">
                       {medicines.map((m, idx) => (
-                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_90px_110px_110px_36px] gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                          <Input placeholder={t("disease.medicineNameEGOxytetracycline")} value={m.medicineName} onChange={e => updateMedicineRow(idx, "medicineName", e.target.value)} />
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[90px_110px_1fr_110px_36px] xl:grid-cols-[1fr_90px_110px_150px_110px_36px] gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <Input placeholder={t("disease.medicineNameEGOxytetracycline")} value={m.medicineName} onChange={e => updateMedicineRow(idx, "medicineName", e.target.value)} className="sm:col-span-5 xl:col-span-1" />
                           <Input type="number" min="1" placeholder={t("disease.doses")} value={m.doseCount} onChange={e => updateMedicineRow(idx, "doseCount", e.target.value)} />
                           <Input type="number" min="0" step="0.1" placeholder={t("disease.volMl")} value={m.volumeMl} onChange={e => updateMedicineRow(idx, "volumeMl", e.target.value)} />
+                          <Input list="dose-site-suggestions" placeholder={t("disease.injectionSite")} value={m.injectionSite} onChange={e => updateMedicineRow(idx, "injectionSite", e.target.value)} />
                           <Input type="number" min="0" placeholder={t("disease.costRwf")} value={m.cost} onChange={e => updateMedicineRow(idx, "cost", e.target.value)} />
                           <Button type="button" size="sm" variant="ghost" onClick={() => removeMedicineRow(idx)} disabled={medicines.length === 1} className="h-9 w-9 p-0 hover:bg-red-50 disabled:opacity-30">
                             <Trash2 className="h-4 w-4 text-red-500" />
@@ -1324,6 +1329,9 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         </div>
                       ))}
                     </div>
+                    <datalist id="dose-site-suggestions">
+                      {INJECTION_SITES.map(s => <option key={s} value={injectionSiteLabel(t, s)} />)}
+                    </datalist>
                     {doseErrors.medicines && <p className="text-xs text-red-500">{doseErrors.medicines}</p>}
                   </div>
 
@@ -1409,7 +1417,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                             {d.medicines && d.medicines.length > 0
                               ? d.medicines.map((m, i) => (
                                 <div key={i} className="whitespace-nowrap">
-                                  {m.medicineName} <span className="text-gray-400">({doseCountLabel(m.doseCount)}{m.volumeMl ? `, ${m.volumeMl}mL` : ""}{m.cost > 0 ? `, RWF ${m.cost.toLocaleString()}` : ""})</span>
+                                  {m.medicineName} <span className="text-gray-400">({doseCountLabel(m.doseCount)}{m.volumeMl ? `, ${m.volumeMl}mL` : ""}{m.injectionSite ? `, ${siteSummary(m.injectionSite)}` : ""}{m.cost > 0 ? `, RWF ${m.cost.toLocaleString()}` : ""})</span>
                                 </div>
                               ))
                               : <span className="text-gray-400">—</span>}
