@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Pencil, Trash2, History, TrendingUp, TrendingDown, Scale } from "lucide-react"
@@ -253,13 +254,17 @@ export default function AnimalSalesPage() {
                 {/* Animal picker */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.animal')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Select value={animalId || (animalName ? "other" : "")} onValueChange={handleAnimalSelect}>
-                    <SelectTrigger><SelectValue placeholder={t('farmer.selectAnimalOrOther')} /></SelectTrigger>
-                    <SelectContent>
-                      {animals.map(a => <SelectItem key={a._id} value={a._id}>{a.name} ({a.type})</SelectItem>)}
-                      <SelectItem value="other">{t('farmer.otherAnimalNotListed')}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    value={animalId || (animalName ? "other" : "")}
+                    onValueChange={handleAnimalSelect}
+                    options={[
+                      ...animals.map(a => ({ value: a._id, label: `${a.name} (${a.type})` })),
+                      { value: "other", label: t('farmer.otherAnimalNotListed') },
+                    ]}
+                    placeholder={t('farmer.selectAnimalOrOther')}
+                    searchPlaceholder={t('farmer.searchAnimals')}
+                    emptyText={t('farmer.noResultsFound')}
+                  />
                 </div>
 
                 {/* Animal name (manual / confirm) */}
