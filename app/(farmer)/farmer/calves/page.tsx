@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search, ChevronLeft, ChevronRight } from "lucide-react"
@@ -349,6 +350,7 @@ export default function CalvesPage() {
   }, [expensePage, filterExpCalf, filterExpType])
 
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
+  const calfOptions = useMemo(() => calves.map(c => ({ value: c._id, label: c.name })), [calves])
   // Old enough to move into the animals herd - the move itself stays a farmer decision.
   const readyCalves = useMemo(() => calves.filter(c => isReadyToGraduate(c)), [calves])
   const totalMilkGiven = useMemo(() => expenses.filter(e => e.expenseType === "milk").reduce((s, e) => s + (e.milkLiters || 0), 0), [expenses])
@@ -926,12 +928,16 @@ export default function CalvesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-gray-700">{t('farmer.selectCalf')} *</label>
-                      <Select value={weightCalfId} onValueChange={setWeightCalfId} disabled={!!editWeight}>
-                        <SelectTrigger className={weightErrors.weightCalfId ? "border-red-500" : ""}><SelectValue placeholder={t('farmer.selectCalf')} /></SelectTrigger>
-                        <SelectContent>
-                          {calves.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <Combobox
+                        value={weightCalfId}
+                        onValueChange={setWeightCalfId}
+                        disabled={!!editWeight}
+                        options={calfOptions}
+                        placeholder={t('farmer.selectCalf')}
+                        searchPlaceholder={t('farmer.searchCalves')}
+                        emptyText={t('farmer.noCalvesMatch')}
+                        className={weightErrors.weightCalfId ? "border-red-500" : ""}
+                      />
                       {weightErrors.weightCalfId && <p className="text-xs text-red-500">{weightErrors.weightCalfId}</p>}
                     </div>
                     <div className="space-y-1">
@@ -970,13 +976,15 @@ export default function CalvesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Select value={chartCalfId || "none"} onValueChange={v => setChartCalfId(v === "none" ? "" : v)}>
-                <SelectTrigger className="max-w-xs"><SelectValue placeholder={t('farmer.selectCalfToViewChart')} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t('farmer.selectCalfToViewChart')}</SelectItem>
-                  {calves.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Combobox
+                value={chartCalfId || "none"}
+                onValueChange={v => setChartCalfId(v === "none" ? "" : v)}
+                options={[{ value: "none", label: t('farmer.selectCalfToViewChart') }, ...calfOptions]}
+                placeholder={t('farmer.selectCalfToViewChart')}
+                searchPlaceholder={t('farmer.searchCalves')}
+                emptyText={t('farmer.noCalvesMatch')}
+                className="max-w-xs"
+              />
               {chartCalfId && chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={260}>
                   <LineChart data={chartData}>
@@ -1073,12 +1081,16 @@ export default function CalvesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-sm font-medium text-gray-700">{t('farmer.selectCalf')} *</label>
-                      <Select value={expCalfId} onValueChange={setExpCalfId} disabled={!!editExpense}>
-                        <SelectTrigger className={expErrors.expCalfId ? "border-red-500" : ""}><SelectValue placeholder={t('farmer.selectCalf')} /></SelectTrigger>
-                        <SelectContent>
-                          {calves.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <Combobox
+                        value={expCalfId}
+                        onValueChange={setExpCalfId}
+                        disabled={!!editExpense}
+                        options={calfOptions}
+                        placeholder={t('farmer.selectCalf')}
+                        searchPlaceholder={t('farmer.searchCalves')}
+                        emptyText={t('farmer.noCalvesMatch')}
+                        className={expErrors.expCalfId ? "border-red-500" : ""}
+                      />
                       {expErrors.expCalfId && <p className="text-xs text-red-500">{expErrors.expCalfId}</p>}
                     </div>
 
@@ -1173,13 +1185,14 @@ export default function CalvesPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl">
-                <Select value={filterExpCalf || "all"} onValueChange={v => setFilterExpCalf(v === "all" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder={t('farmer.allCalves')} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('farmer.allCalves')}</SelectItem>
-                    {calves.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  value={filterExpCalf || "all"}
+                  onValueChange={v => setFilterExpCalf(v === "all" ? "" : v)}
+                  options={[{ value: "all", label: t('farmer.allCalves') }, ...calfOptions]}
+                  placeholder={t('farmer.allCalves')}
+                  searchPlaceholder={t('farmer.searchCalves')}
+                  emptyText={t('farmer.noCalvesMatch')}
+                />
                 <Select value={filterExpType || "all"} onValueChange={v => setFilterExpType(v === "all" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder={t('farmer.allTypes')} /></SelectTrigger>
                   <SelectContent>
@@ -1271,18 +1284,17 @@ export default function CalvesPage() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.mother')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                <Select value={motherAnimalId || "none"} onValueChange={v => setMotherAnimalId(v === "none" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder={t('farmer.selectMotherOptional')} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{t('common.optional')}</SelectItem>
-                    {animals.map(a => (
-                      <SelectItem key={a._id} value={a._id}>
-                        {a.name} ({a.type})
-                        <span className={a.status === "Deceased" ? "text-red-500" : "text-gray-400"}> — {animalStatusText(a.status, t)}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  value={motherAnimalId || "none"}
+                  onValueChange={v => setMotherAnimalId(v === "none" ? "" : v)}
+                  options={[
+                    { value: "none", label: t('common.optional') },
+                    ...animals.map(a => ({ value: a._id, label: `${a.name} (${a.type}) — ${animalStatusText(a.status, t)}` })),
+                  ]}
+                  placeholder={t('farmer.selectMotherOptional')}
+                  searchPlaceholder={t('farmer.searchAnimals')}
+                  emptyText={t('farmer.noResultsFound')}
+                />
               </div>
 
               <div className="space-y-1">
