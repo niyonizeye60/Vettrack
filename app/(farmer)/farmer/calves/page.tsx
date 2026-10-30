@@ -537,6 +537,12 @@ export default function CalvesPage() {
     Promise.all([fetchWeights(farmerId), fetchWeightsPage(farmerId, weightPage)]).catch(() => {})
   }
 
+  // The growth chart only offers calves that have at least one weight recorded.
+  const chartCalfOptions = useMemo(() => {
+    const weighed = new Set(weights.map(w => w.calfId))
+    return calfOptions.filter(o => weighed.has(o.value))
+  }, [weights, calfOptions])
+
   const chartData = useMemo(() => {
     if (!chartCalfId) return []
     return weights
@@ -977,12 +983,12 @@ export default function CalvesPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <Combobox
-                value={chartCalfId || "none"}
-                onValueChange={v => setChartCalfId(v === "none" ? "" : v)}
-                options={[{ value: "none", label: t('farmer.selectCalfToViewChart') }, ...calfOptions]}
+                value={chartCalfId}
+                onValueChange={setChartCalfId}
+                options={chartCalfOptions}
                 placeholder={t('farmer.selectCalfToViewChart')}
                 searchPlaceholder={t('farmer.searchCalves')}
-                emptyText={t('farmer.noCalvesMatch')}
+                emptyText={chartCalfOptions.length === 0 ? t('farmer.noWeightRecordsYet') : t('farmer.noCalvesMatch')}
                 className="max-w-xs"
               />
               {chartCalfId && chartData.length > 0 ? (
