@@ -1396,6 +1396,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                         <TableHead>{t('farmer.animal')}</TableHead>
                         <TableHead>{t('farmer.disease')}</TableHead>
                         <TableHead>{t("disease.medicines")}</TableHead>
+                        <TableHead>{t("disease.site")}</TableHead>
                         <TableHead>{t("disease.medCost")}</TableHead>
                         <TableHead>{t("disease.vetCost")}</TableHead>
                         <TableHead>{t("disease.total")}</TableHead>
@@ -1404,7 +1405,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                     </TableHeader>
                     <TableBody>
                       {filteredDoses.length === 0 ? (
-                        <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">{t("disease.noDosesLoggedYet")}</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={10} className="text-center py-8 text-gray-400">{t("disease.noDosesLoggedYet")}</TableCell></TableRow>
                       ) : filteredDoses.map(d => (
                         <TableRow key={d._id}>
                           <TableCell className="text-sm">{d.date}</TableCell>
@@ -1417,7 +1418,17 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
                             {d.medicines && d.medicines.length > 0
                               ? d.medicines.map((m, i) => (
                                 <div key={i} className="whitespace-nowrap">
-                                  {m.medicineName} <span className="text-gray-400">({doseCountLabel(m.doseCount)}{m.volumeMl ? `, ${m.volumeMl}mL` : ""}{m.injectionSite ? `, ${siteSummary(m.injectionSite)}` : ""}{m.cost > 0 ? `, RWF ${m.cost.toLocaleString()}` : ""})</span>
+                                  {m.medicineName} <span className="text-gray-400">({doseCountLabel(m.doseCount)}{m.volumeMl ? `, ${m.volumeMl}mL` : ""}{m.cost > 0 ? `, RWF ${m.cost.toLocaleString()}` : ""})</span>
+                                </div>
+                              ))
+                              : <span className="text-gray-400">—</span>}
+                          </TableCell>
+                          {/* One line per medicine, level with its line in the Medicines column. */}
+                          <TableCell className="text-sm">
+                            {d.medicines && d.medicines.some(m => m.injectionSite)
+                              ? d.medicines.map((m, i) => (
+                                <div key={i} className="whitespace-nowrap">
+                                  {m.injectionSite ? injectionSiteLabel(t, m.injectionSite) : <span className="text-gray-400">—</span>}
                                 </div>
                               ))
                               : <span className="text-gray-400">—</span>}
