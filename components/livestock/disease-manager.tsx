@@ -89,8 +89,8 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
   const sessionLabel = (s?: string | null) => (s && SESSION_LABEL_KEYS[s] ? t(SESSION_LABEL_KEYS[s]) : s || "")
   const doseCountLabel = (n: number) => t(n === 1 ? "disease.doseOne" : "disease.doseMany").replace("{count}", String(n))
   const siteSummary = (site: string) => t("disease.injectionSiteValue").replace("{site}", injectionSiteLabel(t, site))
-  const medicineSummary = (m: { medicineName: string; doseCount: number; volumeMl?: number | null; injectionSite?: string | null; cost: number }, withZeroCost = false) =>
-    `${m.medicineName} (${doseCountLabel(m.doseCount)}${m.volumeMl ? `, ${m.volumeMl}mL` : ''}${m.injectionSite ? `, ${siteSummary(m.injectionSite)}` : ''}${m.cost > 0 || withZeroCost ? `, RWF ${m.cost.toLocaleString()}` : ''})`
+  const medicineSummary = (m: { medicineName: string; doseCount: number; volumeMl?: number | null; injectionSite?: string | null; cost: number }, withZeroCost = false, withSite = false) =>
+    `${m.medicineName} (${doseCountLabel(m.doseCount)}${m.volumeMl ? `, ${m.volumeMl}mL` : ''}${withSite && m.injectionSite ? `, ${siteSummary(m.injectionSite)}` : ''}${m.cost > 0 || withZeroCost ? `, RWF ${m.cost.toLocaleString()}` : ''})`
   const { submitWithLocationGate, dialog: locationGateDialog } = useLocationGatedRequest()
   const [animals, setAnimals] = useState<Animal[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -615,7 +615,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
 
       // ─────────────────────────────────────────────────────────────
       // SECTION 2 — FULL TREATMENT DOSES TABLE
-      // Columns: Date | Session | Animal | Disease | Medicines | Med Cost | Vet Cost | Total | Notes
+      // Columns: Date | Session | Animal | Disease | Medicines | Site | Med Cost | Vet Cost | Total | Notes
       // ─────────────────────────────────────────────────────────────
       y += 12
       if (y > 170) { doc.addPage(); y = 20 }
@@ -623,13 +623,14 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       const dCols = {
         date: { x: 16, w: 20 },
         session: { x: 37, w: 16 },
-        animal: { x: 54, w: 26 },
-        disease: { x: 81, w: 30 },
-        medicines: { x: 112, w: 47 },
-        medCost: { x: 160, w: 24 },
-        vetCost: { x: 185, w: 24 },
-        total: { x: 210, w: 26 },
-        notes: { x: 237, w: 44 },
+        animal: { x: 54, w: 24 },
+        disease: { x: 79, w: 27 },
+        medicines: { x: 107, w: 44 },
+        site: { x: 152, w: 22 },
+        medCost: { x: 175, w: 22 },
+        vetCost: { x: 198, w: 22 },
+        total: { x: 221, w: 24 },
+        notes: { x: 246, w: 36 },
       }
 
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(55, 65, 81)
@@ -644,6 +645,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         doc.text(t("disease.animal"), dCols.animal.x, y)
         doc.text(t("disease.disease"), dCols.disease.x, y)
         doc.text(t("disease.medicines"), dCols.medicines.x, y)
+        doc.text(t("disease.site"), dCols.site.x, y)
         doc.text(t("disease.medCostRwf"), dCols.medCost.x, y)
         doc.text(t("disease.vetCostRwf"), dCols.vetCost.x, y)
         doc.text(t("disease.totalRwf"), dCols.total.x, y)
@@ -655,15 +657,30 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
       y += 8
 
       exportDoses.forEach((d, i) => {
-        const medicineLines = (d.medicines && d.medicines.length > 0)
-          ? d.medicines.flatMap(m => doc.splitTextToSize(medicineSummary(m), dCols.medicines.w))
+        const meds = d.medicines || []
+        let medicineLines: string[] = meds.length > 0
+          ? meds.flatMap(m => doc.splitTextToSize(medicineSummary(m), dCols.medicines.w))
           : ['—']
+        let siteLines: string[] = ['—']
+        if (meds.some(m => m.injectionSite)) {
+          // Each site starts on its medicine's first line, so a medicine that wraps
+          // doesn't put the sites below it out of step.
+          medicineLines = []; siteLines = []
+          meds.forEach(m => {
+            const mLines: string[] = doc.splitTextToSize(medicineSummary(m), dCols.medicines.w)
+            const sLines: string[] = doc.splitTextToSize(m.injectionSite ? injectionSiteLabel(t, m.injectionSite) : '—', dCols.site.w)
+            for (let k = 0; k < Math.max(mLines.length, sLines.length); k++) {
+              medicineLines.push(mLines[k] ?? ''); siteLines.push(sLines[k] ?? '')
+            }
+          })
+        }
         const cells = [
           doc.splitTextToSize(d.date || '—', dCols.date.w),
           doc.splitTextToSize(sessionLabel(d.session) || '—', dCols.session.w),
           doc.splitTextToSize(d.animalName || '—', dCols.animal.w),
           doc.splitTextToSize(d.diseaseName || '—', dCols.disease.w),
           medicineLines,
+          siteLines,
           doc.splitTextToSize(doseMedicineCost(d) > 0 ? doseMedicineCost(d).toLocaleString() : '—', dCols.medCost.w),
           doc.splitTextToSize(d.vetCost > 0 ? d.vetCost.toLocaleString() : '—', dCols.vetCost.w),
           doc.splitTextToSize(d.totalCost > 0 ? d.totalCost.toLocaleString() : '—', dCols.total.w),
@@ -676,7 +693,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         if (i % 2 === 0) { doc.setFillColor(255, 251, 235); doc.rect(15, y - 4, PW - 30, rowH, 'F') }
         doc.setDrawColor(226, 232, 240); doc.rect(15, y - 4, PW - 30, rowH)
 
-          ;[35, 52, 79, 110, 158, 183, 208, 235].forEach(sx =>
+          ;[35, 52, 77, 105, 150, 173, 196, 219, 244].forEach(sx =>
             doc.line(sx, y - 4, sx, y - 4 + rowH))
 
         doc.setFontSize(6.5)
@@ -937,7 +954,7 @@ export default function DiseaseManager({ farmerId, can, showHeader = true }: Dis
         [t("disease.animal")]: d.animalName || '—',
         [t("disease.disease")]: d.diseaseName || '—',
         [t("disease.medicines")]: (d.medicines && d.medicines.length > 0)
-          ? d.medicines.map(m => medicineSummary(m, true)).join('; ')
+          ? d.medicines.map(m => medicineSummary(m, true, true)).join('; ')
           : '—',
         [t("disease.totalDoses")]: doseTotalCount(d),
         [t("disease.medicineCostRwf")]: doseMedicineCost(d),

@@ -8404,7 +8404,7 @@ const translations = {
     'disease.volMl': 'Ingano (mL)',
     'disease.injectionSite': 'Aho batereye urushinge, urugero ijosi',
     'disease.injectionSiteValue': 'aho yatewe: {site}',
-    'disease.site': 'Aho batereye urushinge',
+    'disease.site': 'Aho yatewe',
     'disease.costRwf': 'Igiciro (RWF)',
     'disease.anyObservationsForThisDose': 'Ibyo wabonye kuri iyi miti...',
     'disease.saving': 'Birabikwa...',
