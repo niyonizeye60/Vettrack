@@ -355,6 +355,15 @@ export default function CalvesPage() {
   const readyCalves = useMemo(() => calves.filter(c => isReadyToGraduate(c)), [calves])
   const totalMilkGiven = useMemo(() => expenses.filter(e => e.expenseType === "milk").reduce((s, e) => s + (e.milkLiters || 0), 0), [expenses])
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses])
+  // The expenses table filter only offers calves that have at least one expense recorded.
+  const expenseCalfOptions = useMemo(() => {
+    const withExpenses = new Set(expenses.map(e => e.calfId))
+    return calfOptions.filter(o => withExpenses.has(o.value))
+  }, [expenses, calfOptions])
+  // Once the filtered calf's last expense is deleted, go back to all calves.
+  useEffect(() => {
+    if (filterExpCalf && !expenseCalfOptions.some(o => o.value === filterExpCalf)) setFilterExpCalf("")
+  }, [expenseCalfOptions, filterExpCalf])
 
   // ---- Calf CRUD ----
   const resetCalfForm = () => {
@@ -1194,7 +1203,7 @@ export default function CalvesPage() {
                 <Combobox
                   value={filterExpCalf || "all"}
                   onValueChange={v => setFilterExpCalf(v === "all" ? "" : v)}
-                  options={[{ value: "all", label: t('farmer.allCalves') }, ...calfOptions]}
+                  options={[{ value: "all", label: t('farmer.allCalves') }, ...expenseCalfOptions]}
                   placeholder={t('farmer.allCalves')}
                   searchPlaceholder={t('farmer.searchCalves')}
                   emptyText={t('farmer.noCalvesMatch')}
