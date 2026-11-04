@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
         weight: weight ? Number(weight) : null,
         // Born on this farm - the vocabulary the animal form already uses.
         acquisitionType: "born",
-        earTagId: earTagId || null,
-        insuranceId: insuranceId || null,
+        earTagId: earTagId || calf.earTagId || null,
+        insuranceId: insuranceId || calf.insuranceId || null,
         gender: calf.gender || null,
         lactationStatus: type === "cow" && calf.gender === "female" ? "dry" : null,
         birthDate: calf.birthDate || null,

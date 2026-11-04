@@ -139,7 +139,7 @@ async function loadRecords(db: Db, farmerId: string) {
       "calves",
       { farmerId },
       { createdAt: -1 },
-      ["name", "motherAnimalId", "motherName", "gender", "breed", "birthDate", "birthWeight", "status"]
+      ["name", "motherAnimalId", "motherName", "gender", "breed", "earTagId", "insuranceId", "birthDate", "birthWeight", "status"]
     ),
     find("calf_weights", { farmerId }, { date: -1, createdAt: -1 }, ["calfId", "weight", "date"]),
   ])

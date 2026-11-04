@@ -272,7 +272,7 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
       .map(s => ({ value: subjectKey(s.kind, s._id), label: `${s.name} (${s.type})`, group: t("farmer.animals") }))
     const calfOpts = subjects
       .filter(s => s.kind === "calf" && VACCINABLE_CALF_STATUSES.includes(s.status || "active"))
-      // Calves have no ear tag to tell two "Calf 1"s apart, so the dam disambiguates.
+      // A calf's ear tag is optional, so it can't tell two "Calf 1"s apart; the dam does.
       .map(s => ({
         value: subjectKey(s.kind, s._id),
         label: s.motherName ? t("vacc.dam").replace("{name}", s.name).replace("{mother}", s.motherName) : s.name,
@@ -915,17 +915,13 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     {errors.subject && <p className="text-xs text-red-500">{errors.subject}</p>}
                   </div>
 
-                  {/* Ear Tag ID - calves are not tagged, so say so rather than showing
-                      an empty state that reads like the farmer forgot to fill it in. */}
+                  {/* Ear Tag ID */}
                   <div className="space-y-1">
                     <label className="text-sm font-medium text-gray-700">{t("farmer.earTagId")} <span className="text-gray-400 text-xs">{t("farmer.autoDetected")}</span></label>
                     <Input
                       readOnly
-                      value={
-                        isCalfSelected ? t("farmer.notApplicableForCalves")
-                          : earTagId || (subjectSel ? t("vacc.noEarTagRegistered") : t("farmer.selectSubjectFirst"))
-                      }
-                      className={earTagId && !isCalfSelected ? "bg-amber-50 text-amber-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
+                      value={earTagId || (subjectSel ? t("vacc.noEarTagRegistered") : t("farmer.selectSubjectFirst"))}
+                      className={earTagId ? "bg-amber-50 text-amber-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                     />
                   </div>
 
@@ -934,11 +930,8 @@ export default function VaccinationManager({ farmerId, can, showHeader = true }:
                     <label className="text-sm font-medium text-gray-700">{t("farmer.insuranceId")} <span className="text-gray-400 text-xs">{t("farmer.autoDetected")}</span></label>
                     <Input
                       readOnly
-                      value={
-                        isCalfSelected ? t("farmer.notApplicableForCalves")
-                          : insuranceId || (subjectSel ? t("vacc.noInsuranceRegistered") : t("farmer.selectSubjectFirst"))
-                      }
-                      className={insuranceId && !isCalfSelected ? "bg-blue-50 text-blue-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
+                      value={insuranceId || (subjectSel ? t("vacc.noInsuranceRegistered") : t("farmer.selectSubjectFirst"))}
+                      className={insuranceId ? "bg-blue-50 text-blue-700 font-medium" : "bg-gray-50 text-gray-400 italic"}
                     />
                   </div>
 

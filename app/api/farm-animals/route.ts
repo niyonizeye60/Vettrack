@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       const calves = await db
         .collection("calves")
         .find({ farmerId })
-        .project({ name: 1, breed: 1, gender: 1, birthDate: 1, motherName: 1, status: 1 })
+        .project({ name: 1, breed: 1, gender: 1, earTagId: 1, insuranceId: 1, birthDate: 1, motherName: 1, status: 1 })
         .sort({ name: 1 })
         .toArray()
 
@@ -107,10 +107,8 @@ export async function GET(req: NextRequest) {
           type: "Calf",
           breed: c.breed || "",
           gender: c.gender || null,
-          // Calves carry neither of these - the record forms show "not applicable"
-          // rather than an empty state that reads like missing data.
-          earTagId: null,
-          insuranceId: null,
+          earTagId: c.earTagId || null,
+          insuranceId: c.insuranceId || null,
           status: c.status || "active",
           lactationStatus: null,
           birthDate: c.birthDate || null,

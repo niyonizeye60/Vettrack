@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     const query: any = { farmerId }
     if (search) {
       const re = new RegExp(escapeRegex(search.trim()), "i")
-      query.$or = [{ name: re }, { motherName: re }, { breed: re }]
+      query.$or = [{ name: re }, { earTagId: re }, { insuranceId: re }, { motherName: re }, { breed: re }]
     }
 
     if (pageParam) {
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, name, motherAnimalId, motherName, gender, breed, birthDate, birthWeight, status, notes } = body
+    const { farmerId, name, motherAnimalId, motherName, gender, breed, earTagId, insuranceId, birthDate, birthWeight, status, notes } = body
 
     if (!farmerId || !name || !gender || !birthDate)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -89,6 +89,8 @@ export async function POST(req: NextRequest) {
       motherAnimalId: motherAnimalId || null,
       motherName: motherName || null,
       gender, breed: breed || null,
+      earTagId: earTagId || null,
+      insuranceId: insuranceId || null,
       birthDate,
       birthWeight: birthWeight ? Number(birthWeight) : null,
       status: status || "active",
@@ -112,7 +114,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, name, motherAnimalId, motherName, gender, breed, birthDate, birthWeight, status, notes } = body
+    const { id, name, motherAnimalId, motherName, gender, breed, earTagId, insuranceId, birthDate, birthWeight, status, notes } = body
     if (!id) return NextResponse.json({ error: "Calf ID required" }, { status: 400 })
 
     const client = await clientPromise
@@ -133,7 +135,7 @@ export async function PUT(req: NextRequest) {
 
     await db.collection("calves").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { name, motherAnimalId: motherAnimalId || null, motherName: motherName || null, gender, breed: breed || null, birthDate, birthWeight: birthWeight ? Number(birthWeight) : null, status: nextStatus, notes: notes || null, updatedAt: new Date() } }
+      { $set: { name, motherAnimalId: motherAnimalId || null, motherName: motherName || null, gender, breed: breed || null, earTagId: earTagId || null, insuranceId: insuranceId || null, birthDate, birthWeight: birthWeight ? Number(birthWeight) : null, status: nextStatus, notes: notes || null, updatedAt: new Date() } }
     )
     await logActivity(currentUser._id, "livestock.calf_updated", name)
     return NextResponse.json({ success: true })

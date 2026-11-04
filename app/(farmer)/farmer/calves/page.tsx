@@ -28,6 +28,8 @@ interface Animal { _id: string; name: string; type: string; status?: string }
 interface Calf {
   _id: string; farmerId: string; name: string; motherAnimalId: string | null; motherName: string | null
   gender: "male" | "female"; breed: string | null; birthDate: string; birthWeight: number | null
+  /** Calves registered before these fields existed don't have them. */
+  earTagId?: string | null; insuranceId?: string | null
   status: "active" | "weaned" | "sold" | "deceased" | "graduated"; notes: string | null
   /** Set once the calf has been promoted into the animals herd. */
   graduatedToAnimalId?: string | null
@@ -156,6 +158,8 @@ export default function CalvesPage() {
   const [motherAnimalId, setMotherAnimalId] = useState("")
   const [gender, setGender] = useState("")
   const [breed, setBreed] = useState("")
+  const [calfEarTag, setCalfEarTag] = useState("")
+  const [calfInsurance, setCalfInsurance] = useState("")
   const [birthDate, setBirthDate] = useState(today)
   const [birthWeight, setBirthWeight] = useState("")
   const [status, setStatus] = useState("active")
@@ -327,15 +331,17 @@ export default function CalvesPage() {
     if (!user) return
     if (isCalvesFirstRun.current) { isCalvesFirstRun.current = false; return }
     fetchCalvesPage(user._id.toString(), calvesPage, debouncedCalfSearch)
+    // user is listed so the first-run skip is spent on the initial load, not on the first search.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calvesPage, debouncedCalfSearch])
+  }, [user?._id, calvesPage, debouncedCalfSearch])
 
   useEffect(() => {
     if (!user) return
     if (isWeightsFirstRun.current) { isWeightsFirstRun.current = false; return }
     fetchWeightsPage(user._id.toString(), weightPage)
+    // user is listed for the same reason as the calves table above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weightPage])
+  }, [user?._id, weightPage])
 
   useEffect(() => {
     if (isExpensesFirstRun.current || !user) return
@@ -346,8 +352,9 @@ export default function CalvesPage() {
     if (!user) return
     if (isExpensesFirstRun.current) { isExpensesFirstRun.current = false; return }
     fetchExpensesPage(user._id.toString(), expensePage, filterExpCalf, filterExpType)
+    // user is listed for the same reason as the calves table above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expensePage, filterExpCalf, filterExpType])
+  }, [user?._id, expensePage, filterExpCalf, filterExpType])
 
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
   const calfOptions = useMemo(() => calves.map(c => ({ value: c._id, label: c.name })), [calves])
@@ -367,7 +374,7 @@ export default function CalvesPage() {
 
   // ---- Calf CRUD ----
   const resetCalfForm = () => {
-    setCalfName(""); setMotherAnimalId(""); setGender(""); setBreed(""); setBirthDate(today)
+    setCalfName(""); setMotherAnimalId(""); setGender(""); setBreed(""); setCalfEarTag(""); setCalfInsurance(""); setBirthDate(today)
     setBirthWeight(""); setStatus("active"); setCalfNotes(""); setCalfErrors({}); setEditCalf(null)
     setCalfFormUnlocked(false)
   }
@@ -387,10 +394,10 @@ export default function CalvesPage() {
     const mother = animals.find(a => a._id === motherAnimalId)
     const farmerId = user._id.toString()
     const wasAdd = !editCalf
-    const body = { farmerId, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }
+    const body = { farmerId, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, earTagId: calfEarTag, insuranceId: calfInsurance, birthDate, birthWeight, status, notes: calfNotes }
 
     const res = await (editCalf
-      ? fetch("/api/calves", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editCalf._id, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, birthDate, birthWeight, status, notes: calfNotes }) })
+      ? fetch("/api/calves", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editCalf._id, name: calfName, motherAnimalId: motherAnimalId || null, motherName: mother?.name || null, gender, breed, earTagId: calfEarTag, insuranceId: calfInsurance, birthDate, birthWeight, status, notes: calfNotes }) })
       : fetch("/api/calves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     ).catch(() => null)
     // No connection: a new calf is kept on the phone and sent once there is one.
@@ -416,7 +423,8 @@ export default function CalvesPage() {
   const handleCalfEdit = (c: Calf) => {
     setEditCalf(c)
     setCalfName(c.name); setMotherAnimalId(c.motherAnimalId || ""); setGender(c.gender)
-    setBreed(c.breed || ""); setBirthDate(c.birthDate); setBirthWeight(c.birthWeight ? String(c.birthWeight) : "")
+    setBreed(c.breed || ""); setCalfEarTag(c.earTagId || ""); setCalfInsurance(c.insuranceId || "")
+    setBirthDate(c.birthDate); setBirthWeight(c.birthWeight ? String(c.birthWeight) : "")
     setStatus(c.status); setCalfNotes(c.notes || "")
     setCalfFormUnlocked(true)
   }
@@ -448,7 +456,7 @@ export default function CalvesPage() {
     setGradBreed(c.breed || "")
     // Start from the calf's latest weigh-in, if it has one.
     const latestWeight = weights.filter(w => w.calfId === c._id).sort((a, b) => b.date.localeCompare(a.date))[0]
-    setGradEarTag(""); setGradInsurance(""); setGradWeight(latestWeight ? String(latestWeight.weight) : ""); setGradPrice("")
+    setGradEarTag(c.earTagId || ""); setGradInsurance(c.insuranceId || ""); setGradWeight(latestWeight ? String(latestWeight.weight) : ""); setGradPrice("")
     setGradError("")
   }
 
@@ -747,10 +755,11 @@ export default function CalvesPage() {
       </div>
 
       <Tabs defaultValue="calves">
-        <TabsList className="grid grid-cols-3 w-full max-w-lg">
-          <TabsTrigger value="calves" className="flex items-center gap-1"><Baby className="h-4 w-4" /> {t('farmer.tabCalves')}</TabsTrigger>
-          <TabsTrigger value="weight" className="flex items-center gap-1"><Scale className="h-4 w-4" /> {t('farmer.tabWeightLog')}</TabsTrigger>
-          <TabsTrigger value="expenses" className="flex items-center gap-1"><Receipt className="h-4 w-4" /> {t('farmer.tabExpenses')}</TabsTrigger>
+        {/* Sized by label, not equal thirds: the Kinyarwanda expenses label doesn't fit a third. */}
+        <TabsList className="flex h-auto w-full max-w-lg">
+          <TabsTrigger value="calves" className="flex flex-auto items-center gap-1 whitespace-normal px-2 text-xs sm:px-3 sm:text-sm"><Baby className="h-4 w-4 shrink-0" /> {t('farmer.tabCalves')}</TabsTrigger>
+          <TabsTrigger value="weight" className="flex flex-auto items-center gap-1 whitespace-normal px-2 text-xs sm:px-3 sm:text-sm"><Scale className="h-4 w-4 shrink-0" /> {t('farmer.tabWeightLog')}</TabsTrigger>
+          <TabsTrigger value="expenses" className="flex flex-auto items-center gap-1 whitespace-normal px-2 text-xs sm:px-3 sm:text-sm"><Receipt className="h-4 w-4 shrink-0" /> {t('farmer.tabExpenses')}</TabsTrigger>
         </TabsList>
 
         {/* CALVES TAB */}
@@ -825,6 +834,8 @@ export default function CalvesPage() {
                     <TableHeader>
                       <TableRow className="bg-gray-50 hover:bg-gray-50">
                         <TableHead className="font-semibold text-gray-600">{t('farmer.name')}</TableHead>
+                        <TableHead className="font-semibold text-gray-600 whitespace-nowrap">{t('farmer.earTagId')}</TableHead>
+                        <TableHead className="font-semibold text-gray-600 whitespace-nowrap">{t('farmer.insuranceId')}</TableHead>
                         <TableHead className="font-semibold text-gray-600">{t('farmer.mother')}</TableHead>
                         <TableHead className="font-semibold text-gray-600">{t('farmer.gender')}</TableHead>
                         <TableHead className="font-semibold text-gray-600">{t('farmer.age')}</TableHead>
@@ -843,6 +854,8 @@ export default function CalvesPage() {
                               </div>
                             </TableCell>
                             <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                             <TableCell><Skeleton className="h-4 w-14" /></TableCell>
                             <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                             <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
@@ -857,7 +870,7 @@ export default function CalvesPage() {
                         ))
                       ) : calvesTableRows.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-12">
+                          <TableCell colSpan={8} className="text-center py-12">
                             <div className="bg-gray-100 rounded-full w-12 h-12 mx-auto mb-3 flex items-center justify-center">
                               <Baby className="h-5 w-5 text-gray-400" />
                             </div>
@@ -874,15 +887,18 @@ export default function CalvesPage() {
                               <span className="font-medium text-gray-800 text-sm">{c.name}</span>
                             </div>
                           </TableCell>
+                          {/* Short IDs stay on one line; a long one wraps instead of stretching the column. */}
+                          <TableCell className="text-sm text-gray-600"><div className="w-max max-w-[9rem] break-words">{c.earTagId || <span className="text-gray-400">—</span>}</div></TableCell>
+                          <TableCell className="text-sm text-gray-600"><div className="w-max max-w-[9rem] break-words">{c.insuranceId || <span className="text-gray-400">—</span>}</div></TableCell>
                           <TableCell className="text-sm text-gray-600">{c.motherName || <span className="text-gray-400">—</span>}</TableCell>
                           <TableCell className="text-sm text-gray-600">{c.gender === "male" ? t('farmer.male') : t('farmer.female')}</TableCell>
-                          <TableCell className="text-sm text-gray-600">{formatAge(c.birthDate, t)}</TableCell>
+                          <TableCell className="text-sm text-gray-600 whitespace-nowrap">{formatAge(c.birthDate, t)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <Badge variant="outline" className={statusColor(c.status)}>{statusLabel(c.status)}</Badge>
+                              <Badge variant="outline" className={cn(statusColor(c.status), "whitespace-nowrap")}>{statusLabel(c.status)}</Badge>
                               {isReadyToGraduate(c) && (
                                 <button type="button" onClick={() => openGraduate(c)} title={t('farmer.graduateToAnimals')}>
-                                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer">
+                                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100 cursor-pointer whitespace-nowrap">
                                     <ArrowUpCircle className="h-3 w-3 mr-1" />{t('farmer.readyToMove')}
                                   </Badge>
                                 </button>
@@ -1341,6 +1357,16 @@ export default function CalvesPage() {
               </div>
 
               <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input placeholder={t("calves.eGRw00125")} value={calfEarTag} onChange={e => setCalfEarTag(e.target.value)} />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input placeholder={t('farmer.enterInsuranceId')} value={calfInsurance} onChange={e => setCalfInsurance(e.target.value)} />
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.status')}</label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1369,7 +1395,7 @@ export default function CalvesPage() {
       {/* Delete dialogs */}
       {/* Graduate to animals */}
       <Dialog open={!!graduateCalf} onOpenChange={open => { if (!open) { setGraduateCalf(null); setGradError("") } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowUpCircle className="h-5 w-5 text-purple-600" />
