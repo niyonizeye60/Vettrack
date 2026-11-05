@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/actions/auth"
 import { getAnimals } from "@/lib/actions"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/contexts/LanguageContext"
-import { localizeError } from "@/lib/error-messages"
+import { errorMessage, localizeError } from "@/lib/error-messages"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
 import { useSaveOffline } from "@/hooks/use-save-offline"
@@ -389,6 +389,18 @@ export default function CalvesPage() {
     if (!calfName.trim()) e.calfName = t("calves.enterACalfName")
     if (!gender) e.gender = t("calves.selectGender")
     if (!birthDate) e.birthDate = t("calves.selectABirthDate")
+    // The server has the last word and also checks the farm's animals, but with no
+    // connection this is the only check before the calf is kept on the phone.
+    const idTaken = (field: "earTagId" | "insuranceId", typed: string, message: "earTagInUse" | "insuranceIdInUse") => {
+      const id = typed.trim()
+      if (!id || id.toLowerCase() === (editCalf?.[field] || "").trim().toLowerCase()) return ""
+      const holder = calves.find(c => c._id !== editCalf?._id && c[field]?.trim().toLowerCase() === id.toLowerCase())
+      return holder ? localizeError(errorMessage(message, { id, name: holder.name }), language) || "" : ""
+    }
+    const tagTaken = idTaken("earTagId", calfEarTag, "earTagInUse")
+    if (tagTaken) e.calfEarTag = tagTaken
+    const insuranceTaken = idTaken("insuranceId", calfInsurance, "insuranceIdInUse")
+    if (insuranceTaken) e.calfInsurance = insuranceTaken
     setCalfErrors(e)
     return Object.keys(e).length === 0
   }
@@ -413,7 +425,10 @@ export default function CalvesPage() {
     }
     if (!res?.ok) {
       setSaving(false)
-      reportError(res)
+      const data = res ? await res.clone().json().catch(() => null) : null
+      if (data?.field === "earTagId") setCalfErrors({ calfEarTag: localizeError(data.error, language) || data.error })
+      else if (data?.field === "insuranceId") setCalfErrors({ calfInsurance: localizeError(data.error, language) || data.error })
+      else reportError(res)
       return
     }
 
@@ -1435,12 +1450,14 @@ export default function CalvesPage() {
 
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.earTagId')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                <Input placeholder={t("calves.eGRw00125")} value={calfEarTag} onChange={e => setCalfEarTag(e.target.value)} />
+                <Input placeholder={t("calves.eGRw00125")} value={calfEarTag} onChange={e => setCalfEarTag(e.target.value)} className={calfErrors.calfEarTag ? "border-red-500" : ""} />
+                {calfErrors.calfEarTag && <p className="text-xs text-red-500 break-words">{calfErrors.calfEarTag}</p>}
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.insuranceId')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                <Input placeholder={t('farmer.enterInsuranceId')} value={calfInsurance} onChange={e => setCalfInsurance(e.target.value)} />
+                <Input placeholder={t('farmer.enterInsuranceId')} value={calfInsurance} onChange={e => setCalfInsurance(e.target.value)} className={calfErrors.calfInsurance ? "border-red-500" : ""} />
+                {calfErrors.calfInsurance && <p className="text-xs text-red-500 break-words">{calfErrors.calfInsurance}</p>}
               </div>
 
               <div className="space-y-1">

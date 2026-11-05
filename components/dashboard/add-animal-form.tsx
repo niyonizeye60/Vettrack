@@ -40,6 +40,7 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
     gender: "",
   })
   const [breedChoice, setBreedChoice] = useState("")
+  const [idErrors, setIdErrors] = useState<Record<string, string>>({})
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -84,6 +85,7 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setIdErrors({})
 
     const form = new FormData()
     Object.entries(formData).forEach(([key, value]) => form.append(key, value))
@@ -93,6 +95,8 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
       if (result.success) {
         toast({ title: t('farmer.animalAdded'), description: t('farmer.animalAddedDesc') })
         onSuccess()
+      } else if (result.field) {
+        setIdErrors({ [result.field]: localizeError(result.error, language) || t('farmer.actionFailed') })
       } else {
         toast({ title: t('common.error'), description: localizeError(result.error, language) || t('farmer.actionFailed'), variant: "destructive" })
       }
@@ -240,13 +244,15 @@ export default function AddAnimalForm({ userId, onSuccess, onCancel }: AddAnimal
         <div className="space-y-1.5">
           <Label htmlFor="add-earTagId">{t('animal.earTagId')}{optionalLabel}</Label>
           <Input id="add-earTagId" name="earTagId" value={formData.earTagId}
-            onChange={handleChange} placeholder={t('farmer.enterEarTagId')} />
+            onChange={handleChange} placeholder={t('farmer.enterEarTagId')} className={idErrors.earTagId ? "border-red-500" : ""} />
+          {idErrors.earTagId && <p className="text-xs text-red-500 break-words">{idErrors.earTagId}</p>}
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="add-insuranceId">{t('farmer.insuranceId')}{optionalLabel}</Label>
           <Input id="add-insuranceId" name="insuranceId" value={formData.insuranceId}
-            onChange={handleChange} placeholder={t('farmer.enterInsuranceId')} />
+            onChange={handleChange} placeholder={t('farmer.enterInsuranceId')} className={idErrors.insuranceId ? "border-red-500" : ""} />
+          {idErrors.insuranceId && <p className="text-xs text-red-500 break-words">{idErrors.insuranceId}</p>}
         </div>
 
       </div>

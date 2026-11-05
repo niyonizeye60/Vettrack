@@ -4,6 +4,7 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
+import { cleanLivestockId, findLivestockIdConflict, livestockIdConflictFromError } from "@/lib/livestock-ids"
 
 const DB = "ntdm_animal_hospital"
 
@@ -52,6 +53,12 @@ export async function POST(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    // The move dialog lets the farmer change both IDs. Checked before the claim below, so
+    // a refused ID leaves the calf as it was.
+    const typedIds = { earTagId: cleanLivestockId(earTagId), insuranceId: cleanLivestockId(insuranceId) }
+    const conflict = await findLivestockIdConflict(db, farmerId, typedIds, { calfId })
+    if (conflict) return NextResponse.json(conflict, { status: 409 })
+
     // Claim the calf atomically. The graduatedAt guard means a second concurrent
     // request matches nothing and is rejected before any animal is created.
     // Driver v6 returns the document itself here, not a { value } wrapper.
@@ -65,6 +72,11 @@ export async function POST(req: NextRequest) {
       return exists
         ? NextResponse.json({ error: "This calf has already been moved to your animals" }, { status: 409 })
         : NextResponse.json({ error: "Calf not found on this farm" }, { status: 404 })
+    }
+
+    const ids = {
+      earTagId: typedIds.earTagId || cleanLivestockId(calf.earTagId),
+      insuranceId: typedIds.insuranceId || cleanLivestockId(calf.insuranceId),
     }
 
     try {
@@ -83,8 +95,7 @@ export async function POST(req: NextRequest) {
         weight: weight ? Number(weight) : null,
         // Born on this farm - the vocabulary the animal form already uses.
         acquisitionType: "born",
-        earTagId: earTagId || calf.earTagId || null,
-        insuranceId: insuranceId || calf.insuranceId || null,
+        ...ids,
         gender: calf.gender || null,
         lactationStatus: type === "cow" && calf.gender === "female" ? "dry" : null,
         birthDate: calf.birthDate || null,
@@ -135,6 +146,8 @@ export async function POST(req: NextRequest) {
         { _id: new ObjectId(calfId) },
         { $unset: { graduatedAt: "" } }
       )
+      const lost = await livestockIdConflictFromError(error, db, farmerId, ids, { calfId })
+      if (lost) return NextResponse.json(lost, { status: 409 })
       throw error
     }
   } catch (error) {

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { Db } from "mongodb"
 import clientPromise, { withDbRetry } from "@/lib/db"
 import { getOfflineFarmer } from "@/lib/offline-farmer"
+import { cleanLivestockId, LIVESTOCK_ID_COLLATION } from "@/lib/livestock-ids"
 import { POST as saveMilk } from "@/app/api/milk/route"
 import { POST as saveDisease } from "@/app/api/diseases/route"
 import { POST as saveDose } from "@/app/api/treatment-doses/route"
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
 
       let recordId: string | null = res.ok && typeof data.id === "string" ? data.id : null
       if (!recordId && entry.kind === "milk" && res.status === 409) recordId = await sameMilking(db, body)
+      if (!recordId && entry.kind === "calf" && res.status === 409) recordId = await sameCalf(db, body)
       if (recordId) {
         // Saved: from here on a retry must find this, not save the record again.
         release = false
@@ -197,6 +199,27 @@ async function sameMilking(db: Db, body: Record<string, unknown>): Promise<strin
     db.collection("milk_records").findOne({ farmerId: body.farmerId, cowId: body.cowId, date: body.date, session: body.session })
   )
   return existing && Number(existing.liters) === Number(body.liters) ? existing._id.toString() : null
+}
+
+/**
+ * The calves route refuses an ear tag or insurance ID already in use. When the calf that
+ * has it also has this record's name, birth date and other ID, it is this record, saved
+ * by an earlier send whose answer never reached the phone.
+ */
+async function sameCalf(db: Db, body: Record<string, unknown>): Promise<string | null> {
+  const existing = await withDbRetry(() =>
+    db.collection("calves").findOne(
+      {
+        farmerId: body.farmerId,
+        name: body.name,
+        birthDate: body.birthDate,
+        earTagId: cleanLivestockId(body.earTagId),
+        insuranceId: cleanLivestockId(body.insuranceId),
+      },
+      { collation: LIVESTOCK_ID_COLLATION }
+    )
+  )
+  return existing ? existing._id.toString() : null
 }
 
 // Ensured once per warm process. A failure only means sent records are kept longer.

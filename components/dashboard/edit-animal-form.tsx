@@ -34,12 +34,11 @@ type Animal = {
 
 interface EditAnimalFormProps {
   animal: Animal
-  farmerId: string
   onSuccess: () => void
   onCancel: () => void
 }
 
-export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }: EditAnimalFormProps) {
+export default function EditAnimalForm({ animal, onSuccess, onCancel }: EditAnimalFormProps) {
   const { t, language } = useLanguage()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,6 +63,7 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
     const options = getBreedOptionsForType(animal.type)
     return options.includes(animal.breed) ? animal.breed : (animal.breed ? "other" : "")
   })
+  const [idErrors, setIdErrors] = useState<Record<string, string>>({})
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -108,16 +108,18 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setIdErrors({})
 
     const form = new FormData()
     Object.entries(formData).forEach(([key, value]) => form.append(key, value))
-    form.append("ownerId", farmerId)
 
     try {
       const result = await updateAnimal(animal._id, form)
       if (result.success) {
         toast({ title: t('farmer.animalUpdated'), description: t('farmer.animalUpdatedDesc') })
         onSuccess()
+      } else if (result.field) {
+        setIdErrors({ [result.field]: localizeError(result.error, language) || t('farmer.actionFailed') })
       } else {
         toast({ title: t('common.error'), description: localizeError(result.error, language) || t('farmer.actionFailed'), variant: "destructive" })
       }
@@ -292,14 +294,16 @@ export default function EditAnimalForm({ animal, farmerId, onSuccess, onCancel }
         <div className="space-y-1.5">
           <Label htmlFor="edit-earTagId">{t('animal.earTagId')}{optionalLabel}</Label>
           <Input id="edit-earTagId" name="earTagId" value={formData.earTagId}
-            onChange={handleChange} placeholder={t('farmer.enterEarTagId')} />
+            onChange={handleChange} placeholder={t('farmer.enterEarTagId')} className={idErrors.earTagId ? "border-red-500" : ""} />
+          {idErrors.earTagId && <p className="text-xs text-red-500 break-words">{idErrors.earTagId}</p>}
         </div>
 
         {/* Insurance ID — optional */}
         <div className="space-y-1.5">
           <Label htmlFor="edit-insuranceId">{t('farmer.insuranceId')}{optionalLabel}</Label>
           <Input id="edit-insuranceId" name="insuranceId" value={formData.insuranceId}
-            onChange={handleChange} placeholder={t('farmer.enterInsuranceId')} />
+            onChange={handleChange} placeholder={t('farmer.enterInsuranceId')} className={idErrors.insuranceId ? "border-red-500" : ""} />
+          {idErrors.insuranceId && <p className="text-xs text-red-500 break-words">{idErrors.insuranceId}</p>}
         </div>
 
       </div>

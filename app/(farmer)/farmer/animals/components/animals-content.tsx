@@ -168,7 +168,7 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
     if (!deleteAnimalTarget) return
     setDeleting(true)
     try {
-      const result = await deleteAnimal(deleteAnimalTarget._id, farmerId)
+      const result = await deleteAnimal(deleteAnimalTarget._id)
       if (result.success) {
         // Close the dialog now - the table catches up in the background.
         fetchData(page).catch(() => {})
@@ -190,7 +190,7 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
     const next = animal.lactationStatus === "lactating" ? "dry" : "lactating"
     setTogglingId(animal._id)
     try {
-      const result = await updateAnimalLactationStatus(animal._id, next, farmerId)
+      const result = await updateAnimalLactationStatus(animal._id, next)
       if (result.success) {
         await fetchData(page)
       } else {
@@ -481,7 +481,6 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
           {editAnimal && (
             <EditAnimalForm
               animal={editAnimal}
-              farmerId={farmerId}
               onSuccess={() => { setEditAnimal(null); fetchData(page) }}
               onCancel={() => setEditAnimal(null)}
             />

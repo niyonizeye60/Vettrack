@@ -192,6 +192,8 @@ const en = {
   calfNotFound: "Calf not found",
   failedToUpdateCalf: "Failed to update calf",
   failedToDeleteCalf: "Failed to delete calf",
+  earTagInUse: "Ear tag ID {id} is already used by {name}",
+  insuranceIdInUse: "Insurance ID {id} is already used by {name}",
   failedToFetchCategories: "Failed to fetch categories",
   failedToUpdateCategory: "Failed to update category",
   passwordChangedSuccessfully: "Password changed successfully",
@@ -659,6 +661,8 @@ const rw: Record<ErrorId, string> = {
   calfNotFound: "Inyana ntiyabonetse",
   failedToUpdateCalf: "Ntibyakunze kuvugurura inyana",
   failedToDeleteCalf: "Ntibyakunze gusiba inyana",
+  earTagInUse: "ID y'agatambi k'amatwi {id} isanzwe ikoreshwa na {name}",
+  insuranceIdInUse: "ID y'ubwishingizi {id} isanzwe ikoreshwa na {name}",
   failedToFetchCategories: "Ntibyakunze kubona ibyiciro",
   failedToUpdateCategory: "Ntibyakunze kuvugurura icyiciro",
   passwordChangedSuccessfully: "Ijambo ryibanga ryahinduwe neza",
@@ -948,7 +952,7 @@ const MESSAGES: Record<string, Record<ErrorId, string>> = { en, rw }
 
 /** Words the server fills into a message (a milking session, a stand-in name), per language. */
 const VALUE_WORDS: Record<string, Record<string, string>> = {
-  rw: { Morning: "mu gitondo", Evening: "nimugoroba", Afternoon: "ku manywa", "This animal": "Iyi nka" },
+  rw: { Morning: "mu gitondo", Evening: "nimugoroba", Afternoon: "ku manywa", "This animal": "Iyi nka", "another animal": "irindi tungo" },
 }
 
 type Params = Record<string, string | number>

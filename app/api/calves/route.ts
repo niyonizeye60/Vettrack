@@ -4,6 +4,7 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
+import { changedLivestockIds, cleanLivestockId, findLivestockIdConflict, livestockIdConflictFromError } from "@/lib/livestock-ids"
 
 const DB = "ntdm_animal_hospital"
 
@@ -84,13 +85,16 @@ export async function POST(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    const ids = { earTagId: cleanLivestockId(earTagId), insuranceId: cleanLivestockId(insuranceId) }
+    const conflict = await findLivestockIdConflict(db, farmerId, ids)
+    if (conflict) return NextResponse.json(conflict, { status: 409 })
+
     const calf = {
       farmerId, name,
       motherAnimalId: motherAnimalId || null,
       motherName: motherName || null,
       gender, breed: breed || null,
-      earTagId: earTagId || null,
-      insuranceId: insuranceId || null,
+      ...ids,
       birthDate,
       birthWeight: birthWeight ? Number(birthWeight) : null,
       status: status || "active",
@@ -98,7 +102,14 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     }
 
-    const result = await db.collection("calves").insertOne(calf)
+    let result
+    try {
+      result = await db.collection("calves").insertOne(calf)
+    } catch (error) {
+      const lost = await livestockIdConflictFromError(error, db, farmerId, ids)
+      if (lost) return NextResponse.json(lost, { status: 409 })
+      throw error
+    }
     await logActivity(currentUser._id, "livestock.calf_registered", name)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch {
@@ -133,10 +144,20 @@ export async function PUT(req: NextRequest) {
     // orphaned and let the calf be graduated a second time.
     const nextStatus = existing.graduatedToAnimalId ? "graduated" : status
 
-    await db.collection("calves").updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { name, motherAnimalId: motherAnimalId || null, motherName: motherName || null, gender, breed: breed || null, earTagId: earTagId || null, insuranceId: insuranceId || null, birthDate, birthWeight: birthWeight ? Number(birthWeight) : null, status: nextStatus, notes: notes || null, updatedAt: new Date() } }
-    )
+    const ids = { earTagId: cleanLivestockId(earTagId), insuranceId: cleanLivestockId(insuranceId) }
+    const conflict = await findLivestockIdConflict(db, existing.farmerId, changedLivestockIds(ids, existing), { calfId: id })
+    if (conflict) return NextResponse.json(conflict, { status: 409 })
+
+    try {
+      await db.collection("calves").updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { name, motherAnimalId: motherAnimalId || null, motherName: motherName || null, gender, breed: breed || null, ...ids, birthDate, birthWeight: birthWeight ? Number(birthWeight) : null, status: nextStatus, notes: notes || null, updatedAt: new Date() } }
+      )
+    } catch (error) {
+      const lost = await livestockIdConflictFromError(error, db, existing.farmerId, ids, { calfId: id })
+      if (lost) return NextResponse.json(lost, { status: 409 })
+      throw error
+    }
     await logActivity(currentUser._id, "livestock.calf_updated", name)
     return NextResponse.json({ success: true })
   } catch {

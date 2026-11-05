@@ -3,22 +3,55 @@
 import { revalidatePath } from "next/cache"
 import clientPromise from "./db"
 import { getCurrentUser } from "./auth"
-import { ObjectId } from "mongodb"
+import { ObjectId, type Db } from "mongodb"
 import { sendConsultationRequestEmail } from "./email"
 import { logActivity, logSystemError } from "./activity-log"
 import { deleteDocumentsForConsultation, getDocumentsByConsultation } from "./consultation-documents"
 import { notificationText } from "./notification-messages"
 import { insertNotification } from "./notify"
+import { changedLivestockIds, cleanLivestockId, findLivestockIdConflict, livestockIdConflictFromError } from "./livestock-ids"
+
+// Anyone can call a server action with any IDs they like, so who is asking comes from the
+// session, never from the browser. Same rule as the calf routes: a farmer's own animals, or staff.
+type ActiveUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
+
+async function getActiveUser(): Promise<ActiveUser | null> {
+  const user = await getCurrentUser()
+  return user && user.status !== "suspended" && user.status !== "inactive" ? user : null
+}
+
+const isStaff = (user: ActiveUser) => ["admin", "superadmin"].includes(user.role)
+
+/** The animal if this user may change it. Same owner shapes as getAnimals(). */
+async function findManagedAnimal(db: Db, id: string, user: ActiveUser) {
+  return db.collection("animals").findOne({
+    _id: new ObjectId(id),
+    ...(isStaff(user) ? {} : { $or: [{ ownerId: user._id }, { "owner._id": user._id }, { owner: user._id }] }),
+  })
+}
+
+function storedOwnerId(animal: Record<string, any>): string | null {
+  const owner = animal.ownerId || animal.owner?._id || (typeof animal.owner === "string" ? animal.owner : null)
+  return owner ? owner.toString() : null
+}
 
 // Animal-related actions
 export async function registerAnimal(formData: FormData, ownerId: string) {
   try {
+    const actor = await getActiveUser()
+    if (!actor) return { success: false, error: "Unauthorized" }
+    if (actor._id !== ownerId && !isStaff(actor)) return { success: false, error: "Forbidden" }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
     // Get user info for the owner
     const owner = await db.collection("users").findOne({ _id: new ObjectId(ownerId) })
     const ownerName = owner ? owner.name : formData.get("ownerName")
+
+    const ids = { earTagId: cleanLivestockId(formData.get("earTagId")), insuranceId: cleanLivestockId(formData.get("insuranceId")) }
+    const conflict = await findLivestockIdConflict(db, ownerId, ids)
+    if (conflict) return { success: false, error: conflict.error, field: conflict.field }
 
     const animal = {
       name: formData.get("name"),
@@ -32,8 +65,7 @@ export async function registerAnimal(formData: FormData, ownerId: string) {
       price: Number(formData.get("price")),
       weight: formData.get("weight") ? Number(formData.get("weight")) : null,
       acquisitionType: formData.get("acquisitionType"),
-      earTagId: formData.get("earTagId") || null,
-      insuranceId: formData.get("insuranceId") || null,
+      ...ids,
       gender: formData.get("gender") || null,
       lactationStatus: formData.get("type") === "cow" && formData.get("gender") === "female" ? "dry" : null,
       createdAt: new Date(),
@@ -45,7 +77,14 @@ export async function registerAnimal(formData: FormData, ownerId: string) {
       }
     }
 
-    const result = await db.collection("animals").insertOne(animal)
+    let result
+    try {
+      result = await db.collection("animals").insertOne(animal)
+    } catch (error) {
+      const lost = await livestockIdConflictFromError(error, db, ownerId, ids)
+      if (lost) return { success: false, error: lost.error, field: lost.field }
+      throw error
+    }
 
     // Update the user's animals array
     await db.collection("users").updateOne(
@@ -56,8 +95,7 @@ export async function registerAnimal(formData: FormData, ownerId: string) {
     // Revalidate the animals page
     revalidatePath("/farmer/animals")
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "livestock.animal_registered", `Registered animal "${animal.name}"`)
+    await logActivity(actor._id, "livestock.animal_registered", `Registered animal "${animal.name}"`)
 
     return { success: true, id: result.insertedId }
   } catch (error) {
@@ -68,27 +106,25 @@ export async function registerAnimal(formData: FormData, ownerId: string) {
 
 export async function updateAnimal(id: string, formData: FormData) {
   try {
+    const actor = await getActiveUser()
+    if (!actor) return { success: false, error: "Unauthorized" }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    // Get the original animal to preserve owner information
-    const originalAnimal = await db.collection("animals").findOne({
-      _id: new ObjectId(id)
-    })
-
+    const originalAnimal = await findManagedAnimal(db, id, actor)
     if (!originalAnimal) {
-      return { success: false, error: "Animal not found" }
+      return { success: false, error: "Animal not found or you don't have permission to edit it" }
     }
 
-    // Get ownerId from formData or use the original
-    const ownerId = formData.get("ownerId") || originalAnimal.ownerId ||
-      (originalAnimal.owner && originalAnimal.owner._id) || null
+    // Editing never moves an animal to another farm.
+    const ownerId = storedOwnerId(originalAnimal)
 
     // If we have an ownerId, get the owner info
     let ownerInfo = null
     if (ownerId) {
       try {
-        const owner = await db.collection("users").findOne({ _id: new ObjectId(ownerId.toString()) })
+        const owner = await db.collection("users").findOne({ _id: new ObjectId(ownerId) })
         if (owner) {
           ownerInfo = {
             _id: owner._id,
@@ -98,6 +134,18 @@ export async function updateAnimal(id: string, formData: FormData) {
       } catch (e) {
         console.error("Error fetching owner info:", e)
       }
+    }
+
+    // An ID left out keeps its value; one sent blank clears it, so a farmer can take a
+    // wrong or duplicate ID off an animal.
+    const ids = {
+      earTagId: cleanLivestockId(formData.has("earTagId") ? formData.get("earTagId") : originalAnimal.earTagId),
+      insuranceId: cleanLivestockId(formData.has("insuranceId") ? formData.get("insuranceId") : originalAnimal.insuranceId),
+    }
+    const saved = { animalId: id, calfId: originalAnimal.graduatedFromCalfId || undefined }
+    if (ownerId) {
+      const conflict = await findLivestockIdConflict(db, ownerId, changedLivestockIds(ids, originalAnimal), saved)
+      if (conflict) return { success: false, error: conflict.error, field: conflict.field }
     }
 
     const animal = {
@@ -112,8 +160,7 @@ export async function updateAnimal(id: string, formData: FormData) {
       price: Number(formData.get("price")),
       weight: formData.get("weight") ? Number(formData.get("weight")) : (originalAnimal.weight ?? null),
       acquisitionType: formData.get("acquisitionType") || originalAnimal.acquisitionType || null,
-      earTagId: formData.get("earTagId") || originalAnimal.earTagId || null,
-      insuranceId: formData.get("insuranceId") || originalAnimal.insuranceId || null,
+      ...ids,
       gender: formData.get("gender") || originalAnimal.gender || null,
       lactationStatus: formData.get("type") === "cow" && (formData.get("gender") || originalAnimal.gender) === "female"
         ? (originalAnimal.lactationStatus || "dry")
@@ -128,17 +175,23 @@ export async function updateAnimal(id: string, formData: FormData) {
       }
     }
 
-    const result = await db.collection("animals").updateOne(
-      { _id: new ObjectId(id) },
-      { $set: animal }
-    )
+    let result
+    try {
+      result = await db.collection("animals").updateOne(
+        { _id: new ObjectId(id) },
+        { $set: animal }
+      )
+    } catch (error) {
+      const lost = ownerId && await livestockIdConflictFromError(error, db, ownerId, ids, saved)
+      if (lost) return { success: false, error: lost.error, field: lost.field }
+      throw error
+    }
 
     // Revalidate paths for both farmer and admin views
     revalidatePath("/farmer/animals")
     revalidatePath("/dashboard/animals")
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "livestock.animal_updated", `Updated animal "${animal.name}"`)
+    await logActivity(actor._id, "livestock.animal_updated", `Updated animal "${animal.name}"`)
 
     return { success: true, modifiedCount: result.modifiedCount }
   } catch (error) {
@@ -147,25 +200,19 @@ export async function updateAnimal(id: string, formData: FormData) {
   }
 }
 
-export async function updateAnimalLactationStatus(id: string, status: "lactating" | "dry", ownerId?: string) {
+export async function updateAnimalLactationStatus(id: string, status: "lactating" | "dry") {
   try {
     if (status !== "lactating" && status !== "dry") {
       return { success: false, error: "Invalid lactation status" }
     }
 
+    const actor = await getActiveUser()
+    if (!actor) return { success: false, error: "Unauthorized" }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    const query: Record<string, any> = { _id: new ObjectId(id) }
-    if (ownerId) {
-      query.$or = [
-        { ownerId },
-        { 'owner._id': ownerId },
-        { 'owner': ownerId }
-      ]
-    }
-
-    const animal = await db.collection("animals").findOne(query)
+    const animal = await findManagedAnimal(db, id, actor)
     if (!animal) {
       return { success: false, error: "Animal not found or you don't have permission to edit it" }
     }
@@ -181,8 +228,7 @@ export async function updateAnimalLactationStatus(id: string, status: "lactating
     revalidatePath("/farmer/animals")
     revalidatePath("/dashboard/animals")
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "livestock.animal_updated", `Marked "${animal.name}" as ${status}`)
+    await logActivity(actor._id, "livestock.animal_updated", `Marked "${animal.name}" as ${status}`)
 
     return { success: true }
   } catch (error) {
@@ -191,36 +237,27 @@ export async function updateAnimalLactationStatus(id: string, status: "lactating
   }
 }
 
-export async function deleteAnimal(id: string, ownerId?: string) {
+export async function deleteAnimal(id: string) {
   try {
+    const actor = await getActiveUser()
+    if (!actor) return { success: false, error: "Unauthorized" }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    // If ownerId is provided, verify ownership
-    if (ownerId) {
-      const animal = await db.collection("animals").findOne({
-        _id: new ObjectId(id),
-        $or: [
-          { ownerId },
-          { 'owner._id': ownerId },
-          { 'owner': ownerId }
-        ]
-      })
-
-      if (!animal) {
-        return { success: false, error: "Animal not found or you don't have permission to delete it" }
-      }
+    const animalToDelete = await findManagedAnimal(db, id, actor)
+    if (!animalToDelete) {
+      return { success: false, error: "Animal not found or you don't have permission to delete it" }
     }
-
-    const animalToDelete = await db.collection("animals").findOne({ _id: new ObjectId(id) })
 
     // Remove animal from the database
     const result = await db.collection("animals").deleteOne({
       _id: new ObjectId(id),
     })
 
-    // If ownerId is provided, also update the user's animals array
-    if (ownerId) {
+    // Also update the owner's animals array
+    const ownerId = storedOwnerId(animalToDelete)
+    if (ownerId && ObjectId.isValid(ownerId)) {
       await db.collection("users").updateOne(
         { _id: new ObjectId(ownerId) },
         { $pull: { animals: new ObjectId(id) } } as any
@@ -231,8 +268,7 @@ export async function deleteAnimal(id: string, ownerId?: string) {
     revalidatePath("/farmer/animals")
     revalidatePath("/dashboard/animals")
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "livestock.animal_deleted", `Deleted animal "${animalToDelete?.name || id}"`)
+    await logActivity(actor._id, "livestock.animal_deleted", `Deleted animal "${animalToDelete.name || id}"`)
 
     return { success: true, deletedCount: result.deletedCount }
   } catch (error) {
