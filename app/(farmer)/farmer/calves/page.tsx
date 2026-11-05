@@ -19,9 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search, ChevronLeft, ChevronRight } from "lucide-react"
+import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search, ChevronLeft, ChevronRight, Download } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { CalfReportDialog, type CalfReportColumn } from "@/components/livestock/calf-report-dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 interface Animal { _id: string; name: string; type: string; status?: string }
@@ -129,6 +130,10 @@ export default function CalvesPage() {
   const [weightsPagination, setWeightsPagination] = useState<Pagination>(emptyPagination)
   const [weightsTableLoading, setWeightsTableLoading] = useState(false)
   const isWeightsFirstRun = useRef(true)
+
+  const [weightExportOpen, setWeightExportOpen] = useState(false)
+  const [expenseExportOpen, setExpenseExportOpen] = useState(false)
+  const [expenseExportType, setExpenseExportType] = useState("all")
 
   const [expensePage, setExpensePage] = useState(1)
   const [expensesTableRows, setExpensesTableRows] = useState<CalfExpense[]>([])
@@ -657,6 +662,22 @@ export default function CalvesPage() {
     return [e.description, water && `${t('farmer.water')}: ${water}`].filter(Boolean).join(" · ") || "—"
   }
 
+  const weightReportColumns: CalfReportColumn<WeightRecord>[] = [
+    { name: "Weight (kg)", excelWidth: 12, value: w => w.weight, pdf: { label: t('farmer.weightKg'), width: 18 } },
+    { name: "Notes", excelWidth: 40, value: w => w.notes || "", pdf: { label: t('exportColumn.Notes'), width: 115 } },
+  ]
+  // The PDF puts the milk and water details in one column, as the table does; the sheet keeps them as numbers.
+  const expenseReportColumns: CalfReportColumn<CalfExpense>[] = [
+    { name: "Type", excelWidth: 18, value: e => typeLabel(e.expenseType), pdf: { label: t('expenses.type'), width: 22 } },
+    { name: "Description", excelWidth: 30, value: e => e.description || "", pdf: { label: t('farmer.description'), width: 46, text: expenseDetail } },
+    { name: "Milk (L)", excelWidth: 10, value: e => e.milkLiters ?? "" },
+    { name: "Water (L)", excelWidth: 10, value: e => e.waterLiters ?? "" },
+    { name: "Water Cost (RWF)", excelWidth: 18, value: e => e.waterCost ?? "" },
+    { name: "Amount (RWF)", excelWidth: 16, value: e => e.amount, pdf: { label: t('farmer.amount'), width: 26, text: e => e.amount.toLocaleString() } },
+    // Not farmer.notes: in Kinyarwanda that reads the same as the Description column's label.
+    { name: "Notes", excelWidth: 40, value: e => e.notes || "", pdf: { label: t('exportColumn.Notes'), width: 35 } },
+  ]
+
   if (loading) return (
     <div className="space-y-6">
       <div>
@@ -944,6 +965,12 @@ export default function CalvesPage() {
 
         {/* WEIGHT LOG TAB */}
         <TabsContent value="weight" className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => setWeightExportOpen(true)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2">
+              <Download className="h-4 w-4" /> {t('farmer.exportReport')}
+            </Button>
+          </div>
+
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -1097,6 +1124,12 @@ export default function CalvesPage() {
 
         {/* EXPENSES TAB */}
         <TabsContent value="expenses" className="space-y-6">
+          <div className="flex justify-end">
+            <Button onClick={() => setExpenseExportOpen(true)} className="bg-green-600 hover:bg-green-700 text-white rounded-lg gap-2">
+              <Download className="h-4 w-4" /> {t('farmer.exportReport')}
+            </Button>
+          </div>
+
           <Card className="border border-gray-200 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -1295,6 +1328,50 @@ export default function CalvesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <CalfReportDialog
+        open={weightExportOpen}
+        onOpenChange={setWeightExportOpen}
+        dialogTitle={t('farmer.exportWeightReport')}
+        reportTitle={t('calves.weightReportTitle')}
+        fileName="calf-weight-report"
+        activityName="Calf weight report"
+        sheetName={t('farmer.weightHistory')}
+        records={weights}
+        calves={calves}
+        calfOptions={chartCalfOptions}
+        columns={weightReportColumns}
+        generatedBy={user?.name}
+      />
+
+      <CalfReportDialog
+        open={expenseExportOpen}
+        onOpenChange={setExpenseExportOpen}
+        dialogTitle={t('farmer.exportCalfExpenseReport')}
+        reportTitle={t('calves.expenseReportTitle')}
+        fileName="calf-expense-report"
+        activityName="Calf expense report"
+        sheetName={t('farmer.tabExpenses')}
+        records={expenseExportType === "all" ? expenses : expenses.filter(e => e.expenseType === expenseExportType)}
+        calves={calves}
+        calfOptions={expenseCalfOptions}
+        columns={expenseReportColumns}
+        generatedBy={user?.name}
+        filterLine={`${t('expenses.type')}: ${expenseExportType === "all" ? t('farmer.allTypes') : typeLabel(expenseExportType)}`}
+        summaryExtra={rows => t("pdf.totalAmount").replace("{amount}", rows.reduce((sum, e) => sum + e.amount, 0).toLocaleString())}
+        extraFilter={
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">{t('farmer.expenseType')}</label>
+            <Select value={expenseExportType} onValueChange={setExpenseExportType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('farmer.allTypes')}</SelectItem>
+                {EXPENSE_TYPES.map(ty => <SelectItem key={ty} value={ty}>{typeLabel(ty)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+      />
 
       {/* New / Edit Calf */}
       <Dialog open={calfFormUnlocked} onOpenChange={open => !open && resetCalfForm()}>
