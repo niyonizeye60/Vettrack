@@ -15,9 +15,10 @@ async function isTestAccount(userId: string | ObjectId): Promise<boolean> {
   }
 }
 
-// Shared by lib/actions/auth.ts, lib/actions.ts, and lib/actions/superadmin.ts (via
-// logUserActivity) - kept dependency-free so auth.ts (which superadmin.ts imports from)
-// can log without creating a circular import.
+// Shared by lib/actions/auth.ts, lib/actions.ts, lib/actions/superadmin.ts and the API
+// routes - kept dependency-free so auth.ts (which superadmin.ts imports from) can log
+// without creating a circular import. Not a server action file: nothing here may be
+// callable from the browser, or anyone could write log entries under any user's name.
 export async function logActivity(userId: string | ObjectId, action: string, details?: string) {
   try {
     if (await isTestAccount(userId)) return
@@ -56,4 +57,10 @@ export async function logSystemError(error: {
   } catch (err) {
     console.error("Failed to log system error:", err)
   }
+}
+
+/** The same as logActivity, taking an object: what the API routes and moderation actions use. */
+export async function logUserActivity(data: { userId: string; action: string; details?: string }) {
+  await logActivity(data.userId, data.action, data.details)
+  return { success: true }
 }

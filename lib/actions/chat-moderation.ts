@@ -4,14 +4,13 @@ import clientPromise from "../db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "./auth"
 import { updateUserStatus } from "./superadmin"
-import { logUserActivity } from "./superadmin"
 import { decryptText } from "../crypto"
 import { revalidatePath } from "next/cache"
-import { logSystemError } from "../activity-log"
+import { logSystemError, logUserActivity } from "../activity-log"
 
 async function requireSuperAdmin() {
   const user = await getCurrentUser()
-  if (!user || user.role !== "superadmin") {
+  if (!user || user.role !== "superadmin" || user.status === "suspended" || user.status === "inactive") {
     throw new Error("Unauthorized")
   }
   return user

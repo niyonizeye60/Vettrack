@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache"
 import { ObjectId } from "mongodb"
 import { hashPassword } from "../password"
 import { getCurrentUser } from "./auth"
-import { logActivity, logSystemError as recordSystemError } from "../activity-log"
+import { logActivity } from "../activity-log"
+import { endUserSessions } from "../sessions"
 import { isPresenceOnline, type PresenceDoc } from "../presence"
 import { normalizeMarketplaceAccess } from "../marketplace-access"
 import { notificationText } from "../notification-messages"
@@ -20,9 +21,10 @@ import {
 // Every exported function in this file is a Next.js server action with its own
 // network-invocable endpoint, independent of which page renders it - so each one
 // needs its own auth check rather than relying on the (superadmin) layout's redirect.
+// A suspended superadmin is refused too, whatever session they still hold.
 async function requireSuperAdmin() {
   const user = await getCurrentUser()
-  if (!user || user.role !== "superadmin") {
+  if (!user || user.role !== "superadmin" || user.status === "suspended" || user.status === "inactive") {
     throw new Error("Unauthorized")
   }
   return user
@@ -126,6 +128,7 @@ export async function updateUserStatus(userId: string, status: "active" | "suspe
     )
 
     if (result.modifiedCount > 0) {
+      if (status !== "active") await endUserSessions(db, [userId])
       await logAdminAction(
         status === "suspended" ? "admin.user.suspended" : status === "active" ? "admin.user.activated" : "admin.user.deactivated",
         targetUser?.name || userId
@@ -144,11 +147,13 @@ export async function updateUserStatus(userId: string, status: "active" | "suspe
 // Bulk User Operations
 export async function bulkUpdateUserStatus(userIds: string[], status: "active" | "suspended" | "inactive") {
   try {
-    await requireSuperAdmin()
+    const currentUser = await requireSuperAdmin()
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    const objectIds = userIds.map(id => new ObjectId(id))
+    // As in updateUserStatus: you can't suspend or deactivate yourself, which would now sign you out.
+    const targetIds = status === "active" ? userIds : userIds.filter((id) => id !== currentUser._id.toString())
+    const objectIds = targetIds.map(id => new ObjectId(id))
     const result = await db.collection("users").updateMany(
       { _id: { $in: objectIds } },
       {
@@ -159,6 +164,7 @@ export async function bulkUpdateUserStatus(userIds: string[], status: "active" |
       }
     )
 
+    if (status !== "active") await endUserSessions(db, targetIds)
     await logAdminAction("admin.user.bulkStatusChanged", `${result.modifiedCount} users set to ${status}`)
     revalidatePath("/superadmin/users")
     return { success: true, message: `${result.modifiedCount} users updated successfully`, count: result.modifiedCount }
@@ -448,28 +454,13 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
-export async function logUserActivity(data: {
-  userId: string
-  action: string
-  details?: string
-  ipAddress?: string
-  userAgent?: string
-}) {
-  await logActivity(data.userId, data.action, data.details)
-  return { success: true }
-}
-
 // Records an admin/superadmin-initiated action against the currently authenticated actor,
 // so it can surface in the recent activity feed and system log exports.
 async function logAdminAction(action: string, details?: string) {
   try {
     const actor = await getCurrentUser()
     if (!actor) return
-    await logUserActivity({
-      userId: actor._id.toString(),
-      action,
-      details: details || '',
-    })
+    await logActivity(actor._id.toString(), action, details || '')
   } catch (error) {
     console.error("Error logging admin action:", error)
   }
@@ -1224,15 +1215,6 @@ export async function getSystemHealth() {
 }
 
 // Log system errors
-export async function logSystemError(error: {
-  message: string
-  stack?: string
-  userId?: string
-  action?: string
-}) {
-  await recordSystemError(error)
-}
-
 // Announcement CRUD (create/update/delete/list + audience targeting) lives in
 // lib/actions/announcements.ts, shared with the admin content page.
 
@@ -1353,25 +1335,6 @@ export async function generateSystemNotifications() {
  * Called from a cron route's catch block, not a superadmin session - so this
  * can't gate on requireSuperAdmin the way the rest of this file does.
  */
-export async function notifyCronFailure(jobName: string, error: unknown) {
-  try {
-    const client = await clientPromise
-    const db = client.db("ntdm_animal_hospital")
-    await insertNotification(db, {
-      ...notificationText("cronFailed", { job: jobName, error: error instanceof Error ? error.message : String(error) }),
-      type: "system",
-      priority: "high",
-      role: "superadmin",
-      read: false,
-      deletedBy: [],
-      expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
-      createdAt: new Date(),
-    })
-  } catch (notifyError) {
-    console.error("Failed to insert cron-failure notification:", notifyError)
-  }
-}
-
 // Get system settings
 export async function getSystemSettings() {
   try {

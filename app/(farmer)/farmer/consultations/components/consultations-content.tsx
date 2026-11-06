@@ -160,7 +160,7 @@ export default function ConsultationsContent({ consultations, pagination, filter
     if (!deleteId) return
     setDeleting(true)
     try {
-      const result = await deleteConsultation(deleteId, farmerId)
+      const result = await deleteConsultation(deleteId)
       if (!result.success) {
         toast({ title: t('farmer.actionFailed'), variant: "destructive" })
       }
@@ -453,7 +453,6 @@ export default function ConsultationsContent({ consultations, pagination, filter
             <EditConsultationForm
               consultation={editConsultation}
               doctors={doctors}
-              farmerId={farmerId}
               onSuccess={() => { setEditConsultation(null); router.refresh() }}
               onCancel={() => setEditConsultation(null)}
             />

@@ -1,6 +1,8 @@
 "use server"
 
+import { cookies, headers } from "next/headers"
 import { sendBookingNotificationEmail } from "@/lib/email"
+import { checkRateLimit, getRateLimitKey } from "@/lib/rate-limit"
 
 export interface BookingData {
   name: string
@@ -49,8 +51,18 @@ const getServiceLabel = (serviceValue: string): string => {
   return serviceValue
 }
 
+
+// Public form: anyone can send it, so it gets the same limit as sign-up (by session, else by IP).
+async function withinLimit() {
+  const ip = headers().get("x-forwarded-for")?.split(",")[0]?.trim() || headers().get("x-real-ip")
+  const { success } = await checkRateLimit(getRateLimitKey(cookies().get("session")?.value, ip), "sensitive")
+  return success
+}
+
 export async function sendBookingEmail(bookingData: BookingData) {
   try {
+    if (!(await withinLimit())) return { success: false, message: "Too many attempts. Please try again in a minute." }
+
     const result = await sendBookingNotificationEmail({
       ...bookingData,
       serviceLabel: getServiceLabel(bookingData.service),

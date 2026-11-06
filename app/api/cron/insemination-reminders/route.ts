@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import { sendInseminationReminders } from "@/lib/actions/insemination-reminders"
-import { notifyCronFailure } from "@/lib/actions/superadmin"
+import { notifyCronFailure } from "@/lib/cron-failure"
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization")

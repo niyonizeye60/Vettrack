@@ -20,10 +20,9 @@ import ConsultationDocuments from "@/components/dashboard/consultation-documents
 interface ConsultationDetailContentProps {
   consultation: any
   doctorName: string
-  farmerId: string
 }
 
-export default function ConsultationDetailContent({ consultation, doctorName, farmerId }: ConsultationDetailContentProps) {
+export default function ConsultationDetailContent({ consultation, doctorName }: ConsultationDetailContentProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const router = useRouter()
@@ -33,7 +32,7 @@ export default function ConsultationDetailContent({ consultation, doctorName, fa
   const handleDelete = async () => {
     setDeleting(true)
     try {
-      const result = await deleteConsultation(consultation._id, farmerId)
+      const result = await deleteConsultation(consultation._id)
       if (result.success) {
         router.push("/farmer/consultations")
         router.refresh()

@@ -12,7 +12,7 @@ const COLLECTION = "blogPosts"
 
 async function requireStaff() {
   const user = await getCurrentUser()
-  if (!user || !["admin", "superadmin"].includes(user.role)) {
+  if (!user || !["admin", "superadmin"].includes(user.role) || user.status === "suspended" || user.status === "inactive") {
     throw new Error("Unauthorized")
   }
   return user
@@ -72,12 +72,13 @@ export async function getPublishedBlogPosts() {
   }
 }
 
+// Published posts only: anyone can call this, and drafts aren't public yet.
 export async function getBlogPostById(id: string) {
   if (!ObjectId.isValid(id)) return null
   try {
     const client = await clientPromise
     const db = client.db(DB)
-    const post = await db.collection(COLLECTION).findOne({ _id: new ObjectId(id) })
+    const post = await db.collection(COLLECTION).findOne({ _id: new ObjectId(id), status: "published" })
     if (!post) return null
     return serializeBlogPost(post)
   } catch (error) {

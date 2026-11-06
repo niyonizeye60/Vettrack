@@ -28,6 +28,7 @@ interface Consultation {
   time: string
   type: string
   doctor: string
+  doctorId?: string | null
   status: string
   createdAt: string
   farmerId: string | null
@@ -36,12 +37,11 @@ interface Consultation {
 interface EditConsultationFormProps {
   consultation: Consultation
   doctors: Doctor[]
-  farmerId: string
   onSuccess: () => void
   onCancel: () => void
 }
 
-export default function EditConsultationForm({ consultation, doctors, farmerId, onSuccess, onCancel }: EditConsultationFormProps) {
+export default function EditConsultationForm({ consultation, doctors, onSuccess, onCancel }: EditConsultationFormProps) {
   const { t, language } = useLanguage()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -53,7 +53,7 @@ export default function EditConsultationForm({ consultation, doctors, farmerId, 
     const formData = new FormData(e.currentTarget)
 
     try {
-      const result = await updateConsultation(consultation._id, formData, farmerId)
+      const result = await updateConsultation(consultation._id, formData)
       if (result.success) {
         toast({ title: t('farmer.consultationUpdated') || 'Consultation updated', description: t('farmer.consultationUpdatedDesc') || 'Your consultation has been updated successfully.' })
         onSuccess()
@@ -91,7 +91,8 @@ export default function EditConsultationForm({ consultation, doctors, farmerId, 
 
         <div className="space-y-1.5">
           <Label htmlFor="edit-doctor">{t('farmer.selectDoctor')}</Label>
-          <Select name="doctor" defaultValue={consultation.doctor} required>
+          {/* By id: a value with no matching option would quietly submit the first vet in the list. */}
+          <Select name="doctor" defaultValue={doctors.some((doc) => doc._id === consultation.doctorId) ? consultation.doctorId! : undefined} required>
             <SelectTrigger id="edit-doctor">
               <SelectValue placeholder={t('farmer.selectDoctor')} />
             </SelectTrigger>

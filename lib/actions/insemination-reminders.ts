@@ -1,4 +1,5 @@
-"use server"
+// Not a server action: only the cron and farmer API routes call these, after checking who
+// is asking. As a server action anyone could set off these emails.
 
 import clientPromise from "../db"
 import { ObjectId } from "mongodb"

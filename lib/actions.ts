@@ -1,12 +1,14 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
 import clientPromise from "./db"
 import { getCurrentUser } from "./auth"
 import { ObjectId, type Db } from "mongodb"
 import { sendConsultationRequestEmail } from "./email"
 import { logActivity, logSystemError } from "./activity-log"
-import { deleteDocumentsForConsultation, getDocumentsByConsultation } from "./consultation-documents"
+import { deleteDocumentsForConsultation, getConsultationAccess, getDocumentsByConsultation } from "./consultation-documents"
+import { vetConsultedOnAnimal } from "./farm-access"
 import { notificationText } from "./notification-messages"
 import { insertNotification } from "./notify"
 import { changedLivestockIds, cleanLivestockId, findLivestockIdConflict, livestockIdConflictFromError } from "./livestock-ids"
@@ -15,9 +17,22 @@ import { changedLivestockIds, cleanLivestockId, findLivestockIdConflict, livesto
 // session, never from the browser. Same rule as the calf routes: a farmer's own animals, or staff.
 type ActiveUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>
 
+const isSwitchedOff = (user: ActiveUser) => user.status === "suspended" || user.status === "inactive"
+
 async function getActiveUser(): Promise<ActiveUser | null> {
   const user = await getCurrentUser()
-  return user && user.status !== "suspended" && user.status !== "inactive" ? user : null
+  return user && !isSwitchedOff(user) ? user : null
+}
+
+/**
+ * For reads. A session that has ended goes to the login page, because an empty answer would
+ * leave an open page saying the farmer has no animals. Call it outside any try: redirect()
+ * works by throwing.
+ */
+async function getReader(): Promise<ActiveUser | null> {
+  const user = await getCurrentUser()
+  if (!user) redirect("/login")
+  return isSwitchedOff(user) ? null : user
 }
 
 const isStaff = (user: ActiveUser) => ["admin", "superadmin"].includes(user.role)
@@ -33,6 +48,16 @@ async function findManagedAnimal(db: Db, id: string, user: ActiveUser) {
 function storedOwnerId(animal: Record<string, any>): string | null {
   const owner = animal.ownerId || animal.owner?._id || (typeof animal.owner === "string" ? animal.owner : null)
   return owner ? owner.toString() : null
+}
+
+/**
+ * The consultation if this user has a part in it: its farmer, its vet, or staff. Name a side
+ * to limit it: the farmer edits a booking, the vet answers it, and staff can do either.
+ */
+async function findConsultationFor(db: Db, id: string, user: ActiveUser, side?: "isFarmer" | "isDoctor") {
+  if (isStaff(user)) return ObjectId.isValid(id) ? db.collection("consultations").findOne({ _id: new ObjectId(id) }) : null
+  const access = await getConsultationAccess(db, id, user)
+  return access && (!side || access[side]) ? access.consultation : null
 }
 
 // Animal-related actions
@@ -280,6 +305,10 @@ export async function deleteAnimal(id: string) {
 // Consultation-related actions
 export async function bookConsultation(formData: FormData, farmerId: string) {
   try {
+    const actor = await getActiveUser()
+    if (!actor) return { success: false, error: "Unauthorized" }
+    if (actor._id !== farmerId && !isStaff(actor)) return { success: false, error: "Forbidden" }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -349,8 +378,7 @@ export async function bookConsultation(formData: FormData, farmerId: string) {
       console.error("Error sending consultation request email:", emailError)
     }
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "consultation.booked", `Booked a ${consultation.service || "consultation"}${consultation.animalName ? ` for ${consultation.animalName}` : ""}`)
+    await logActivity(actor._id, "consultation.booked", `Booked a ${consultation.service || "consultation"}${consultation.animalName ? ` for ${consultation.animalName}` : ""}`)
 
     return { success: true }
   } catch (error) {
@@ -465,6 +493,9 @@ export async function updateConsultationStatus(
   }
 ) {
   try {
+    const actor = await getActiveUser()
+    if (!actor) return { success: false, error: "Unauthorized" }
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
@@ -475,6 +506,11 @@ export async function updateConsultationStatus(
     } catch (error) {
       console.error("Invalid ObjectId format:", id);
       return { success: false, error: "Invalid consultation ID format" };
+    }
+
+    const consultation = await findConsultationFor(db, id, actor, "isDoctor")
+    if (!consultation) {
+      return { success: false, error: "Consultation not found or you don't have permission to edit it" }
     }
 
     // Create the update data with proper typing
@@ -520,8 +556,7 @@ export async function updateConsultationStatus(
     // Notify the farmer in-app that the vet responded. The vet already sees the
     // change live; the farmer otherwise has no signal, so this closes the loop.
     try {
-      const consultation = await db.collection("consultations").findOne({ _id: objectId });
-      const farmerId = consultation?.farmerId as string | undefined;
+      const farmerId = consultation.farmerId as string | undefined;
       if (farmerId && ObjectId.isValid(farmerId)) {
         // The status shows as its label in the reader's language (appointments.completed, ...).
         const params = {
@@ -529,7 +564,7 @@ export async function updateConsultationStatus(
           feedback: feedback ? feedback.slice(0, 80) : "",
         };
         await insertNotification(db, {
-          ...(consultation?.animalName
+          ...(consultation.animalName
             ? notificationText("consultationStatusAnimal", { ...params, animal: consultation.animalName })
             : notificationText("consultationStatus", params)),
           type: "consultation",
@@ -551,8 +586,7 @@ export async function updateConsultationStatus(
     revalidatePath("/dashboard/veterinary/consultations");
     revalidatePath("/farmer/consultations");
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "consultation.status_updated", `Marked a consultation as ${status}`)
+    await logActivity(actor._id, "consultation.status_updated", `Marked a consultation as ${status}`)
 
     return { success: true, modifiedCount: result.modifiedCount };
   } catch (error) {
@@ -563,29 +597,6 @@ export async function updateConsultationStatus(
       action: "consultation.status_updated",
     })
     return { success: false, error: "Failed to update consultation status" };
-  }
-}
-
-// Message-related actions
-export async function sendMessage(formData: FormData) {
-  try {
-    const client = await clientPromise
-    const db = client.db()
-
-    const message = {
-      sender: formData.get("sender"),
-      recipient: formData.get("recipient"),
-      content: formData.get("content"),
-      read: false,
-      createdAt: new Date(),
-    }
-
-    await db.collection("messages").insertOne(message)
-    revalidatePath("/dashboard/messages")
-    return { success: true, message: "Message sent successfully" }
-  } catch (error) {
-    console.error("Error sending message:", error)
-    return { success: false, message: "Failed to send message" }
   }
 }
 
@@ -655,6 +666,18 @@ export async function getAnimals(
   options?: { page?: number; limit?: number; search?: string; tab?: "all" | "lactating" | "dry" }
 ): Promise<any> {
   const paginate = options?.page != null
+  const nothing = paginate
+    ? {
+        animals: [],
+        pagination: { page: options?.page || 1, pageSize: options?.limit || 10, total: 0, totalPages: 1 },
+        counts: { all: 0, lactating: 0, dry: 0 },
+      }
+    : []
+
+  // Your own animals. Only staff can list another farm's, or every farm's.
+  const actor = await getReader()
+  if (!actor || (actor._id !== ownerId && !isStaff(actor))) return nothing
+
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
@@ -713,25 +736,25 @@ export async function getAnimals(
     }
   } catch (error) {
     console.error("Error fetching animals:", error)
-    if (paginate) {
-      return {
-        animals: [],
-        pagination: { page: options?.page || 1, pageSize: options?.limit || 10, total: 0, totalPages: 1 },
-        counts: { all: 0, lactating: 0, dry: 0 },
-      }
-    }
-    return []
+    return nothing
   }
 }
 
 export async function getAnimalById(id: string) {
+  const actor = await getReader()
+  if (!actor) return null
+
   try {
     if (!ObjectId.isValid(id)) return null
 
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
 
-    const animal = await db.collection("animals").findOne({ _id: new ObjectId(id) })
+    // Its farmer or staff, or a vet who has been consulted about it.
+    const consulted = actor.role === "doctor" && (await vetConsultedOnAnimal(actor._id, id))
+    const animal = consulted
+      ? await db.collection("animals").findOne({ _id: new ObjectId(id) })
+      : await findManagedAnimal(db, id, actor)
     if (!animal) return null
 
     return {
@@ -805,6 +828,14 @@ export async function getConsultations(
   }
 ): Promise<any> {
   const paginate = options?.page != null
+  const nothing = paginate
+    ? { consultations: [], pagination: { page: options?.page || 1, pageSize: options?.limit || 10, total: 0, totalPages: 1 } }
+    : []
+
+  // A vet's or farmer's own list. Only staff can read someone else's, or everyone's.
+  const actor = await getReader()
+  if (!actor || ((doctorId || farmerId) !== actor._id && !isStaff(actor))) return nothing
+
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
@@ -947,10 +978,7 @@ export async function getConsultations(
     return mapped
   } catch (error) {
     console.error("Error fetching consultations:", error)
-    if (paginate) {
-      return { consultations: [], pagination: { page: options?.page || 1, pageSize: options?.limit || 10, total: 0, totalPages: 1 } }
-    }
-    return []
+    return nothing
   }
 }
 
@@ -961,6 +989,9 @@ export async function getConsultationFilterOptions(farmerId: string): Promise<{
   animals: { _id: string; name: string }[]
   doctors: { _id: string; name: string }[]
 }> {
+  const actor = await getReader()
+  if (!actor || (actor._id !== farmerId && !isStaff(actor))) return { animals: [], doctors: [] }
+
   try {
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
@@ -995,6 +1026,9 @@ export async function getConsultationFilterOptions(farmerId: string): Promise<{
 
 export async function getDoctorsList() {
   try {
+    // Vets' emails and phone numbers are for people using the app, not the open web.
+    if (!(await getActiveUser())) return []
+
     const client = await clientPromise
     const db = client.db("ntdm_animal_hospital")
     const doctors = await db.collection("users").find({ role: "doctor" }).toArray()
@@ -1011,22 +1045,15 @@ export async function getDoctorsList() {
   }
 }
 
-export async function getConsultationById(id: string, farmerId?: string) {
+export async function getConsultationById(id: string) {
+  const actor = await getReader();
+  if (!actor) return null;
+
   try {
     const client = await clientPromise;
     const db = client.db("ntdm_animal_hospital");
 
-    // Build query to get consultation by ID
-    const query: { _id: ObjectId; farmerId?: string } = {
-      _id: new ObjectId(id)
-    };
-
-    // If farmerId is provided, make sure the consultation belongs to this farmer
-    if (farmerId) {
-      query.farmerId = farmerId;
-    }
-
-    const consultation = await db.collection("consultations").findOne(query);
+    const consultation = await findConsultationFor(db, id, actor);
 
     if (!consultation) {
       return null;
@@ -1080,21 +1107,16 @@ export async function getConsultationById(id: string, farmerId?: string) {
   }
 }
 
-export async function updateConsultation(id: string, formData: FormData, farmerId?: string) {
+export async function updateConsultation(id: string, formData: FormData) {
   try {
+    const actor = await getActiveUser();
+    if (!actor) return { success: false, error: "Unauthorized" };
+
     const client = await clientPromise;
     const db = client.db("ntdm_animal_hospital");
 
-    // If farmerId is provided, verify ownership
-    if (farmerId) {
-      const consultation = await db.collection("consultations").findOne({
-        _id: new ObjectId(id),
-        farmerId
-      });
-
-      if (!consultation) {
-        return { success: false, error: "Consultation not found or you don't have permission to edit it" };
-      }
+    if (!(await findConsultationFor(db, id, actor, "isFarmer"))) {
+      return { success: false, error: "Consultation not found or you don't have permission to edit it" };
     }
 
     const consultation = {
@@ -1117,8 +1139,7 @@ export async function updateConsultation(id: string, formData: FormData, farmerI
     revalidatePath("/farmer/consultations");
     revalidatePath(`/farmer/consultations/${id}`);
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "consultation.updated", `Updated a ${consultation.service || "consultation"}`)
+    await logActivity(actor._id, "consultation.updated", `Updated a ${consultation.service || "consultation"}`)
 
     return { success: true, modifiedCount: result.modifiedCount };
   } catch (error) {
@@ -1132,21 +1153,16 @@ export async function updateConsultation(id: string, formData: FormData, farmerI
   }
 }
 
-export async function deleteConsultation(id: string, farmerId?: string) {
+export async function deleteConsultation(id: string) {
   try {
+    const actor = await getActiveUser();
+    if (!actor) return { success: false, error: "Unauthorized" };
+
     const client = await clientPromise;
     const db = client.db("ntdm_animal_hospital");
 
-    // If farmerId is provided, verify ownership
-    if (farmerId) {
-      const consultation = await db.collection("consultations").findOne({
-        _id: new ObjectId(id),
-        farmerId
-      });
-
-      if (!consultation) {
-        return { success: false, error: "Consultation not found or you don't have permission to delete it" };
-      }
+    if (!(await findConsultationFor(db, id, actor, "isFarmer"))) {
+      return { success: false, error: "Consultation not found or you don't have permission to delete it" };
     }
 
     const result = await db.collection("consultations").deleteOne({
@@ -1165,8 +1181,7 @@ export async function deleteConsultation(id: string, farmerId?: string) {
     // Revalidate paths
     revalidatePath("/farmer/consultations");
 
-    const actor = await getCurrentUser()
-    if (actor) await logActivity(actor._id, "consultation.deleted", "Deleted a consultation")
+    await logActivity(actor._id, "consultation.deleted", "Deleted a consultation")
 
     return { success: true, deletedCount: result.deletedCount };
   } catch (error) {

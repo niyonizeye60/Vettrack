@@ -3,8 +3,9 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
-import { logUserActivity } from "@/lib/actions/superadmin"
+import { logUserActivity } from "@/lib/activity-log"
 import { hashPassword } from "@/lib/password"
+import { endUserSessions } from "@/lib/sessions"
 import { ObjectId } from "mongodb"
 
 const EDITABLE_FIELDS = ["name", "email", "phone", "district", "sector", "licenseNumber", "specialization"] as const
@@ -58,10 +59,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       const newStatus = action === "suspend" ? "suspended" : "active"
       const targetUser = await db.collection("users").findOne({ _id: new ObjectId(params.id), role: MANAGED_ROLES }, { projection: { name: 1 } })
 
-      await db.collection("users").updateOne(
+      const result = await db.collection("users").updateOne(
         { _id: new ObjectId(params.id), role: MANAGED_ROLES },
         { $set: { status: newStatus, updatedAt: new Date() } }
       )
+      if (action === "suspend" && result.matchedCount) await endUserSessions(db, [params.id])
 
       await logUserActivity({
         userId: currentUser._id,

@@ -4,6 +4,7 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { getAnimalById } from "@/lib/actions"
+import { vetConsultedOnAnimal } from "@/lib/farm-access"
 
 const DB = "ntdm_animal_hospital"
 
@@ -20,6 +21,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const animalId = searchParams.get("animalId")
     if (!animalId) return NextResponse.json({ error: "animalId required" }, { status: 400 })
+
+    if (currentUser.role === "doctor" && !(await vetConsultedOnAnimal(currentUser._id, animalId))) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const client = await clientPromise
     const db = client.db(DB)

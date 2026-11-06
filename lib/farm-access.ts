@@ -334,6 +334,21 @@ export async function animalBelongsToFarm(animalId: string, farmerId: string): P
 }
 
 /**
+ * Whether a vet has a consultation about this animal, which is what lets them read its
+ * history. `doctor` is a raw id string from the booking form, an ObjectId in legacy rows.
+ */
+export async function vetConsultedOnAnimal(vetId: string, animalId: string): Promise<boolean> {
+  if (!ObjectId.isValid(vetId)) return false
+  const client = await clientPromise
+  const db = client.db(DB)
+  const consultation = await db.collection("consultations").findOne(
+    { animalId, $or: [{ doctor: vetId }, { doctor: new ObjectId(vetId) }] },
+    { projection: { _id: 1 } }
+  )
+  return !!consultation
+}
+
+/**
  * What a farm record can be filed against. Calves live in their own collection with
  * their own id space, so an id alone cannot say which one it came from - every record
  * that accepts both must store the type alongside it and re-check the pair here.

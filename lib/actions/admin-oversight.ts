@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth"
 
 async function requireStaff() {
   const user = await getCurrentUser()
-  if (!user || !["admin", "superadmin"].includes(user.role)) {
+  if (!user || !["admin", "superadmin"].includes(user.role) || user.status === "suspended" || user.status === "inactive") {
     throw new Error("Unauthorized")
   }
   return user

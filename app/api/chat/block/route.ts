@@ -2,8 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
-import { logUserActivity } from "@/lib/actions/superadmin"
-import { logSystemError } from "@/lib/activity-log"
+import { logSystemError, logUserActivity } from "@/lib/activity-log"
 import { ObjectId } from "mongodb"
 
 export async function POST(request: NextRequest) {

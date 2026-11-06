@@ -21,8 +21,7 @@ export default async function ConsultationDetailPage({ params }: PageProps) {
     redirect("/login");
   }
   
-  const farmerId = currentUser._id.toString();
-  const consultation = await getConsultationById(id, farmerId);
+  const consultation = await getConsultationById(id);
   
   if (!consultation) {
     notFound();
@@ -35,7 +34,6 @@ export default async function ConsultationDetailPage({ params }: PageProps) {
     <ConsultationDetailContent
       consultation={consultation}
       doctorName={doctorName}
-      farmerId={farmerId}
     />
   );
 } 

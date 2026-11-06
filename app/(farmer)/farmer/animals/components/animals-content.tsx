@@ -92,6 +92,8 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
         tab: activeTab,
         search: debouncedSearch || undefined,
       })
+      // Nothing comes back when the session has ended: the page is on its way to log in.
+      if (!result) return
       if (result.pagination.total > 0 && targetPage > result.pagination.totalPages) {
         await fetchData(result.pagination.totalPages)
         return
