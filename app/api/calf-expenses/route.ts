@@ -4,10 +4,16 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
-import { calfBelongsToFarm } from "@/lib/farm-access"
+import { resolveFarmAccess, calfBelongsToFarm, logVetAction, diffRecord, provenanceFor } from "@/lib/farm-access"
+import { DELEGATE_CALF_EXPENSE_TYPE } from "@/lib/permissions"
 import { getHomeConsumptionBalance } from "@/lib/home-consumption"
 
 const DB = "ntdm_animal_hospital"
+// The farmer can delegate the Expenses tab to a vet as part of the "calves" module.
+const MODULE = "calves" as const
+// A vet only ever sees and records veterinary expenses: milk and feed are the farmer's
+// own costs, so they stay out of the vet's view even though they share this collection.
+const VET_ONLY_ERROR = "You can only record veterinary expenses"
 
 // Feed expenses can optionally record the water the calf drank and its cost.
 // The water cost is folded into `amount`, so every total/report that sums
@@ -43,9 +49,9 @@ export async function GET(req: NextRequest) {
     const pageParam = searchParams.get("page")
     if (!farmerId) return NextResponse.json({ error: "farmerId required" }, { status: 400 })
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff && farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const access = await resolveFarmAccess(currentUser, farmerId, MODULE, "view")
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
     }
 
     const client = await clientPromise
@@ -54,6 +60,8 @@ export async function GET(req: NextRequest) {
     const query: any = { farmerId }
     if (calfId) query.calfId = calfId
     if (expenseType) query.expenseType = expenseType
+    // Whatever type a vet asks for, they get the veterinary expenses only.
+    if (access.via === "grant") query.expenseType = DELEGATE_CALF_EXPENSE_TYPE
     if (startDate || endDate) {
       query.date = {}
       if (startDate) query.date.$gte = startDate
@@ -102,9 +110,12 @@ export async function POST(req: NextRequest) {
     const waterError = validateWater(expenseType, waterLiters, waterCost)
     if (waterError) return NextResponse.json({ error: waterError }, { status: 400 })
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff && farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const access = await resolveFarmAccess(currentUser, farmerId, MODULE, "create")
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
+    }
+    if (access.via === "grant" && expenseType !== DELEGATE_CALF_EXPENSE_TYPE) {
+      return NextResponse.json({ error: VET_ONLY_ERROR }, { status: 403 })
     }
 
     if (!(await calfBelongsToFarm(calfId, farmerId))) {
@@ -134,9 +145,25 @@ export async function POST(req: NextRequest) {
       amount: Number(amount) + (water.waterCost || 0),
       date, notes: notes || null,
       createdAt: new Date(),
+      ...provenanceFor(currentUser, "create"),
     }
 
     const result = await db.collection("calf_expenses").insertOne(record)
+
+    if (access.via === "grant") {
+      await logVetAction({
+        farmerId,
+        vetId: currentUser._id,
+        vetName: currentUser.name,
+        module: MODULE,
+        action: "calf_expense.create",
+        recordId: result.insertedId.toString(),
+        animalId: calfId,
+        animalName: calfName || null,
+        summary: `${currentUser.name} recorded a veterinary expense of RWF ${record.amount.toLocaleString()}${calfName ? ` for ${calfName}` : ""} (calf)`,
+      })
+    }
+
     await logActivity(currentUser._id, "livestock.calf_expense_logged", `${expenseType} expense for ${calfName || calfId}`)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch {
@@ -153,7 +180,9 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json()
     const { id, expenseType, milkLiters, waterLiters, waterCost, description, amount, date, notes } = body
-    if (!id) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
+    if (!id || !ObjectId.isValid(id)) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
+    if (!["milk", "feed", "veterinary", "other"].includes(expenseType))
+      return NextResponse.json({ error: "Invalid expense type" }, { status: 400 })
     const waterError = validateWater(expenseType, waterLiters, waterCost)
     if (waterError) return NextResponse.json({ error: waterError }, { status: 400 })
 
@@ -163,9 +192,17 @@ export async function PUT(req: NextRequest) {
     const existing = await db.collection("calf_expenses").findOne({ _id: new ObjectId(id) })
     if (!existing) return NextResponse.json({ error: "Expense not found" }, { status: 404 })
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff && existing.farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    // The record's own farmerId decides which farm this is, never one the caller sends.
+    const access = await resolveFarmAccess(currentUser, existing.farmerId, MODULE, "update", {
+      record: existing as { createdById?: string | null },
+    })
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
+    }
+    // Neither side of the edit may be a milk, feed or other expense: a vet can't change
+    // the farmer's own costs, nor turn a veterinary expense into one.
+    if (access.via === "grant" && (existing.expenseType !== DELEGATE_CALF_EXPENSE_TYPE || expenseType !== DELEGATE_CALF_EXPENSE_TYPE)) {
+      return NextResponse.json({ error: VET_ONLY_ERROR }, { status: 403 })
     }
 
     if (expenseType === "milk") {
@@ -182,10 +219,27 @@ export async function PUT(req: NextRequest) {
     }
 
     const water = waterFields(expenseType, waterLiters, waterCost)
+    const updated = { expenseType, milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null, ...water, description: description || null, amount: Number(amount) + (water.waterCost || 0), date, notes: notes || null }
     await db.collection("calf_expenses").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { expenseType, milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null, ...water, description: description || null, amount: Number(amount) + (water.waterCost || 0), date, notes: notes || null, updatedAt: new Date() } }
+      { $set: { ...updated, ...provenanceFor(currentUser, "update") } }
     )
+
+    if (access.via === "grant") {
+      await logVetAction({
+        farmerId: existing.farmerId,
+        vetId: currentUser._id,
+        vetName: currentUser.name,
+        module: MODULE,
+        action: "calf_expense.update",
+        recordId: id,
+        animalId: existing.calfId || null,
+        animalName: existing.calfName || null,
+        summary: `${currentUser.name} updated a veterinary expense${existing.calfName ? ` for ${existing.calfName}` : ""} (calf)`,
+        changes: diffRecord(existing, updated),
+      })
+    }
+
     await logActivity(currentUser._id, "livestock.calf_expense_updated", expenseType)
     return NextResponse.json({ success: true })
   } catch {
@@ -202,20 +256,40 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
-    if (!id) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
+    if (!id || !ObjectId.isValid(id)) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
 
     const client = await clientPromise
     const db = client.db(DB)
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff) {
-      const existing = await db.collection("calf_expenses").findOne({ _id: new ObjectId(id) })
-      if (!existing || existing.farmerId !== currentUser._id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
+    const existing = await db.collection("calf_expenses").findOne({ _id: new ObjectId(id) })
+    if (!existing) return NextResponse.json({ error: "Expense not found" }, { status: 404 })
+
+    const access = await resolveFarmAccess(currentUser, existing.farmerId, MODULE, "delete", {
+      record: existing as { createdById?: string | null },
+    })
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
+    }
+    if (access.via === "grant" && existing.expenseType !== DELEGATE_CALF_EXPENSE_TYPE) {
+      return NextResponse.json({ error: VET_ONLY_ERROR }, { status: 403 })
     }
 
     await db.collection("calf_expenses").deleteOne({ _id: new ObjectId(id) })
+
+    if (access.via === "grant") {
+      await logVetAction({
+        farmerId: existing.farmerId,
+        vetId: currentUser._id,
+        vetName: currentUser.name,
+        module: MODULE,
+        action: "calf_expense.delete",
+        recordId: id,
+        animalId: existing.calfId || null,
+        animalName: existing.calfName || null,
+        summary: `${currentUser.name} deleted a veterinary expense${existing.calfName ? ` for ${existing.calfName}` : ""} (calf)`,
+      })
+    }
+
     await logActivity(currentUser._id, "livestock.calf_expense_deleted", id)
     return NextResponse.json({ success: true })
   } catch {

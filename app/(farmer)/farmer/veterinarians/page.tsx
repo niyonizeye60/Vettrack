@@ -18,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Stethoscope, ShieldCheck, Plus, Pencil, Trash2, Syringe, ShieldAlert, KeyRound, Lock, History, Search, List, Grid3X3 } from "lucide-react"
+import { Stethoscope, ShieldCheck, Plus, Pencil, Trash2, Syringe, ShieldAlert, ShieldPlus, Baby, KeyRound, Lock, History, Search, List, Grid3X3 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeError } from "@/lib/error-messages"
@@ -65,12 +65,16 @@ interface AuditEntry {
 const MODULE_ICON: Record<string, JSX.Element> = {
   insemination: <Syringe className="h-4 w-4" />,
   health: <ShieldAlert className="h-4 w-4" />,
+  vaccination: <ShieldPlus className="h-4 w-4" />,
+  calves: <Baby className="h-4 w-4" />,
   access: <KeyRound className="h-4 w-4" />,
 }
 
 const MODULE_TONE: Record<string, string> = {
   insemination: "bg-blue-50 text-blue-700 border-blue-200",
   health: "bg-amber-50 text-amber-700 border-amber-200",
+  vaccination: "bg-green-50 text-green-700 border-green-200",
+  calves: "bg-pink-50 text-pink-700 border-pink-200",
   access: "bg-purple-50 text-purple-700 border-purple-200",
 }
 

@@ -4,8 +4,11 @@ import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
+import { resolveFarmAccess, calfBelongsToFarm, logVetAction, diffRecord, provenanceFor } from "@/lib/farm-access"
 
 const DB = "ntdm_animal_hospital"
+// The farmer can delegate the Weight Log to a vet as part of the "calves" module.
+const MODULE = "calves" as const
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,9 +23,9 @@ export async function GET(req: NextRequest) {
     const pageParam = searchParams.get("page")
     if (!farmerId) return NextResponse.json({ error: "farmerId required" }, { status: 400 })
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff && farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const access = await resolveFarmAccess(currentUser, farmerId, MODULE, "view")
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
     }
 
     const client = await clientPromise
@@ -69,9 +72,13 @@ export async function POST(req: NextRequest) {
     if (!farmerId || !calfId || !weight || !date)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff && farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    const access = await resolveFarmAccess(currentUser, farmerId, MODULE, "create")
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
+    }
+
+    if (!(await calfBelongsToFarm(calfId, farmerId))) {
+      return NextResponse.json({ error: "That calf is not on this farm" }, { status: 403 })
     }
 
     const client = await clientPromise
@@ -81,9 +88,25 @@ export async function POST(req: NextRequest) {
       farmerId, calfId, calfName: calfName || null,
       weight: Number(weight), date, notes: notes || null,
       createdAt: new Date(),
+      ...provenanceFor(currentUser, "create"),
     }
 
     const result = await db.collection("calf_weights").insertOne(record)
+
+    if (access.via === "grant") {
+      await logVetAction({
+        farmerId,
+        vetId: currentUser._id,
+        vetName: currentUser.name,
+        module: MODULE,
+        action: "calf_weight.create",
+        recordId: result.insertedId.toString(),
+        animalId: calfId,
+        animalName: calfName || null,
+        summary: `${currentUser.name} recorded a weight of ${Number(weight)} kg${calfName ? ` for ${calfName}` : ""} (calf)`,
+      })
+    }
+
     await logActivity(currentUser._id, "livestock.calf_weight_logged", `${weight}kg for ${calfName || calfId}`)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })
   } catch {
@@ -100,23 +123,43 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json()
     const { id, weight, date, notes } = body
-    if (!id) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
+    if (!id || !ObjectId.isValid(id)) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
 
     const client = await clientPromise
     const db = client.db(DB)
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff) {
-      const existing = await db.collection("calf_weights").findOne({ _id: new ObjectId(id) })
-      if (!existing || existing.farmerId !== currentUser._id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
+    const existing = await db.collection("calf_weights").findOne({ _id: new ObjectId(id) })
+    if (!existing) return NextResponse.json({ error: "Record not found" }, { status: 404 })
+
+    // The record's own farmerId decides which farm this is, never one the caller sends.
+    const access = await resolveFarmAccess(currentUser, existing.farmerId, MODULE, "update", {
+      record: existing as { createdById?: string | null },
+    })
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
     }
 
+    const updated = { weight: Number(weight), date, notes: notes || null }
     await db.collection("calf_weights").updateOne(
       { _id: new ObjectId(id) },
-      { $set: { weight: Number(weight), date, notes: notes || null, updatedAt: new Date() } }
+      { $set: { ...updated, ...provenanceFor(currentUser, "update") } }
     )
+
+    if (access.via === "grant") {
+      await logVetAction({
+        farmerId: existing.farmerId,
+        vetId: currentUser._id,
+        vetName: currentUser.name,
+        module: MODULE,
+        action: "calf_weight.update",
+        recordId: id,
+        animalId: existing.calfId || null,
+        animalName: existing.calfName || null,
+        summary: `${currentUser.name} updated a weight record${existing.calfName ? ` for ${existing.calfName}` : ""} (calf)`,
+        changes: diffRecord(existing, updated),
+      })
+    }
+
     await logActivity(currentUser._id, "livestock.calf_weight_updated", `${weight}kg`)
     return NextResponse.json({ success: true })
   } catch {
@@ -133,20 +176,37 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
-    if (!id) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
+    if (!id || !ObjectId.isValid(id)) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
 
     const client = await clientPromise
     const db = client.db(DB)
 
-    const isStaff = ["admin", "superadmin"].includes(currentUser.role)
-    if (!isStaff) {
-      const existing = await db.collection("calf_weights").findOne({ _id: new ObjectId(id) })
-      if (!existing || existing.farmerId !== currentUser._id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
+    const existing = await db.collection("calf_weights").findOne({ _id: new ObjectId(id) })
+    if (!existing) return NextResponse.json({ error: "Record not found" }, { status: 404 })
+
+    const access = await resolveFarmAccess(currentUser, existing.farmerId, MODULE, "delete", {
+      record: existing as { createdById?: string | null },
+    })
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.reason }, { status: access.status })
     }
 
     await db.collection("calf_weights").deleteOne({ _id: new ObjectId(id) })
+
+    if (access.via === "grant") {
+      await logVetAction({
+        farmerId: existing.farmerId,
+        vetId: currentUser._id,
+        vetName: currentUser.name,
+        module: MODULE,
+        action: "calf_weight.delete",
+        recordId: id,
+        animalId: existing.calfId || null,
+        animalName: existing.calfName || null,
+        summary: `${currentUser.name} deleted a weight record${existing.calfName ? ` for ${existing.calfName}` : ""} (calf)`,
+      })
+    }
+
     await logActivity(currentUser._id, "livestock.calf_weight_deleted", id)
     return NextResponse.json({ success: true })
   } catch {

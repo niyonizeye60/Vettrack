@@ -24,7 +24,19 @@ export const PERMISSION_MODULES = [
     labelKey: "farmer.permVaccination",
     descKey: "farmer.permVaccinationDesc",
   },
+  {
+    // The Calves page's Weight Log and Expenses tabs (calf_weights, calf_expenses).
+    // A vet never gets the Calves tab itself, and only sees and records veterinary
+    // expenses: milk and feed costs are the farmer's own finances.
+    key: "calves",
+    collection: "calf_weights",
+    labelKey: "farmer.permCalves",
+    descKey: "farmer.permCalvesDesc",
+  },
 ] as const
+
+/** The only calf expense type a delegated vet can see or record. */
+export const DELEGATE_CALF_EXPENSE_TYPE = "veterinary"
 
 export const PERMISSION_ACTIONS = ["view", "create", "update", "delete"] as const
 

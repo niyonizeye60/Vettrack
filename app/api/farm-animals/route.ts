@@ -21,7 +21,8 @@ const DB = "ntdm_animal_hospital"
  * `kind: "calf"`. They are served from here rather than from /api/calves because that
  * route is the calves *management* endpoint and is farmer-only - routing the picker
  * through it would mean loosening auth on far more than the picker. Callers that omit
- * the flag get exactly the animals-only array they got before.
+ * the flag get exactly the animals-only array they got before. `module=calves` returns
+ * the calves alone.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -50,8 +51,12 @@ export async function GET(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    // The calves module (Weight Log and Expenses) only works with calves, so a vet
+    // granted only that module gets the calves and none of the farm's herd.
+    const calvesModule = requested === "calves"
+
     // Same legacy ownerId shapes as getAnimals() in lib/actions.ts.
-    const animals = await db
+    const animals = calvesModule ? [] : await db
       .collection("animals")
       .find({ $or: [{ ownerId: farmerId }, { "owner._id": farmerId }, { owner: farmerId }] })
       .project({ name: 1, type: 1, breed: 1, gender: 1, earTagId: 1, insuranceId: 1, status: 1, lactationStatus: 1 })
@@ -88,7 +93,7 @@ export async function GET(req: NextRequest) {
       motherName: null,
     }))
 
-    if (searchParams.get("includeCalves") === "1") {
+    if (calvesModule || searchParams.get("includeCalves") === "1") {
       // Every status is returned, not just the ones a picker would offer: the caller
       // still needs sold and deceased calves to label and filter their existing
       // records. Narrowing to what may be *vaccinated* is the caller's job.

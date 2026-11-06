@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
-import { MapPin, Warehouse, Syringe, ShieldAlert, ShieldPlus, Search, Info, Lock, List, Grid3X3 } from "lucide-react"
+import { MapPin, Warehouse, Syringe, ShieldAlert, ShieldPlus, Search, Info, Lock, List, Grid3X3, Baby } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { PERMISSION_MODULES, PERMISSION_ACTIONS, type PermissionMap, type PermissionModule } from "@/lib/permissions"
 
@@ -28,12 +28,14 @@ const MODULE_ICON: Record<string, JSX.Element> = {
   insemination: <Syringe className="h-3 w-3" />,
   health: <ShieldAlert className="h-3 w-3" />,
   vaccination: <ShieldPlus className="h-3 w-3" />,
+  calves: <Baby className="h-3 w-3" />,
 }
 
 const MODULE_TONE: Record<string, string> = {
   insemination: "bg-blue-50 text-blue-700 border-blue-200",
   health: "bg-amber-50 text-amber-700 border-amber-200",
   vaccination: "bg-green-50 text-green-700 border-green-200",
+  calves: "bg-pink-50 text-pink-700 border-pink-200",
 }
 
 export default function FarmsPageClient({ farms }: { farms: Farm[] }) {
