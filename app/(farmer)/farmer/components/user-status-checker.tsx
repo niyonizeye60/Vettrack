@@ -5,6 +5,7 @@ import { useSessionTimeout } from "@/hooks/useSessionTimeout"
 import { useDailySummaryEmail } from "@/hooks/useDailySummaryEmail"
 import { useInseminationReminders } from "@/hooks/useInseminationReminders"
 import { useCalfGraduationReminders } from "@/hooks/useCalfGraduationReminders"
+import { useFeedingPlans } from "@/hooks/useFeedingPlans"
 
 export default function UserStatusChecker() {
   const statusModal = useUserStatus()
@@ -12,6 +13,7 @@ export default function UserStatusChecker() {
   useDailySummaryEmail()
   useInseminationReminders()
   useCalfGraduationReminders()
+  useFeedingPlans()
   return (
     <>
       {statusModal}

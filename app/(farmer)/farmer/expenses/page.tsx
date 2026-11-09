@@ -15,10 +15,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Receipt, Plus, Pencil, Trash2, History, Droplet, SprayCan, PawPrint, Download, FileText, Wheat } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Receipt, Plus, Pencil, Trash2, History, Droplet, SprayCan, PawPrint, Download, FileText, Wheat, CalendarClock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
+import { addDays, kigaliToday } from "@/lib/product-rules"
+import { MAX_FEEDING_PLAN_DAYS, canGetFeedRecords, planDayCount, rationTotal, type FeedingRation } from "@/lib/feeding-plan-rules"
 
 interface MilkingExpense {
   _id: string; farmerId: string
@@ -27,7 +30,7 @@ interface MilkingExpense {
   pricePerUnit?: number | null
   amount: number; date: string; notes: string | null
 }
-interface Animal { _id: string; name: string; type: string; lactationStatus?: string | null }
+interface Animal { _id: string; name: string; type: string; lactationStatus?: string | null; status?: string }
 interface AnimalExpense {
   _id: string; farmerId: string; animalId: string; animalName: string | null
   expenseType: "feed" | "water" | "health" | "other"
@@ -36,6 +39,16 @@ interface AnimalExpense {
   foodKg?: number | null; foodCost?: number | null
   waterLiters?: number | null; waterCost?: number | null
   saltKg?: number | null; saltCost?: number | null
+  /** Set when a feeding plan wrote the record (lib/feeding-plans.ts) */
+  feedingPlanId?: string | null
+}
+// A feeding plan as GET /api/feeding-plans returns it - see lib/feeding-plans.ts
+interface FeedingPlan {
+  _id: string; startDate: string; endDate: string; time: string | null; notes: string | null
+  animals: { animalId: string; animalName: string | null; animalType: string }[]
+  rations: Record<string, FeedingRation>
+  status: "active" | "stopped" | "finished"
+  recordedThrough: string | null
 }
 // One usual ration per animal type (not per session as in Milk Production: dry animals
 // are fed the same whatever the time of day, but a cow and a goat eat very different amounts).
@@ -46,6 +59,16 @@ interface FeedRoutine {
 const EMPTY_FEED_ROUTINE: FeedRoutine = { foodKg: "", foodCost: "", waterLiters: "", waterCost: "", saltKg: "", saltCost: "" }
 const hasFeedRoutine = (r?: FeedRoutine) => !!r && Object.values(r).some(v => v !== "")
 const animalTypeOf = (a?: Animal) => (a?.type || "other").toLowerCase()
+
+// The ration fields of the feeding plan form, in the order the Feed Defaults show them
+const RATION_INPUTS: { field: keyof FeedRoutine; label: string; step: string; placeholder: string }[] = [
+  { field: "foodKg", label: "farmer.foodEaten", step: "0.1", placeholder: "e.g. 15" },
+  { field: "foodCost", label: "farmer.foodCost", step: "0.01", placeholder: "e.g. 3000" },
+  { field: "waterLiters", label: "farmer.waterIntake", step: "0.5", placeholder: "e.g. 40" },
+  { field: "waterCost", label: "farmer.waterCost", step: "0.01", placeholder: "e.g. 1000" },
+  { field: "saltKg", label: "farmer.saltConsumed", step: "0.1", placeholder: "e.g. 0.5" },
+  { field: "saltCost", label: "farmer.saltCost", step: "0.01", placeholder: "e.g. 500" },
+]
 
 const EXPENSE_TYPES = ["washing_drugs", "milking_oil"] as const
 const EXPENSE_UNITS = ["litres", "ml", "kg", "units"]
@@ -129,6 +152,19 @@ export default function ExpensesPage() {
 
   const feedRoutineStorageKey = (farmerId: string) => `vettrack_animal_expense_routine_${farmerId}`
 
+  // Feeding plans
+  const [feedingPlans, setFeedingPlans] = useState<FeedingPlan[]>([])
+  const [planOpen, setPlanOpen] = useState(false)
+  const [planStart, setPlanStart] = useState("")
+  const [planEnd, setPlanEnd] = useState("")
+  const [planTime, setPlanTime] = useState("")
+  const [planNotes, setPlanNotes] = useState("")
+  const [planAnimalIds, setPlanAnimalIds] = useState<string[]>([])
+  const [planRations, setPlanRations] = useState<Record<string, FeedRoutine>>({})
+  const [planErrors, setPlanErrors] = useState<Record<string, string>>({})
+  const [planSaving, setPlanSaving] = useState(false)
+  const [stopPlanId, setStopPlanId] = useState<string | null>(null)
+
   // Animal Expenses report export
   const [aeExportOpen, setAeExportOpen] = useState(false)
   const [aeExportType, setAeExportType] = useState<"daily" | "monthly" | "total" | "custom">("total")
@@ -157,9 +193,15 @@ export default function ExpensesPage() {
           ))
         }
       } catch {}
+      // Write the feeding plan days that are due before loading the records, so a farmer
+      // back from a few days away finds them already there (lib/feeding-plans.ts).
+      if (userData.role === "farmer") {
+        await fetch("/api/farmer/feeding-plans/check", { method: "POST" }).catch(() => {})
+      }
       await Promise.all([
         fetchExpenses(userData._id.toString()),
         fetchAnimalExpenses(userData._id.toString()),
+        fetchFeedingPlans(userData._id.toString()).catch(() => {}),
       ])
       setLoading(false)
     }
@@ -168,6 +210,7 @@ export default function ExpensesPage() {
 
   const expensesRequest = useLatestRequest()
   const animalExpensesRequest = useLatestRequest()
+  const feedingPlansRequest = useLatestRequest()
   const reportError = useActionError()
 
   const fetchExpenses = async (farmerId: string) => {
@@ -183,6 +226,13 @@ export default function ExpensesPage() {
     const data = await res.json()
     if (!isLatest()) return
     setAExpenses(Array.isArray(data) ? data : [])
+  }
+  const fetchFeedingPlans = async (farmerId: string) => {
+    const isLatest = feedingPlansRequest()
+    const res = await fetch(`/api/feeding-plans?farmerId=${farmerId}`)
+    const data = await res.json()
+    if (!isLatest()) return
+    setFeedingPlans(Array.isArray(data) ? data : [])
   }
 
   const totalWashingDrugsCost = useMemo(() => expenses.filter(e => e.expenseType === "washing_drugs").reduce((s, e) => s + e.amount, 0), [expenses])
@@ -628,6 +678,102 @@ export default function ExpensesPage() {
     fetchAnimalExpenses(user._id.toString()).catch(() => {})
   }
 
+  // ---- Feeding plans: a daily ration for chosen animals over a period. The server writes
+  // one feed record per animal per day as each day comes (lib/feeding-plans.ts). ----
+  const planToday = kigaliToday()
+  const planAnimalChoices = useMemo(() => dryAnimals.filter(canGetFeedRecords), [dryAnimals])
+  const planAnimalsByType = useMemo(() => {
+    const groups = new Map<string, Animal[]>()
+    for (const a of planAnimalChoices) groups.set(animalTypeOf(a), [...(groups.get(animalTypeOf(a)) || []), a])
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b))
+  }, [planAnimalChoices])
+  // Animals in a running plan on any of the chosen days: a second plan would record them twice
+  const planBusyIds = useMemo(() => new Set(
+    feedingPlans
+      .filter(p => p.status === "active" && p.startDate <= planEnd && p.endDate >= planStart)
+      .flatMap(p => p.animals.map(a => a.animalId))
+  ), [feedingPlans, planStart, planEnd])
+  useEffect(() => {
+    setPlanAnimalIds(prev => prev.some(id => planBusyIds.has(id)) ? prev.filter(id => !planBusyIds.has(id)) : prev)
+  }, [planBusyIds])
+  const planSelectedAnimals = useMemo(() => planAnimalChoices.filter(a => planAnimalIds.includes(a._id)), [planAnimalChoices, planAnimalIds])
+  const planSelectedTypes = useMemo(() => Array.from(new Set(planSelectedAnimals.map(a => animalTypeOf(a)))).sort(), [planSelectedAnimals])
+  const planDays = planStart && planEnd && planEnd >= planStart ? planDayCount(planStart, planEnd) : 0
+  const planPerDay = planSelectedAnimals.reduce((s, a) => s + rationTotal(planRations[animalTypeOf(a)]), 0)
+
+  const togglePlanAnimal = (id: string, on: boolean) =>
+    setPlanAnimalIds(prev => on ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id))
+
+  const togglePlanType = (animalsOfType: Animal[], on: boolean) => {
+    const ids = animalsOfType.filter(a => !planBusyIds.has(a._id)).map(a => a._id)
+    setPlanAnimalIds(prev => on ? Array.from(new Set([...prev, ...ids])) : prev.filter(x => !ids.includes(x)))
+  }
+
+  const setPlanRationField = (type: string, field: keyof FeedRoutine, value: string) =>
+    setPlanRations(prev => ({ ...prev, [type]: { ...(prev[type] ?? EMPTY_FEED_ROUTINE), [field]: value } }))
+
+  // A new plan runs for a week from today, with each type's ration taken from the Feed Defaults
+  const openPlanDialog = () => {
+    setPlanStart(planToday); setPlanEnd(addDays(planToday, 6)); setPlanTime(""); setPlanNotes("")
+    setPlanAnimalIds([]); setPlanRations({ ...feedRoutine }); setPlanErrors({})
+    setPlanOpen(true)
+  }
+
+  const validatePlan = () => {
+    const e: Record<string, string> = {}
+    if (!planStart || planStart < planToday) e.start = t('farmer.planErrStart')
+    if (!planEnd || planEnd < planStart) e.end = t('farmer.planErrEnd')
+    else if (planDays > MAX_FEEDING_PLAN_DAYS) e.end = t('farmer.planErrTooLong').replace("{days}", String(MAX_FEEDING_PLAN_DAYS))
+    if (planAnimalIds.length === 0) e.animals = t('farmer.planErrAnimals')
+    for (const type of planSelectedTypes) {
+      if (rationTotal(planRations[type]) <= 0) e[`ration:${type}`] = t('farmer.planErrRation')
+    }
+    setPlanErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const handlePlanSubmit = async () => {
+    if (!validatePlan()) return
+    setPlanSaving(true)
+    const res = await fetch("/api/feeding-plans", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        farmerId: user._id.toString(), startDate: planStart, endDate: planEnd, time: planTime, notes: planNotes,
+        animalIds: planSelectedAnimals.map(a => a._id),
+        rations: Object.fromEntries(planSelectedTypes.map(type => [type, planRations[type] ?? EMPTY_FEED_ROUTINE])),
+      }),
+    }).catch(() => null)
+    setPlanSaving(false)
+    if (!res?.ok) {
+      reportError(res)
+      return
+    }
+    const data = await res.json().catch(() => ({}))
+    setPlanOpen(false)
+    toast({
+      title: t('farmer.planStarted'),
+      description: data.recorded > 0
+        ? t('farmer.planStartedToday').replace("{count}", String(data.recorded))
+        : t('farmer.planStartedLater').replace("{date}", planStart),
+    })
+    fetchFeedingPlans(user._id.toString()).catch(() => {})
+    fetchAnimalExpenses(user._id.toString()).catch(() => {})
+  }
+
+  const handleStopPlan = async (id: string) => {
+    setStopPlanId(null)
+    const res = await fetch("/api/feeding-plans", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "stopped" }),
+    }).catch(() => null)
+    if (!res?.ok) reportError(res)
+    else toast({ title: t('farmer.planStoppedToast') })
+    fetchFeedingPlans(user._id.toString()).catch(() => {})
+    fetchAnimalExpenses(user._id.toString()).catch(() => {})
+  }
+
   if (loading) return (
     <div className="space-y-6 animate-pulse">
       <div>
@@ -876,8 +1022,9 @@ export default function ExpensesPage() {
             </Button>
           </div>
           <Tabs defaultValue="record">
-            <TabsList className="grid grid-cols-2 w-full max-w-sm">
+            <TabsList className="grid grid-cols-3 w-full max-w-md">
               <TabsTrigger value="record" className="flex items-center gap-1"><Plus className="h-4 w-4" /> {t('farmer.tabRecord')}</TabsTrigger>
+              <TabsTrigger value="plans" className="flex items-center gap-1 min-w-0"><CalendarClock className="h-4 w-4 flex-shrink-0" /> <span className="truncate">{t('farmer.tabFeedingPlans')}</span></TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-1"><History className="h-4 w-4" /> {t('farmer.tabHistory')}</TabsTrigger>
             </TabsList>
 
@@ -1017,6 +1164,68 @@ export default function ExpensesPage() {
               </Card>
             </TabsContent>
 
+            {/* FEEDING PLANS TAB */}
+            <TabsContent value="plans">
+              <Card className="border border-gray-200 shadow-sm">
+                <CardHeader className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full" />
+                      {t('farmer.tabFeedingPlans')}
+                    </CardTitle>
+                    {planAnimalChoices.length > 0 && (
+                      <Button type="button" size="sm" onClick={openPlanDialog} className="rounded-lg gap-1.5 bg-green-600 hover:bg-green-700 text-white">
+                        <Plus className="h-3.5 w-3.5" />
+                        {t('farmer.newFeedingPlan')}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">{t('farmer.feedingPlansDesc')}</p>
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">{t('farmer.feedingPlansCaution')}</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {feedingPlans.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">
+                      {animals.length === 0 ? t('farmer.selectAnimalRegisterFirst') : planAnimalChoices.length === 0 ? t('farmer.noDryAnimalsAvailable') : t('farmer.noFeedingPlans')}
+                    </p>
+                  ) : feedingPlans.map(p => {
+                    const perDay = p.animals.reduce((s, a) => s + rationTotal(p.rations[a.animalType]), 0)
+                    const upcoming = p.status === "active" && p.startDate > planToday
+                    const label = p.status === "stopped" ? t('farmer.planStopped')
+                      : p.status === "finished" ? t('farmer.planFinished')
+                      : upcoming ? t('farmer.planStartsOn').replace("{date}", p.startDate)
+                      : t('farmer.planRunning')
+                    const color = p.status !== "active" ? "bg-gray-50 text-gray-600 border-gray-200"
+                      : upcoming ? "bg-sky-50 text-sky-700 border-sky-200"
+                      : "bg-green-50 text-green-700 border-green-200"
+                    return (
+                      <div key={p._id} className="border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-start gap-3">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className={color}>{label}</Badge>
+                            <span className="text-sm font-medium text-gray-900">{p.startDate} → {p.endDate}</span>
+                            {p.time && <span className="text-xs text-gray-500">{p.time}</span>}
+                          </div>
+                          <p className="text-sm text-gray-700 truncate">
+                            {t('farmer.planAnimalsCount').replace("{count}", String(p.animals.length))}: {p.animals.map(a => a.animalName || "—").join(", ")}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {t('farmer.planPerDay').replace("{amount}", perDay.toLocaleString())} · {p.recordedThrough ? t('farmer.planRecordedThrough').replace("{date}", p.recordedThrough) : t('farmer.planNothingRecorded')}
+                          </p>
+                          {p.notes && <p className="text-xs text-gray-500 truncate">{p.notes}</p>}
+                        </div>
+                        {p.status === "active" && (
+                          <Button size="sm" variant="outline" onClick={() => setStopPlanId(p._id)} className="rounded-lg self-start text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
+                            {t('farmer.stopPlan')}
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
             {/* HISTORY TAB */}
             <TabsContent value="history">
               <Card className="border border-gray-200 shadow-sm">
@@ -1075,7 +1284,14 @@ export default function ExpensesPage() {
                             <TableCell className="text-sm">{e.date}</TableCell>
                             <TableCell className="text-sm text-gray-500">{e.time || "—"}</TableCell>
                             <TableCell className="font-medium">{e.animalName || "—"}</TableCell>
-                            <TableCell><Badge variant="outline" className={aTypeColor(e.expenseType)}>{aTypeLabel(e.expenseType)}</Badge></TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <Badge variant="outline" className={aTypeColor(e.expenseType)}>{aTypeLabel(e.expenseType)}</Badge>
+                                {e.feedingPlanId && (
+                                  <Badge variant="outline" title={t('farmer.fromPlanTitle')} className="bg-violet-50 text-violet-700 border-violet-200">{t('farmer.fromPlan')}</Badge>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-sm text-gray-500">
                               {e.expenseType === "feed" ? (
                                 <div className="flex flex-col gap-0.5">
@@ -1383,6 +1599,130 @@ export default function ExpensesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* New Feeding Plan Dialog */}
+      <Dialog open={planOpen} onOpenChange={setPlanOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-green-600" />
+              {t('farmer.newFeedingPlan')}
+            </DialogTitle>
+            <p className="text-sm text-gray-500">{t('farmer.planDialogDesc')}</p>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.startDate')} *</label>
+                <Input type="date" value={planStart} min={planToday} onChange={e => setPlanStart(e.target.value)} className={planErrors.start ? "border-red-500" : ""} />
+                {planErrors.start && <p className="text-xs text-red-500">{planErrors.start}</p>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.endDate')} *</label>
+                <Input type="date" value={planEnd} min={planStart || planToday} max={planStart ? addDays(planStart, MAX_FEEDING_PLAN_DAYS - 1) : undefined} onChange={e => setPlanEnd(e.target.value)} className={planErrors.end ? "border-red-500" : ""} />
+                {planErrors.end && <p className="text-xs text-red-500">{planErrors.end}</p>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.time')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input type="time" value={planTime} onChange={e => setPlanTime(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">{t('farmer.notes')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                <Input placeholder={t('farmer.anyObservations')} value={planNotes} maxLength={500} onChange={e => setPlanNotes(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">{t('farmer.planAnimals')} *</label>
+              <div className={`border rounded-xl divide-y max-h-64 overflow-y-auto ${planErrors.animals ? "border-red-500" : "border-gray-200"}`}>
+                {planAnimalsByType.map(([type, list]) => {
+                  const free = list.filter(a => !planBusyIds.has(a._id))
+                  const chosen = free.filter(a => planAnimalIds.includes(a._id)).length
+                  const allChecked = free.length > 0 && chosen === free.length ? true : chosen > 0 ? "indeterminate" : false
+                  return (
+                    <div key={type} className="p-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm font-medium text-gray-800 cursor-pointer">
+                        <Checkbox checked={allChecked} disabled={free.length === 0} onCheckedChange={v => togglePlanType(list, v === true)} />
+                        {animalTypeLabel(type)} ({list.length})
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-6">
+                        {list.map(a => {
+                          const busy = planBusyIds.has(a._id)
+                          return (
+                            <label key={a._id} className={`flex items-center gap-2 text-sm min-w-0 ${busy ? "text-gray-400" : "text-gray-700 cursor-pointer"}`}>
+                              <Checkbox checked={planAnimalIds.includes(a._id)} disabled={busy} onCheckedChange={v => togglePlanAnimal(a._id, v === true)} />
+                              <span className="truncate">{a.name}{busy ? ` (${t('farmer.planAnimalBusy')})` : ""}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              {planErrors.animals && <p className="text-xs text-red-500">{planErrors.animals}</p>}
+            </div>
+
+            {planSelectedTypes.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500">{t('farmer.planRationPrefilled')}</p>
+                {planSelectedTypes.map(type => {
+                  const r = planRations[type] ?? EMPTY_FEED_ROUTINE
+                  return (
+                    <div key={type} className={`border rounded-xl p-3 space-y-3 ${planErrors[`ration:${type}`] ? "border-red-500" : "border-orange-200"}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-gray-800">{t('farmer.planRationFor').replace("{type}", animalTypeLabel(type))}</p>
+                        <span className="text-sm font-bold text-orange-700 whitespace-nowrap">RWF {rationTotal(r).toLocaleString()}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {RATION_INPUTS.map(({ field, label, step, placeholder }) => (
+                          <div key={field} className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">{t(label)}</label>
+                            <Input type="number" min="0" step={step} placeholder={placeholder} value={r[field]} onChange={e => setPlanRationField(type, field, e.target.value)} />
+                          </div>
+                        ))}
+                      </div>
+                      {planErrors[`ration:${type}`] && <p className="text-xs text-red-500">{planErrors[`ration:${type}`]}</p>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="p-3 bg-green-50 rounded-xl border border-green-100 text-sm space-y-1">
+              <p className="font-medium text-green-700">
+                {t('farmer.planSummary')
+                  .replace("{animals}", String(planSelectedAnimals.length))
+                  .replace("{days}", String(planDays))
+                  .replace("{perDay}", planPerDay.toLocaleString())
+                  .replace("{total}", (planPerDay * planDays).toLocaleString())}
+              </p>
+              <p className="text-xs text-gray-600">{t('farmer.planManualHint')}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={handlePlanSubmit} disabled={planSaving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
+                {planSaving ? t('farmer.savingRecord') : t('farmer.startPlan')}
+              </Button>
+              <Button variant="outline" onClick={() => setPlanOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!stopPlanId} onOpenChange={open => !open && setStopPlanId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('farmer.stopPlanTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('farmer.stopPlanDesc')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('farmer.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => stopPlanId && handleStopPlan(stopPlanId)} className="bg-red-600 hover:bg-red-700 text-white">{t('farmer.stopPlan')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
