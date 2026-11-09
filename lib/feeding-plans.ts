@@ -173,9 +173,10 @@ async function recordPlan(db: Db, plan: FeedingPlanDoc, today: string, now: Date
   const finished = through >= plan.endDate
   if (from <= through || finished) {
     // Conditional on the cursor it started from, so a slower overlapping run can't move
-    // it back, and on the plan still being active, so a stop made meanwhile stands.
+    // it back, on the plan still being active, so a stop made meanwhile stands, and on
+    // the end date it read, so an edit extending the plan meanwhile doesn't get finished.
     await db.collection<FeedingPlanDoc>(PLANS).updateOne(
-      { _id: plan._id, status: "active", recordedThrough: plan.recordedThrough },
+      { _id: plan._id, status: "active", recordedThrough: plan.recordedThrough, endDate: plan.endDate },
       {
         $set: {
           recordedThrough: from <= through ? through : plan.recordedThrough,
@@ -271,6 +272,100 @@ export interface CreateFeedingPlanInput {
   rations: unknown
 }
 
+export type UpdateFeedingPlanInput = Omit<CreateFeedingPlanInput, "farmerId">
+
+function parseTimeAndNotes(input: UpdateFeedingPlanInput) {
+  return {
+    time: typeof input.time === "string" && /^\d{2}:\d{2}$/.test(input.time) ? input.time : null,
+    notes: typeof input.notes === "string" && input.notes.trim() ? input.notes.trim().slice(0, 500) : null,
+  }
+}
+
+function parseAnimalIds(raw: unknown): { ok: true; ids: string[] } | Failure {
+  const ids = Array.isArray(raw)
+    ? Array.from(new Set(raw.filter((id): id is string => typeof id === "string")))
+    : []
+  if (ids.length === 0) return { ok: false, status: 400, error: errorMessage("feedingPlanNoAnimals") }
+  if (ids.length > 1000 || !ids.every(id => ObjectId.isValid(id))) {
+    return { ok: false, status: 400, error: errorMessage("invalidRequest") }
+  }
+  return { ok: true, ids }
+}
+
+/** Animals joining a plan: they must be on this farm and be getting feed records now. */
+async function loadJoiningAnimals(
+  db: Db,
+  farmerId: string,
+  ids: string[]
+): Promise<{ ok: true; animals: FeedingPlanAnimal[] } | Failure> {
+  if (ids.length === 0) return { ok: true, animals: [] }
+  const found = await db.collection("animals").find(
+    { _id: { $in: ids.map(id => new ObjectId(id)) }, $or: ownedBy(farmerId) },
+    { projection: { name: 1, type: 1, lactationStatus: 1, status: 1 } }
+  ).toArray()
+  if (found.length !== ids.length) {
+    return { ok: false, status: 403, error: errorMessage("thatAnimalIsNotOnThisFarm") }
+  }
+  const notFed = found.find(a => !isFed(a))
+  if (notFed) {
+    return { ok: false, status: 400, error: errorMessage("feedingPlanAnimalNotFed", { animal: notFed.name || "This animal" }) }
+  }
+  return {
+    ok: true,
+    animals: found.map(a => ({
+      animalId: a._id.toString(),
+      animalName: typeof a.name === "string" ? a.name : null,
+      animalType: feedingTypeOf(a.type),
+    })),
+  }
+}
+
+/**
+ * Only the rations of the types in the plan are kept, and each needs a cost - the same
+ * rule as a feed record entered by hand. `stored` is an edited plan's current rations,
+ * for a type the form has no ration box for because its animals aren't selectable now.
+ */
+function buildRations(
+  animals: FeedingPlanAnimal[],
+  raw: unknown,
+  stored: Record<string, FeedingRation> = {}
+): { ok: true; rations: Record<string, FeedingRation> } | Failure {
+  const sent = raw && typeof raw === "object" ? raw as Record<string, unknown> : {}
+  const rations: Record<string, FeedingRation> = {}
+  for (const type of Array.from(new Set(animals.map(a => a.animalType)))) {
+    const ration = parseRation(sent[type] ?? stored[type])
+    if (!ration || rationTotal(ration) <= 0) {
+      return { ok: false, status: 400, error: errorMessage("feedingPlanRationRequired") }
+    }
+    rations[type] = ration
+  }
+  return { ok: true, rations }
+}
+
+/** Two running plans for the same animal and day would record its feeding twice. */
+async function findOverlap(
+  db: Db,
+  farmerId: string,
+  from: string,
+  to: string,
+  animals: FeedingPlanAnimal[],
+  exceptPlan?: ObjectId
+): Promise<Failure | null> {
+  const ids = animals.map(a => a.animalId)
+  const overlapping = await db.collection<FeedingPlanDoc>(PLANS).findOne({
+    farmerId,
+    status: "active",
+    ...(exceptPlan ? { _id: { $ne: exceptPlan } } : {}),
+    startDate: { $lte: to },
+    endDate: { $gte: from },
+    "animals.animalId": { $in: ids },
+  })
+  if (!overlapping) return null
+  const shared = overlapping.animals.find(a => ids.includes(a.animalId))
+  const name = animals.find(a => a.animalId === shared?.animalId)?.animalName || shared?.animalName || "This animal"
+  return { ok: false, status: 409, error: errorMessage("feedingPlanOverlap", { animal: name }) }
+}
+
 export async function createFeedingPlan(
   input: CreateFeedingPlanInput,
   actorId: string
@@ -283,55 +378,17 @@ export async function createFeedingPlan(
   if (planDayCount(startDate, endDate) > MAX_FEEDING_PLAN_DAYS) {
     return { ok: false, status: 400, error: errorMessage("feedingPlanTooLong", { days: MAX_FEEDING_PLAN_DAYS }) }
   }
-  const time = typeof input.time === "string" && /^\d{2}:\d{2}$/.test(input.time) ? input.time : null
-  const notes = typeof input.notes === "string" && input.notes.trim() ? input.notes.trim().slice(0, 500) : null
-
-  const animalIds = Array.isArray(input.animalIds)
-    ? Array.from(new Set(input.animalIds.filter((id): id is string => typeof id === "string")))
-    : []
-  if (animalIds.length === 0) return { ok: false, status: 400, error: errorMessage("feedingPlanNoAnimals") }
-  if (animalIds.length > 1000 || !animalIds.every(id => ObjectId.isValid(id))) {
-    return { ok: false, status: 400, error: errorMessage("invalidRequest") }
-  }
+  const { time, notes } = parseTimeAndNotes(input)
+  const parsedIds = parseAnimalIds(input.animalIds)
+  if (!parsedIds.ok) return parsedIds
 
   const db = await getDb()
-  const animals = await db.collection("animals").find(
-    { _id: { $in: animalIds.map(id => new ObjectId(id)) }, $or: ownedBy(farmerId) },
-    { projection: { name: 1, type: 1, lactationStatus: 1, status: 1 } }
-  ).toArray()
-  if (animals.length !== animalIds.length) {
-    return { ok: false, status: 403, error: errorMessage("thatAnimalIsNotOnThisFarm") }
-  }
-  const notFed = animals.find(a => !isFed(a))
-  if (notFed) {
-    return { ok: false, status: 400, error: errorMessage("feedingPlanAnimalNotFed", { animal: notFed.name || "This animal" }) }
-  }
-
-  // Only the rations of the types in the plan are kept, and each needs a cost - the
-  // same rule as a feed record entered by hand.
-  const rawRations = input.rations && typeof input.rations === "object" ? input.rations as Record<string, unknown> : {}
-  const rations: Record<string, FeedingRation> = {}
-  for (const type of Array.from(new Set(animals.map(a => feedingTypeOf(a.type))))) {
-    const ration = parseRation(rawRations[type])
-    if (!ration || rationTotal(ration) <= 0) {
-      return { ok: false, status: 400, error: errorMessage("feedingPlanRationRequired") }
-    }
-    rations[type] = ration
-  }
-
-  // Two running plans for the same animal and day would record its feeding twice.
-  const overlapping = await db.collection<FeedingPlanDoc>(PLANS).findOne({
-    farmerId,
-    status: "active",
-    startDate: { $lte: endDate },
-    endDate: { $gte: startDate },
-    "animals.animalId": { $in: animalIds },
-  })
-  if (overlapping) {
-    const shared = overlapping.animals.find(a => animalIds.includes(a.animalId))
-    const name = animals.find(a => a._id.toString() === shared?.animalId)?.name || shared?.animalName || "This animal"
-    return { ok: false, status: 409, error: errorMessage("feedingPlanOverlap", { animal: name }) }
-  }
+  const joining = await loadJoiningAnimals(db, farmerId, parsedIds.ids)
+  if (!joining.ok) return joining
+  const built = buildRations(joining.animals, input.rations)
+  if (!built.ok) return built
+  const overlap = await findOverlap(db, farmerId, startDate, endDate, joining.animals)
+  if (overlap) return overlap
 
   const now = new Date()
   const plan: Omit<FeedingPlanDoc, "_id"> = {
@@ -340,12 +397,8 @@ export async function createFeedingPlan(
     endDate,
     time,
     notes,
-    animals: animals.map(a => ({
-      animalId: a._id.toString(),
-      animalName: typeof a.name === "string" ? a.name : null,
-      animalType: feedingTypeOf(a.type),
-    })),
-    rations,
+    animals: joining.animals,
+    rations: built.rations,
     status: "active",
     recordedThrough: null,
     createdBy: actorId,
@@ -363,6 +416,86 @@ export async function createFeedingPlan(
     console.error("Error recording a new feeding plan:", error)
   }
   return { ok: true, id: result.insertedId.toString(), recorded }
+}
+
+/**
+ * Edit a running or upcoming plan. Days already recorded are never touched: the days due
+ * are written first, as the plan stood when they came, and the edit reaches only the days
+ * after them. So a plan that has started keeps its start date, and its end can't move
+ * before today (Stop Plan is how to end it now).
+ *
+ * An animal already in the plan stays unless it was unticked, even if it can't be fed
+ * right now: a lactating cow has no checkbox on the form, and an edit mustn't quietly
+ * drop her. The run skips her while she's lactating, as it always does.
+ */
+export async function updateFeedingPlan(
+  planId: string,
+  input: UpdateFeedingPlanInput,
+  actor: { _id: string; isStaff: boolean }
+): Promise<{ ok: true; recorded: number } | Failure> {
+  if (!ObjectId.isValid(planId)) return { ok: false, status: 400, error: errorMessage("invalidId") }
+  const db = await getDb()
+  const plans = db.collection<FeedingPlanDoc>(PLANS)
+  const found = await plans.findOne({ _id: new ObjectId(planId) })
+  if (!found) return { ok: false, status: 404, error: errorMessage("feedingPlanNotFound") }
+  if (!actor.isStaff && found.farmerId !== actor._id) return { ok: false, status: 403, error: errorMessage("forbidden") }
+  if (found.status !== "active") return { ok: false, status: 409, error: errorMessage("feedingPlanEnded") }
+
+  try {
+    await recordDueFeedings({ farmerId: found.farmerId })
+  } catch (error) {
+    console.error("Error recording a feeding plan before editing it:", error)
+  }
+  // Read again: that moved the cursor, and may have finished the plan.
+  const plan = await plans.findOne({ _id: found._id, status: "active" })
+  if (!plan) return { ok: false, status: 409, error: errorMessage("feedingPlanEnded") }
+
+  const { startDate, endDate } = input
+  const today = kigaliToday()
+  const started = plan.startDate <= today
+  if (
+    !isDateString(startDate) || !isDateString(endDate) ||
+    (started ? startDate !== plan.startDate : startDate < today) ||
+    endDate < startDate || endDate < today
+  ) {
+    return { ok: false, status: 400, error: errorMessage("feedingPlanDates") }
+  }
+  if (planDayCount(startDate, endDate) > MAX_FEEDING_PLAN_DAYS) {
+    return { ok: false, status: 400, error: errorMessage("feedingPlanTooLong", { days: MAX_FEEDING_PLAN_DAYS }) }
+  }
+  const { time, notes } = parseTimeAndNotes(input)
+  const parsedIds = parseAnimalIds(input.animalIds)
+  if (!parsedIds.ok) return parsedIds
+
+  const inPlan = new Set(plan.animals.map(a => a.animalId))
+  const joining = await loadJoiningAnimals(db, plan.farmerId, parsedIds.ids.filter(id => !inPlan.has(id)))
+  if (!joining.ok) return joining
+  const animals = [...plan.animals.filter(a => parsedIds.ids.includes(a.animalId)), ...joining.animals]
+  const built = buildRations(animals, input.rations, plan.rations)
+  if (!built.ok) return built
+
+  // Only the days still to come can clash: an animal in another plan that ends today can
+  // join this one from tomorrow.
+  const from = plan.recordedThrough ? addDays(plan.recordedThrough, 1) : startDate
+  const overlap = await findOverlap(db, plan.farmerId, from, endDate, animals, plan._id)
+  if (overlap) return overlap
+
+  // Conditional on the cursor, so a run that wrote a day since the read above can't leave
+  // records before a start date moved later.
+  const updated = await plans.updateOne(
+    { _id: plan._id, status: "active", recordedThrough: plan.recordedThrough },
+    { $set: { startDate, endDate, time, notes, animals, rations: built.rations, updatedAt: new Date() } }
+  )
+  if (updated.matchedCount === 0) return { ok: false, status: 409, error: errorMessage("feedingPlanChanged") }
+
+  // An upcoming plan moved to start today gets today's records straight away.
+  let recorded = 0
+  try {
+    recorded = (await recordDueFeedings({ farmerId: plan.farmerId })).recorded
+  } catch (error) {
+    console.error("Error recording an edited feeding plan:", error)
+  }
+  return { ok: true, recorded }
 }
 
 /**

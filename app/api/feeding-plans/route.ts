@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
 import { errorMessage } from "@/lib/error-messages"
-import { createFeedingPlan, listFeedingPlans, stopFeedingPlan } from "@/lib/feeding-plans"
+import { createFeedingPlan, listFeedingPlans, stopFeedingPlan, updateFeedingPlan } from "@/lib/feeding-plans"
 
 // Feeding plans on the Animal Expenses tab - see lib/feeding-plans.ts. Same access as
 // /api/animal-expenses: a farmer manages their own farm's, staff any farm's.
@@ -64,6 +64,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, id: result.id, recorded: result.recorded })
   } catch (error) {
     console.error("Error creating feeding plan:", error)
+    return NextResponse.json({ error: errorMessage("failedToSaveFeedingPlan") }, { status: 500 })
+  }
+}
+
+/** Edit a running or upcoming plan. The records already written stay as they are. */
+export async function PUT(req: NextRequest) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) return NextResponse.json({ error: errorMessage("unauthorized") }, { status: 401 })
+
+    const body = await req.json().catch(() => null)
+    if (typeof body?.id !== "string") {
+      return NextResponse.json({ error: errorMessage("invalidRequest") }, { status: 400 })
+    }
+
+    const result = await updateFeedingPlan(
+      body.id,
+      {
+        startDate: body.startDate,
+        endDate: body.endDate,
+        time: body.time,
+        notes: body.notes,
+        animalIds: body.animalIds,
+        rations: body.rations,
+      },
+      { _id: currentUser._id, isStaff: isStaffRole(currentUser.role) }
+    )
+    if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
+
+    await logActivity(currentUser._id, "livestock.feeding_plan_updated", body.id)
+    return NextResponse.json({ success: true, recorded: result.recorded })
+  } catch (error) {
+    console.error("Error updating feeding plan:", error)
     return NextResponse.json({ error: errorMessage("failedToSaveFeedingPlan") }, { status: 500 })
   }
 }

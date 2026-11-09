@@ -16,12 +16,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Receipt, Plus, Pencil, Trash2, History, Droplet, SprayCan, PawPrint, Download, FileText, Wheat, CalendarClock } from "lucide-react"
+import { Receipt, Plus, Pencil, Trash2, History, Droplet, SprayCan, PawPrint, Download, FileText, Wheat, CalendarClock, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
 import { addDays, kigaliToday } from "@/lib/product-rules"
-import { MAX_FEEDING_PLAN_DAYS, canGetFeedRecords, planDayCount, rationTotal, type FeedingRation } from "@/lib/feeding-plan-rules"
+import { MAX_FEEDING_PLAN_DAYS, RATION_FIELDS, canGetFeedRecords, planDayCount, rationTotal, type FeedingRation } from "@/lib/feeding-plan-rules"
 
 interface MilkingExpense {
   _id: string; farmerId: string
@@ -59,6 +59,9 @@ interface FeedRoutine {
 const EMPTY_FEED_ROUTINE: FeedRoutine = { foodKg: "", foodCost: "", waterLiters: "", waterCost: "", saltKg: "", saltCost: "" }
 const hasFeedRoutine = (r?: FeedRoutine) => !!r && Object.values(r).some(v => v !== "")
 const animalTypeOf = (a?: Animal) => (a?.type || "other").toLowerCase()
+// A saved plan's ration as the form's text boxes hold it
+const rationToForm = (r: FeedingRation) =>
+  Object.fromEntries(RATION_FIELDS.map(f => [f, r[f] == null ? "" : String(r[f])])) as unknown as FeedRoutine
 
 // The ration fields of the feeding plan form, in the order the Feed Defaults show them
 const RATION_INPUTS: { field: keyof FeedRoutine; label: string; step: string; placeholder: string }[] = [
@@ -164,6 +167,8 @@ export default function ExpensesPage() {
   const [planErrors, setPlanErrors] = useState<Record<string, string>>({})
   const [planSaving, setPlanSaving] = useState(false)
   const [stopPlanId, setStopPlanId] = useState<string | null>(null)
+  const [editingPlan, setEditingPlan] = useState<FeedingPlan | null>(null)
+  const [viewPlan, setViewPlan] = useState<FeedingPlan | null>(null)
 
   // Animal Expenses report export
   const [aeExportOpen, setAeExportOpen] = useState(false)
@@ -687,19 +692,28 @@ export default function ExpensesPage() {
     for (const a of planAnimalChoices) groups.set(animalTypeOf(a), [...(groups.get(animalTypeOf(a)) || []), a])
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b))
   }, [planAnimalChoices])
-  // Animals in a running plan on any of the chosen days: a second plan would record them twice
+  const planStarted = !!editingPlan && editingPlan.startDate <= planToday
+  // The first day the form can affect: a started plan has its days up to today written
+  const planFirstOpenDay = planStarted ? addDays(planToday, 1) : planStart
+  // Animals in another running plan on any of those days: they'd be recorded twice
   const planBusyIds = useMemo(() => new Set(
     feedingPlans
-      .filter(p => p.status === "active" && p.startDate <= planEnd && p.endDate >= planStart)
+      .filter(p => p.status === "active" && p._id !== editingPlan?._id && p.startDate <= planEnd && p.endDate >= planFirstOpenDay)
       .flatMap(p => p.animals.map(a => a.animalId))
-  ), [feedingPlans, planStart, planEnd])
+  ), [feedingPlans, editingPlan, planFirstOpenDay, planEnd])
   useEffect(() => {
     setPlanAnimalIds(prev => prev.some(id => planBusyIds.has(id)) ? prev.filter(id => !planBusyIds.has(id)) : prev)
   }, [planBusyIds])
   const planSelectedAnimals = useMemo(() => planAnimalChoices.filter(a => planAnimalIds.includes(a._id)), [planAnimalChoices, planAnimalIds])
   const planSelectedTypes = useMemo(() => Array.from(new Set(planSelectedAnimals.map(a => animalTypeOf(a)))).sort(), [planSelectedAnimals])
   const planDays = planStart && planEnd && planEnd >= planStart ? planDayCount(planStart, planEnd) : 0
+  const planCostDays = planFirstOpenDay && planEnd >= planFirstOpenDay ? planDayCount(planFirstOpenDay, planEnd) : 0
   const planPerDay = planSelectedAnimals.reduce((s, a) => s + rationTotal(planRations[animalTypeOf(a)]), 0)
+  // Animals the edited plan holds that have no checkbox now (removed, dead or lactating).
+  // They stay in the plan, so the form says so instead of leaving the count unexplained.
+  const planHiddenAnimals = editingPlan
+    ? editingPlan.animals.filter(a => planAnimalIds.includes(a.animalId) && !planAnimalChoices.some(c => c._id === a.animalId))
+    : []
 
   const togglePlanAnimal = (id: string, on: boolean) =>
     setPlanAnimalIds(prev => on ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(x => x !== id))
@@ -714,15 +728,27 @@ export default function ExpensesPage() {
 
   // A new plan runs for a week from today, with each type's ration taken from the Feed Defaults
   const openPlanDialog = () => {
+    setEditingPlan(null)
     setPlanStart(planToday); setPlanEnd(addDays(planToday, 6)); setPlanTime(""); setPlanNotes("")
     setPlanAnimalIds([]); setPlanRations({ ...feedRoutine }); setPlanErrors({})
     setPlanOpen(true)
   }
 
+  // The Feed Defaults are kept underneath, for a type the farmer adds while editing
+  const openEditPlan = (plan: FeedingPlan) => {
+    setEditingPlan(plan)
+    setPlanStart(plan.startDate); setPlanEnd(plan.endDate); setPlanTime(plan.time ?? ""); setPlanNotes(plan.notes ?? "")
+    setPlanAnimalIds(plan.animals.map(a => a.animalId))
+    setPlanRations({ ...feedRoutine, ...Object.fromEntries(Object.entries(plan.rations).map(([type, r]) => [type, rationToForm(r)])) })
+    setPlanErrors({})
+    setPlanOpen(true)
+  }
+
   const validatePlan = () => {
     const e: Record<string, string> = {}
-    if (!planStart || planStart < planToday) e.start = t('farmer.planErrStart')
+    if (!planStarted && (!planStart || planStart < planToday)) e.start = t('farmer.planErrStart')
     if (!planEnd || planEnd < planStart) e.end = t('farmer.planErrEnd')
+    else if (editingPlan && planEnd < planToday) e.end = t('farmer.planErrEndPast')
     else if (planDays > MAX_FEEDING_PLAN_DAYS) e.end = t('farmer.planErrTooLong').replace("{days}", String(MAX_FEEDING_PLAN_DAYS))
     if (planAnimalIds.length === 0) e.animals = t('farmer.planErrAnimals')
     for (const type of planSelectedTypes) {
@@ -736,11 +762,12 @@ export default function ExpensesPage() {
     if (!validatePlan()) return
     setPlanSaving(true)
     const res = await fetch("/api/feeding-plans", {
-      method: "POST",
+      method: editingPlan ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        farmerId: user._id.toString(), startDate: planStart, endDate: planEnd, time: planTime, notes: planNotes,
-        animalIds: planSelectedAnimals.map(a => a._id),
+        ...(editingPlan ? { id: editingPlan._id } : { farmerId: user._id.toString() }),
+        startDate: planStart, endDate: planEnd, time: planTime, notes: planNotes,
+        animalIds: planAnimalIds,
         rations: Object.fromEntries(planSelectedTypes.map(type => [type, planRations[type] ?? EMPTY_FEED_ROUTINE])),
       }),
     }).catch(() => null)
@@ -751,12 +778,10 @@ export default function ExpensesPage() {
     }
     const data = await res.json().catch(() => ({}))
     setPlanOpen(false)
-    toast({
-      title: t('farmer.planStarted'),
-      description: data.recorded > 0
-        ? t('farmer.planStartedToday').replace("{count}", String(data.recorded))
-        : t('farmer.planStartedLater').replace("{date}", planStart),
-    })
+    const recordedToday = data.recorded > 0 ? t('farmer.planStartedToday').replace("{count}", String(data.recorded)) : undefined
+    toast(editingPlan
+      ? { title: t('farmer.planUpdated'), description: recordedToday }
+      : { title: t('farmer.planStarted'), description: recordedToday ?? t('farmer.planStartedLater').replace("{date}", planStart) })
     fetchFeedingPlans(user._id.toString()).catch(() => {})
     fetchAnimalExpenses(user._id.toString()).catch(() => {})
   }
@@ -772,6 +797,21 @@ export default function ExpensesPage() {
     else toast({ title: t('farmer.planStoppedToast') })
     fetchFeedingPlans(user._id.toString()).catch(() => {})
     fetchAnimalExpenses(user._id.toString()).catch(() => {})
+  }
+
+  const planDailyCost = (p: FeedingPlan) => p.animals.reduce((s, a) => s + rationTotal(p.rations[a.animalType]), 0)
+
+  const planBadge = (p: FeedingPlan) => {
+    const upcoming = p.status === "active" && p.startDate > planToday
+    return {
+      label: p.status === "stopped" ? t('farmer.planStopped')
+        : p.status === "finished" ? t('farmer.planFinished')
+        : upcoming ? t('farmer.planStartsOn').replace("{date}", p.startDate)
+        : t('farmer.planRunning'),
+      color: p.status !== "active" ? "bg-gray-50 text-gray-600 border-gray-200"
+        : upcoming ? "bg-sky-50 text-sky-700 border-sky-200"
+        : "bg-green-50 text-green-700 border-green-200",
+    }
   }
 
   if (loading) return (
@@ -1189,15 +1229,7 @@ export default function ExpensesPage() {
                       {animals.length === 0 ? t('farmer.selectAnimalRegisterFirst') : planAnimalChoices.length === 0 ? t('farmer.noDryAnimalsAvailable') : t('farmer.noFeedingPlans')}
                     </p>
                   ) : feedingPlans.map(p => {
-                    const perDay = p.animals.reduce((s, a) => s + rationTotal(p.rations[a.animalType]), 0)
-                    const upcoming = p.status === "active" && p.startDate > planToday
-                    const label = p.status === "stopped" ? t('farmer.planStopped')
-                      : p.status === "finished" ? t('farmer.planFinished')
-                      : upcoming ? t('farmer.planStartsOn').replace("{date}", p.startDate)
-                      : t('farmer.planRunning')
-                    const color = p.status !== "active" ? "bg-gray-50 text-gray-600 border-gray-200"
-                      : upcoming ? "bg-sky-50 text-sky-700 border-sky-200"
-                      : "bg-green-50 text-green-700 border-green-200"
+                    const { label, color } = planBadge(p)
                     return (
                       <div key={p._id} className="border border-gray-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-start gap-3">
                         <div className="flex-1 min-w-0 space-y-1">
@@ -1210,15 +1242,27 @@ export default function ExpensesPage() {
                             {t('farmer.planAnimalsCount').replace("{count}", String(p.animals.length))}: {p.animals.map(a => a.animalName || "—").join(", ")}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {t('farmer.planPerDay').replace("{amount}", perDay.toLocaleString())} · {p.recordedThrough ? t('farmer.planRecordedThrough').replace("{date}", p.recordedThrough) : t('farmer.planNothingRecorded')}
+                            {t('farmer.planPerDay').replace("{amount}", planDailyCost(p).toLocaleString())} · {p.recordedThrough ? t('farmer.planRecordedThrough').replace("{date}", p.recordedThrough) : t('farmer.planNothingRecorded')}
                           </p>
                           {p.notes && <p className="text-xs text-gray-500 truncate">{p.notes}</p>}
                         </div>
-                        {p.status === "active" && (
-                          <Button size="sm" variant="outline" onClick={() => setStopPlanId(p._id)} className="rounded-lg self-start text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
-                            {t('farmer.stopPlan')}
+                        <div className="flex flex-wrap gap-2 self-start sm:justify-end">
+                          <Button size="sm" variant="outline" onClick={() => setViewPlan(p)} className="rounded-lg gap-1.5">
+                            <Eye className="h-3.5 w-3.5" />
+                            {t('farmer.view')}
                           </Button>
-                        )}
+                          {p.status === "active" && (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => openEditPlan(p)} className="rounded-lg gap-1.5">
+                                <Pencil className="h-3.5 w-3.5" />
+                                {t('farmer.edit')}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setStopPlanId(p._id)} className="rounded-lg text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
+                                {t('farmer.stopPlan')}
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
@@ -1600,27 +1644,28 @@ export default function ExpensesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* New Feeding Plan Dialog */}
+      {/* New / Edit Feeding Plan Dialog */}
       <Dialog open={planOpen} onOpenChange={setPlanOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarClock className="h-5 w-5 text-green-600" />
-              {t('farmer.newFeedingPlan')}
+              {editingPlan ? t('farmer.editPlanTitle') : t('farmer.newFeedingPlan')}
             </DialogTitle>
-            <p className="text-sm text-gray-500">{t('farmer.planDialogDesc')}</p>
+            <p className="text-sm text-gray-500">{planStarted ? t('farmer.planEditAppliesFrom').replace("{date}", planFirstOpenDay) : t('farmer.planDialogDesc')}</p>
           </DialogHeader>
 
           <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.startDate')} *</label>
-                <Input type="date" value={planStart} min={planToday} onChange={e => setPlanStart(e.target.value)} className={planErrors.start ? "border-red-500" : ""} />
+                <Input type="date" value={planStart} min={planStarted ? undefined : planToday} disabled={planStarted} onChange={e => setPlanStart(e.target.value)} className={planErrors.start ? "border-red-500" : ""} />
+                {planStarted && <p className="text-xs text-gray-500">{t('farmer.planStartLocked')}</p>}
                 {planErrors.start && <p className="text-xs text-red-500">{planErrors.start}</p>}
               </div>
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">{t('farmer.endDate')} *</label>
-                <Input type="date" value={planEnd} min={planStart || planToday} max={planStart ? addDays(planStart, MAX_FEEDING_PLAN_DAYS - 1) : undefined} onChange={e => setPlanEnd(e.target.value)} className={planErrors.end ? "border-red-500" : ""} />
+                <Input type="date" value={planEnd} min={planStart > planToday ? planStart : planToday} max={planStart ? addDays(planStart, MAX_FEEDING_PLAN_DAYS - 1) : undefined} onChange={e => setPlanEnd(e.target.value)} className={planErrors.end ? "border-red-500" : ""} />
                 {planErrors.end && <p className="text-xs text-red-500">{planErrors.end}</p>}
               </div>
               <div className="space-y-1">
@@ -1662,11 +1707,14 @@ export default function ExpensesPage() {
                 })}
               </div>
               {planErrors.animals && <p className="text-xs text-red-500">{planErrors.animals}</p>}
+              {planHiddenAnimals.length > 0 && (
+                <p className="text-xs text-gray-500">{t('farmer.planHiddenAnimals').replace("{names}", planHiddenAnimals.map(a => a.animalName || "—").join(", "))}</p>
+              )}
             </div>
 
             {planSelectedTypes.length > 0 && (
               <div className="space-y-3">
-                <p className="text-xs text-gray-500">{t('farmer.planRationPrefilled')}</p>
+                {!editingPlan && <p className="text-xs text-gray-500">{t('farmer.planRationPrefilled')}</p>}
                 {planSelectedTypes.map(type => {
                   const r = planRations[type] ?? EMPTY_FEED_ROUTINE
                   return (
@@ -1692,22 +1740,87 @@ export default function ExpensesPage() {
 
             <div className="p-3 bg-green-50 rounded-xl border border-green-100 text-sm space-y-1">
               <p className="font-medium text-green-700">
-                {t('farmer.planSummary')
+                {(planStarted ? t('farmer.planEditSummary').replace("{date}", planFirstOpenDay) : t('farmer.planSummary'))
                   .replace("{animals}", String(planSelectedAnimals.length))
-                  .replace("{days}", String(planDays))
+                  .replace("{days}", String(planCostDays))
                   .replace("{perDay}", planPerDay.toLocaleString())
-                  .replace("{total}", (planPerDay * planDays).toLocaleString())}
+                  .replace("{total}", (planPerDay * planCostDays).toLocaleString())}
               </p>
               <p className="text-xs text-gray-600">{t('farmer.planManualHint')}</p>
             </div>
 
             <div className="flex gap-3">
               <Button onClick={handlePlanSubmit} disabled={planSaving} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
-                {planSaving ? t('farmer.savingRecord') : t('farmer.startPlan')}
+                {planSaving ? t('farmer.savingRecord') : editingPlan ? t('farmer.saveChanges') : t('farmer.startPlan')}
               </Button>
               <Button variant="outline" onClick={() => setPlanOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Feeding Plan Details Dialog */}
+      <Dialog open={!!viewPlan} onOpenChange={open => !open && setViewPlan(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-green-600" />
+              {t('farmer.planDetails')}
+            </DialogTitle>
+          </DialogHeader>
+          {viewPlan && (() => {
+            const badge = planBadge(viewPlan)
+            const records = aExpenses.filter(e => e.feedingPlanId === viewPlan._id)
+            const types = Array.from(new Set(viewPlan.animals.map(a => a.animalType))).sort()
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className={badge.color}>{badge.label}</Badge>
+                  <span className="text-sm font-medium text-gray-900">{viewPlan.startDate} → {viewPlan.endDate}</span>
+                  {viewPlan.time && <span className="text-xs text-gray-500">{viewPlan.time}</span>}
+                </div>
+                <div className="text-sm text-gray-700 space-y-1">
+                  <p>{t('farmer.planPerDay').replace("{amount}", planDailyCost(viewPlan).toLocaleString())}</p>
+                  <p>{viewPlan.recordedThrough ? t('farmer.planRecordedThrough').replace("{date}", viewPlan.recordedThrough) : t('farmer.planNothingRecorded')}</p>
+                  {records.length > 0 && (
+                    <p>{t('farmer.planRecordsSoFar').replace("{count}", String(records.length)).replace("{amount}", records.reduce((s, e) => s + e.amount, 0).toLocaleString())}</p>
+                  )}
+                  {viewPlan.notes && <p className="text-gray-500 break-words">{viewPlan.notes}</p>}
+                </div>
+                {types.map(type => {
+                  const ration = viewPlan.rations[type]
+                  const list = viewPlan.animals.filter(a => a.animalType === type)
+                  return (
+                    <div key={type} className="border border-orange-200 rounded-xl p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-gray-800">{t('farmer.planRationFor').replace("{type}", animalTypeLabel(type))}</p>
+                        <span className="text-sm font-bold text-orange-700 whitespace-nowrap">RWF {rationTotal(ration).toLocaleString()}</span>
+                      </div>
+                      <dl className="space-y-1 text-sm">
+                        {RATION_INPUTS.map(({ field, label }) => (
+                          <div key={field} className="flex justify-between gap-3">
+                            <dt className="text-gray-500">{t(label)}</dt>
+                            <dd className="font-medium text-gray-800">{ration?.[field]?.toLocaleString() ?? "—"}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-gray-500">{t('farmer.planAnimalsCount').replace("{count}", String(list.length))}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {list.map(a => (
+                            <Badge key={a.animalId} variant="outline" className="font-normal text-gray-700 border-gray-200 max-w-full whitespace-normal">
+                              {a.animalName || "—"}
+                              {viewPlan.status === "active" && !planAnimalChoices.some(c => c._id === a.animalId) ? ` (${t('farmer.planNotRecordedNow')})` : ""}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 
