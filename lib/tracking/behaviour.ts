@@ -125,20 +125,6 @@ export function bandRms(spec: Array<[number, number]>, lo: number, hi: number): 
   return Math.sqrt(s)
 }
 
-/**
- * Overall movement of a burst in mg: the plain standard deviation of the samples.
- * This is what the old backend stored as `motion_mg` (checked against its data), so
- * the per-animal activity baseline keeps the same meaning across the migration.
- */
-export function motionMg(samples: number[], scalePerG?: number | null): number {
-  const n = samples.length
-  if (n === 0) return 0
-  const mean = samples.reduce((a, b) => a + b, 0) / n
-  let v = 0
-  for (const s of samples) v += (s - mean) * (s - mean)
-  return Math.sqrt(v / n) / countsPerMg(scalePerG)
-}
-
 export interface BurstFeatures {
   actMg: number
   chewMg: number

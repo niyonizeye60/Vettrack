@@ -9,6 +9,7 @@ import { createHash, timingSafeEqual } from "crypto"
 import { ObjectId, type Db } from "mongodb"
 import clientPromise, { withDbRetry } from "@/lib/db"
 import { POSTURE_NAMES, type PostureCalibration, type Vec3 } from "./behaviour"
+import type { HrNote } from "./heart-rate"
 import type { TrackingDeviceSummary } from "./types"
 
 const DB = "ntdm_animal_hospital"
@@ -60,6 +61,7 @@ export interface BurstDoc {
   farmerId: string
   receivedAt: Date
   sampleRateHz: number
+  /** Counts per g as the collar sent it; 0 = not sent (the behaviour code then assumes 10000). */
   scalePerG: number
   durationSeconds: number
   /** Raw acceleration magnitude in counts, kept so real cow data can be studied later. */
@@ -70,8 +72,11 @@ export interface BurstDoc {
   bpmPeaks: number | null
   confidence: number | null
   method: string | null
+  /** The heart-rate analysis's English note, as hr_process.php words it. */
   notes: string | null
-  /** False until heart-rate analysis has run on this burst. */
+  /** The same note as a code, for the page to translate. Missing on bursts analysed before it existed. */
+  noteCode?: HrNote | null
+  /** False on bursts stored before the heart-rate analysis was ported; the page analyses those when it shows them. */
   analysed: boolean
 }
 

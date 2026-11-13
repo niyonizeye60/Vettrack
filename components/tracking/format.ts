@@ -1,7 +1,7 @@
 // Wording for the tracking pages. The behaviour code returns codes and numbers; the
 // sentences live in the translations so both languages get them.
 import type { BehaviourFlag, BehaviourNote, BehaviourState, PostureName, Snapshot } from "@/lib/tracking/behaviour"
-import type { TrackingDeviceSummary } from "@/lib/tracking/types"
+import type { TrackingDeviceSummary, TrackingPulse } from "@/lib/tracking/types"
 
 type T = (key: string) => string
 
@@ -51,6 +51,12 @@ export function flagText(flag: BehaviourFlag, t: T): string {
 
 export function noteText(note: BehaviourNote, t: T): string {
   return t(`deviceTracking.note.${note}`)
+}
+
+/** Why a burst's pulse was not trusted. Bursts analysed before the codes existed keep their English note. */
+export function pulseNoteText(p: Pick<TrackingPulse, "analysed" | "noteCode" | "notes">, t: T): string {
+  if (!p.analysed) return t("deviceTracking.notAnalysed")
+  return p.noteCode ? t(`deviceTracking.pulseNote.${p.noteCode}`) : p.notes ?? ""
 }
 
 /** "movement 3.1 mg, chewing rhythm 1.2 mg, steps 0.8 mg, posture: lying" */

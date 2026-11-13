@@ -1,6 +1,7 @@
 // Shapes the tracking API returns to the farmer and vet pages. Client-safe: no
 // database or Node imports, so components can import these freely.
 import type { BehaviourSummary, PostureName } from "./behaviour"
+import type { HrNote } from "./heart-rate"
 
 export interface TrackingDeviceSummary {
   id: string
@@ -32,14 +33,16 @@ export interface TrackingReading {
 
 export interface TrackingPulse {
   time: string
-  /** Null when the burst was analysed but not trusted, or not analysed at all. */
+  /** Null when the signal was not trusted (see noteCode), or the burst was not analysed. */
   bpm: number | null
   bpmPeaks: number | null
   confidence: number | null
   method: string | null
   motionMg: number | null
+  /** The analysis's English note; shown only when there is no noteCode to translate. */
   notes: string | null
-  /** False until the heart-rate analysis is ported (see app/api/iot/bursts/route.ts). */
+  noteCode: HrNote | null
+  /** False only for a burst whose sample rate the heart-rate analysis cannot handle. */
   analysed: boolean
 }
 
@@ -49,6 +52,8 @@ export interface TrackingWaveform {
   seconds: number[]
   /** Acceleration with the resting value removed, in milli-g. */
   mg: number[]
+  /** The 2-8 Hz band where a heartbeat shows up, in milli-g; null when it cannot be computed. */
+  band: number[] | null
 }
 
 export interface TrackingDashboardData {

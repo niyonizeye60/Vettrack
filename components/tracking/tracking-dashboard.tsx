@@ -9,7 +9,7 @@ import { RwandaMap } from "@/components/rwanda-map"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { BEHAVIOUR_STATE_COLORS, POSTURE_NAMES, type PostureName, type Snapshot } from "@/lib/tracking/behaviour"
 import type { TrackingDashboardData } from "@/lib/tracking/types"
-import { clockTime, fill, flagText, noteText, postureLabel, snapshotWhy, stateLabel, timeAgo, totalG } from "./format"
+import { clockTime, fill, flagText, noteText, postureLabel, pulseNoteText, snapshotWhy, stateLabel, timeAgo, totalG } from "./format"
 
 export interface CalibrationControls {
   onCalibrate: (posture: PostureName, action: "set" | "clear") => void
@@ -149,7 +149,7 @@ export function TrackingDashboard({ data, animalLabel, calibration }: Props) {
   const anyAccel = accelSeries.some((p) => p.total !== null)
   const newestAccel = readings.find((r) => totalG(r.accelX, r.accelY, r.accelZ) !== null) ?? null
   const pulseSeries = [...pulses].reverse().map((p) => ({ label: clockTime(p.time), bpm: p.bpm }))
-  const waveSeries = waveform ? waveform.seconds.map((s, i) => ({ s, mg: waveform.mg[i] })) : []
+  const waveSeries = waveform ? waveform.seconds.map((s, i) => ({ s, mg: waveform.mg[i], band: waveform.band?.[i] ?? null })) : []
 
   const locationPoints = chronological
     .filter((r) => r.latitude !== null && r.longitude !== null)
@@ -196,7 +196,9 @@ export function TrackingDashboard({ data, animalLabel, calibration }: Props) {
           sub={
             trustedPulse
               ? `${fill(t("deviceTracking.confidence"), { value: (trustedPulse.confidence ?? 0).toFixed(2) })} · ${clockTime(trustedPulse.time)}`
-              : undefined
+              : anyAnalysed
+                ? fill(t("deviceTracking.noTrustedOfLast"), { n: pulses.length })
+                : undefined
           }
         />
         <StatCard
@@ -274,12 +276,6 @@ export function TrackingDashboard({ data, animalLabel, calibration }: Props) {
           <p className="text-sm text-gray-500 py-8 text-center">{t("deviceTracking.noBursts")}</p>
         ) : (
           <>
-            {!anyAnalysed && (
-              <div className="flex gap-2 rounded-md bg-amber-50 text-amber-800 text-sm p-3 mb-4">
-                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>{t("deviceTracking.pulseNotSetUp")}</span>
-              </div>
-            )}
             {anyAnalysed && (
               <>
                 <ResponsiveContainer width="100%" height={220}>
@@ -315,7 +311,7 @@ export function TrackingDashboard({ data, animalLabel, calibration }: Props) {
                       <td className="px-4 py-2">{p.confidence !== null ? p.confidence.toFixed(2) : "—"}</td>
                       <td className="px-4 py-2">{p.method ?? "—"}</td>
                       <td className="px-4 py-2">{p.motionMg !== null ? p.motionMg.toFixed(1) : "—"}</td>
-                      <td className="px-4 py-2 text-gray-500">{p.analysed ? p.notes ?? "" : t("deviceTracking.notAnalysed")}</td>
+                      <td className="px-4 py-2 text-gray-500">{pulseNoteText(p, t)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -335,11 +331,18 @@ export function TrackingDashboard({ data, animalLabel, calibration }: Props) {
               <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
               <XAxis dataKey="s" type="number" domain={["dataMin", "dataMax"]} unit=" s" tick={{ fontSize: 12 }} />
               <YAxis unit=" mg" width={60} />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={(s: any) => `${s} s`} formatter={(v: any) => [`${v} mg`, ""]} />
-              <Line type="monotone" dataKey="mg" stroke="#9e9e9e" strokeWidth={1.2} dot={false} isAnimationActive={false} />
+              <Tooltip contentStyle={tooltipStyle} labelFormatter={(s: any) => `${s} s`} formatter={(v: any, name: any) => [`${v} mg`, name]} />
+              <Legend />
+              <Line type="monotone" dataKey="mg" name={t("deviceTracking.waveRaw")} stroke="#9e9e9e" strokeWidth={1.2} dot={false} isAnimationActive={false} />
+              {waveform.band && (
+                <Line type="monotone" dataKey="band" name={t("deviceTracking.waveBand")} stroke="#c62828" strokeWidth={1.8} dot={false} isAnimationActive={false} />
+              )}
             </LineChart>
           </ResponsiveContainer>
-          <p className={hint}>{t("deviceTracking.waveformHint")}</p>
+          <p className={hint}>
+            {t("deviceTracking.waveformHint")}
+            {waveform.band && ` ${t("deviceTracking.waveformBandHint")}`}
+          </p>
         </div>
       )}
 

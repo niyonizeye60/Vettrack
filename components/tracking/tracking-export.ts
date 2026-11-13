@@ -2,7 +2,7 @@
 // farmer and vet tracking pages.
 import { logPortalExport } from "@/lib/actions"
 import type { TrackingDashboardData } from "@/lib/tracking/types"
-import { fill, stateLabel, totalG } from "./format"
+import { fill, pulseNoteText, stateLabel, totalG } from "./format"
 
 type T = (key: string) => string
 
@@ -202,7 +202,7 @@ export async function exportTrackingExcel(data: TrackingDashboardData, meta: Tra
     [t("deviceTracking.confidenceHeader")]: p.confidence ?? "",
     [t("deviceTracking.method")]: p.method ?? "",
     [t("deviceTracking.movementMg")]: p.motionMg !== null ? Math.round(p.motionMg * 100) / 100 : "",
-    [t("deviceTracking.note")]: p.analysed ? p.notes ?? "" : t("deviceTracking.notAnalysed"),
+    [t("deviceTracking.note")]: pulseNoteText(p, t),
   }))
   const snapshots = data.behaviour.snaps.map((s) => ({
     [t("farmer.timestamp")]: new Date(s.time).toLocaleString(),

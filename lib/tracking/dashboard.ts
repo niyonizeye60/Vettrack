@@ -1,6 +1,8 @@
 // Everything the tracking page shows for one collar, built server-side.
 // Mirrors the queries at the top of the IoT backend's dashboard.php.
+import type { Collection } from "mongodb"
 import { BEHAVIOUR_CONFIG, summarizeBehaviour, DEFAULT_SCALE_PER_G } from "./behaviour"
+import { hrAnalyze, hrBandpass } from "./heart-rate"
 import {
   BURSTS,
   READINGS,
@@ -44,7 +46,43 @@ function toPulse(b: BurstDoc): TrackingPulse {
     method: b.method,
     motionMg: b.motionMg,
     notes: b.notes,
+    noteCode: b.noteCode ?? null,
     analysed: b.analysed,
+  }
+}
+
+// The sample rates the heart-rate analysis accepts (hr_process_payload's range).
+const analysable = (fs: number) => fs >= 5 && fs <= 200
+
+/**
+ * Bursts stored before the heart-rate analysis was ported have analysed: false. The
+ * ones about to be shown are analysed now from their stored samples, and saved.
+ */
+async function analysePending(col: Collection<BurstDoc>, rows: BurstDoc[]) {
+  const pending = rows.filter((b) => !b.analysed && b._id && analysable(Math.trunc(b.sampleRateHz)))
+  if (pending.length === 0) return
+  try {
+    const stored = await col
+      .find({ _id: { $in: pending.map((b) => b._id!) } }, { projection: { samples: 1, sampleRateHz: 1, scalePerG: 1 } })
+      .toArray()
+    const updates = stored.map((b) => {
+      const a = hrAnalyze(b.samples ?? [], Math.trunc(b.sampleRateHz), b.scalePerG ?? 0)
+      const set = {
+        bpm: a.bpm,
+        bpmPeaks: a.bpmPeaks,
+        confidence: a.confidence,
+        method: a.method,
+        notes: a.notes,
+        noteCode: a.note,
+        analysed: true,
+      }
+      Object.assign(pending.find((p) => p._id!.equals(b._id!)) as BurstDoc, set)
+      return { updateOne: { filter: { _id: b._id!, analysed: false }, update: { $set: set } } }
+    })
+    if (updates.length) await col.bulkWrite(updates, { ordered: false })
+  } catch (error) {
+    // Not fatal: the rows show as not analysed, and the next load tries again.
+    console.error("Tracking burst analysis error:", error)
   }
 }
 
@@ -93,6 +131,8 @@ export async function loadDeviceDashboard(device: TrackingDeviceDoc, limit: numb
       .next(),
   ])
 
+  await analysePending(burstsCol, pulseRows)
+
   const newest = readings[0]
   const ageMin = newest ? Math.floor((now - newest.receivedAt.getTime()) / 60_000) : null
   const dayMotion = dayBursts.map((b) => b.motionMg).filter((v): v is number => typeof v === "number")
@@ -131,11 +171,14 @@ export async function loadDeviceDashboard(device: TrackingDeviceDoc, limit: numb
     const fs = waveformBurst.sampleRateHz
     const perMg = (waveformBurst.scalePerG || DEFAULT_SCALE_PER_G) / 1000
     const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+    const toMg = (v: number) => Math.round((v / perMg) * 100) / 100
     waveform = {
       time: waveformBurst.receivedAt.toISOString(),
       sampleRateHz: fs,
       seconds: vals.map((_, i) => Math.round((i / fs) * 100) / 100),
-      mg: vals.map((v) => Math.round(((v - mean) / perMg) * 100) / 100),
+      mg: vals.map((v) => toMg(v - mean)),
+      // the band the heart-rate analysis's envelope route reads, as dashboard.php drew it
+      band: analysable(fs) ? hrBandpass(vals, fs, 2.0, Math.min(8.0, fs * 0.4)).map(toMg) : null,
     }
   }
 
