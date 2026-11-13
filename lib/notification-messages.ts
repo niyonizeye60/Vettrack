@@ -193,17 +193,56 @@ const en = {
   supportResolved: { title: "Support ticket resolved", message: '{staff} marked your ticket "{subject}" as resolved' },
   supportReopened: { title: "Support ticket reopened", message: '{staff} reopened your ticket "{subject}"' },
 
-  // Built fresh for the admin portal on each request (app/api/admin/notifications)
-  doctorUnavailable: { title: "Doctor Unavailable", message: "Dr. {doctor} marked unavailable" },
-  adminTicketNew: { title: "New support ticket", message: "{requester} ({role}): {subject}" },
-  adminTicketReply: { title: "Support ticket reply", message: "{requester} ({role}): {subject}" },
-  newFarmer: { title: "New User Registration", message: "Farmer {name} registered" },
-  newDoctor: { title: "New User Registration", message: "Doctor {name} registered" },
-  "adminConsultation.accepted": { title: "Consultation accepted", message: "Dr. {doctor} accepted consultation" },
-  "adminConsultation.rejected": { title: "Consultation rejected", message: "Dr. {doctor} rejected consultation" },
-  "adminConsultation.completed": { title: "Consultation completed", message: "Dr. {doctor} completed consultation" },
-  responseTimeAlert: { title: "Response Time Alert", message: "Dr. {doctor} exceeded 30-min target ({minutes} min)" },
-  dailyPerformance: { title: "Daily Performance Report", message: "{rate}% consultation completion rate (Target: 90%)" },
+  // The admin portal (lib/admin-notifications.ts, lib/admin-alerts.ts)
+  farmerAwaitingVerification: {
+    title: "Farmer account to verify",
+    message: "{name} registered as a farmer and is waiting for you to verify the account.",
+  },
+  vetAwaitingVerification: {
+    title: "Vet account to verify",
+    message: "{name} registered as a vet and is waiting for you to check their license and verify the account.",
+  },
+  verificationBacklog: {
+    title: "Accounts waiting for verification",
+    message: "{count} accounts have waited more than 2 days for verification.",
+  },
+  verificationBacklogOne: {
+    title: "Accounts waiting for verification",
+    message: "An account has waited more than 2 days for verification.",
+  },
+  epidemicCaseReported: {
+    title: "Disease case to review",
+    message: "{reporter} reported {disease} ({severity}) in {place}. It stays off the public map until you confirm it.",
+  },
+  outbreakSuspected: {
+    title: "Possible {disease} outbreak in {district}",
+    message: "{count} cases of {disease} were reported in {district} in the last {days} days. Check them on the epidemic map.",
+  },
+  supportTicketReplied: { title: "Reply on a support ticket", message: '{requester} replied on "{subject}".' },
+  ticketWaiting: {
+    title: "Support ticket waiting for a reply",
+    message: '"{subject}" from {requester} has waited more than 24 hours for a reply.',
+  },
+  ticketsWaiting: {
+    title: "Support tickets waiting for a reply",
+    message: "{count} support tickets have waited more than 24 hours for a reply.",
+  },
+  consultationWaiting: {
+    title: "Consultation waiting for a vet",
+    message: "{farmer}'s consultation request has waited more than 24 hours for {vet} to respond.",
+  },
+  consultationWaitingNoVet: {
+    title: "Consultation waiting for a vet",
+    message: "{farmer}'s consultation request has waited more than 24 hours for a vet to respond.",
+  },
+  consultationsWaiting: {
+    title: "Consultations waiting for a vet",
+    message: "{count} consultation requests have waited more than 24 hours for a vet to respond.",
+  },
+  consultationDeclined: {
+    title: "Vet declined a consultation",
+    message: "{vet} declined {farmer}'s consultation request. The farmer may need another vet.",
+  },
 } satisfies Record<string, Template>
 
 export type NotificationId = keyof typeof en
@@ -415,21 +454,57 @@ const rw: Record<NotificationId, Template> = {
     message: '{staff} yongeye gufungura icyifuzo cyawe "{subject}"',
   },
 
-  doctorUnavailable: { title: "Muganga ntaboneka", message: "Dr. {doctor} yatangaje ko ataboneka" },
-  adminTicketNew: { title: "Icyifuzo gishya cy'ubufasha", message: "{requester} ({role}): {subject}" },
-  adminTicketReply: { title: "Igisubizo ku cyifuzo cy'ubufasha", message: "{requester} ({role}): {subject}" },
-  newFarmer: { title: "Umukoresha mushya yiyandikishije", message: "Umworozi {name} yiyandikishije" },
-  newDoctor: { title: "Umukoresha mushya yiyandikishije", message: "Muganga {name} yiyandikishije" },
-  "adminConsultation.accepted": { title: "Randevu yemewe", message: "Dr. {doctor} yemeye randevu" },
-  "adminConsultation.rejected": { title: "Randevu yanzwe", message: "Dr. {doctor} yanze randevu" },
-  "adminConsultation.completed": { title: "Randevu yarangiye", message: "Dr. {doctor} yarangije randevu" },
-  responseTimeAlert: {
-    title: "Iburira ku gihe cyo gusubiza",
-    message: "Dr. {doctor} yarengeje intego y'iminota 30 (iminota {minutes})",
+  farmerAwaitingVerification: {
+    title: "Konti y'umworozi itegereje kwemezwa",
+    message: "{name} yiyandikishije nk'umworozi kandi ategereje ko wemeza konti ye.",
   },
-  dailyPerformance: {
-    title: "Raporo y'umunsi",
-    message: "Igipimo cyo kurangiza randevu ni {rate}% (Intego: 90%)",
+  vetAwaitingVerification: {
+    title: "Konti ya muganga itegereje kwemezwa",
+    message: "{name} yiyandikishije nka muganga w'amatungo kandi ategereje ko ugenzura uruhushya rwe ukemeza konti ye.",
+  },
+  verificationBacklog: {
+    title: "Konti zitegereje kwemezwa",
+    message: "Konti {count} zimaze iminsi irenga 2 zitegereje kwemezwa.",
+  },
+  verificationBacklogOne: {
+    title: "Konti zitegereje kwemezwa",
+    message: "Konti imwe imaze iminsi irenga 2 itegereje kwemezwa.",
+  },
+  epidemicCaseReported: {
+    title: "Raporo y'indwara igomba gusuzumwa",
+    message: "{reporter} yatanze raporo ya {disease} ({severity}) i {place}. Ntizagaragara ku ikarita rusange kugeza uyemeje.",
+  },
+  outbreakSuspected: {
+    title: "Hashobora kuba icyorezo cya {disease} i {district}",
+    message: "Raporo {count} za {disease} zatanzwe i {district} mu minsi {days} ishize. Zirebe ku ikarita y'ibyorezo.",
+  },
+  supportTicketReplied: {
+    title: "Igisubizo ku cyifuzo cy'ubufasha",
+    message: '{requester} yasubije ku cyifuzo "{subject}".',
+  },
+  ticketWaiting: {
+    title: "Icyifuzo cy'ubufasha gitegereje igisubizo",
+    message: 'Icyifuzo "{subject}" cya {requester} kimaze amasaha arenga 24 gitegereje igisubizo.',
+  },
+  ticketsWaiting: {
+    title: "Ibyifuzo by'ubufasha bitegereje igisubizo",
+    message: "Ibyifuzo by'ubufasha {count} bimaze amasaha arenga 24 bitegereje igisubizo.",
+  },
+  consultationWaiting: {
+    title: "Randevu itegereje muganga",
+    message: "Icyifuzo cya randevu cya {farmer} kimaze amasaha arenga 24 gitegereje ko {vet} agisubiza.",
+  },
+  consultationWaitingNoVet: {
+    title: "Randevu itegereje muganga",
+    message: "Icyifuzo cya randevu cya {farmer} kimaze amasaha arenga 24 gitegereje ko muganga agisubiza.",
+  },
+  consultationsWaiting: {
+    title: "Randevu zitegereje muganga",
+    message: "Ibyifuzo bya randevu {count} bimaze amasaha arenga 24 bitegereje ko muganga abisubiza.",
+  },
+  consultationDeclined: {
+    title: "Muganga yanze randevu",
+    message: "{vet} yanze icyifuzo cya randevu cya {farmer}. Umworozi ashobora gukenera undi muganga.",
   },
 }
 

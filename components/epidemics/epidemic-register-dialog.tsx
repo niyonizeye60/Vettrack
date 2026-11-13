@@ -344,7 +344,9 @@ export default function EpidemicRegisterDialog({
         longitude: Number(form.longitude),
         district: form.district.trim() || null,
         sector: form.sector.trim() || null,
-        status: "confirmed",
+        // The server ignores this unless an admin is reporting - everyone else's report
+        // waits for an admin to confirm it.
+        status: canManage ? "confirmed" : undefined,
       }
       const res = await fetch("/api/epidemics", {
         method: "POST",
@@ -353,7 +355,10 @@ export default function EpidemicRegisterDialog({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t("epidemicReg.failedToSave"))
-      toast({ title: t("epidemicReg.epidemicCaseReported"), description: t("epidemicReg.pinnedOnMap").replace("{name}", finalDisease) })
+      toast({
+        title: t("epidemicReg.epidemicCaseReported"),
+        description: t(canManage ? "epidemicReg.pinnedOnMap" : "epidemicReg.sentForReview").replace("{name}", finalDisease),
+      })
       onSaved?.()
       loadCategories() // pick up any category auto-created for admins
       onOpenChange(false)

@@ -14,6 +14,8 @@ export interface FeedItem {
   read: boolean
   announcement: boolean
   actionUrl: string | null
+  /** True for high or critical priority, e.g. a possible disease outbreak. */
+  urgent: boolean
   /** Marketplace notifications carry their template, so they show in the reader's language. */
   i18n?: unknown
 }
@@ -104,6 +106,7 @@ export function useNotificationsFeed(
               read: !!n.read,
               announcement: false,
               actionUrl: n.actionUrl ?? null,
+              urgent: n.priority === "high" || n.priority === "critical",
               i18n: n.i18n ?? null,
             }))
           : []
@@ -118,6 +121,7 @@ export function useNotificationsFeed(
                 read: false,
                 announcement: true,
                 actionUrl: null,
+                urgent: a.priority === "high" || a.priority === "critical",
               }))
               .filter((a: FeedItem) => !dismissedAnnouncements.has(a.id))
               .map((a: FeedItem) => ({ ...a, read: readAnnouncements.has(a.id) }))

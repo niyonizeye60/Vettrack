@@ -1,5 +1,6 @@
 "use client"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -78,6 +79,20 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
     fetchCases()
   }, [fetchCases])
 
+  // An admin alert links here as ?case=<id>: open that case once the list has loaded.
+  const searchParams = useSearchParams()
+  const linkedCaseId = searchParams.get("case")
+  const openedLinkedCase = useRef<string | null>(null)
+  useEffect(() => {
+    if (!linkedCaseId || loading || openedLinkedCase.current === linkedCaseId) return
+    openedLinkedCase.current = linkedCaseId
+    const linked = cases.find((c) => c._id === linkedCaseId)
+    if (linked) {
+      setStatusFilter("all")
+      setSelectedCase(linked)
+    }
+  }, [linkedCaseId, loading, cases])
+
   const filtered = useMemo(
     () => (statusFilter === "all" ? cases : cases.filter((c) => c.status === statusFilter)),
     [cases, statusFilter]
@@ -138,6 +153,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t("epidemic.failed"))
       toast({ title: t("epidemic.caseMarkedAs").replace("{status}", t(`epidemic.status.${status}`)), description: t("epidemic.nameUpdated").replace("{name}", c.diseaseName) })
+      setSelectedCase((prev) => (prev && prev._id === c._id ? { ...prev, status: status as EpidemicCase["status"] } : prev))
       await fetchCases()
     } catch (err: any) {
       toast({ title: t("epidemic.updateFailed"), description: err.message || t("epidemic.pleaseTryAgain"), variant: "destructive" })
@@ -483,7 +499,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <Badge variant="outline" className={EPIDEMIC_STATUS_STYLES[selectedCase.status] || ""}>
-                  <span className="capitalize">{selectedCase.status}</span>
+                  <span className="capitalize">{t(`epidemic.status.${selectedCase.status}`)}</span>
                 </Badge>
                 <button
                   onClick={() => setSelectedCase(null)}
@@ -500,6 +516,17 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
               {selectedCase.symptoms && <p className="text-gray-500">Symptoms: {selectedCase.symptoms}</p>}
               <p className="text-xs text-gray-400">{new Date(selectedCase.reportedAt).toLocaleString()}</p>
             </div>
+            {/* A report opened from an admin alert is usually one to review - decide it here. */}
+            {canApprove && selectedCase.status === "pending" && (
+              <div className="mt-3 flex items-center gap-2">
+                <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50" disabled={actionId === selectedCase._id} onClick={() => updateStatus(selectedCase, "confirmed")}>
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t("epidemic.confirm")}
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs text-gray-500 border-gray-200 hover:bg-gray-100" disabled={actionId === selectedCase._id} onClick={() => updateStatus(selectedCase, "rejected")}>
+                  <XCircle className="h-3.5 w-3.5 mr-1" /> {t("epidemic.reject")}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}

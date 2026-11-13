@@ -110,6 +110,11 @@ export default function SellerNotifications({ role, descKey }: { role: string; d
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className={`text-sm font-semibold ${!item.read ? "text-gray-900" : "text-gray-600"}`}>
+                      {item.urgent && (
+                        <span className="mr-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-700 align-middle">
+                          {t("notifPriority.urgent")}
+                        </span>
+                      )}
                       {item.title}
                       {!item.read && <span className="inline-block ml-2 h-2 w-2 rounded-full bg-orange-500 align-middle" />}
                     </p>

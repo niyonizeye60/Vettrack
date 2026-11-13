@@ -80,7 +80,14 @@ export default function NotificationBell({ role, viewAllHref }: { role: string; 
                     <span className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!item.read ? "bg-green-500" : "bg-gray-300"}`} />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${!item.read ? "text-gray-900" : "text-gray-600"}`}>{item.title}</p>
+                    <p className={`text-sm font-medium truncate ${!item.read ? "text-gray-900" : "text-gray-600"}`}>
+                      {item.urgent && (
+                        <span className="mr-1.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-700 align-middle">
+                          {t("notifPriority.urgent")}
+                        </span>
+                      )}
+                      {item.title}
+                    </p>
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2">{preview(item)}</p>
                     <p className="text-xs text-gray-400 mt-1">{new Date(item.createdAt).toLocaleDateString()}</p>
                   </div>

@@ -10,6 +10,7 @@ import { isRole, isPrivilegedRole, canSelfRegister, homePathForRole } from "../r
 import { normalizeMarketplaceAccess } from "../marketplace-access"
 import { notificationText } from "../notification-messages"
 import { insertNotification } from "../notify"
+import { notifyAdmins } from "../admin-notifications"
 
 // Ensured once per warm process, not on every registration - createIndex is a
 // no-op after the first call, but there's no need to pay even that round trip
@@ -175,6 +176,20 @@ export async function registerUser(formData: FormData) {
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         createdAt: new Date(),
       }).catch((err) => console.error("Failed to insert privileged-account notification:", err))
+    }
+
+    // Farmers and vets can't sign in until an admin verifies them, so every admin hears
+    // about it straight away. An admin who created the account themselves already knows.
+    if (userData.status === "pending_verification") {
+      const creator = await getCurrentUser().catch(() => null)
+      await notifyAdmins(db, {
+        text: notificationText(role === "doctor" ? "vetAwaitingVerification" : "farmerAwaitingVerification", {
+          name: String(userData.name || userData.email),
+        }),
+        type: "account",
+        actionUrl: `/admin/users?user=${result.insertedId.toString()}`,
+        alreadyRead: creator?.role === "admin" ? [String(creator._id)] : [],
+      })
     }
 
     // Send welcome email after successful registration

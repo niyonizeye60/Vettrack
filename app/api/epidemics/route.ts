@@ -1,9 +1,12 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
-import { ObjectId } from "mongodb"
+import { ObjectId, type Db } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
+import { notificationText } from "@/lib/notification-messages"
+import { notifyAdmins } from "@/lib/admin-notifications"
+import { checkForOutbreak } from "@/lib/admin-alerts"
 
 import { EPIDEMIC_STATUSES, EPIDEMIC_SEVERITIES, type EpidemicCase } from "@/lib/epidemics"
 import { ensureEpidemicDisease } from "@/lib/epidemic-diseases"
@@ -19,6 +22,31 @@ function isStaff(role?: string) {
 // Vets and farmers can view and report, but cannot confirm, resolve or reject.
 function canApprove(role?: string) {
   return role === "admin" || role === "superadmin"
+}
+
+/** What the public map shows of a case (app/api/epidemics/public). */
+const PUBLIC_CASE_FIELDS = [
+  "diseaseName", "animalType", "animalName", "affectedCount", "severity",
+  "latitude", "longitude", "locationLabel", "district", "sector",
+] as const
+
+/** Tell every admin a reported case is waiting for them to confirm or reject it. */
+async function alertCaseToReview(db: Db, doc: any, reporterName: string | null | undefined) {
+  const place =
+    [doc.district, doc.sector].filter(Boolean).join(", ") ||
+    doc.locationLabel ||
+    `${Number(doc.latitude).toFixed(4)}, ${Number(doc.longitude).toFixed(4)}`
+  await notifyAdmins(db, {
+    text: notificationText("epidemicCaseReported", {
+      reporter: String(reporterName || doc.farmerName || "Someone"),
+      disease: String(doc.diseaseName),
+      severity: { keys: [`epidemic.severity.${doc.severity}`], text: String(doc.severity) },
+      place: String(place),
+    }),
+    type: "epidemic",
+    priority: doc.severity === "high" || doc.severity === "critical" ? "high" : "normal",
+    actionUrl: `/admin/epidemics?case=${doc._id.toString()}`,
+  })
 }
 
 function toClientCase(doc: any): EpidemicCase {
@@ -138,10 +166,11 @@ export async function POST(req: NextRequest) {
     const cleanDistrict = typeof district === "string" && district.trim() ? district.trim().slice(0, 60) : null
     const cleanSector = typeof sector === "string" && sector.trim() ? sector.trim().slice(0, 60) : null
 
-    const finalStatus = EPIDEMIC_STATUSES.includes(status) ? status : "confirmed"
-    // Submissions are public immediately. Only admins/superadmins may create a
-    // case with a non-default status (e.g. pending/rejected).
-    const resolvedStatus = canApprove(currentUser.role) ? finalStatus : "confirmed"
+    // A farmer's or vet's report waits as "pending" - off the public map - until an admin
+    // confirms it. Admins' own reports default to confirmed, and only they may pick a status.
+    const approver = canApprove(currentUser.role)
+    const resolvedStatus = approver ? (EPIDEMIC_STATUSES.includes(status) ? status : "confirmed") : "pending"
+    const severityLevel = EPIDEMIC_SEVERITIES.includes(severity) ? severity : "medium"
 
     const client = await clientPromise
     const db = client.db(DB)
@@ -155,7 +184,7 @@ export async function POST(req: NextRequest) {
       diseaseName,
       symptoms: symptoms || null,
       affectedCount: Number(affectedCount) > 0 ? Number(affectedCount) : 1,
-      severity: EPIDEMIC_SEVERITIES.includes(severity) ? severity : "medium",
+      severity: severityLevel,
       latitude: lat,
       longitude: lng,
       locationLabel: locationLabel || null,
@@ -163,8 +192,9 @@ export async function POST(req: NextRequest) {
       sector: cleanSector,
       status: resolvedStatus,
       notes: notes || null,
-      confirmedBy: staff ? currentUser.name || null : null,
-      confirmedAt: new Date(),
+      // Who confirmed (or otherwise decided) it - nobody yet, for a report awaiting review.
+      confirmedBy: approver ? currentUser.name || null : null,
+      confirmedAt: approver ? new Date() : null,
       reportedAt: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -172,6 +202,11 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await db.collection("epidemic_cases").insertOne(record)
+
+    if (!approver) {
+      await alertCaseToReview(db, { ...record, _id: result.insertedId }, currentUser.name)
+    }
+    await checkForOutbreak(db, { _id: result.insertedId, diseaseName: record.diseaseName, district: record.district })
 
     // First time an admin writes a brand-new disease name, save it as a
     // selectable category so it can be picked from the dropdown later.
@@ -248,7 +283,22 @@ export async function PUT(req: NextRequest) {
       $set.confirmedAt = new Date()
     }
 
+    // What an admin confirmed is what the public map shows. If anyone else changes any of
+    // it, the case goes back to waiting for review instead of showing unchecked details.
+    const backToReview =
+      !canApprove(currentUser.role) &&
+      existing.status === "confirmed" &&
+      PUBLIC_CASE_FIELDS.some((field) => String($set[field] ?? "") !== String(existing[field] ?? ""))
+    if (backToReview) {
+      $set.status = "pending"
+      $set.confirmedBy = null
+      $set.confirmedAt = null
+    }
+
     await db.collection("epidemic_cases").updateOne({ _id: new ObjectId(id) }, { $set })
+    if (backToReview) {
+      await alertCaseToReview(db, { ...existing, ...$set }, currentUser.name)
+    }
     await logActivity(currentUser._id, "epidemic.case_updated", diseaseName || id)
     return NextResponse.json({ success: true })
   } catch (error) {

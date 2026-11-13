@@ -108,8 +108,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       update.status = "in_progress"
     } else if (action === "resolve") {
       update.status = "resolved"
+      update.awaitingStaffSince = null
     } else if (action === "reopen") {
+      // Staff reopened it themselves, so the requester isn't the one waiting on them.
       update.status = "open"
+      update.awaitingStaffSince = null
     }
 
     // Any admin action attributes ownership if the ticket has no owner yet -

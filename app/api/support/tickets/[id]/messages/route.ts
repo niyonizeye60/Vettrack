@@ -8,6 +8,7 @@ import { ObjectId } from "mongodb"
 import { logActivity } from "@/lib/activity-log"
 import { notificationText } from "@/lib/notification-messages"
 import { insertNotification } from "@/lib/notify"
+import { notifyTicketOwner } from "@/lib/admin-notifications"
 
 const DB = "ntdm_animal_hospital"
 const STAFF_ROLES = ["admin", "superadmin"]
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (isStaff) {
       ticketUpdate.unreadByRequester = true
       ticketUpdate.unreadByAdmin = false
+      ticketUpdate.awaitingStaffSince = null
       if (!ticket.assignedTo) {
         ticketUpdate.assignedTo = currentUser._id
         ticketUpdate.assignedToName = currentUser.name
@@ -71,6 +73,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     } else {
       ticketUpdate.unreadByAdmin = true
       ticketUpdate.unreadByRequester = false
+      // The wait runs from their first unanswered message, not their latest one.
+      ticketUpdate.awaitingStaffSince = ticket.awaitingStaffSince || now
       if (ticket.status === "resolved") {
         ticketUpdate.status = "open"
       }
@@ -92,6 +96,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         createdAt: now,
       }).catch((err) => console.error("Error inserting support ticket notification:", err))
+    } else {
+      // The requester wrote back - the admin holding the ticket, or every admin if
+      // nobody does, needs to answer.
+      await notifyTicketOwner(db, ticket.assignedTo, {
+        text: notificationText("supportTicketReplied", {
+          requester: currentUser.name,
+          subject: String(ticket.subject || ""),
+        }),
+        type: "support_ticket",
+        actionUrl: `/admin/support?ticketId=${ticketId.toString()}`,
+        expiresInDays: 7,
+      })
     }
 
     await logActivity(currentUser._id, "support.ticket_replied", `Ticket ${params.id}`)

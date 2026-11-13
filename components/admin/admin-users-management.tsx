@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -182,6 +183,26 @@ export default function AdminUsersManagement() {
       setLoading(false)
     }
   }
+
+  // Admin alerts link here: ?user=<id> opens that account (e.g. one waiting for
+  // verification) and ?status=pending_verification shows the verification queue.
+  const searchParams = useSearchParams()
+  const linkedUserId = searchParams.get("user")
+  const linkedStatus = searchParams.get("status")
+  const openedLinkedUser = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (linkedStatus) setStatusFilter(linkedStatus)
+  }, [linkedStatus])
+
+  useEffect(() => {
+    if (!linkedUserId || loading || openedLinkedUser.current === linkedUserId) return
+    openedLinkedUser.current = linkedUserId
+    const linked = users.find((user) => user._id === linkedUserId)
+    if (linked) openDetails(linked)
+    // openDetails is recreated each render; the ref keeps this to one open per link.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedUserId, loading, users])
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -657,6 +678,35 @@ export default function AdminUsersManagement() {
             <SheetTitle>{selectedUser?.name || t('admin.userDetails')}</SheetTitle>
             <SheetDescription>{selectedUser?.email}</SheetDescription>
           </SheetHeader>
+
+          {/* Verification alerts open this sheet, so the decision is made right here. */}
+          {selectedUser?.status === "pending_verification" && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  handleStatusChange(selectedUser._id, "approve")
+                  setIsDetailsOpen(false)
+                }}
+              >
+                <UserCheck className="mr-2 h-4 w-4" />
+                {t('admin.approve')}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => {
+                  handleStatusChange(selectedUser._id, "reject")
+                  setIsDetailsOpen(false)
+                }}
+              >
+                <UserX className="mr-2 h-4 w-4" />
+                {t('admin.reject')}
+              </Button>
+            </div>
+          )}
 
           <div className="mt-6">
             {detailsLoading ? (

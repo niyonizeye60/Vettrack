@@ -11,6 +11,7 @@ import { deleteDocumentsForConsultation, getConsultationAccess, getDocumentsByCo
 import { vetConsultedOnAnimal } from "./farm-access"
 import { notificationText } from "./notification-messages"
 import { insertNotification } from "./notify"
+import { notifyAdmins } from "./admin-notifications"
 import { changedLivestockIds, cleanLivestockId, findLivestockIdConflict, livestockIdConflictFromError } from "./livestock-ids"
 
 // Anyone can call a server action with any IDs they like, so who is asking comes from the
@@ -579,6 +580,19 @@ export async function updateConsultationStatus(
       }
     } catch (notifyError) {
       console.error("Error notifying farmer of consultation update:", notifyError);
+    }
+
+    // A vet declining leaves the farmer without one; an admin can book them another.
+    // When an admin declines it from the appointments page, they already know.
+    if (status === "rejected" && actor.role === "doctor" && consultation.status !== "rejected") {
+      await notifyAdmins(db, {
+        text: notificationText("consultationDeclined", {
+          vet: String(actor.name || "A vet"),
+          farmer: String(consultation.fullName || "A farmer"),
+        }),
+        type: "consultation",
+        actionUrl: `/admin/appointments?appointment=${id}`,
+      });
     }
 
     // Revalidate paths

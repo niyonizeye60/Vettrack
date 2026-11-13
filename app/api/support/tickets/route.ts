@@ -7,6 +7,7 @@ import { ObjectId } from "mongodb"
 import { logActivity } from "@/lib/activity-log"
 import { notificationText } from "@/lib/notification-messages"
 import { insertNotification } from "@/lib/notify"
+import { notifyAdmins } from "@/lib/admin-notifications"
 
 const DB = "ntdm_animal_hospital"
 const REQUESTER_ROLES = ["farmer", "doctor"]
@@ -105,6 +106,8 @@ export async function POST(request: NextRequest) {
       lastMessageAt: now,
       unreadByAdmin: true,
       unreadByRequester: false,
+      // When the requester started waiting for staff - see lib/admin-alerts.ts.
+      awaitingStaffSince: now,
     }
 
     const result = await db.collection("supportTickets").insertOne(ticket)
@@ -129,6 +132,13 @@ export async function POST(request: NextRequest) {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       createdAt: now,
     }).catch((err) => console.error("Error inserting new-ticket notification:", err))
+
+    await notifyAdmins(db, {
+      text: notificationText("supportTicketNew", { requester: currentUser.name, subject: ticket.subject }),
+      type: "support_ticket",
+      actionUrl: `/admin/support?ticketId=${result.insertedId.toString()}`,
+      expiresInDays: 7,
+    })
 
     await logActivity(currentUser._id, "support.ticket_created", trimmedSubject)
     return NextResponse.json({ success: true, id: result.insertedId.toString() })

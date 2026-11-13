@@ -171,7 +171,10 @@ export async function pushNotifications(db: Db, docs: Document[]): Promise<void>
     if (doc.userId) return new Set([String(doc.userId)])
     const role = audienceRole(doc)
     if (role === "all") return "all"
-    return new Set(role ? idsByRole.get(role) ?? [] : [])
+    // A broadcast can be stored already read by someone - e.g. the admin who did the
+    // thing it reports - and they don't need their phone to tell them.
+    const alreadyRead = new Set(Array.isArray(doc.readBy) ? doc.readBy.map(String) : [])
+    return new Set((role ? idsByRole.get(role) ?? [] : []).filter((id) => !alreadyRead.has(id)))
   })
   const everyone = audiences.includes("all")
   const userIds = Array.from(

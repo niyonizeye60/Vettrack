@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useLanguage } from "@/contexts/LanguageContext"
@@ -35,10 +36,18 @@ function statusBadgeClass(status: string) {
 export default function AdminSupportInbox() {
   const { t } = useLanguage()
 
+  // Notifications link to a ticket as ?ticketId=<id> - open it, including when the link is
+  // followed while the inbox is already on screen.
+  const linkedTicketId = useSearchParams().get("ticketId")
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [tickets, setTickets] = useState<TicketSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(linkedTicketId)
+
+  useEffect(() => {
+    if (linkedTicketId) setSelectedId(linkedTicketId)
+  }, [linkedTicketId])
   const [scope, setScope] = useState<Scope>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 

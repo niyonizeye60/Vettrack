@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -145,6 +146,21 @@ export default function AdminAppointments() {
     setEditTime(appointment.time)
     setIsAppointmentDialogOpen(true)
   }
+
+  // Admin alerts link a consultation as ?appointment=<id>: open it once the list has loaded.
+  const linkedAppointmentId = useSearchParams().get("appointment")
+  const openedLinkedAppointment = useRef<string | null>(null)
+  useEffect(() => {
+    if (!linkedAppointmentId || loading || openedLinkedAppointment.current === linkedAppointmentId) return
+    openedLinkedAppointment.current = linkedAppointmentId
+    const linked = appointments.find((a) => a.id === linkedAppointmentId)
+    if (linked) {
+      setActiveTab("appointments")
+      openEditDialog(linked)
+    }
+    // openEditDialog is recreated each render; the ref keeps this to one open per link.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedAppointmentId, loading, appointments])
 
   const handleQuickStatus = async (id: string, status: string) => {
     try {
