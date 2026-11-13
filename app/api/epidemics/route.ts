@@ -271,9 +271,10 @@ export async function PUT(req: NextRequest) {
     // A deleted case is changed only by restoring it first (PATCH).
     if (!existing || existing.deletedAt) return NextResponse.json({ error: "Case not found" }, { status: 404 })
 
-    const staff = isStaff(currentUser.role)
-    if (!staff && existing.farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    // Admins may change any case; farmers and vets only the ones they reported - the same
+    // rule as deleting.
+    if (!canApprove(currentUser.role) && reporterId(existing) !== currentUser._id) {
+      return NextResponse.json({ error: "You can only edit cases you reported" }, { status: 403 })
     }
 
     if (latitude != null && longitude != null) {
