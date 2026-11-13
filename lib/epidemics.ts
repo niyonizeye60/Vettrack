@@ -48,6 +48,11 @@ export type EpidemicCase = {
   reportedAt: string
   createdAt: string
   updatedAt: string
+  /** Whether the viewer may delete it: admins always, everyone else only their own reports. */
+  canDelete: boolean
+  /** Set when a farmer or vet deleted it. Only admins get deleted cases, to restore or remove. */
+  deletedAt: string | null
+  deletedByName: string | null
 }
 
 export const EPIDEMIC_STATUS_STYLES: Record<string, string> = {

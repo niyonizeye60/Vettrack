@@ -19,7 +19,7 @@ import {
   type EpidemicCase,
 } from "@/lib/epidemics"
 import {
-  Activity, MapPin, Plus, CheckCircle2, XCircle, Trash2, Loader2, RefreshCw, AlertTriangle,
+  Activity, MapPin, Plus, CheckCircle2, XCircle, Trash2, Loader2, RefreshCw, AlertTriangle, RotateCcw,
 } from "lucide-react"
 
 interface EpidemicManagementProps {
@@ -31,6 +31,8 @@ interface EpidemicManagementProps {
 }
 
 const STATUS_FILTERS = ["all", ...EPIDEMIC_STATUSES]
+/** Admins also get the cases farmers and vets deleted, to restore or remove for good. */
+const DELETED_FILTER = "deleted"
 
 export default function EpidemicManagement({ role, farmerId, farmerName }: EpidemicManagementProps) {
   const { t } = useLanguage()
@@ -88,23 +90,33 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
     openedLinkedCase.current = linkedCaseId
     const linked = cases.find((c) => c._id === linkedCaseId)
     if (linked) {
-      setStatusFilter("all")
+      setStatusFilter(linked.deletedAt ? DELETED_FILTER : "all")
       setSelectedCase(linked)
     }
   }, [linkedCaseId, loading, cases])
 
+  // Only admins are sent deleted cases; they sit under their own filter, out of the counts and map.
+  const liveCases = useMemo(() => cases.filter((c) => !c.deletedAt), [cases])
+  const deletedCases = useMemo(() => cases.filter((c) => c.deletedAt), [cases])
+  const statusFilters = canApprove ? [...STATUS_FILTERS, DELETED_FILTER] : STATUS_FILTERS
+
   const filtered = useMemo(
-    () => (statusFilter === "all" ? cases : cases.filter((c) => c.status === statusFilter)),
-    [cases, statusFilter]
+    () =>
+      statusFilter === DELETED_FILTER
+        ? deletedCases
+        : statusFilter === "all"
+          ? liveCases
+          : liveCases.filter((c) => c.status === statusFilter),
+    [liveCases, deletedCases, statusFilter]
   )
 
   const stats = useMemo(() => ({
-    total: cases.length,
-    confirmed: cases.filter((c) => c.status === "confirmed").length,
-    resolved: cases.filter((c) => c.status === "resolved").length,
-    rejected: cases.filter((c) => c.status === "rejected").length,
-    pending: cases.filter((c) => c.status === "pending").length,
-  }), [cases])
+    total: liveCases.length,
+    confirmed: liveCases.filter((c) => c.status === "confirmed").length,
+    resolved: liveCases.filter((c) => c.status === "resolved").length,
+    rejected: liveCases.filter((c) => c.status === "rejected").length,
+    pending: liveCases.filter((c) => c.status === "pending").length,
+  }), [liveCases])
 
   const addCategory = async () => {
     const name = newCategory.trim()
@@ -169,6 +181,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
       const res = await fetch(`/api/epidemics?id=${deleteId}`, { method: "DELETE" })
       if (!res.ok) throw new Error(t("epidemic.failedToDelete"))
       toast({ title: t("epidemic.caseDeleted") })
+      setSelectedCase((prev) => (prev && prev._id === deleteId ? null : prev))
       await fetchCases()
     } catch {
       toast({ title: t("epidemic.deleteFailed"), description: t("epidemic.pleaseTryAgain"), variant: "destructive" })
@@ -178,9 +191,35 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
     }
   }
 
-  // Resolved/rejected cases are removed from the map (they still appear in the table).
+  /** Admins: bring back a case a farmer or vet deleted, with the status it had. */
+  const restoreCase = async (c: EpidemicCase) => {
+    setActionId(c._id)
+    try {
+      const res = await fetch("/api/epidemics", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: c._id, action: "restore" }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || t("epidemic.restoreFailed"))
+      toast({ title: t("epidemic.caseRestored"), description: t("epidemic.nameUpdated").replace("{name}", c.diseaseName) })
+      setSelectedCase((prev) => (prev && prev._id === c._id ? null : prev))
+      await fetchCases()
+    } catch (err: any) {
+      toast({ title: t("epidemic.restoreFailed"), description: err.message || t("epidemic.pleaseTryAgain"), variant: "destructive" })
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  // What the delete dialog is about: an admin removes for good, anyone else only hides
+  // their own report (an admin can still restore it).
+  const deleteTarget = deleteId ? cases.find((c) => c._id === deleteId) ?? null : null
+  const deleteIsPermanent = canApprove
+
+  // Resolved/rejected/deleted cases are removed from the map (the first two still appear in the table).
   const mapCases = filtered
-    .filter((c) => c.status !== "resolved" && c.status !== "rejected")
+    .filter((c) => !c.deletedAt && c.status !== "resolved" && c.status !== "rejected")
     .map((c) => ({
       _id: c._id,
       diseaseName: c.diseaseName,
@@ -269,7 +308,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
               {t("epidemic.casesOnMap")} {filtered.length > 0 && <span className="text-xs font-normal text-gray-400">({filtered.length})</span>}
             </CardTitle>
             <div className="flex flex-wrap gap-1.5">
-              {STATUS_FILTERS.map((s) => (
+              {statusFilters.map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
@@ -280,6 +319,7 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                   }`}
                 >
                   {t(`epidemic.status.${s}`)}
+                  {s === DELETED_FILTER && deletedCases.length > 0 && ` (${deletedCases.length})`}
                 </button>
               ))}
             </div>
@@ -361,10 +401,33 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                     <Badge variant="outline" className={EPIDEMIC_STATUS_STYLES[c.status] || ""}>
                       <span className="capitalize">{t(`epidemic.status.${c.status}`)}</span>
                     </Badge>
+                    {c.deletedAt && (
+                      <span className="block text-xs text-gray-400 mt-1">
+                        {t("epidemic.deletedByOn")
+                          .replace("{name}", c.deletedByName || "—")
+                          .replace("{date}", new Date(c.deletedAt).toLocaleDateString())}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs text-gray-500">{new Date(c.reportedAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
+                    {c.deletedAt ? (
+                      // Only admins are sent deleted cases: bring it back, or remove it for good.
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-green-700 border-green-200 hover:bg-green-50" disabled={actionId === c._id} onClick={() => restoreCase(c)}>
+                          <RotateCcw className="h-3.5 w-3.5 mr-1" /> {t("epidemic.restore")}
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50" disabled={actionId === c._id} onClick={() => setDeleteId(c._id)}>
+                          <Trash2 className="h-3.5 w-3.5 mr-1" /> {t("epidemic.deletePermanently")}
+                        </Button>
+                      </div>
+                    ) : (
                     <div className="flex items-center justify-end gap-1 flex-wrap">
+                      {canApprove && c.status === "confirmed" && (
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-amber-700 border-amber-200 hover:bg-amber-50" disabled={actionId === c._id} onClick={() => updateStatus(c, "pending")}>
+                          <RotateCcw className="h-3.5 w-3.5 mr-1" /> {t("epidemic.moveToPending")}
+                        </Button>
+                      )}
                       {canApprove && c.status !== "confirmed" && (
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50" disabled={actionId === c._id} onClick={() => updateStatus(c, "confirmed")}>
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t("epidemic.confirm")}
@@ -380,16 +443,21 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
                           <XCircle className="h-3.5 w-3.5 mr-1" /> {t("epidemic.reject")}
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 w-7 p-0 text-red-500 border-red-200 hover:bg-red-50"
-                        disabled={actionId === c._id}
-                        onClick={() => setDeleteId(c._id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {/* Farmers and vets can delete only the cases they reported. */}
+                      {c.canDelete && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-red-500 border-red-200 hover:bg-red-50"
+                          disabled={actionId === c._id}
+                          onClick={() => setDeleteId(c._id)}
+                          aria-label={t("common.delete")}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -470,14 +538,14 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
               {t("epidemic.deleteThisCase")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("epidemic.thisWillPermanentlyRemoveTheCase")}
+              {deleteIsPermanent ? t("epidemic.thisWillPermanentlyRemoveTheCase") : t("epidemic.softDeleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionId === deleteId}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction className="bg-red-600 hover:bg-red-700" disabled={actionId === deleteId} onClick={handleDelete}>
               {actionId === deleteId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              {t("common.delete")}
+              {deleteIsPermanent && deleteTarget?.deletedAt ? t("epidemic.deletePermanently") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -515,9 +583,43 @@ export default function EpidemicManagement({ role, farmerId, farmerName }: Epide
               {selectedCase.affectedCount > 0 && <p>{selectedCase.affectedCount} animal(s) affected</p>}
               {selectedCase.symptoms && <p className="text-gray-500">Symptoms: {selectedCase.symptoms}</p>}
               <p className="text-xs text-gray-400">{new Date(selectedCase.reportedAt).toLocaleString()}</p>
+              {selectedCase.deletedAt && (
+                <p className="text-xs font-medium text-red-600">
+                  {t("epidemic.deletedByOn")
+                    .replace("{name}", selectedCase.deletedByName || "—")
+                    .replace("{date}", new Date(selectedCase.deletedAt).toLocaleDateString())}
+                </p>
+              )}
             </div>
+            {canApprove && selectedCase.deletedAt && (
+              <div className="mt-3 flex items-center gap-2">
+                <Button size="sm" variant="outline" className="h-8 text-xs text-green-700 border-green-200 hover:bg-green-50" disabled={actionId === selectedCase._id} onClick={() => restoreCase(selectedCase)}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> {t("epidemic.restore")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                  disabled={actionId === selectedCase._id}
+                  // The panel sits above dialogs, so step it aside for the confirmation.
+                  onClick={() => {
+                    setDeleteId(selectedCase._id)
+                    setSelectedCase(null)
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> {t("epidemic.deletePermanently")}
+                </Button>
+              </div>
+            )}
+            {canApprove && !selectedCase.deletedAt && selectedCase.status === "confirmed" && (
+              <div className="mt-3 flex items-center gap-2">
+                <Button size="sm" variant="outline" className="h-8 text-xs text-amber-700 border-amber-200 hover:bg-amber-50" disabled={actionId === selectedCase._id} onClick={() => updateStatus(selectedCase, "pending")}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> {t("epidemic.moveToPending")}
+                </Button>
+              </div>
+            )}
             {/* A report opened from an admin alert is usually one to review - decide it here. */}
-            {canApprove && selectedCase.status === "pending" && (
+            {canApprove && !selectedCase.deletedAt && selectedCase.status === "pending" && (
               <div className="mt-3 flex items-center gap-2">
                 <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50" disabled={actionId === selectedCase._id} onClick={() => updateStatus(selectedCase, "confirmed")}>
                   <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> {t("epidemic.confirm")}

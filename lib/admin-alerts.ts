@@ -235,7 +235,7 @@ function exactly(text: string) {
  * After a disease case is reported: if this makes OUTBREAK_MIN_CASES or more of the same
  * disease in the same district within OUTBREAK_WINDOW_DAYS, tell every admin - once per
  * disease and district per window. Unreviewed reports count too, since this is the early
- * warning; rejected ones don't.
+ * warning; rejected and deleted ones don't.
  *
  * Never throws: a failed check must not fail the report.
  */
@@ -255,6 +255,7 @@ export async function checkForOutbreak(
       district: exactly(district),
       status: { $in: ["pending", "confirmed", "resolved"] },
       seeded: { $ne: true },
+      deletedAt: null,
       reportedAt: { $gte: since },
     })
     if (count < OUTBREAK_MIN_CASES) return

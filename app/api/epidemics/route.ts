@@ -49,7 +49,22 @@ async function alertCaseToReview(db: Db, doc: any, reporterName: string | null |
   })
 }
 
-function toClientCase(doc: any): EpidemicCase {
+/**
+ * Who reported a case. Cases from before reportedById was kept fall back to farmerId,
+ * which was the reporter whenever they filed for themselves.
+ */
+function reporterId(doc: any): string | null {
+  if (doc.reportedById) return String(doc.reportedById)
+  return doc.farmerId ? String(doc.farmerId) : null
+}
+
+/**
+ * A farmer or vet deleting a case only hides it (deletedAt): an admin can still see it
+ * and restore it, or remove it for good. Everyone else's queries leave these out.
+ */
+const NOT_DELETED = { deletedAt: null }
+
+function toClientCase(doc: any, viewer: { _id: string; role: string }): EpidemicCase {
   return {
     _id: doc._id.toString(),
     farmerId: doc.farmerId,
@@ -73,6 +88,9 @@ function toClientCase(doc: any): EpidemicCase {
     reportedAt: new Date(doc.reportedAt || doc.createdAt).toISOString(),
     createdAt: new Date(doc.createdAt).toISOString(),
     updatedAt: new Date(doc.updatedAt || doc.createdAt).toISOString(),
+    canDelete: canApprove(viewer.role) || (!doc.deletedAt && reporterId(doc) === viewer._id),
+    deletedAt: doc.deletedAt ? new Date(doc.deletedAt).toISOString() : null,
+    deletedByName: doc.deletedByName || null,
   }
 }
 
@@ -111,9 +129,11 @@ export async function GET(req: NextRequest) {
     if (statusFilter && EPIDEMIC_STATUSES.includes(statusFilter as any)) {
       query.status = statusFilter
     }
+    // Deleted cases are for admins to restore or remove; nobody else sees them.
+    if (!canApprove(currentUser.role)) Object.assign(query, NOT_DELETED)
 
     const records = await db.collection("epidemic_cases").find(query).sort({ reportedAt: -1, createdAt: -1 }).toArray()
-    return NextResponse.json(records.map(toClientCase))
+    return NextResponse.json(records.map((doc) => toClientCase(doc, currentUser)))
   } catch (error) {
     console.error("Error fetching epidemic cases:", error)
     return NextResponse.json({ error: "Failed to fetch epidemic cases" }, { status: 500 })
@@ -178,6 +198,10 @@ export async function POST(req: NextRequest) {
     const record = {
       farmerId: targetFarmerId,
       farmerName: targetFarmerName || currentUser.name || null,
+      // Who filed it - a vet reporting for a farmer is the reporter, and only the
+      // reporter (or an admin) may delete it.
+      reportedById: currentUser._id,
+      reportedByRole: currentUser.role,
       animalId: animalId || null,
       animalName: animalName || null,
       animalType: animalType || null,
@@ -242,8 +266,10 @@ export async function PUT(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Case not found" }, { status: 404 })
     const existing = await db.collection("epidemic_cases").findOne({ _id: new ObjectId(id) })
-    if (!existing) return NextResponse.json({ error: "Case not found" }, { status: 404 })
+    // A deleted case is changed only by restoring it first (PATCH).
+    if (!existing || existing.deletedAt) return NextResponse.json({ error: "Case not found" }, { status: 404 })
 
     const staff = isStaff(currentUser.role)
     if (!staff && existing.farmerId !== currentUser._id) {
@@ -279,8 +305,15 @@ export async function PUT(req: NextRequest) {
     // Recording who confirmed/resolved/rejected keeps an audit trail.
     if (canApprove(currentUser.role) && EPIDEMIC_STATUSES.includes(status)) {
       $set.status = status
-      $set.confirmedBy = currentUser.name || existing.confirmedBy || null
-      $set.confirmedAt = new Date()
+      if (status === "pending") {
+        // Moved back to waiting for review (e.g. a report published before reviews
+        // existed): nobody has confirmed it now. The activity log keeps who did this.
+        $set.confirmedBy = null
+        $set.confirmedAt = null
+      } else {
+        $set.confirmedBy = currentUser.name || existing.confirmedBy || null
+        $set.confirmedAt = new Date()
+      }
     }
 
     // What an admin confirmed is what the public map shows. If anyone else changes any of
@@ -317,22 +350,80 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "Case ID required" }, { status: 400 })
+    if (!ObjectId.isValid(id)) return NextResponse.json({ error: "Case not found" }, { status: 404 })
 
     const client = await clientPromise
     const db = client.db(DB)
+    const cases = db.collection("epidemic_cases")
 
-    const existing = await db.collection("epidemic_cases").findOne({ _id: new ObjectId(id) })
+    const existing = await cases.findOne({ _id: new ObjectId(id) })
     if (!existing) return NextResponse.json({ error: "Case not found" }, { status: 404 })
 
-    if (!isStaff(currentUser.role) && existing.farmerId !== currentUser._id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    // Admins remove a case for good - a live one, or one a farmer or vet deleted.
+    if (canApprove(currentUser.role)) {
+      await cases.deleteOne({ _id: existing._id })
+      await logActivity(currentUser._id, "epidemic.case_deleted", `${existing.diseaseName || id} (permanently)`)
+      return NextResponse.json({ success: true, permanent: true })
     }
 
-    await db.collection("epidemic_cases").deleteOne({ _id: new ObjectId(id) })
-    await logActivity(currentUser._id, "epidemic.case_deleted", id)
-    return NextResponse.json({ success: true })
+    // Farmers and vets may delete only the reports they filed, and only hide them.
+    if (existing.deletedAt) return NextResponse.json({ error: "Case not found" }, { status: 404 })
+    if (reporterId(existing) !== currentUser._id) {
+      return NextResponse.json({ error: "You can only delete cases you reported" }, { status: 403 })
+    }
+
+    await cases.updateOne(
+      { _id: existing._id, deletedAt: null },
+      {
+        $set: {
+          deletedAt: new Date(),
+          deletedById: currentUser._id,
+          deletedByName: currentUser.name || null,
+          deletedByRole: currentUser.role,
+        },
+      }
+    )
+    await logActivity(currentUser._id, "epidemic.case_deleted", existing.diseaseName || id)
+    return NextResponse.json({ success: true, permanent: false })
   } catch (error) {
     console.error("Error deleting epidemic case:", error)
     return NextResponse.json({ error: "Failed to delete epidemic case" }, { status: 500 })
+  }
+}
+
+// PATCH { id, action: "restore" }: an admin brings back a case a farmer or vet deleted,
+// with the status it had - a confirmed case goes straight back on the public map.
+export async function PATCH(req: NextRequest) {
+  try {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    if (!canApprove(currentUser.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const { id, action } = await req.json()
+    if (action !== "restore") return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    if (typeof id !== "string" || !ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Case not found" }, { status: 404 })
+    }
+
+    const client = await clientPromise
+    const db = client.db(DB)
+    const result = await db.collection("epidemic_cases").findOneAndUpdate(
+      { _id: new ObjectId(id), deletedAt: { $ne: null } },
+      {
+        $unset: { deletedAt: "", deletedById: "", deletedByName: "", deletedByRole: "" },
+        $set: { updatedAt: new Date() },
+      }
+    )
+    if (!result) return NextResponse.json({ error: "Case not found" }, { status: 404 })
+
+    await logActivity(currentUser._id, "epidemic.case_restored", result.diseaseName || id)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error restoring epidemic case:", error)
+    return NextResponse.json({ error: "Failed to restore epidemic case" }, { status: 500 })
   }
 }

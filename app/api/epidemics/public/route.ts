@@ -12,11 +12,11 @@ export async function GET() {
     const client = await clientPromise
     const db = client.db(DB)
     // Only confirmed, active outbreaks are pinned on the public map. A report still
-    // waiting for an admin (pending) stays off it, and resolved or rejected cases come
-    // off as soon as an admin changes their status.
+    // waiting for an admin (pending) stays off it, resolved or rejected cases come off
+    // as soon as an admin changes their status, and deleted ones come off at once.
     const records = await db
       .collection("epidemic_cases")
-      .find({ status: "confirmed" })
+      .find({ status: "confirmed", deletedAt: null })
       .sort({ reportedAt: -1 })
       .limit(500)
       .toArray()
