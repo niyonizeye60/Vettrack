@@ -7,7 +7,8 @@ interface LocationPoint {
   latitude: number
   longitude: number
   timestamp: string
-  bpm: number
+  /** Null when no trusted pulse goes with this position. */
+  bpm: number | null
   temperature: number | null
 }
 
@@ -136,12 +137,18 @@ export function RwandaMap({ locationPoints, animalName }: RwandaMapProps) {
                   <span class="text-gray-600">${t('farmer.time')}:</span>
                   <span class="font-medium">${new Date(point.timestamp).toLocaleString()}</span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600">${t('farmer.heartRate')}:</span>
-                  <span class="font-medium text-red-600">${point.bpm} BPM</span>
-                </div>
                 ${
-                  point.temperature
+                  point.bpm != null
+                    ? `
+                  <div class="flex justify-between">
+                    <span class="text-gray-600">${t('farmer.heartRate')}:</span>
+                    <span class="font-medium text-red-600">${point.bpm} BPM</span>
+                  </div>
+                `
+                    : ""
+                }
+                ${
+                  point.temperature != null
                     ? `
                   <div class="flex justify-between">
                     <span class="text-gray-600">${t('farmer.temperature')}:</span>
@@ -258,16 +265,18 @@ export function RwandaMap({ locationPoints, animalName }: RwandaMapProps) {
 
         {latestPoint && (
           <>
-            <div className="bg-white rounded-lg p-4 border shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="w-5 h-5 text-red-500" />
-                <h4 className="font-semibold text-gray-800">{t('farmer.currentHealth')}</h4>
+            {latestPoint.bpm != null && (
+              <div className="bg-white rounded-lg p-4 border shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-5 h-5 text-red-500" />
+                  <h4 className="font-semibold text-gray-800">{t('farmer.currentHealth')}</h4>
+                </div>
+                <p className="text-2xl font-bold text-red-600">{latestPoint.bpm} BPM</p>
+                <p className="text-sm text-gray-600">{t('farmer.heartRate')}</p>
               </div>
-              <p className="text-2xl font-bold text-red-600">{latestPoint.bpm} BPM</p>
-              <p className="text-sm text-gray-600">{t('farmer.heartRate')}</p>
-            </div>
+            )}
 
-            {latestPoint.temperature && (
+            {latestPoint.temperature != null && (
               <div className="bg-white rounded-lg p-4 border shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
@@ -280,7 +289,8 @@ export function RwandaMap({ locationPoints, animalName }: RwandaMapProps) {
                   <h4 className="font-semibold text-gray-800">{t('farmer.temperature')}</h4>
                 </div>
                 <p className="text-2xl font-bold text-orange-600">{latestPoint.temperature}°C</p>
-                <p className="text-sm text-gray-600">{t('farmer.bodyTemperature')}</p>
+                {/* The collar's infrared sensor reads the skin, not core body temperature. */}
+                <p className="text-sm text-gray-600">{t('deviceTracking.skinTemperature')}</p>
               </div>
             )}
           </>
@@ -302,11 +312,13 @@ export function RwandaMap({ locationPoints, animalName }: RwandaMapProps) {
               <span className="text-gray-600 block">{t('farmer.time')}</span>
               <span className="font-medium">{new Date(selectedPoint.timestamp).toLocaleString()}</span>
             </div>
-            <div>
-              <span className="text-gray-600 block">{t('farmer.heartRate')}</span>
-              <span className="font-medium text-red-600">{selectedPoint.bpm} BPM</span>
-            </div>
-            {selectedPoint.temperature && (
+            {selectedPoint.bpm != null && (
+              <div>
+                <span className="text-gray-600 block">{t('farmer.heartRate')}</span>
+                <span className="font-medium text-red-600">{selectedPoint.bpm} BPM</span>
+              </div>
+            )}
+            {selectedPoint.temperature != null && (
               <div>
                 <span className="text-gray-600 block">{t('farmer.temperature')}</span>
                 <span className="font-medium text-orange-600">{selectedPoint.temperature}°C</span>

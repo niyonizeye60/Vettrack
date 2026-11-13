@@ -18,6 +18,9 @@ import {
 import EpidemicRegisterDialog from "@/components/epidemics/epidemic-register-dialog"
 import TodaysSummaryCard from "./todays-summary-card"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from "recharts"
+import { BEHAVIOUR_STATE_COLORS, type BehaviourState } from "@/lib/tracking/behaviour"
+import type { TrackingDashboardData } from "@/lib/tracking/types"
+import { clockTime, stateLabel } from "@/components/tracking/format"
 
 interface FarmerDashboardContentProps {
   currentUser: { _id: string; name: string; role: string }
@@ -33,17 +36,12 @@ interface MilkTrendPoint { date: string; liters: number }
 interface PnlTrendPoint { month: string; income: number; expense: number }
 interface TrackingSummary {
   hasConfig: boolean
+  /** Newest trusted pulse from the collar, if any. */
   latestBpm: number | null
+  /** Newest skin (surface) temperature. */
   latestTemp: number | null
-  series: { time: string; bpm: number }[]
-}
-
-function getBpmStatus(bpm: number | null, t: (key: string) => string) {
-  if (bpm === null || bpm === 0) return { label: t("farmer.noData"), color: "#9CA3AF" }
-  if (bpm < 60) return { label: t("farmer.low"), color: "#3B82F6" }
-  if (bpm <= 100) return { label: t("farmer.normal"), color: "#10B981" }
-  if (bpm <= 130) return { label: t("farmer.elevated"), color: "#F59E0B" }
-  return { label: t("farmer.high"), color: "#EF4444" }
+  state: BehaviourState | null
+  series: { time: string; temp: number | null }[]
 }
 
 export default function FarmerDashboardContent({
@@ -208,36 +206,27 @@ export default function FarmerDashboardContent({
   }, [currentUser._id])
 
   useEffect(() => {
+    // The first of the farmer's collars, read from Vettrack's own tracking store.
     async function fetchTracking() {
+      const none: TrackingSummary = { hasConfig: false, latestBpm: null, latestTemp: null, state: null, series: [] }
       try {
-        const configRes = await fetch(`/api/tracking-config?role=farmer`)
-        const configData = await configRes.json()
-        const channelId = configData?.config?.channelId
+        const devicesRes = await fetch("/api/tracking/devices")
+        const devices = devicesRes.ok ? (await devicesRes.json()).devices ?? [] : []
+        if (devices.length === 0) return setTrackingSummary(none)
 
-        if (!channelId) {
-          setTrackingSummary({ hasConfig: false, latestBpm: null, latestTemp: null, series: [] })
-          return
-        }
-
-        const feedRes = await fetch(`/api/thingspeak?channelId=${channelId}&results=20`)
-        if (!feedRes.ok) {
-          setTrackingSummary({ hasConfig: true, latestBpm: null, latestTemp: null, series: [] })
-          return
-        }
-        const feedData = await feedRes.json()
-        const feeds = Array.isArray(feedData?.feeds) ? feedData.feeds : []
-        const series = feeds.map((f: any) => ({
-          time: new Date(f.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          bpm: Number.parseFloat(f.field1) || 0,
-        }))
-        const latest = feeds[feeds.length - 1]
-        const latestBpm = latest ? Number.parseFloat(latest.field1) || 0 : null
-        const latestTempRaw = latest?.field4 != null ? Number.parseFloat(latest.field4) : NaN
-        const latestTemp = !Number.isNaN(latestTempRaw) ? latestTempRaw : null
-
-        setTrackingSummary({ hasConfig: true, latestBpm, latestTemp, series })
+        const dataRes = await fetch(`/api/tracking/devices/${devices[0].id}/data?limit=20`)
+        if (!dataRes.ok) return setTrackingSummary({ ...none, hasConfig: true })
+        const data: TrackingDashboardData = await dataRes.json()
+        const skin = data.readings.find((r) => r.tempObject !== null && r.tempObject !== 0)
+        setTrackingSummary({
+          hasConfig: true,
+          latestBpm: data.pulses.find((p) => p.bpm !== null)?.bpm ?? null,
+          latestTemp: skin?.tempObject ?? null,
+          state: data.behaviour.latest?.state ?? null,
+          series: [...data.readings].reverse().map((r) => ({ time: clockTime(r.time), temp: r.tempObject === 0 ? null : r.tempObject })),
+        })
       } catch {
-        setTrackingSummary({ hasConfig: false, latestBpm: null, latestTemp: null, series: [] })
+        setTrackingSummary(none)
       }
     }
     fetchTracking()
@@ -290,7 +279,7 @@ export default function FarmerDashboardContent({
     .slice(0, 6)
 
   const today = new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })
-  const bpmStatus = getBpmStatus(trackingSummary?.latestBpm ?? null, t)
+  const trackingState = trackingSummary?.state ?? null
 
   return (
     <div className="p-4 sm:p-6 min-h-full">
@@ -759,9 +748,13 @@ export default function FarmerDashboardContent({
                   <Heart className="h-4 w-4 text-green-600" />
                   {t("farmer.liveTracking")}
                 </div>
-                {trackingSummary?.hasConfig && trackingSummary.latestBpm !== null && (
-                  <Badge variant="outline" className="text-xs" style={{ borderColor: bpmStatus.color, color: bpmStatus.color }}>
-                    {bpmStatus.label}
+                {trackingSummary?.hasConfig && trackingState && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs"
+                    style={{ borderColor: BEHAVIOUR_STATE_COLORS[trackingState], color: BEHAVIOUR_STATE_COLORS[trackingState] }}
+                  >
+                    {stateLabel(trackingState, t)}
                   </Badge>
                 )}
               </CardTitle>
@@ -785,20 +778,24 @@ export default function FarmerDashboardContent({
               ) : (
                 <div className="h-[260px] flex flex-col">
                   <div className="flex items-center gap-6 mb-2 flex-shrink-0">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {trackingSummary.latestBpm} <span className="text-sm font-normal text-gray-400">BPM</span>
-                    </p>
                     {trackingSummary.latestTemp !== null && (
                       <p className="text-2xl font-bold text-gray-900">
-                        {trackingSummary.latestTemp}° <span className="text-sm font-normal text-gray-400">C</span>
+                        {trackingSummary.latestTemp}°C <span className="text-sm font-normal text-gray-400">{t("deviceTracking.skinShort")}</span>
+                      </p>
+                    )}
+                    {trackingSummary.latestBpm !== null && (
+                      <p className="text-2xl font-bold text-gray-900">
+                        {Math.round(trackingSummary.latestBpm)} <span className="text-sm font-normal text-gray-400">BPM</span>
                       </p>
                     )}
                   </div>
                   <div className="flex-1 min-h-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trackingSummary.series}>
-                        <Tooltip formatter={(v: any) => [`${v} BPM`, ""]} labelFormatter={() => ""} />
-                        <Line type="monotone" dataKey="bpm" stroke={bpmStatus.color} strokeWidth={2} dot={false} />
+                        {/* Fit the axis to the readings; from 0 °C a 33-35 °C line would sit flat at the top. */}
+                        <YAxis hide domain={["dataMin - 1", "dataMax + 1"]} />
+                        <Tooltip formatter={(v: any) => [`${v}°C`, ""]} labelFormatter={() => ""} />
+                        <Line type="monotone" dataKey="temp" stroke="#16a34a" strokeWidth={2} dot={false} connectNulls={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>

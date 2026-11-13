@@ -7,7 +7,7 @@ Sentry.init({
   // and returns { success: false }, so an uncaught-errors-only SDK would miss nearly all of
   // them. Turning console.error into events is what surfaces those.
   integrations: [Sentry.captureConsoleIntegration({ levels: ["error"] })],
-  // Nothing we call (Mongo Atlas, Upstash, ThingSpeak, the payment providers) understands
+  // Nothing we call (Mongo Atlas, Upstash, the payment providers) understands
   // Sentry's trace headers, so don't attach them to outgoing requests.
   tracePropagationTargets: [],
 })

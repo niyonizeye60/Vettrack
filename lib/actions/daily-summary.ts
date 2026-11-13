@@ -27,9 +27,8 @@ function dateLabelFor(dateString: string) {
  * Cron sweep (app/api/cron/daily-summary/route.ts) - depends on Vercel actually
  * invoking it, which needs CRON_SECRET set in the Production environment. Kept as
  * a catch-all, but sendDailyActivitySummaryForFarmer below is the primary path:
- * it piggybacks on ordinary farmer traffic the same way the ThingSpeak temperature
- * alert does (app/api/thingspeak/route.ts), so it works even if the cron infra
- * doesn't. Both paths mark users.dailySummaryEmailSentFor so neither double-sends
+ * it piggybacks on ordinary farmer traffic instead of a schedule, so it works even
+ * if the cron infra doesn't. Both paths mark users.dailySummaryEmailSentFor so neither double-sends
  * on a day the other already handled.
  */
 export async function sendDailyActivitySummaries() {
@@ -85,9 +84,8 @@ export async function sendDailyActivitySummaries() {
 
 /**
  * The primary send path. Called from the client (useDailySummaryEmail) whenever a
- * logged-in farmer has a page open at or after the digest cutoff - exactly how the
- * ThingSpeak route emails a temperature alert off the back of an ordinary poll
- * instead of a scheduled job. Safe to call repeatedly: it no-ops before the
+ * logged-in farmer has a page open at or after the digest cutoff - an ordinary
+ * authenticated request instead of a scheduled job. Safe to call repeatedly: it no-ops before the
  * cutoff, and is idempotent per Kigali day via dailySummaryEmailSentFor so
  * multiple tabs, repeated polls, or the cron sweep can never double-send.
  */

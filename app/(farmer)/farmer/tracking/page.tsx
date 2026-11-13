@@ -1,941 +1,499 @@
 ﻿"use client"
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart } from "recharts"
-import { useEffect, useState } from "react"
-import { Activity, MapPin, Heart, RefreshCw, Thermometer, Database, Download, FileText, FileSpreadsheet, Eye, EyeOff, User } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import { DistributionChart } from "@/components/distribution-chart"
-import { RwandaMap } from "@/components/rwanda-map"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+// The farmer's collar tracking page. Data comes from Vettrack's own database: the
+// collars post readings and accelerometer bursts to /api/iot/*, and this page reads
+// them back through /api/tracking/*. (It used to proxy ThingSpeak channels.)
+import { useCallback, useEffect, useState } from "react"
+import { Eye, EyeOff, Loader2, Plus, Radio, Settings, Trash2 } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
 import { useLanguage } from "@/contexts/LanguageContext"
-import { localizeColumns } from "@/lib/export-columns"
-import { getCurrentUser } from "@/lib/actions/auth"
-import { logPortalExport } from "@/lib/actions"
 import { getCurrentUser as getAuthUser } from "@/lib/auth"
+import { TrackingDashboard } from "@/components/tracking/tracking-dashboard"
+import { TrackingActions, TrackingSkeleton, useLeafletCss } from "@/components/tracking/tracking-actions"
+import { useDeviceDashboard } from "@/components/tracking/use-device-dashboard"
+import { deviceLabel, fill, postureLabel, timeAgo } from "@/components/tracking/format"
+import type { PostureName } from "@/lib/tracking/behaviour"
+import type { TrackingDeviceSummary } from "@/lib/tracking/types"
 
-// Define our data types based on API response
-type Channel = {
-  id: number
-  name: string
-  latitude: string
-  longitude: string
-  field1: string
-  field2: string
-  field3: string
-  field4: string
-  created_at: string
-  updated_at: string
-  last_entry_id: number
+type AnimalOption = { _id: string; name: string; earTagId: string | null; kind?: string }
+
+const ERROR_KEYS: Record<string, string> = {
+  duplicate_device: "deviceTracking.errDuplicate",
+  invalid_device_id: "deviceTracking.errDeviceId",
+  invalid_api_key: "deviceTracking.errApiKey",
+  invalid_animal: "deviceTracking.errAnimal",
+  no_recent_reading: "deviceTracking.errNoRecentReading",
 }
 
-type Feed = {
-  created_at: string
-  entry_id: number
-  field1: string
-  field2: string | null
-  field3: string | null
-  field4: string | null
+const input =
+  "w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white"
+
+function KeyInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative">
+      <input
+        type={show ? "text" : "password"}
+        className={`${input} pr-12`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      <button
+        type="button"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        onClick={() => setShow(!show)}
+        aria-label={show ? "Hide" : "Show"}
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  )
 }
 
-type ApiResponse = {
-  channel: Channel
-  feeds: Feed[]
-}
-
-type FormattedData = {
-  created_at: string
-  timestamp: string
-  bpm: number
-  latitude: number | null
-  longitude: number | null
-  temperature: number | null
-  hasLocation: boolean
-  hasTemperature: boolean
-}
-
-export default function PetTrackingPage() {
+function AnimalSelect({ animals, value, onChange }: { animals: AnimalOption[]; value: string; onChange: (v: string) => void }) {
   const { t } = useLanguage()
-  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null)
-  const [data, setData] = useState<FormattedData[]>([])
-  const [loading, setLoading] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState<string>("")
-  const [refreshing, setRefreshing] = useState(false)
-  const [deviceId, setDeviceId] = useState<string>("")
-  const [apiKey, setApiKey] = useState<string>("")
-  const [results, setResults] = useState<number>(20)
-  const [configLoading, setConfigLoading] = useState(true)
-  const [showApiKey, setShowApiKey] = useState(false)
-  const [currentUser, setCurrentUser] = useState<{ name: string; email?: string; phone?: string } | null>(null)
-  const role = "farmer" // TODO: Replace with dynamic role detection if needed
+  return (
+    <select className={input} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{t("deviceTracking.noAnimalLinked")}</option>
+      {animals.map((a) => (
+        <option key={a._id} value={a._id}>
+          {a.name}
+          {a.earTagId ? ` #${a.earTagId}` : ""}
+        </option>
+      ))}
+    </select>
+  )
+}
 
-  // Fetch config and user data from API on mount
-  useEffect(() => {
-    async function fetchConfig() {
-      setConfigLoading(true)
-      try {
-        const res = await fetch(`/api/tracking-config?role=${role}`)
-        const json = await res.json()
-        if (json.config) {
-          setDeviceId(json.config.channelId || "")
-          setApiKey(json.config.apiKey || "")
-        }
-      } catch (err) {
-        // fallback to defaults if needed
-      } finally {
-        setConfigLoading(false)
-      }
+export default function FarmerTrackingPage() {
+  const { t } = useLanguage()
+  const { toast } = useToast()
+  useLeafletCss()
+
+  const [me, setMe] = useState<{ id: string; name: string } | null>(null)
+  const [devices, setDevices] = useState<TrackingDeviceSummary[]>([])
+  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [devicesError, setDevicesError] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [limitInput, setLimitInput] = useState("50")
+  const [limit, setLimit] = useState(50)
+  const [animals, setAnimals] = useState<AnimalOption[]>([])
+  const [dialog, setDialog] = useState<"add" | "settings" | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  const [calibrating, setCalibrating] = useState<PostureName | null>(null)
+
+  // form state, shared by the add and settings dialogs
+  const [formDeviceId, setFormDeviceId] = useState("")
+  const [formKey, setFormKey] = useState("")
+  const [formName, setFormName] = useState("")
+  const [formAnimalId, setFormAnimalId] = useState("")
+  const [formError, setFormError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const { data, loading, refreshing, error, lastUpdated, refresh } = useDeviceDashboard(selectedId, limit)
+  const selected = devices.find((d) => d.id === selectedId) ?? null
+
+  const apiError = useCallback(
+    (json: any) => (json?.code && ERROR_KEYS[json.code] ? t(ERROR_KEYS[json.code]) : json?.error || t("deviceTracking.errGeneric")),
+    [t]
+  )
+
+  const loadDevices = useCallback(async (preferId?: string) => {
+    setDevicesLoading(true)
+    try {
+      const res = await fetch("/api/tracking/devices", { cache: "no-store" })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      const list: TrackingDeviceSummary[] = json.devices ?? []
+      setDevices(list)
+      setDevicesError(false)
+      setSelectedId((prev) => {
+        const want = preferId ?? prev
+        return want && list.some((d) => d.id === want) ? want : list[0]?.id ?? null
+      })
+    } catch (err) {
+      console.error("Failed to load tracking devices:", err)
+      setDevicesError(true)
+    } finally {
+      setDevicesLoading(false)
     }
-
-    async function fetchUser() {
-      try {
-        const userData = await getAuthUser()
-        if (userData) {
-          // cast to any for optional fields not declared on the User type (e.g. phone)
-          const u = userData as any
-          setCurrentUser({
-            name: u.name ?? userData.name,
-            email: u.email ?? userData.email,
-            phone: u.phone ?? undefined
-          })
-        }
-      } catch (err) {
-        console.error('Failed to fetch user data:', err)
-      }
-    }
-
-    fetchConfig()
-    fetchUser()
   }, [])
 
-  // Save config to API
-  const saveConfig = async () => {
+  useEffect(() => {
+    loadDevices()
+    getAuthUser()
+      .then((u) => u && setMe({ id: u._id, name: u.name }))
+      .catch((err) => console.error("Failed to fetch user data:", err))
+  }, [loadDevices])
+
+  // The farm's animals, for linking a collar to the cow wearing it.
+  useEffect(() => {
+    if (!me) return
+    fetch(`/api/farm-animals?farmerId=${me.id}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list) => setAnimals(Array.isArray(list) ? list.filter((a: AnimalOption) => a.kind !== "calf") : []))
+      .catch(() => setAnimals([]))
+  }, [me])
+
+  const openAdd = () => {
+    setFormDeviceId("")
+    setFormKey("")
+    setFormName("")
+    setFormAnimalId("")
+    setFormError(null)
+    setDialog("add")
+  }
+
+  const openSettings = () => {
+    if (!selected) return
+    setFormName(selected.name)
+    setFormKey("")
+    setFormAnimalId(selected.animalId ?? "")
+    setFormError(null)
+    setDialog("settings")
+  }
+
+  const submitAdd = async () => {
+    setSaving(true)
+    setFormError(null)
     try {
-      await fetch("/api/tracking-config", {
+      const res = await fetch("/api/tracking/devices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelId: deviceId, apiKey, role }),
+        body: JSON.stringify({ deviceId: formDeviceId, apiKey: formKey, name: formName, animalId: formAnimalId || null }),
       })
-    } catch (err) { }
-  }
-  // Load Leaflet CSS dynamically
-  useEffect(() => {
-    const link = document.createElement("link")
-    link.rel = "stylesheet"
-    link.href = "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-    link.integrity = "sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
-    link.crossOrigin = ""
-    document.head.appendChild(link)
-
-    return () => {
-      document.head.removeChild(link)
-    }
-  }, [])
-
-  const fetchSensorData = async () => {
-    setRefreshing(true)
-    try {
-      const res = await fetch(`/api/thingspeak?channelId=${deviceId}&results=${results}`)
-
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || `HTTP error! status: ${res.status}`)
-      }
-
-      const json: ApiResponse = await res.json()
-
-      // Validate the response structure
-      if (!json.feeds || !Array.isArray(json.feeds)) {
-        console.error("Invalid API response:", json)
-        throw new Error(t("trackingReport.noDataAvailableFromSensor"))
-      }
-
-      setApiResponse(json)
-
-      // Format the data using dynamic field mapping
-      const formatted = json.feeds.map((feed: Feed) => {
-        const date = new Date(feed.created_at)
-        return {
-          created_at: date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          timestamp: date.toISOString(),
-          bpm: Number.parseFloat(feed.field1) || 0,
-          latitude: feed.field2 ? Number.parseFloat(feed.field2) : null,
-          longitude: feed.field3 ? Number.parseFloat(feed.field3) : null,
-          temperature: feed.field4 ? Number.parseFloat(feed.field4) : null,
-          hasLocation: !!feed.field2 && !!feed.field3,
-          hasTemperature: !!feed.field4,
-        }
-      })
-
-      // Sort by date
-      formatted.sort(
-        (a: FormattedData, b: FormattedData) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-      )
-
-      setData(formatted)
-      setLastUpdated(new Date().toLocaleString())
-    } catch (error) {
-      console.error("Error fetching data:", error)
-      setData([]) // Clear data on error
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) return setFormError(apiError(json))
+      setDialog(null)
+      toast({ title: t("deviceTracking.addedToast") })
+      await loadDevices(json.device?.id)
+    } catch {
+      setFormError(t("deviceTracking.errGeneric"))
     } finally {
-      setLoading(false)
-      setRefreshing(false)
+      setSaving(false)
     }
   }
 
-  useEffect(() => {
-    fetchSensorData()
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchSensorData()
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [deviceId, apiKey, results])
-
-  // Calculate stats dynamically
-  const averageBpm =
-    data.length > 0 ? Math.round(data.reduce((sum: number, item: FormattedData) => sum + item.bpm, 0) / data.length) : 0
-
-  const latestBpm = data.length > 0 ? data[data.length - 1].bpm : 0
-
-  // Temperature stats
-  const temperatureData = data.filter((item: FormattedData) => item.hasTemperature)
-  const averageTemperature =
-    temperatureData.length > 0
-      ? Math.round(
-        (temperatureData.reduce((sum: number, item: FormattedData) => sum + (item.temperature || 0), 0) /
-          temperatureData.length) *
-        10,
-      ) / 10
-      : 0
-
-  const latestTemperature = data.length > 0 ? data[data.length - 1].temperature : null
-
-  // Location data stats
-  const locationDataPoints = data.filter((item: FormattedData) => item.hasLocation).length
-  const totalDataPoints = data.length
-  const locationPercentage = totalDataPoints > 0 ? Math.round((locationDataPoints / totalDataPoints) * 100) : 0
-
-  // Dynamic status determination
-  const getBpmStatus = (bpm: number) => {
-    if (bpm === 0) return { label: t('farmer.noData'), color: "#9CA3AF" }
-    if (bpm < 60) return { label: t('farmer.low'), color: "#3B82F6" }
-    if (bpm <= 100) return { label: t('farmer.normal'), color: "#10B981" }
-    if (bpm <= 130) return { label: t('farmer.elevated'), color: "#F59E0B" }
-    return { label: t('farmer.high'), color: "#EF4444" }
-  }
-
-  const getTemperatureStatus = (temp: number | null) => {
-    if (temp === null) return { label: t('farmer.noData'), color: "#9CA3AF" }
-    if (temp < 36) return { label: t('farmer.low'), color: "#3B82F6" }
-    if (temp <= 39) return { label: t('farmer.normal'), color: "#10B981" }
-    if (temp <= 41) return { label: t('farmer.elevated'), color: "#F59E0B" }
-    return { label: t('farmer.high'), color: "#EF4444" }
-  }
-
-  const bpmStatus = getBpmStatus(latestBpm)
-  const temperatureStatus = getTemperatureStatus(latestTemperature)
-
-  // Data for pie chart - use English keys for consistent colors
-  const statusCounts = data.reduce((acc: Record<string, number>, item: FormattedData) => {
-    const bpm = item.bpm
-    let statusKey = "High"
-    if (bpm === 0) statusKey = "No Data"
-    else if (bpm < 60) statusKey = "Low"
-    else if (bpm <= 100) statusKey = "Normal"
-    else if (bpm <= 130) statusKey = "Elevated"
-
-    acc[statusKey] = (acc[statusKey] || 0) + 1
-    return acc
-  }, {})
-
-  const getStatusColor = (statusKey: string) => {
-    switch (statusKey) {
-      case "No Data": return "#9CA3AF"
-      case "Low": return "#3B82F6"
-      case "Normal": return "#10B981"
-      case "Elevated": return "#F59E0B"
-      case "High": return "#EF4444"
-      default: return "#9CA3AF"
-    }
-  }
-
-  const getTranslatedStatus = (statusKey: string) => {
-    switch (statusKey) {
-      case "No Data": return t('farmer.noData')
-      case "Low": return t('farmer.low')
-      case "Normal": return t('farmer.normal')
-      case "Elevated": return t('farmer.elevated')
-      case "High": return t('farmer.high')
-      default: return statusKey
-    }
-  }
-
-  const pieData = Object.entries(statusCounts).map(([statusKey, value]: [string, number]) => ({
-    name: getTranslatedStatus(statusKey),
-    value,
-    color: getStatusColor(statusKey),
-  }))
-
-  // Get locations for map
-  const locationPoints = data.filter((item: FormattedData) => item.hasLocation)
-
-  // Get dynamic field labels from channel
-  const getFieldLabel = (fieldKey: keyof Channel) => {
-    return apiResponse?.channel[fieldKey] || fieldKey
-  }
-
-  // Export functions
-  const exportToPDF = async () => {
+  const submitSettings = async () => {
+    if (!selected) return
+    setSaving(true)
+    setFormError(null)
     try {
-      const jsPDF = (await import('jspdf')).default
-      const doc = new jsPDF()
-
-      // Header text
-      doc.setTextColor(17, 24, 39) // gray-900
-      doc.setFontSize(18)
-      doc.setFont('helvetica', 'bold')
-      doc.text(t('farmer.animalHealthMonitoringReport'), 15, 20)
-
-      // Divider under header
-      doc.setDrawColor(226, 232, 240)
-      doc.line(15, 38, 195, 38)
-
-      // Reset text color for body
-      doc.setTextColor(55, 65, 81) // gray-700
-      doc.setFontSize(11)
-      doc.text(`${t('farmer.animal')}: ${apiResponse?.channel.name || t('farmer.unknown')}`, 20, 55)
-      doc.text(`${t('farmer.generated')}: ${new Date().toLocaleString()}`, 20, 65)
-      doc.text(`${t('farmer.genName')}: ${currentUser?.name || t("trackingReport.unknownUser")}`, 20, 75)
-      doc.text(`${t('farmer.channelId')}: ${deviceId}`, 20, 85)
-
-      // Health Summary section
-      doc.setFillColor(248, 250, 252) // slate-50
-      doc.rect(15, 95, 180, 60, 'F')
-      doc.setDrawColor(226, 232, 240) // slate-200
-      doc.rect(15, 95, 180, 60, 'S')
-
-      doc.setTextColor(22, 163, 74) // green-600
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.text(t('farmer.healthSummary'), 20, 108)
-
-      doc.setTextColor(55, 65, 81) // gray-700
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.text(`${t('farmer.latest')} ${getFieldLabel('field1')}: ${latestBpm}`, 20, 120)
-      doc.text(`${t('farmer.average')} ${getFieldLabel('field1')}: ${averageBpm}`, 20, 130)
-      doc.text(`${t('farmer.latest')} ${t('farmer.temperature')}: ${latestTemperature || 'N/A'}°C`, 20, 140)
-      doc.text(`${t('farmer.locationCoverage')}: ${locationPercentage}%`, 20, 150)
-
-      // Reserve space for the footer so it never gets clipped by a
-      // printer's non-printable bottom margin (most printers can't
-      // print all the way to the physical edge of the page).
-      const pageHeight = doc.internal.pageSize.height
-      const footerHeight = 25
-      const footerBottomMargin = 12
-      const footerTop = pageHeight - footerHeight - footerBottomMargin
-      const maxContentY = footerTop - 8
-
-      // Recent Readings section
-      doc.setTextColor(22, 163, 74) // green-600
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.text(t('farmer.recentReadings'), 20, 175)
-
-      doc.setTextColor(55, 65, 81) // gray-700
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'normal')
-
-      let yPos = 185
-      data.slice(-15).forEach((item, index) => {
-        if (yPos > maxContentY) {
-          doc.addPage()
-          yPos = 20
-        }
-        const status = getBpmStatus(item.bpm)
-        const statusColor: [number, number, number] = status.color === '#10B981' ? [16, 185, 129] :
-          status.color === '#EF4444' ? [239, 68, 68] :
-            status.color === '#F59E0B' ? [245, 158, 11] :
-              status.color === '#3B82F6' ? [59, 130, 246] : [156, 163, 175]
-
-        doc.setTextColor(...statusColor)
-        doc.text(`● `, 20, yPos)
-        doc.setTextColor(55, 65, 81)
-        doc.text(t("trackingReport.readingLine").replace("{time}", new Date(item.timestamp).toLocaleString()).replace("{bpm}", String(item.bpm)).replace("{temp}", item.temperature ? String(item.temperature) : t("trackingReport.notAvailable")), 25, yPos)
-        yPos += 8
+      const body: Record<string, unknown> = { name: formName, animalId: formAnimalId || null }
+      if (formKey.trim()) body.apiKey = formKey
+      const res = await fetch(`/api/tracking/devices/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       })
-
-      // Footer — kept footerBottomMargin (12mm) clear of the physical
-      // page edge so printers with a non-printable border don't clip it
-      doc.setFillColor(248, 250, 252) // slate-50
-      doc.rect(0, footerTop, 210, footerHeight, 'F')
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      doc.setTextColor(55, 65, 81) // gray-700
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'normal')
-
-      // Contact info
-      const contactInfo = t("trackingReport.contactVettrackSupport")
-      const emailInfo = t("trackingReport.emailLine").replace("{email}", "info@vettrack.rw")
-      const phoneInfo = t("trackingReport.phoneLine").replace("{phone}", "+250 78 072 1800")
-
-      const baseY = footerTop + 8;
-      const lineHeight = 5;
-      const centerX = pageWidth / 2;
-
-      doc.text(contactInfo, centerX, baseY, { align: 'center' });
-      doc.text(emailInfo, centerX, baseY + lineHeight, { align: 'center' });
-      doc.text(phoneInfo, centerX, baseY + lineHeight * 2, { align: 'center' });
-
-      doc.textWithLink(
-        t("trackingReport.websiteLine").replace("{site}", "www.vettrack.rw"),
-        centerX,
-        baseY + lineHeight * 3,
-        { align: 'center', url: 'https://www.vettrack.rw' }
-      );
-
-      doc.text(
-        t("pdf.rights").replace("{year}", String(new Date().getFullYear())),
-        centerX,
-        baseY + lineHeight * 4,
-        { align: 'center' }
-      );
-
-
-      doc.save(`health-report-${new Date().toISOString().split('T')[0]}.pdf`)
-      logPortalExport("Health tracking report", "PDF")
-    } catch (error) {
-      console.error('PDF export failed:', error)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) return setFormError(apiError(json))
+      setDevices((list) => list.map((d) => (d.id === json.device.id ? json.device : d)))
+      setDialog(null)
+      toast({ title: t("deviceTracking.savedToast") })
+    } catch {
+      setFormError(t("deviceTracking.errGeneric"))
+    } finally {
+      setSaving(false)
     }
   }
 
-  const exportToCSV = () => {
-    const headers = [t('farmer.timestamp'), 'BPM', t('farmer.temperature'), t('farmer.latitude'), t('farmer.longitude'), t('farmer.status')]
-    const csvData = data.map(item => [
-      new Date(item.timestamp).toLocaleString(),
-      item.bpm,
-      item.temperature || '',
-      item.latitude || '',
-      item.longitude || '',
-      getBpmStatus(item.bpm).label
-    ])
-
-    const csvContent = [headers, ...csvData]
-      .map(row => row.map(field => `"${field}"`).join(','))
-      .join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `health-data-${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-    logPortalExport("Health tracking data", "CSV")
-  }
-
-  const exportToExcel = async () => {
+  const removeDevice = async () => {
+    if (!selected) return
+    setSaving(true)
     try {
-      const XLSX = await import('xlsx')
-
-      // Animal info sheet
-      const animalInfo = {
-        [t('farmer.genName')]: currentUser?.name || t("trackingReport.unknownUser"),
-        [t('farmer.animal')]: apiResponse?.channel.name || t('farmer.unknown'),
-        [t('farmer.channelId')]: deviceId,
-        [t('farmer.reportDate')]: new Date().toLocaleString(),
-        [`${t('farmer.latest')} BPM`]: latestBpm,
-        [`${t('farmer.average')} BPM`]: averageBpm,
-        [`${t('farmer.latest')} ${t('farmer.temperature')}`]: latestTemperature || 'N/A',
-        [t('farmer.locationCoverage')]: `${locationPercentage}%`,
-        [t('farmer.totalRecords')]: data.length
-      }
-
-      // Health data sheet
-      const healthData = data.map(item => ({
-        [t('farmer.timestamp')]: new Date(item.timestamp).toLocaleString(),
-        'BPM': item.bpm,
-        [`${t('farmer.temperature')} (°C)`]: item.temperature || '',
-        [t('farmer.latitude')]: item.latitude || '',
-        [t('farmer.longitude')]: item.longitude || '',
-        [t('farmer.bpmStatus')]: getBpmStatus(item.bpm).label,
-        [t('farmer.tempStatus')]: getTemperatureStatus(item.temperature).label,
-        [t('farmer.hasLocation')]: item.hasLocation ? t('farmer.yes') : t('farmer.no')
-      }))
-
-      const wb = XLSX.utils.book_new()
-
-      // Add animal info sheet
-      const infoWs = XLSX.utils.json_to_sheet(localizeColumns([animalInfo], t))
-      XLSX.utils.book_append_sheet(wb, infoWs, t('farmer.animalInfo'))
-
-      // Add health data sheet
-      const dataWs = XLSX.utils.json_to_sheet(localizeColumns(healthData, t))
-      XLSX.utils.book_append_sheet(wb, dataWs, t('farmer.healthData'))
-
-      XLSX.writeFile(wb, `health-report-${new Date().toISOString().split('T')[0]}.xlsx`)
-      logPortalExport("Health tracking report", "Excel")
-    } catch (error) {
-      console.error('Excel export failed:', error)
+      const res = await fetch(`/api/tracking/devices/${selected.id}`, { method: "DELETE" })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiError(json))
+      setConfirmRemove(false)
+      setDialog(null)
+      toast({ title: t("deviceTracking.removedToast") })
+      setSelectedId(null)
+      await loadDevices()
+    } catch (err) {
+      toast({ title: t("deviceTracking.errGeneric"), description: err instanceof Error ? err.message : undefined, variant: "destructive" })
+    } finally {
+      setSaving(false)
     }
   }
+
+  const calibrate = async (posture: PostureName, action: "set" | "clear") => {
+    if (!selected) return
+    setCalibrating(posture)
+    try {
+      const res = await fetch(`/api/tracking/devices/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ calibrate: { posture, action } }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiError(json))
+      setDevices((list) => list.map((d) => (d.id === json.device.id ? json.device : d)))
+      toast({
+        title:
+          action === "set"
+            ? fill(t("deviceTracking.calibratedToast"), { posture: postureLabel(posture, t) })
+            : t("deviceTracking.calibrationClearedToast"),
+      })
+      refresh()
+    } catch (err) {
+      toast({
+        title: t("deviceTracking.calibrationFailed"),
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      })
+    } finally {
+      setCalibrating(null)
+    }
+  }
+
+  const applyLimit = () => {
+    const n = Math.min(500, Math.max(1, Number.parseInt(limitInput, 10) || 50))
+    setLimitInput(String(n))
+    setLimit(n)
+  }
+
+  const label = selected ? deviceLabel(selected) : t("farmer.cowHealthMonitor")
+  // The device list is updated straight after a calibration; the dashboard catches up on its next fetch.
+  const shown = data && selected ? { ...data, device: selected } : data
 
   return (
     <div className="space-y-6">
       <div className="mx-auto max-w-7xl">
-        {/* Header Section */}
-        <div className="mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="space-y-1">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {apiResponse?.channel.name || t('farmer.cowHealthMonitor')}
-                </h1>
-                <p className="text-sm text-gray-500 mt-0.5">{t('farmer.realTimeTracking')}</p>
-              </div>
-              {apiResponse && (
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Database className="w-4 h-4" />
-                  <span>
-                    {t('farmer.channel')} #{apiResponse.channel.id} • {apiResponse.channel.last_entry_id} {t('farmer.totalEntries')}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">{t('farmer.lastUpdated')}:</span> {lastUpdated}
-              </div>
-              <div className="flex gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
-                      <Download className="w-4 h-4" />
-                      <span className="font-medium">{t('farmer.exportReport')}</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => exportToPDF()}>
-                      <FileText className="mr-2 h-4 w-4" />
-                      {t('farmer.exportAsPDF')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => exportToCSV()}>
-                      <FileSpreadsheet className="mr-2 h-4 w-4" />
-                      {t('farmer.exportAsCSV')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => exportToExcel()}>
-                      <FileSpreadsheet className="mr-2 h-4 w-4" />
-                      {t('farmer.exportAsExcel')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <button
-                  className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200 print:hidden"
-                  onClick={fetchSensorData}
-                  disabled={refreshing}
-                >
-                  <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-                  <span className="font-medium">{t('farmer.refresh')}</span>
-                </button>
-              </div>
-            </div>
+        {/* Header */}
+        <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{label}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{t("farmer.realTimeTracking")}</p>
           </div>
+          {selected && (
+            <TrackingActions
+              data={data}
+              meta={{
+                animalLabel: label,
+                generatedBy: me?.name || t("trackingReport.unknownUser"),
+                fileSlug: selected.deviceId.toLowerCase(),
+              }}
+              lastUpdated={lastUpdated}
+              refreshing={refreshing}
+              onRefresh={refresh}
+            />
+          )}
         </div>
 
-        {/* Configuration Panel */}
-        <div className="border border-gray-200 shadow-sm rounded-lg p-6 mb-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">{t('farmer.dataSourceConfig')}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">{t('farmer.channelId')}</label>
-              <input
-                type="text"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                value={deviceId}
-                onChange={(e) => setDeviceId(e.target.value)}
-                onBlur={saveConfig}
-                placeholder={t("tracking.thingspeakChannelId")}
-                disabled={configLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">{t('farmer.apiKey')}</label>
-              <div className="relative">
-                <input
-                  type={showApiKey ? "text" : "password"}
-                  className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  onBlur={saveConfig}
-                  placeholder={t("tracking.thingspeakApiKeySecured")}
-                  disabled={configLoading}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">{t('farmer.resultsCount')}</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
-                  value={results}
-                  onChange={(e) => setResults(Number.parseInt(e.target.value) || 20)}
-                  min="1"
-                  max="8000"
-                />
-                <button
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-                  onClick={fetchSensorData}
-                >
-                  {t('farmer.fetch')}
-                </button>
-              </div>
-            </div>
+        {devicesLoading && devices.length === 0 ? (
+          <TrackingSkeleton />
+        ) : devicesError && devices.length === 0 ? (
+          <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center bg-white">
+            <p className="text-gray-600 mb-6">{t("deviceTracking.errGeneric")}</p>
+            <button onClick={() => loadDevices()} className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">
+              {t("farmer.tryAgain")}
+            </button>
           </div>
-        </div>
-
-        {loading ? (
-          <div className="space-y-8 animate-pulse">
-            <div className="border border-gray-200 shadow-sm rounded-lg p-6">
-              <div className="h-4 bg-gray-200 rounded w-40 mb-4" />
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-gray-200 rounded-lg" />)}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="border border-gray-200 shadow-sm rounded-lg p-6 space-y-4">
-                  <div className="h-10 w-10 bg-gray-200 rounded-xl" />
-                  <div className="h-3 bg-gray-200 rounded w-24" />
-                  <div className="h-7 bg-gray-200 rounded w-16" />
-                </div>
-              ))}
-            </div>
-            <div className="h-72 bg-gray-200 rounded-lg" />
-          </div>
-        ) : data.length === 0 ? (
-          <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center">
+        ) : devices.length === 0 ? (
+          <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center bg-white">
             <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-full bg-green-50">
-              <Database className="w-6 h-6 text-green-600" />
+              <Radio className="w-6 h-6 text-green-600" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">{t('farmer.noDataAvailable')}</h3>
-            <p className="text-gray-600 mb-6">
-              {t('farmer.noSensorData')}
-            </p>
-            <button
-              onClick={fetchSensorData}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-            >
-              {t('farmer.tryAgain')}
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">{t("deviceTracking.connectTitle")}</h3>
+            <p className="text-gray-600 mb-6 max-w-xl mx-auto">{t("deviceTracking.connectDesc")}</p>
+            <button onClick={openAdd} className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">
+              <Plus className="w-4 h-4" /> {t("deviceTracking.addDevice")}
             </button>
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* Field Information */}
-            {apiResponse && (
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
-                <h2 className="text-base font-semibold text-gray-900 mb-4">{t('farmer.dataFieldsMapping')}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="flex items-center gap-3 p-4 bg-red-50 rounded-lg border border-red-100">
-                    <Heart className="w-6 h-6 text-red-500" />
-                    <div>
-                      <p className="font-semibold text-red-800">{t('farmer.field')} 1</p>
-                      <p className="text-sm text-red-600">{getFieldLabel("field1")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                    <MapPin className="w-6 h-6 text-blue-500" />
-                    <div>
-                      <p className="font-semibold text-blue-800">{t('farmer.field')} 2</p>
-                      <p className="text-sm text-blue-600">{getFieldLabel("field2")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
-                    <MapPin className="w-6 h-6 text-green-500" />
-                    <div>
-                      <p className="font-semibold text-green-800">{t('farmer.field')} 3</p>
-                      <p className="text-sm text-green-600">{getFieldLabel("field3")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-orange-50 rounded-lg border border-orange-100">
-                    <Thermometer className="w-6 h-6 text-orange-500" />
-                    <div>
-                      <p className="font-semibold text-orange-800">{t('farmer.field')} 4</p>
-                      <p className="text-sm text-orange-600">{getFieldLabel("field4")}</p>
-                    </div>
+          <>
+            {/* Device bar */}
+            <div className="border border-gray-200 shadow-sm rounded-lg p-6 mb-6 bg-white">
+              <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-6 items-end">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.collar")}</label>
+                  <select className={input} value={selectedId ?? ""} onChange={(e) => setSelectedId(e.target.value)}>
+                    {devices.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {deviceLabel(d)} · {d.deviceId}
+                      </option>
+                    ))}
+                  </select>
+                  {selected && (
+                    <p className="text-xs text-gray-500">
+                      {selected.lastSeenAt
+                        ? fill(t("deviceTracking.lastSeen"), { when: timeAgo(selected.lastSeenAt, t) })
+                        : t("deviceTracking.neverSeen")}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.readingsToShow")}</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      className={`${input} flex-1 min-w-0`}
+                      value={limitInput}
+                      onChange={(e) => setLimitInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && applyLimit()}
+                      min={1}
+                      max={500}
+                    />
+                    <button className="px-5 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium" onClick={applyLimit}>
+                      {t("farmer.fetch")}
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-red-50 rounded-xl">
-                    <Heart className="w-6 h-6 text-red-500" />
-                  </div>
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${bpmStatus.color === "#10B981"
-                      ? "bg-green-100 text-green-800"
-                      : bpmStatus.color === "#EF4444"
-                        ? "bg-red-100 text-red-800"
-                        : bpmStatus.color === "#F59E0B"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : bpmStatus.color === "#3B82F6"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                      }`}
+                <div className="flex gap-2">
+                  <button
+                    onClick={openSettings}
+                    className="inline-flex items-center gap-2 px-4 py-3 border border-gray-200 rounded-lg hover:border-green-600 hover:text-green-700"
                   >
-                    {bpmStatus.label}
-                  </span>
-                </div>
-                <h3 className="text-sm font-medium text-gray-600 mb-1">{t('farmer.latest')} {getFieldLabel("field1")}</h3>
-                <p className="text-3xl font-bold text-gray-900">{latestBpm}</p>
-              </div>
-
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-orange-50 rounded-xl">
-                    <Thermometer className="w-6 h-6 text-orange-500" />
-                  </div>
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full ${temperatureStatus.color === "#10B981"
-                      ? "bg-green-100 text-green-800"
-                      : temperatureStatus.color === "#EF4444"
-                        ? "bg-red-100 text-red-800"
-                        : temperatureStatus.color === "#F59E0B"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : temperatureStatus.color === "#3B82F6"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                      }`}
-                  >
-                    {temperatureStatus.label}
-                  </span>
-                </div>
-                <h3 className="text-sm font-medium text-gray-600 mb-1">{getFieldLabel("field4")}</h3>
-                <p className="text-3xl font-bold text-gray-900">
-                  {latestTemperature !== null ? `${latestTemperature}°C` : "N/A"}
-                </p>
-              </div>
-
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-purple-50 rounded-xl">
-                    <Activity className="w-6 h-6 text-purple-500" />
-                  </div>
-                </div>
-                <h3 className="text-sm font-medium text-gray-600 mb-1">{t('farmer.average')} {getFieldLabel("field1")}</h3>
-                <p className="text-3xl font-bold text-gray-900">{averageBpm}</p>
-              </div>
-
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-3 bg-sky-50 rounded-xl">
-                    <MapPin className="w-6 h-6 text-sky-500" />
-                  </div>
-                </div>
-                <h3 className="text-sm font-medium text-gray-600 mb-1">{t('farmer.locationCoverage')}</h3>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-gray-900">{locationPercentage}%</p>
-                  <span className="text-sm text-gray-500">
-                    ({locationDataPoints}/{totalDataPoints})
-                  </span>
+                    <Settings className="w-4 h-4" /> {t("deviceTracking.settings")}
+                  </button>
+                  <button onClick={openAdd} className="inline-flex items-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg">
+                    <Plus className="w-4 h-4" /> {t("deviceTracking.addDevice")}
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
-                <h2 className="text-base font-semibold text-gray-900 mb-4">{t('farmer.healthMetricsTrend')}
-                </h2>
-                <ResponsiveContainer width="100%" height={320}>
-                  <ComposedChart data={data}>
-                    <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
-                    <XAxis dataKey="created_at" tick={{ fontSize: 12 }} tickMargin={10} />
-                    <YAxis
-                      yAxisId="left"
-                      label={{
-                        value: getFieldLabel("field1"),
-                        angle: -90,
-                        position: "insideLeft",
-                        style: { textAnchor: "middle" },
-                      }}
-                      domain={[0, "auto"]}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      label={{
-                        value: `${getFieldLabel("field4")} (°C)`,
-                        angle: 90,
-                        position: "insideRight",
-                        style: { textAnchor: "middle" },
-                      }}
-                      domain={[20, 45]}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "rgba(255, 255, 255, 0.95)",
-                        borderRadius: "12px",
-                        border: "1px solid #e5e7eb",
-                        backdropFilter: "blur(8px)",
-                      }}
-                      labelStyle={{ fontWeight: "bold", marginBottom: "5px" }}
-                    />
-                    <Legend />
-                    <Area
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="bpm"
-                      stroke="#8b5cf6"
-                      fill="#8b5cf6"
-                      fillOpacity={0.2}
-                      name={`${getFieldLabel("field1")}`}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="temperature"
-                      stroke="#f59e0b"
-                      strokeWidth={3}
-                      dot={{ fill: "#f59e0b", strokeWidth: 2, r: 4 }}
-                      name={`${getFieldLabel("field4")} (°C)`}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+            {loading && !data ? (
+              <TrackingSkeleton />
+            ) : error && !data ? (
+              <div className="border border-gray-200 shadow-sm rounded-lg p-12 text-center bg-white">
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">{t("farmer.noDataAvailable")}</h3>
+                <p className="text-gray-600 mb-6">{error}</p>
+                <button onClick={refresh} className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium">
+                  {t("farmer.tryAgain")}
+                </button>
               </div>
-
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
-                <h2 className="text-base font-semibold text-gray-900 mb-4">{getFieldLabel("field1")} {t('farmer.distribution')}
-                </h2>
-                <DistributionChart pieData={pieData} data={data} />
-              </div>
-            </div>
-
-            {/* Rwanda Map */}
-            {locationDataPoints > 0 && (
-              <div className="border border-gray-200 shadow-sm rounded-lg p-6">
-                <h2 className="text-base font-semibold text-gray-900 mb-4">🇷🇼 {apiResponse?.channel.name} {t('farmer.locationTrackingInRwanda')}
-                </h2>
-                <RwandaMap
-                  locationPoints={locationPoints.map((point) => ({
-                    latitude: point.latitude!,
-                    longitude: point.longitude!,
-                    timestamp: point.timestamp,
-                    bpm: point.bpm,
-                    temperature: point.temperature,
-                  }))}
-                  animalName={apiResponse?.channel.name || t("trackingReport.pet")}
-                />
-              </div>
-            )}
-
-            {/* Data Table */}
-            <div className="border border-gray-200 shadow-sm rounded-lg p-6">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">{t('farmer.recentReadings')}
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">{t('farmer.time')}</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                        {getFieldLabel("field1")}
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                        {getFieldLabel("field4")}
-                      </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">{t('farmer.status')}</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                        {t('farmer.location')} ({getFieldLabel("field2")}, {getFieldLabel("field3")})
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data
-                      .slice()
-                      .reverse()
-                      .slice(0, 15)
-                      .map((item, index) => {
-                        const bpmStatus = getBpmStatus(item.bpm)
-                        const tempStatus = getTemperatureStatus(item.temperature)
-                        return (
-                          <tr key={index} className="hover:bg-gray-50/50 transition-colors duration-150">
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {new Date(item.timestamp).toLocaleString()}
-                            </td>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.bpm}</td>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                              {item.temperature !== null ? `${item.temperature}°C` : "N/A"}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col gap-1">
-                                <span
-                                  className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${bpmStatus.color === "#10B981"
-                                    ? "bg-green-100 text-green-800"
-                                    : bpmStatus.color === "#EF4444"
-                                      ? "bg-red-100 text-red-800"
-                                      : bpmStatus.color === "#F59E0B"
-                                        ? "bg-yellow-100 text-yellow-800"
-                                        : bpmStatus.color === "#3B82F6"
-                                          ? "bg-blue-100 text-blue-800"
-                                          : "bg-gray-100 text-gray-800"
-                                    }`}
-                                >
-                                  {getFieldLabel("field1")}: {bpmStatus.label}
-                                </span>
-                                {item.hasTemperature && (
-                                  <span
-                                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${tempStatus.color === "#10B981"
-                                      ? "bg-green-100 text-green-800"
-                                      : tempStatus.color === "#EF4444"
-                                        ? "bg-red-100 text-red-800"
-                                        : tempStatus.color === "#F59E0B"
-                                          ? "bg-yellow-100 text-yellow-800"
-                                          : tempStatus.color === "#3B82F6"
-                                            ? "bg-blue-100 text-blue-800"
-                                            : "bg-gray-100 text-gray-800"
-                                      }`}
-                                  >
-                                    {getFieldLabel("field4")}: {tempStatus.label}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {item.hasLocation ? (
-                                <span className="text-green-600 font-medium">
-                                  {item.latitude?.toFixed(6)}, {item.longitude?.toFixed(6)}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">{t('farmer.noLocationData')}</span>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+            ) : shown ? (
+              <TrackingDashboard data={shown} animalLabel={label} calibration={{ onCalibrate: calibrate, busy: calibrating }} />
+            ) : null}
+          </>
         )}
       </div>
+
+      {/* Add device */}
+      <Dialog open={dialog === "add"} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("deviceTracking.addDevice")}</DialogTitle>
+            <DialogDescription>{t("deviceTracking.addDesc")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.deviceId")}</label>
+              <input className={input} value={formDeviceId} onChange={(e) => setFormDeviceId(e.target.value)} placeholder="COW-001" autoComplete="off" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.deviceKey")}</label>
+              <KeyInput value={formKey} onChange={setFormKey} placeholder={t("deviceTracking.deviceKeyPlaceholder")} />
+              <p className="text-xs text-gray-500">{t("deviceTracking.deviceKeyHint")}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.nameOptional")}</label>
+              <input className={input} value={formName} onChange={(e) => setFormName(e.target.value)} maxLength={100} />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.animalOptional")}</label>
+              <AnimalSelect animals={animals} value={formAnimalId} onChange={setFormAnimalId} />
+            </div>
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
+          </div>
+          <DialogFooter>
+            <button className="px-4 py-2 border border-gray-200 rounded-lg" onClick={() => setDialog(null)} disabled={saving}>
+              {t("deviceTracking.cancel")}
+            </button>
+            <button
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+              onClick={submitAdd}
+              disabled={saving || !formDeviceId.trim() || !formKey.trim()}
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />} {t("deviceTracking.addDevice")}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Device settings */}
+      <Dialog open={dialog === "settings"} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("deviceTracking.settings")}</DialogTitle>
+            <DialogDescription>
+              {t("deviceTracking.deviceId")}: <span className="font-mono">{selected?.deviceId}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.name")}</label>
+              <input className={input} value={formName} onChange={(e) => setFormName(e.target.value)} maxLength={100} />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.animalOptional")}</label>
+              <AnimalSelect animals={animals} value={formAnimalId} onChange={setFormAnimalId} />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">{t("deviceTracking.newDeviceKey")}</label>
+              <KeyInput value={formKey} onChange={setFormKey} placeholder={t("deviceTracking.keepCurrentKey")} />
+            </div>
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
+          </div>
+          <DialogFooter className="sm:justify-between gap-2">
+            <button
+              className="inline-flex items-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+              onClick={() => setConfirmRemove(true)}
+              disabled={saving}
+            >
+              <Trash2 className="w-4 h-4" /> {t("deviceTracking.removeDevice")}
+            </button>
+            <div className="flex gap-2">
+              <button className="px-4 py-2 border border-gray-200 rounded-lg" onClick={() => setDialog(null)} disabled={saving}>
+                {t("deviceTracking.cancel")}
+              </button>
+              <button
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50"
+                onClick={submitSettings}
+                disabled={saving}
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />} {t("deviceTracking.save")}
+              </button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("deviceTracking.removeTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("deviceTracking.removeDesc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>{t("deviceTracking.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={(e) => {
+                e.preventDefault()
+                removeDevice()
+              }}
+              disabled={saving}
+            >
+              {t("deviceTracking.removeDevice")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

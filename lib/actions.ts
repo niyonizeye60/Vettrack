@@ -1194,11 +1194,9 @@ export async function deleteConsultation(id: string) {
     return { success: false, error: "Failed to delete consultation" };
   }
 }
-// getUserConfig/saveUserConfig lived here and read/wrote a `userConfigs` collection.
-// They were superseded by app/api/tracking-config, which stores the same ThingSpeak
-// device settings in `trackingConfigs` keyed on userId + role and is what the four
-// live tracking routes actually call. Nothing referenced the pair and nothing else
-// touched `userConfigs`, so they were removed rather than repaired.
+// getUserConfig/saveUserConfig lived here and read/wrote a `userConfigs` collection of
+// ThingSpeak settings. Tracking no longer uses ThingSpeak: collars are registered in
+// `tracking_devices` and post their data to /api/iot/* (see lib/tracking/store.ts).
 
 // Logs a client-generated export (PDF/Excel/CSV built in-browser, no server round-trip
 // for the file itself) against whoever the session cookie says is currently logged in -

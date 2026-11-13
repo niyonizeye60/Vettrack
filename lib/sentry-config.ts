@@ -4,8 +4,8 @@ import type { Breadcrumb, Event } from "@sentry/nextjs"
 // three Sentry.init calls cannot drift apart. With no DSN (local dev, or a deploy that hasn't
 // set NEXT_PUBLIC_SENTRY_DSN) the SDK stays off.
 
-// What must never reach a third party: reset/verify links carry a live ?token=, the ThingSpeak
-// proxy puts each farmer's device api_key in an outgoing URL, and request bodies, cookies and
+// What must never reach a third party: reset/verify links carry a live ?token=, tracking collars
+// send their api_key in the request body (/api/iot/*), and request bodies, cookies and
 // console output can hold chat text or payment details. So the query string and fragment are cut
 // from every URL or path found in an event, and bodies, cookies and console breadcrumbs are dropped.
 //

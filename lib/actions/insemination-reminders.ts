@@ -103,8 +103,7 @@ export async function sendInseminationReminders() {
 
 /**
  * Session-triggered counterpart, called from useInseminationReminders on every
- * farmer page load - mirrors the ThingSpeak temperature alert
- * (app/api/thingspeak/route.ts) and the daily-summary digest
+ * farmer page load - mirrors the daily-summary digest
  * (sendDailyActivitySummaryForFarmer in lib/actions/daily-summary.ts): a normal
  * authenticated request checks the condition and sends if due, instead of relying
  * on Vercel Cron to fire at all. No time-of-day gate is needed here, unlike the

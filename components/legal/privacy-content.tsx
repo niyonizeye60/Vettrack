@@ -69,8 +69,7 @@ export default function PrivacyContent() {
               We do not sell your personal information. We share it only as needed to operate the platform:
               with the veterinarian or farmer involved in a consultation you initiate, with sellers you choose to
               contact through a marketplace listing, and with service providers that support our operations (such
-              as our email delivery provider and, if you configure a tracking device, ThingSpeak as the IoT data
-              provider). We may also disclose information if required by law.
+              as our email delivery provider). We may also disclose information if required by law.
             </p>
           </section>
 

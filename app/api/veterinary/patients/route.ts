@@ -4,9 +4,10 @@ import { getCurrentUser } from "@/lib/auth"
 import { getConsultations } from "@/lib/actions"
 import clientPromise from "@/lib/db"
 import { ObjectId } from "mongodb"
+import { DEVICES } from "@/lib/tracking/store"
 
 // Returns the vet's patients (farmers they have consultations with), flagging
-// which ones have a tracking channel configured so the client can guide the vet.
+// which ones have a tracking collar registered so the client can guide the vet.
 export async function GET() {
   try {
     const currentUser = await getCurrentUser()
@@ -23,24 +24,17 @@ export async function GET() {
       patientMap.set(c.farmerId, { id: c.farmerId, name: c.fullName, phone: c.phoneNumber })
     }
 
-    const farmerObjectIds = [...patientMap.keys()]
-      .filter((id) => ObjectId.isValid(id))
-      .map((id) => new ObjectId(id))
+    const farmerIds = [...patientMap.keys()].filter((id) => ObjectId.isValid(id))
 
-    // Which of those farmers have actually set up a tracking channel?
+    // Which of those farmers have a tracking collar registered?
     const configured = new Set<string>()
-    if (farmerObjectIds.length > 0) {
+    if (farmerIds.length > 0) {
       const client = await clientPromise
       const db = client.db("ntdm_animal_hospital")
-      const configs = await db.collection("trackingConfigs")
-        .find({
-          userId: { $in: farmerObjectIds },
-          role: "farmer",
-          channelId: { $nin: [null, ""] },
-        })
-        .project({ userId: 1 })
-        .toArray()
-      configs.forEach((cfg) => configured.add(cfg.userId.toString()))
+      const farmerIdsWithDevices = await db
+        .collection(DEVICES)
+        .distinct("farmerId", { farmerId: { $in: farmerIds }, status: "active" })
+      farmerIdsWithDevices.forEach((id) => configured.add(String(id)))
     }
 
     const patients = [...patientMap.values()]
