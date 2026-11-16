@@ -29,6 +29,7 @@ type AnimalOption = { _id: string; name: string; earTagId: string | null; kind?:
 
 const ERROR_KEYS: Record<string, string> = {
   duplicate_device: "deviceTracking.errDuplicate",
+  duplicate_own_device: "deviceTracking.errDuplicateOwn",
   invalid_device_id: "deviceTracking.errDeviceId",
   invalid_api_key: "deviceTracking.errApiKey",
   invalid_animal: "deviceTracking.errAnimal",

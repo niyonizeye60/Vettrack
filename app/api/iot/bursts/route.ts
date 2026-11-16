@@ -4,7 +4,7 @@ import { hrProcessPayload } from "@/lib/tracking/heart-rate"
 import {
   BURSTS,
   DEVICES,
-  authenticateDevice,
+  authenticateDevices,
   ensureTrackingIndexes,
   getTrackingDb,
   type BurstDoc,
@@ -24,6 +24,7 @@ import {
 // The heart rate is estimated on arrival (lib/tracking/heart-rate.ts, the port of
 // hr_process.php). The raw samples are stored too: the behaviour estimates on the
 // tracking page are computed from them, and they let real cow data be studied later.
+// When test accounts have the collar too, each registration gets its own copy.
 
 export async function POST(request: NextRequest) {
   let data: Record<string, unknown>
@@ -37,17 +38,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const device = await authenticateDevice(data.device_id, data.api_key)
-    if (!device) return NextResponse.json({ error: "Invalid device_id or api_key" }, { status: 401 })
+    const devices = await authenticateDevices(data.device_id, data.api_key)
+    if (devices.length === 0) return NextResponse.json({ error: "Invalid device_id or api_key" }, { status: 401 })
 
     const res = hrProcessPayload(data)
     if ("error" in res) return NextResponse.json({ error: res.error }, { status: 400 })
     const a = res.analysis
 
     await ensureTrackingIndexes()
-    const doc: BurstDoc = {
-      deviceRef: device._id,
-      farmerId: device.farmerId,
+    const doc: Omit<BurstDoc, "deviceRef" | "farmerId"> = {
       receivedAt: new Date(),
       sampleRateHz: res.fs,
       scalePerG: res.scale,
@@ -65,8 +64,12 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getTrackingDb()
-    await db.collection<BurstDoc>(BURSTS).insertOne(doc)
-    await db.collection(DEVICES).updateOne({ _id: device._id }, { $set: { lastSeenAt: doc.receivedAt } })
+    await db
+      .collection<BurstDoc>(BURSTS)
+      .insertMany(devices.map((d) => ({ ...doc, deviceRef: d._id, farmerId: d.farmerId })))
+    await db
+      .collection(DEVICES)
+      .updateMany({ _id: { $in: devices.map((d) => d._id) } }, { $set: { lastSeenAt: doc.receivedAt } })
 
     return NextResponse.json(
       {

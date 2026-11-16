@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   DEVICES,
   READINGS,
-  authenticateDevice,
+  authenticateDevices,
   ensureTrackingIndexes,
   getTrackingDb,
   toNumber,
@@ -22,7 +22,8 @@ import {
 //   "gps": "fix" | "nofix" | "nocmd"                         // optional
 // }
 // There is no session: the device_id + api_key pair registered by the farmer is the
-// proof. Missing fields are stored as null.
+// proof. Missing fields are stored as null. When test accounts have the collar too,
+// each registration gets its own copy of the reading.
 
 const KNOWN_FIELDS = new Set([
   "device_id", "api_key", "temp_object", "temp_ambient", "accel_x", "accel_y", "accel_z",
@@ -46,8 +47,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const device = await authenticateDevice(data.device_id, data.api_key)
-    if (!device) return NextResponse.json({ error: "Invalid device_id or api_key" }, { status: 401 })
+    const devices = await authenticateDevices(data.device_id, data.api_key)
+    if (devices.length === 0) return NextResponse.json({ error: "Invalid device_id or api_key" }, { status: 401 })
     await ensureTrackingIndexes()
 
     // Anything else the firmware sent, minus the key. Kept small: it is for debugging.
@@ -59,9 +60,7 @@ export async function POST(request: NextRequest) {
     const latitude = inRange(toNumber(data.latitude), -90, 90)
     const longitude = inRange(toNumber(data.longitude), -180, 180)
     const hasPosition = latitude !== null && longitude !== null
-    const doc: ReadingDoc = {
-      deviceRef: device._id,
-      farmerId: device.farmerId,
+    const reading: Omit<ReadingDoc, "deviceRef" | "farmerId"> = {
       receivedAt: new Date(),
       tempObject: toNumber(data.temp_object),
       tempAmbient: toNumber(data.temp_ambient),
@@ -78,8 +77,12 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getTrackingDb()
-    await db.collection<ReadingDoc>(READINGS).insertOne(doc)
-    await db.collection(DEVICES).updateOne({ _id: device._id }, { $set: { lastSeenAt: doc.receivedAt } })
+    await db
+      .collection<ReadingDoc>(READINGS)
+      .insertMany(devices.map((d) => ({ ...reading, deviceRef: d._id, farmerId: d.farmerId })))
+    await db
+      .collection(DEVICES)
+      .updateMany({ _id: { $in: devices.map((d) => d._id) } }, { $set: { lastSeenAt: reading.receivedAt } })
 
     return NextResponse.json({ status: "ok", message: "Reading recorded" }, { status: 201 })
   } catch (error) {

@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from "next/server"
-import { READINGS, authenticateDevice, getTrackingDb, type ReadingDoc } from "@/lib/tracking/store"
+import { READINGS, authenticateDevices, getTrackingDb, type ReadingDoc } from "@/lib/tracking/store"
 
 // For whoever is setting up a collar: "did my readings arrive?" without logging in.
 // The replacement for latest.php. Unlike latest.php the key goes in a header, not
@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const device = await authenticateDevice(deviceId, apiKey)
+    // The oldest registration has every reading the newer ones (test accounts) have.
+    const [device] = await authenticateDevices(deviceId, apiKey)
     if (!device) return NextResponse.json({ error: "Invalid device_id or api_key" }, { status: 401 })
 
     const db = await getTrackingDb()

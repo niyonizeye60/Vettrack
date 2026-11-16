@@ -11,6 +11,7 @@ import {
   findFarmAnimal,
   getTrackingDb,
   hashApiKey,
+  includesRealAccount,
   normalizeDeviceId,
   resolveTrackingAccess,
   serializeDevices,
@@ -91,21 +92,50 @@ export async function POST(req: NextRequest) {
     }
 
     const db = await getTrackingDb()
-    const duplicate = { error: "This device is already registered", code: "duplicate_device" }
-    // The unique index is the real guard (it also covers two requests racing); this
-    // read keeps the answer right even if the index could not be created.
-    if (await db.collection(DEVICES).findOne({ deviceIdKey: doc.deviceIdKey, status: "active" }, { projection: { _id: 1 } })) {
-      return NextResponse.json(duplicate, { status: 409 })
+    const devices = db.collection<TrackingDeviceDoc>(DEVICES)
+    const duplicate = () =>
+      NextResponse.json({ error: "This device is already registered", code: "duplicate_device" }, { status: 409 })
+    const duplicateOwn = () =>
+      NextResponse.json({ error: "You have already added this device", code: "duplicate_own_device" }, { status: 409 })
+
+    // One real farm per collar. Accounts marked for testing neither block nor are
+    // blocked (see lib/tracking/store.ts), so a collar can be tried out on a test
+    // account before, or while, a farm has it.
+    const isTestAccount = user.isTestAccount === true
+    const holders = await devices
+      .find({ deviceIdKey: doc.deviceIdKey, status: "active" }, { projection: { farmerId: 1 } })
+      .toArray()
+    if (holders.some((d) => d.farmerId === user._id)) return duplicateOwn()
+    if (!isTestAccount && (await includesRealAccount(holders.map((d) => d.farmerId)))) return duplicate()
+
+    const inserted = await db.collection(DEVICES).insertOne(doc).catch((error) => {
+      if (error?.code !== 11000) throw error
+      // The per-account index: the same account adding the collar twice at once. Any
+      // other unique index here is the old one-account-per-collar index, still in
+      // place because ensureTrackingIndexes could not drop it.
+      return error.keyPattern?.farmerId ? "own" : "other"
+    })
+    if (inserted === "own") return duplicateOwn()
+    if (inserted === "other") return duplicate()
+    const { insertedId } = inserted
+    if (!isTestAccount) {
+      // Two real farms adding the same collar at the same moment both pass the check
+      // above. The earlier registration keeps the collar and the later one is undone.
+      const earlier = await devices
+        .find(
+          { deviceIdKey: doc.deviceIdKey, status: "active", _id: { $lt: insertedId }, farmerId: { $ne: user._id } },
+          { projection: { farmerId: 1 } }
+        )
+        .toArray()
+      if (await includesRealAccount(earlier.map((d) => d.farmerId))) {
+        await devices.deleteOne({ _id: insertedId })
+        return duplicate()
+      }
     }
-    try {
-      const { insertedId } = await db.collection(DEVICES).insertOne(doc)
-      await logActivity(user._id, "account.tracking_device_added", `Device: ${deviceId}`)
-      const [device] = await serializeDevices([{ ...doc, _id: insertedId }])
-      return NextResponse.json({ device }, { status: 201 })
-    } catch (error: any) {
-      if (error?.code === 11000) return NextResponse.json(duplicate, { status: 409 })
-      throw error
-    }
+
+    await logActivity(user._id, "account.tracking_device_added", `Device: ${deviceId}`)
+    const [device] = await serializeDevices([{ ...doc, _id: insertedId }])
+    return NextResponse.json({ device }, { status: 201 })
   } catch (error) {
     console.error("Tracking devices POST error:", error)
     return NextResponse.json({ error: "Failed to add device" }, { status: 500 })

@@ -5,6 +5,11 @@
 // Every reading and burst is tied to the *registration* (deviceRef), not just the
 // collar's ID: if a collar is removed and later registered by another farmer, the new
 // owner starts with an empty history instead of inheriting the previous farm's data.
+//
+// A collar belongs to one real farm at a time. Accounts a superadmin has marked for
+// testing (users.isTestAccount) are outside that rule: they can register a collar
+// another account already has, and their registrations don't stop a real farm from
+// adding it. Every registration of the collar whose key matches gets its data.
 import { createHash, timingSafeEqual } from "crypto"
 import { ObjectId, type Db } from "mongodb"
 import clientPromise, { withDbRetry } from "@/lib/db"
@@ -87,8 +92,9 @@ export async function getTrackingDb(): Promise<Db> {
 
 /**
  * Ensured once per warm process - createIndex is a no-op after the first call. The
- * unique index is what actually stops one collar being registered to two farms at
- * once; it is partial so a removed registration doesn't block re-registering.
+ * unique index stops one account holding two registrations of the same collar; it is
+ * partial so a removed registration doesn't block re-registering. Which accounts may
+ * share a collar depends on users.isTestAccount, so the devices route checks that.
  */
 let indexesEnsured: Promise<void> | null = null
 export function ensureTrackingIndexes(): Promise<void> {
@@ -96,9 +102,17 @@ export function ensureTrackingIndexes(): Promise<void> {
     indexesEnsured = (async () => {
       const db = await getTrackingDb()
       await db.collection(DEVICES).createIndex(
-        { deviceIdKey: 1 },
-        { unique: true, partialFilterExpression: { status: "active" }, name: "active_device_unique" }
+        { deviceIdKey: 1, farmerId: 1 },
+        { unique: true, partialFilterExpression: { status: "active" }, name: "active_device_per_account_unique" }
       )
+      // The first version allowed one active registration per collar across all
+      // accounts, which leaves no room for test accounts.
+      await db
+        .collection(DEVICES)
+        .dropIndex("active_device_unique")
+        .catch((error) => {
+          if (error?.code !== 27) throw error // IndexNotFound: already gone
+        })
       await db.collection(DEVICES).createIndex({ farmerId: 1, status: 1 })
       await db.collection(READINGS).createIndex({ deviceRef: 1, receivedAt: -1 })
       await db.collection(BURSTS).createIndex({ deviceRef: 1, receivedAt: -1 })
@@ -139,18 +153,38 @@ function keyMatches(apiKey: string, hash: string): boolean {
 }
 
 /**
- * The active registration for a collar whose api_key matches, or null. Used by the
- * endpoints the collars post to - there is no session there, the key is the proof.
+ * The collar's active registrations whose api_key matches, oldest first; empty when
+ * there are none. Normally one, more when test accounts have the collar too. Used by
+ * the endpoints the collars post to - there is no session there, the key is the proof.
  */
-export async function authenticateDevice(rawDeviceId: unknown, rawApiKey: unknown): Promise<TrackingDeviceDoc | null> {
+export async function authenticateDevices(rawDeviceId: unknown, rawApiKey: unknown): Promise<TrackingDeviceDoc[]> {
   const deviceId = normalizeDeviceId(rawDeviceId)
-  if (!deviceId || typeof rawApiKey !== "string" || !rawApiKey || rawApiKey.length > API_KEY_MAX_LENGTH) return null
+  if (!deviceId || typeof rawApiKey !== "string" || !rawApiKey || rawApiKey.length > API_KEY_MAX_LENGTH) return []
   const db = await getTrackingDb()
-  const device = await withDbRetry(() =>
-    db.collection<TrackingDeviceDoc>(DEVICES).findOne({ deviceIdKey: deviceIdKey(deviceId), status: "active" })
+  const devices = await withDbRetry(() =>
+    db
+      .collection<TrackingDeviceDoc>(DEVICES)
+      .find({ deviceIdKey: deviceIdKey(deviceId), status: "active" })
+      .sort({ createdAt: 1, _id: 1 })
+      .toArray()
   )
-  if (!device || !keyMatches(rawApiKey, device.apiKeyHash)) return null
-  return device
+  return devices.filter((d) => keyMatches(rawApiKey, d.apiKeyHash))
+}
+
+/**
+ * Whether any of these accounts is a real one, i.e. not marked for testing. An ID
+ * with no matching user counts as real, so a registration left by a deleted account
+ * keeps blocking as it did before test accounts could share collars.
+ */
+export async function includesRealAccount(farmerIds: string[]): Promise<boolean> {
+  const ids = [...new Set(farmerIds)]
+  if (ids.length === 0) return false
+  if (!ids.every((id) => ObjectId.isValid(id))) return true
+  const db = await getTrackingDb()
+  const testAccounts = await withDbRetry(() =>
+    db.collection("users").countDocuments({ _id: { $in: ids.map((id) => new ObjectId(id)) }, isTestAccount: true })
+  )
+  return testAccounts < ids.length
 }
 
 /** Finite number from a JSON number or numeric string, else null. */
