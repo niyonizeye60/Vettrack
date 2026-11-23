@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Bell, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets } from "lucide-react"
+import { Bell, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets, Mars, Venus } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeError } from "@/lib/error-messages"
 import { useToast } from "@/hooks/use-toast"
@@ -38,6 +38,8 @@ interface AnimalsCounts {
   all: number
   lactating: number
   dry: number
+  male: number
+  female: number
 }
 
 interface AnimalsData {
@@ -188,6 +190,9 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
 
   const deletePregnancy = deleteAnimalTarget ? getPregnancy(deleteAnimalTarget._id) : null
 
+  // Older animals were registered before gender was asked for.
+  const undefinedGenderCount = Math.max(0, data.counts.all - data.counts.male - data.counts.female)
+
   const handleToggleLactation = async (animal: any) => {
     const next = animal.lactationStatus === "lactating" ? "dry" : "lactating"
     setTogglingId(animal._id)
@@ -219,6 +224,23 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
           <p className="text-gray-500 text-sm mt-0.5">
             {t('farmer.registeredAnimals')}: <span className="font-semibold">{data.counts.all}</span>
           </p>
+          {data.counts.all > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-2" aria-label={t('farmer.gender')}>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-800">
+                <Mars className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('farmer.male')}: <span className="font-semibold">{data.counts.male}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-pink-200 bg-pink-50 px-2.5 py-0.5 text-xs font-medium text-pink-800">
+                <Venus className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('farmer.female')}: <span className="font-semibold">{data.counts.female}</span>
+              </span>
+              {undefinedGenderCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+                  {t('farmer.undefined')}: <span className="font-semibold">{undefinedGenderCount}</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <Button size="sm" onClick={() => setAddOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
           <Plus className="h-4 w-4 mr-1.5" />

@@ -13,7 +13,7 @@ import {
   PlusCircle, Calendar, FileText, Activity,
   MilkIcon as Cow, CheckCircle, XCircle, AlertCircle, ArrowRight, FileBarChart,
   ShieldAlert, Baby, Bell, MessageSquare, LifeBuoy, Droplets, Heart, Eye,
-  MapPin, AlertTriangle,
+  MapPin, AlertTriangle, Mars, Venus,
 } from "lucide-react"
 import EpidemicRegisterDialog from "@/components/epidemics/epidemic-register-dialog"
 import TodaysSummaryCard from "./todays-summary-card"
@@ -246,8 +246,13 @@ export default function FarmerDashboardContent({
     fetchCalfCount()
   }, [currentUser._id])
 
-  const totalAnimals = animals.filter((a) => a.status !== "Deceased").length
+  const livingAnimals = animals.filter((a) => a.status !== "Deceased")
+  const totalAnimals = livingAnimals.length
   const healthyAnimals = animals.filter((a) => a.status === "Healthy").length
+  // Counted from the same living animals as the total, so the three add up to it.
+  const maleCount = livingAnimals.filter((a) => a.gender === "male").length
+  const femaleCount = livingAnimals.filter((a) => a.gender === "female").length
+  const undefinedGenderCount = totalAnimals - maleCount - femaleCount
   const cows = animals.filter((a) => (a.type || "").toLowerCase() === "cow" && a.gender === "female")
   const lactatingCowCount = cows.filter((a) => a.lactationStatus === "lactating").length
   const dryCowCount = cows.filter((a) => a.lactationStatus !== "lactating").length
@@ -309,6 +314,21 @@ export default function FarmerDashboardContent({
               <p className="text-xs text-gray-400 mt-1">
                 {totalAnimals > 0 ? `${healthyAnimals} ${t("farmer.healthyAnimals")}` : t("farmer.registered")}
               </p>
+              {totalAnimals > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium" aria-label={t("farmer.gender")}>
+                  <span className="inline-flex items-center gap-1 text-sky-700">
+                    <Mars className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t("farmer.male")}: {maleCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-pink-700">
+                    <Venus className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t("farmer.female")}: {femaleCount}
+                  </span>
+                  {undefinedGenderCount > 0 && (
+                    <span className="text-gray-500">{t("farmer.undefined")}: {undefinedGenderCount}</span>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -673,7 +673,7 @@ export async function getAnimals(
 ): Promise<{
   animals: any[]
   pagination: { page: number; pageSize: number; total: number; totalPages: number }
-  counts: { all: number; lactating: number; dry: number }
+  counts: { all: number; lactating: number; dry: number; male: number; female: number }
 }>
 export async function getAnimals(
   ownerId?: string,
@@ -684,7 +684,7 @@ export async function getAnimals(
     ? {
         animals: [],
         pagination: { page: options?.page || 1, pageSize: options?.limit || 10, total: 0, totalPages: 1 },
-        counts: { all: 0, lactating: 0, dry: 0 },
+        counts: { all: 0, lactating: 0, dry: 0, male: 0, female: 0 },
       }
     : []
 
@@ -733,12 +733,15 @@ export async function getAnimals(
     }
     const finalQuery = andClauses.length > 1 ? { $and: andClauses } : andClauses[0]
 
-    const [total, animals, allCount, lactatingCount, dryCount] = await Promise.all([
+    // Like the tab counts, the gender counts cover the whole herd and ignore the tab and search.
+    const [total, animals, allCount, lactatingCount, dryCount, maleCount, femaleCount] = await Promise.all([
       db.collection("animals").countDocuments(finalQuery),
       db.collection("animals").find(finalQuery).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
       db.collection("animals").countDocuments(baseQuery),
       db.collection("animals").countDocuments({ $and: [baseQuery, lactatingFilter] }),
       db.collection("animals").countDocuments({ $and: [baseQuery, dryFilter] }),
+      db.collection("animals").countDocuments({ $and: [baseQuery, { gender: "male" }] }),
+      db.collection("animals").countDocuments({ $and: [baseQuery, { gender: "female" }] }),
     ])
 
     console.log(`Found ${animals.length} animals (page ${page} of ${Math.max(1, Math.ceil(total / limit))})`);
@@ -746,7 +749,7 @@ export async function getAnimals(
     return {
       animals: animals.map(mapAnimalDoc),
       pagination: { page, pageSize: limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
-      counts: { all: allCount, lactating: lactatingCount, dry: dryCount },
+      counts: { all: allCount, lactating: lactatingCount, dry: dryCount, male: maleCount, female: femaleCount },
     }
   } catch (error) {
     console.error("Error fetching animals:", error)
