@@ -11,6 +11,7 @@ import { errorMessage, localizeError } from "@/lib/error-messages"
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
 import { useSaveOffline } from "@/hooks/use-save-offline"
+import { useToast } from "@/hooks/use-toast"
 import { ageInMonths, isReadyToGraduate, CALF_GRADUATION_AGE_MONTHS } from "@/lib/calf-age"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Combobox } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search, ChevronLeft, ChevronRight, Download } from "lucide-react"
+import { Baby, Plus, Pencil, Trash2, History, Scale, Milk, Receipt, TrendingUp, ArrowUpCircle, CheckCircle2, Search, ChevronLeft, ChevronRight, Download, Wheat } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { CalfReportDialog, type CalfReportColumn } from "@/components/livestock/calf-report-dialog"
@@ -44,6 +45,8 @@ interface WeightRecord {
 interface CalfExpense {
   _id: string; farmerId: string; calfId: string; calfName: string | null
   expenseType: "milk" | "feed" | "veterinary" | "other"; milkLiters: number | null
+  /** The feeding session - feed expenses only. Feed recorded before sessions existed has none. */
+  session?: FeedSession | null
   /** Water the calf drank and what it cost - only recorded on feed expenses. `amount` already includes waterCost. */
   waterLiters?: number | null; waterCost?: number | null
   description: string | null; amount: number; date: string; notes: string | null
@@ -60,6 +63,16 @@ interface CalvesManagerProps {
 
 const STATUSES = ["active", "weaned", "sold", "deceased"] as const
 const EXPENSE_TYPES = ["milk", "feed", "veterinary", "other"] as const
+// The same two sessions as Milk Production; app/api/calf-expenses allows one feed record per calf per session a day.
+const FEED_SESSIONS = ["Morning", "Evening"] as const
+type FeedSession = (typeof FEED_SESSIONS)[number]
+const isFeedSession = (value: string): value is FeedSession => (FEED_SESSIONS as readonly string[]).includes(value)
+/** The usual feed for a session, kept in this browser like the Milk Production session defaults. */
+interface FeedSessionDefaults { description: string; amount: string; waterLiters: string; waterCost: string }
+const emptyFeedDefaults: FeedSessionDefaults = { description: "", amount: "", waterLiters: "", waterCost: "" }
+const noFeedDefaults: Record<FeedSession, FeedSessionDefaults> = { Morning: emptyFeedDefaults, Evening: emptyFeedDefaults }
+const feedDefaultsKey = (farmerId: string) => `vettrack_calf_feed_sessions_${farmerId}`
+const hasFeedDefaults = (d: FeedSessionDefaults | undefined) => !!d && Object.values(d).some(v => v !== "")
 const today = new Date().toISOString().split("T")[0]
 const PAGE_SIZE = 10
 
@@ -125,6 +138,7 @@ function animalStatusText(status: string | undefined, t: (k: string) => string) 
  */
 export default function CalvesManager({ farmerId, can, showHeader = true }: CalvesManagerProps) {
   const { t, language } = useLanguage()
+  const { toast } = useToast()
   const delegate = can.isDelegate
   const expenseTypes: readonly string[] = delegate ? [DELEGATE_CALF_EXPENSE_TYPE] : EXPENSE_TYPES
   const defaultExpenseType = expenseTypes[0]
@@ -210,6 +224,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null)
   const [expCalfId, setExpCalfId] = useState("")
   const [expenseType, setExpenseType] = useState(defaultExpenseType)
+  const [expSession, setExpSession] = useState("")
   const [milkLiters, setMilkLiters] = useState("")
   const [waterLiters, setWaterLiters] = useState("")
   const [waterCost, setWaterCost] = useState("")
@@ -220,6 +235,21 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
   const [expErrors, setExpErrors] = useState<Record<string, string>>({})
   const [filterExpCalf, setFilterExpCalf] = useState("")
   const [filterExpType, setFilterExpType] = useState("")
+  const [filterExpSession, setFilterExpSession] = useState("")
+
+  // Feed session defaults (the farmer's own: a vet never records feed)
+  const [feedDefaults, setFeedDefaults] = useState(noFeedDefaults)
+  const [feedDefaultsOpen, setFeedDefaultsOpen] = useState(false)
+  const [feedDefaultsTab, setFeedDefaultsTab] = useState<FeedSession>("Morning")
+  const [feedDefaultsDraft, setFeedDefaultsDraft] = useState(noFeedDefaults)
+
+  useEffect(() => {
+    if (delegate) return
+    try {
+      const stored = JSON.parse(localStorage.getItem(feedDefaultsKey(farmerId)) || "null")
+      if (stored?.Morning && stored?.Evening) setFeedDefaults({ Morning: { ...emptyFeedDefaults, ...stored.Morning }, Evening: { ...emptyFeedDefaults, ...stored.Evening } })
+    } catch {}
+  }, [farmerId, delegate])
 
   useEffect(() => {
     async function init() {
@@ -229,7 +259,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
           fetchWeights(farmerId),
           fetchExpenses(farmerId),
           fetchWeightsPage(farmerId, 1),
-          fetchExpensesPage(farmerId, 1, "", ""),
+          fetchExpensesPage(farmerId, 1, "", "", ""),
         ])
       } else {
         // The mothers for the calf form. A session that ended resolves undefined (see getReader).
@@ -242,7 +272,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
           fetchHomeConsumptionBalance(farmerId),
           fetchCalvesPage(farmerId, 1, ""),
           fetchWeightsPage(farmerId, 1),
-          fetchExpensesPage(farmerId, 1, "", ""),
+          fetchExpensesPage(farmerId, 1, "", "", ""),
         ])
       }
       setReady(true)
@@ -335,19 +365,20 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     }
   }
 
-  const fetchExpensesPage = async (farmerId: string, page: number, calfId: string, expType: string) => {
+  const fetchExpensesPage = async (farmerId: string, page: number, calfId: string, expType: string, session: string) => {
     const isLatest = expensesPageRequest()
     setExpensesTableLoading(true)
     try {
       const params = new URLSearchParams({ farmerId, page: String(page), limit: String(PAGE_SIZE) })
       if (calfId) params.set("calfId", calfId)
       if (expType) params.set("expenseType", expType)
+      if (session) params.set("session", session)
       const res = await fetch(`/api/calf-expenses?${params.toString()}`)
       const data = await res.json()
       if (!isLatest()) return
       const pagination: Pagination = data?.pagination || emptyPagination
       if (pagination.total > 0 && page > pagination.totalPages) {
-        await fetchExpensesPage(farmerId, pagination.totalPages, calfId, expType)
+        await fetchExpensesPage(farmerId, pagination.totalPages, calfId, expType, session)
         return
       }
       setExpensesTableRows(Array.isArray(data?.expenses) ? data.expenses : [])
@@ -387,15 +418,15 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
   useEffect(() => {
     if (isExpensesFirstRun.current || !ready) return
     setExpensePage(1)
-  }, [filterExpCalf, filterExpType])
+  }, [filterExpCalf, filterExpType, filterExpSession])
 
   useEffect(() => {
     if (!ready) return
     if (isExpensesFirstRun.current) { isExpensesFirstRun.current = false; return }
-    fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType)
+    fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType, filterExpSession)
     // ready is listed for the same reason as the calves table above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, expensePage, filterExpCalf, filterExpType])
+  }, [ready, expensePage, filterExpCalf, filterExpType, filterExpSession])
 
   const activeCalves = useMemo(() => calves.filter(c => c.status === "active"), [calves])
   const calfOptions = useMemo(() => calves.map(c => ({ value: c._id, label: c.name })), [calves])
@@ -498,7 +529,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
       fetchCalves(farmerId), fetchWeights(farmerId), fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId),
       fetchCalvesPage(farmerId, calvesPage, debouncedCalfSearch),
       fetchWeightsPage(farmerId, weightPage),
-      fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType),
+      fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType, filterExpSession),
     ]).catch(() => {})
   }
 
@@ -621,8 +652,42 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
 
   // ---- Expense CRUD ----
   const resetExpenseForm = () => {
-    setExpCalfId(""); setExpenseType(defaultExpenseType); setMilkLiters(""); setWaterLiters(""); setWaterCost(""); setDescription(""); setAmount("")
+    setExpCalfId(""); setExpenseType(defaultExpenseType); setExpSession(""); setMilkLiters(""); setWaterLiters(""); setWaterCost(""); setDescription(""); setAmount("")
     setExpDate(today); setExpNotes(""); setExpErrors({}); setEditExpense(null)
+  }
+
+  // A feed record saved before sessions existed can be edited without picking one (the API allows the same).
+  const editingSessionlessFeed = editExpense?.expenseType === "feed" && !editExpense.session
+
+  const applyFeedDefaults = (d: FeedSessionDefaults) => {
+    setDescription(d.description); setAmount(d.amount); setWaterLiters(d.waterLiters); setWaterCost(d.waterCost)
+  }
+
+  // Picking a session fills in its saved defaults, as on Milk Production - but not while
+  // editing, where the form holds what was recorded.
+  const handleSessionPick = (value: string) => {
+    setExpSession(value)
+    if (editExpense || !isFeedSession(value) || !hasFeedDefaults(feedDefaults[value])) return
+    applyFeedDefaults(feedDefaults[value])
+    toast({ title: t('farmer.sessionDefaultsApplied'), description: `${sessionLabel(value)} — ${t('farmer.sessionDefaultsAppliedDesc')}` })
+  }
+
+  const openFeedDefaults = () => {
+    setFeedDefaultsDraft(feedDefaults)
+    setFeedDefaultsTab(isFeedSession(expSession) ? expSession : "Morning")
+    setFeedDefaultsOpen(true)
+  }
+  const setFeedDefaultsField = (sess: FeedSession, field: keyof FeedSessionDefaults, value: string) => {
+    setFeedDefaultsDraft(prev => ({ ...prev, [sess]: { ...prev[sess], [field]: value } }))
+  }
+  const saveFeedDefaults = () => {
+    setFeedDefaults(feedDefaultsDraft)
+    try { localStorage.setItem(feedDefaultsKey(farmerId), JSON.stringify(feedDefaultsDraft)) } catch {}
+    // The session already picked on the form takes its new defaults straight away.
+    if (!editExpense && expenseType === "feed" && isFeedSession(expSession) && hasFeedDefaults(feedDefaultsDraft[expSession])) {
+      applyFeedDefaults(feedDefaultsDraft[expSession])
+    }
+    setFeedDefaultsOpen(false)
   }
 
   // When editing an existing milk entry, its own liters are already subtracted out of
@@ -638,6 +703,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
       if (!milkLiters || Number(milkLiters) <= 0) e.milkLiters = t("calves.enterHowManyLitersTheCalf")
       else if (Number(milkLiters) > availableHomeConsumptionForForm) e.milkLiters = t("calves.milkBalanceShort").replace("{liters}", availableHomeConsumptionForForm.toFixed(1))
     }
+    if (expenseType === "feed" && !expSession && !editingSessionlessFeed) e.expSession = t("milk.selectASession")
     if (expenseType === "feed" && waterLiters && !(Number(waterLiters) >= 0)) e.waterLiters = t("calves.enterAValidNumberOfLiters")
     if (expenseType === "feed" && waterCost && !(Number(waterCost) >= 0)) e.waterCost = t("calves.enterAValidWaterCost")
     setExpErrors(e)
@@ -649,10 +715,11 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     setSaving(true)
     const calf = calves.find(c => c._id === expCalfId)
     const wasAdd = !editExpense
-    const body = { farmerId, calfId: expCalfId, calfName: calf?.name, expenseType, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }
+    const session = expenseType === "feed" ? (expSession || null) : null
+    const body = { farmerId, calfId: expCalfId, calfName: calf?.name, expenseType, session, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }
 
     const res = await (editExpense
-      ? fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }) })
+      ? fetch("/api/calf-expenses", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editExpense._id, expenseType, session, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }) })
       : fetch("/api/calf-expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     ).catch(() => null)
 
@@ -664,7 +731,9 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
 
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: t("calves.failedToSaveExpense") }))
-      setExpErrors({ [expenseType === "milk" ? "milkLiters" : "amount"]: localizeError(error, language) || error })
+      // A 409 on feed is that session already being recorded for the calf that day.
+      const field = expenseType === "milk" ? "milkLiters" : expenseType === "feed" && res.status === 409 ? "expSession" : "amount"
+      setExpErrors({ [field]: localizeError(error, language) || error })
       setSaving(false)
       return
     }
@@ -675,11 +744,11 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     setSaving(false)
     Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId)]).catch(() => {})
     if (wasAdd && expensePage !== 1) setExpensePage(1)
-    else fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType).catch(() => {})
+    else fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType, filterExpSession).catch(() => {})
   }
 
   const handleExpenseEdit = (e: CalfExpense) => {
-    setEditExpense(e); setExpCalfId(e.calfId); setExpenseType(e.expenseType)
+    setEditExpense(e); setExpCalfId(e.calfId); setExpenseType(e.expenseType); setExpSession(e.session || "")
     setMilkLiters(e.milkLiters ? String(e.milkLiters) : ""); setWaterLiters(e.waterLiters ? String(e.waterLiters) : "")
     setWaterCost(e.waterCost ? String(e.waterCost) : ""); setDescription(e.description || "")
     // The stored amount includes the water cost - the Amount field only holds the feed part.
@@ -693,17 +762,25 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     setExpensesTableRows(prev => prev.filter(e => e._id !== id))
     const res = await fetch(`/api/calf-expenses?id=${id}`, { method: "DELETE" }).catch(() => null)
     if (!res?.ok) reportError(res)
-    Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId), fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType)]).catch(() => {})
+    Promise.all([fetchExpenses(farmerId), fetchHomeConsumptionBalance(farmerId), fetchExpensesPage(farmerId, expensePage, filterExpCalf, filterExpType, filterExpSession)]).catch(() => {})
   }
 
   const statusLabel = (s: string) => s === "active" ? t('farmer.active') : s === "weaned" ? t('farmer.weaned') : s === "sold" ? t('farmer.calfSold') : s === "graduated" ? t('farmer.graduated') : t('farmer.deceased')
   const statusColor = (s: string) => s === "active" ? "bg-green-50 text-green-700 border-green-200" : s === "weaned" ? "bg-blue-50 text-blue-700 border-blue-200" : s === "sold" ? "bg-amber-50 text-amber-700 border-amber-200" : s === "graduated" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-gray-50 text-gray-500 border-gray-200"
   const typeLabel = (ty: string) => ty === "milk" ? t('farmer.milk') : ty === "feed" ? t('farmer.feed') : ty === "veterinary" ? t('farmer.veterinary') : t('farmer.other')
   const typeColor = (ty: string) => ty === "milk" ? "bg-sky-50 text-sky-700 border-sky-200" : ty === "feed" ? "bg-orange-50 text-orange-700 border-orange-200" : ty === "veterinary" ? "bg-red-50 text-red-700 border-red-200" : "bg-gray-50 text-gray-600 border-gray-200"
+  const sessionLabel = (s: string) => s === "Morning" ? t('farmer.morning') : s === "Evening" ? t('farmer.evening') : s
+  const sessionColor = (s: string) => s === "Morning" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-indigo-50 text-indigo-700 border-indigo-200"
   const expenseDetail = (e: CalfExpense) => {
     if (e.expenseType === "milk") return e.milkLiters ? `${e.milkLiters} L` : "—"
     const water = [e.waterLiters ? `${e.waterLiters} L` : null, e.waterCost ? `RWF ${e.waterCost.toLocaleString()}` : null].filter(Boolean).join(", ")
     return [e.description, water && `${t('farmer.water')}: ${water}`].filter(Boolean).join(" · ") || "—"
+  }
+  // The table shows the session as a badge by the type; the PDF has no room for one, so it leads the details.
+  const expenseDetailWithSession = (e: CalfExpense) => {
+    const detail = expenseDetail(e)
+    if (!e.session) return detail
+    return detail === "—" ? sessionLabel(e.session) : `${sessionLabel(e.session)} · ${detail}`
   }
 
   const weightReportColumns: CalfReportColumn<WeightRecord>[] = [
@@ -713,7 +790,8 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
   // The PDF puts the milk and water details in one column, as the table does; the sheet keeps them as numbers.
   const expenseReportColumns: CalfReportColumn<CalfExpense>[] = [
     { name: "Type", excelWidth: 18, value: e => typeLabel(e.expenseType), pdf: { label: t('expenses.type'), width: 22 } },
-    { name: "Description", excelWidth: 30, value: e => e.description || "", pdf: { label: t('farmer.description'), width: 46, text: expenseDetail } },
+    { name: "Session", excelWidth: 12, value: e => e.session ? sessionLabel(e.session) : "" },
+    { name: "Description", excelWidth: 30, value: e => e.description || "", pdf: { label: t('farmer.description'), width: 46, text: expenseDetailWithSession } },
     { name: "Milk (L)", excelWidth: 10, value: e => e.milkLiters ?? "" },
     { name: "Water (L)", excelWidth: 10, value: e => e.waterLiters ?? "" },
     { name: "Water Cost (RWF)", excelWidth: 18, value: e => e.waterCost ?? "" },
@@ -721,6 +799,9 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     // Not farmer.notes: in Kinyarwanda that reads the same as the Description column's label.
     { name: "Notes", excelWidth: 40, value: e => e.notes || "", pdf: { label: t('exportColumn.Notes'), width: 35 } },
   ]
+
+  // Sessions are only on feed, which a vet never sees; the filter stays out of the way while another type is picked.
+  const showSessionFilter = !delegate && (filterExpType === "" || filterExpType === "feed")
 
   // A vet's view leaves out the two milk cards.
   const summaryGrid = cn("grid grid-cols-2 gap-3 sm:gap-4", delegate ? "lg:grid-cols-3" : "lg:grid-cols-5")
@@ -1205,10 +1286,18 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
           {(can.create || editExpense) && (
             <Card className="border border-gray-200 shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  {editExpense ? t('farmer.editExpense') : t('farmer.recordExpense')}
-                </CardTitle>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    {editExpense ? t('farmer.editExpense') : t('farmer.recordExpense')}
+                  </CardTitle>
+                  {expenseType === "feed" && calves.length > 0 && (
+                    <Button type="button" size="sm" onClick={openFeedDefaults} className="rounded-lg gap-1.5 bg-orange-500 hover:bg-orange-600 text-white">
+                      <Wheat className="h-3.5 w-3.5" />
+                      {t('farmer.routine')}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {calves.length === 0 ? (
@@ -1241,6 +1330,22 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {expenseType === "feed" && (
+                        <div className="space-y-1">
+                          <label className="text-sm font-medium text-gray-700">{t('farmer.session')}{!editingSessionlessFeed && " *"}</label>
+                          <Select value={expSession} onValueChange={handleSessionPick}>
+                            <SelectTrigger className={expErrors.expSession ? "border-red-500" : ""}>
+                              <SelectValue placeholder={t('farmer.session')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {FEED_SESSIONS.map(s => <SelectItem key={s} value={s}>{sessionLabel(s)}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          {expErrors.expSession && <p className="text-xs text-red-500">{expErrors.expSession}</p>}
+                          {!expErrors.expSession && !editExpense && <p className="text-xs text-gray-400">{t('calves.feedSessionHint')}</p>}
+                        </div>
+                      )}
 
                       {expenseType === "milk" && (
                         <div className="space-y-1">
@@ -1323,7 +1428,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 rounded-xl">
+              <div className={cn("grid grid-cols-2 gap-3 p-4 bg-gray-50 rounded-xl", showSessionFilter ? "md:grid-cols-4" : "md:grid-cols-3")}>
                 <Combobox
                   value={filterExpCalf || "all"}
                   onValueChange={v => setFilterExpCalf(v === "all" ? "" : v)}
@@ -1333,16 +1438,34 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                   emptyText={t('farmer.noCalvesMatch')}
                 />
                 {/* A vet's list only has veterinary expenses, so their filter is fixed to it. */}
-                <Select value={delegate ? DELEGATE_CALF_EXPENSE_TYPE : (filterExpType || "all")} onValueChange={v => setFilterExpType(v === "all" ? "" : v)} disabled={delegate}>
+                <Select
+                  value={delegate ? DELEGATE_CALF_EXPENSE_TYPE : (filterExpType || "all")}
+                  onValueChange={v => {
+                    const type = v === "all" ? "" : v
+                    setFilterExpType(type)
+                    // Only feed has sessions.
+                    if (type && type !== "feed") setFilterExpSession("")
+                  }}
+                  disabled={delegate}
+                >
                   <SelectTrigger><SelectValue placeholder={t('farmer.allTypes')} /></SelectTrigger>
                   <SelectContent>
                     {!delegate && <SelectItem value="all">{t('farmer.allTypes')}</SelectItem>}
                     {expenseTypes.map(ty => <SelectItem key={ty} value={ty}>{typeLabel(ty)}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {showSessionFilter && (
+                  <Select value={filterExpSession || "all"} onValueChange={v => setFilterExpSession(v === "all" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder={t('farmer.allSessions')} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('farmer.allSessions')}</SelectItem>
+                      {FEED_SESSIONS.map(s => <SelectItem key={s} value={s}>{sessionLabel(s)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-gray-500">{expensesPagination.total}</p>
-                  <Button variant="outline" onClick={() => { setFilterExpCalf(""); setFilterExpType("") }} className="rounded-lg ml-auto">{t('farmer.clearFilters')}</Button>
+                  <Button variant="outline" onClick={() => { setFilterExpCalf(""); setFilterExpType(""); setFilterExpSession("") }} className="rounded-lg ml-auto">{t('farmer.clearFilters')}</Button>
                 </div>
               </div>
 
@@ -1381,7 +1504,14 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                       <TableRow key={e._id}>
                         <TableCell className="text-sm">{e.date}</TableCell>
                         <TableCell className="font-medium">{e.calfName}</TableCell>
-                        <TableCell><Badge variant="outline" className={typeColor(e.expenseType)}>{typeLabel(e.expenseType)}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline" className={typeColor(e.expenseType)}>{typeLabel(e.expenseType)}</Badge>
+                            {e.expenseType === "feed" && e.session && (
+                              <Badge variant="outline" className={sessionColor(e.session)}>{sessionLabel(e.session)}</Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-sm text-gray-500">{expenseDetail(e)}</TableCell>
                         <TableCell className="font-semibold text-red-700">RWF {e.amount.toLocaleString()}</TableCell>
                         <TableCell>
@@ -1455,6 +1585,65 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
           </div>
         }
       />
+
+      {/* Feed session defaults */}
+      <Dialog open={feedDefaultsOpen} onOpenChange={setFeedDefaultsOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wheat className="h-5 w-5 text-orange-500" />
+              {t('farmer.routine')}
+            </DialogTitle>
+            <p className="text-sm text-gray-500">{t('calves.feedSessionDefaultsDesc')}</p>
+          </DialogHeader>
+
+          <Tabs value={feedDefaultsTab} onValueChange={v => isFeedSession(v) && setFeedDefaultsTab(v)}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <TabsList className="grid grid-cols-2 w-full max-w-xs">
+                {FEED_SESSIONS.map(sess => (
+                  <TabsTrigger key={sess} value={sess} className="gap-1.5">
+                    {sessionLabel(sess)}
+                    {hasFeedDefaults(feedDefaultsDraft[sess]) && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setFeedDefaultsDraft(prev => ({ ...prev, [feedDefaultsTab]: emptyFeedDefaults }))} className="text-gray-500 hover:text-red-600 h-8 px-2">
+                {t('common.clear')}
+              </Button>
+            </div>
+
+            {FEED_SESSIONS.map(sess => (
+              <TabsContent key={sess} value={sess} className="pt-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.expenseDescription')}</label>
+                    <Input placeholder={t("milk.eGHaySilageGrassConcentrate")} value={feedDefaultsDraft[sess].description} onChange={e => setFeedDefaultsField(sess, "description", e.target.value)} />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.foodCost')}</label>
+                    <Input type="number" min="0" placeholder="e.g. 1500" value={feedDefaultsDraft[sess].amount} onChange={e => setFeedDefaultsField(sess, "amount", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.waterIntake')}</label>
+                    <Input type="number" min="0" step="0.5" placeholder="e.g. 10" value={feedDefaultsDraft[sess].waterLiters} onChange={e => setFeedDefaultsField(sess, "waterLiters", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.waterCost')}</label>
+                    <Input type="number" min="0" step="0.01" placeholder="e.g. 200" value={feedDefaultsDraft[sess].waterCost} onChange={e => setFeedDefaultsField(sess, "waterCost", e.target.value)} />
+                  </div>
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
+
+          <div className="flex gap-3 pt-2">
+            <Button onClick={saveFeedDefaults} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
+              {t('farmer.applyRoutine')}
+            </Button>
+            <Button variant="outline" onClick={() => setFeedDefaultsOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* New / Edit Calf */}
       <Dialog open={calfFormUnlocked} onOpenChange={open => !open && resetCalfForm()}>

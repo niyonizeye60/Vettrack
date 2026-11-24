@@ -1,12 +1,13 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
-import { ObjectId } from "mongodb"
+import { ObjectId, type Db } from "mongodb"
 import { getCurrentUser } from "@/lib/auth"
 import { logActivity } from "@/lib/activity-log"
 import { resolveFarmAccess, calfBelongsToFarm, logVetAction, diffRecord, provenanceFor } from "@/lib/farm-access"
 import { DELEGATE_CALF_EXPENSE_TYPE } from "@/lib/permissions"
 import { getHomeConsumptionBalance } from "@/lib/home-consumption"
+import { errorMessage } from "@/lib/error-messages"
 
 const DB = "ntdm_animal_hospital"
 // The farmer can delegate the Expenses tab to a vet as part of the "calves" module.
@@ -33,6 +34,21 @@ function waterFields(expenseType: string, waterLiters: unknown, waterCost: unkno
   }
 }
 
+// Feed is recorded per session, as milk is: a calf can have one feed record for the
+// Morning and one for the Evening each day. Feed records saved before sessions existed
+// have none, and only those may stay without one.
+const FEED_SESSIONS = ["Morning", "Evening"]
+const isFeedSession = (value: unknown): value is string =>
+  typeof value === "string" && FEED_SESSIONS.includes(value)
+
+/** A second feed record for the same calf, day and session would count that feeding twice. */
+function findSameSessionFeed(db: Db, farmerId: string, calfId: string, date: string, session: string, exceptId?: ObjectId) {
+  return db.collection("calf_expenses").findOne(
+    { farmerId, calfId, expenseType: "feed", date, session, ...(exceptId ? { _id: { $ne: exceptId } } : {}) },
+    { projection: { _id: 1 } }
+  )
+}
+
 export async function GET(req: NextRequest) {
   try {
     const currentUser = await getCurrentUser()
@@ -44,6 +60,7 @@ export async function GET(req: NextRequest) {
     const farmerId = searchParams.get("farmerId")
     const calfId = searchParams.get("calfId")
     const expenseType = searchParams.get("expenseType")
+    const session = searchParams.get("session")
     const startDate = searchParams.get("startDate")
     const endDate = searchParams.get("endDate")
     const pageParam = searchParams.get("page")
@@ -60,6 +77,7 @@ export async function GET(req: NextRequest) {
     const query: any = { farmerId }
     if (calfId) query.calfId = calfId
     if (expenseType) query.expenseType = expenseType
+    if (isFeedSession(session)) query.session = session
     // Whatever type a vet asks for, they get the veterinary expenses only.
     if (access.via === "grant") query.expenseType = DELEGATE_CALF_EXPENSE_TYPE
     if (startDate || endDate) {
@@ -101,7 +119,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, calfId, calfName, expenseType, milkLiters, waterLiters, waterCost, description, amount, date, notes } = body
+    const { farmerId, calfId, calfName, expenseType, session, milkLiters, waterLiters, waterCost, description, amount, date, notes } = body
 
     if (!farmerId || !calfId || !expenseType || !amount || !date)
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -109,6 +127,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid expense type" }, { status: 400 })
     const waterError = validateWater(expenseType, waterLiters, waterCost)
     if (waterError) return NextResponse.json({ error: waterError }, { status: 400 })
+    const isFeed = expenseType === "feed"
+    if (isFeed && !isFeedSession(session)) {
+      return NextResponse.json({ error: errorMessage("feedSessionRequired") }, { status: 400 })
+    }
 
     const access = await resolveFarmAccess(currentUser, farmerId, MODULE, "create")
     if (!access.allowed) {
@@ -136,9 +158,14 @@ export async function POST(req: NextRequest) {
     const client = await clientPromise
     const db = client.db(DB)
 
+    if (isFeed && (await findSameSessionFeed(db, farmerId, calfId, date, session))) {
+      return NextResponse.json({ error: errorMessage("calfAlreadyFedThisSession", { calf: calfName || "This calf" }) }, { status: 409 })
+    }
+
     const water = waterFields(expenseType, waterLiters, waterCost)
     const record = {
       farmerId, calfId, calfName: calfName || null, expenseType,
+      session: isFeed ? session : null,
       milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null,
       ...water,
       description: description || null,
@@ -179,7 +206,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, expenseType, milkLiters, waterLiters, waterCost, description, amount, date, notes } = body
+    const { id, expenseType, session, milkLiters, waterLiters, waterCost, description, amount, date, notes } = body
     if (!id || !ObjectId.isValid(id)) return NextResponse.json({ error: "Expense ID required" }, { status: 400 })
     if (!["milk", "feed", "veterinary", "other"].includes(expenseType))
       return NextResponse.json({ error: "Invalid expense type" }, { status: 400 })
@@ -205,6 +232,16 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: VET_ONLY_ERROR }, { status: 403 })
     }
 
+    const isFeed = expenseType === "feed"
+    // A feed record saved before sessions existed can be edited without picking one.
+    const savedWithoutSession = existing.expenseType === "feed" && !existing.session
+    if (isFeed && !isFeedSession(session) && !(savedWithoutSession && !session)) {
+      return NextResponse.json({ error: errorMessage("feedSessionRequired") }, { status: 400 })
+    }
+    if (isFeed && isFeedSession(session) && (await findSameSessionFeed(db, existing.farmerId, existing.calfId, date, session, existing._id))) {
+      return NextResponse.json({ error: errorMessage("calfAlreadyFedThisSession", { calf: existing.calfName || "This calf" }) }, { status: 409 })
+    }
+
     if (expenseType === "milk") {
       const liters = Number(milkLiters)
       if (!milkLiters || !(liters > 0)) {
@@ -219,7 +256,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const water = waterFields(expenseType, waterLiters, waterCost)
-    const updated = { expenseType, milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null, ...water, description: description || null, amount: Number(amount) + (water.waterCost || 0), date, notes: notes || null }
+    const updated = { expenseType, session: isFeed && isFeedSession(session) ? session : null, milkLiters: expenseType === "milk" && milkLiters ? Number(milkLiters) : null, ...water, description: description || null, amount: Number(amount) + (water.waterCost || 0), date, notes: notes || null }
     await db.collection("calf_expenses").updateOne(
       { _id: new ObjectId(id) },
       { $set: { ...updated, ...provenanceFor(currentUser, "update") } }
