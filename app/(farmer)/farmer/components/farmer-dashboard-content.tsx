@@ -21,6 +21,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { BEHAVIOUR_STATE_COLORS, type BehaviourState } from "@/lib/tracking/behaviour"
 import type { TrackingDashboardData } from "@/lib/tracking/types"
 import { clockTime, stateLabel } from "@/components/tracking/format"
+import { upcomingBirths } from "@/lib/pregnancy"
 
 interface FarmerDashboardContentProps {
   currentUser: { _id: string; name: string; role: string }
@@ -107,10 +108,8 @@ export default function FarmerDashboardContent({
         try {
           const records = await inseminationRes.value.json()
           if (Array.isArray(records)) {
-            const now = new Date()
-            const future = records
-              .filter((r: any) => r.expectedBirthDate && new Date(r.expectedBirthDate) >= now)
-              .sort((a: any, b: any) => new Date(a.expectedBirthDate).getTime() - new Date(b.expectedBirthDate).getTime())
+            // Same count as the insemination page's "Expected births" card.
+            const future = upcomingBirths(records)
             setBirthStats({
               upcomingCount: future.length,
               nextDate: future[0]?.expectedBirthDate ?? null,

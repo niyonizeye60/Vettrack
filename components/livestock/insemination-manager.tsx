@@ -23,6 +23,7 @@ import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/l
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
 import { useSaveOffline } from "@/hooks/use-save-offline"
+import { upcomingBirths } from "@/lib/pregnancy"
 
 interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null; status?: string | null }
 interface Vet { _id: string; name: string; specialization: string }
@@ -185,16 +186,13 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   const [notes, setNotes] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Pregnant animal IDs — those with a future expectedBirthDate, no deliveredBabies yet,
-  // and not explicitly marked as a failed pregnancy (which frees the animal up for re-insemination)
-  const pregnantAnimalIds = useMemo(() => {
-    const now = today
-    return new Set(
-      records
-        .filter(r => r.animalId && r.expectedBirthDate && r.expectedBirthDate >= now && !r.deliveredBabies && !r.pregnancyFailed)
-        .map(r => r.animalId as string)
-    )
-  }, [records])
+  // One live pregnancy per animal (lib/pregnancy.ts). It drives the "Expected births"
+  // card and which animals the form hides, and the dashboard counts it the same way.
+  const upcomingBirthRecords = useMemo(() => upcomingBirths(records), [records])
+  const pregnantAnimalIds = useMemo(
+    () => new Set(upcomingBirthRecords.filter(r => r.animalId).map(r => r.animalId as string)),
+    [upcomingBirthRecords]
+  )
 
   const availableAnimals = useMemo(
     () => femaleAnimals.filter(a => !pregnantAnimalIds.has(a._id) || a._id === animalId),
@@ -504,10 +502,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     [filteredRecords]
   )
 
-  const upcoming = useMemo(() =>
-    records.filter(r => r.expectedBirthDate && new Date(r.expectedBirthDate) >= new Date()).length,
-    [records]
-  )
+  const upcoming = upcomingBirthRecords.length
 
   const totalBabies = useMemo(() =>
     records.reduce((s, r) => s + (r.deliveredBabies || 0), 0),

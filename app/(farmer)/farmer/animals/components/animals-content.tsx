@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bell, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Trash2, AlertTriangle, Search, PawPrint, Droplets, Mars, Venus } from "lucide-react"
 import { useLanguage } from "@/contexts/LanguageContext"
 import { localizeError } from "@/lib/error-messages"
+import { isActivePregnancy } from "@/lib/pregnancy"
 import { useToast } from "@/hooks/use-toast"
 import { deleteAnimal, updateAnimalLactationStatus, getAnimals } from "@/lib/actions"
 import AddAnimalForm from "@/components/dashboard/add-animal-form"
@@ -142,17 +143,8 @@ export default function AnimalsContent({ initialData, farmerId, openAdd }: Anima
     return () => { cancelled = true }
   }, [farmerId])
 
-  const getPregnancy = (animalId: string) => {
-    const today = new Date().toISOString().split("T")[0]
-    return inseminationRecords.find(
-      (r) =>
-        r.animalId === animalId &&
-        r.expectedBirthDate &&
-        r.expectedBirthDate >= today &&
-        !r.deliveredBabies &&
-        !r.pregnancyFailed
-    )
-  }
+  const getPregnancy = (animalId: string) =>
+    inseminationRecords.find((r) => r.animalId === animalId && isActivePregnancy(r))
 
   const getStatusColor = (status: string) =>
     status === "Healthy" ? "bg-green-100 text-green-800" :
