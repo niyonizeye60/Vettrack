@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import clientPromise from "@/lib/db"
 import { getCurrentUser } from "@/lib/auth"
 import { loadFarmPnl } from "@/lib/farm-pnl"
+import { inseminationCost } from "@/lib/insemination"
 
 const DB = "ntdm_animal_hospital"
 
@@ -88,8 +89,8 @@ export async function GET(req: NextRequest) {
     incomeLedger.sort((a, b) => b.date.localeCompare(a.date))
 
     const expenseLedger: LedgerEntry[] = []
-    inseminationRecords.filter(r => (r.semenPrice || 0) + (r.vetPrice || 0) > 0).forEach(r => expenseLedger.push({
-      date: r.date, label: "Insemination Costs", description: r.animalName || "Insemination", amount: (r.semenPrice || 0) + (r.vetPrice || 0)
+    inseminationRecords.filter(r => inseminationCost(r) > 0).forEach(r => expenseLedger.push({
+      date: r.date, label: "Insemination Costs", description: r.animalName || "Insemination", amount: inseminationCost(r)
     }))
     vaccinationRecords.filter(r => (r.vaccinePrice || 0) + (r.vetPrice || 0) > 0).forEach(r => expenseLedger.push({
       date: r.date, label: "Vaccination Costs", description: `${r.subjectName || "Animal"}${r.subjectType === "calf" ? " (calf)" : ""}${r.vaccineName ? ` - ${r.vaccineName}` : ""}`, amount: (r.vaccinePrice || 0) + (r.vetPrice || 0)

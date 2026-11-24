@@ -587,6 +587,12 @@
         unit: "Unit",
         unitDoses: "doses",
         semenTypes: "Types of Semen",
+        method: "Type of insemination",
+        methodSemen: "Semen (AI)",
+        methodBull: "Bull (natural mating)",
+        bull: "Bull",
+        bullPlaceholder: "Bull's name or ear tag",
+        bullPrice: "Bull Fee",
         expectedBirth: "Expected Birth Date",
         autoEstimated: "Auto-estimated: AI date + 283 days",
         vetName: "Name of the Vet",
@@ -785,6 +791,12 @@
         unit: "Igipimo",
         unitDoses: "inshuro",
         semenTypes: "Ubwoko bw'imbuto",
+        method: "Uburyo bwakoreshejwe",
+        methodSemen: "Intanga (gutera intanga)",
+        methodBull: "Ikimasa (kubangurira)",
+        bull: "Ikimasa",
+        bullPlaceholder: "Izina cyangwa nimero y'ikimasa",
+        bullPrice: "Igiciro cy'ikimasa",
         expectedBirth: "Itariki y'inzarana iteganijwe",
         autoEstimated: "Byabazwe: itariki yo guterwa intanga + iminsi 283",
         vetName: "Izina rya vete",
@@ -1269,6 +1281,11 @@
       }
       function alive(a) { return a.status !== "Deceased" }
       function femaleAlive(a) { return a.gender !== "male" && a.status !== "Deceased" }
+      // The semen types, or the bull (lib/insemination.ts: no method = semen).
+      function bredWith(r) {
+        return r.method === "bull" ? joinColon([t("bull"), r.bullName]) : (r.semenTypes || []).join(", ")
+      }
+      function joinColon(parts) { return parts.filter(Boolean).join(": ") }
 
       function animalCard(a) {
         var cow = a.type === "cow" && a.gender === "female"
@@ -1314,7 +1331,7 @@
               return [v.vaccineName || "", joinDot([day(v.date), v.nextVaccinationDate ? t("next") + ": " + day(v.nextVaccinationDate) : ""])]
             })),
             mini(t("insemination"), (inseminationsByAnimal[a.id] || []).map(function (r) {
-              return [day(r.date), joinDot([(r.semenTypes || []).join(", "), r.expectedBirthDate ? t("expBirth") + ": " + day(r.expectedBirthDate) : ""])]
+              return [day(r.date), joinDot([bredWith(r), r.expectedBirthDate ? t("expBirth") + ": " + day(r.expectedBirthDate) : ""])]
             })),
             mini(t("milkProduction"), (milkByAnimal[a.id] || []).slice(0, 10).map(function (m) {
               return [joinDot([day(m.date), sessionLabel(m.session)]), liters(m.liters)]
@@ -1429,7 +1446,7 @@
           return h("div", { class: "item row" }, [
             h("div", { class: "row-main" }, [
               h("div", { class: "row-title", text: animalName(r.animalId, r.animalName) || "—" }),
-              h("div", { class: "row-sub", text: joinDot([day(r.date), (r.semenTypes || []).join(", "), r.vetName]) }),
+              h("div", { class: "row-sub", text: joinDot([day(r.date), bredWith(r), r.vetName]) }),
               r.expectedBirthDate ? h("div", { class: "row-sub", text: t("expBirth") + ": " + day(r.expectedBirthDate) }) : null,
               entryError(r),
             ]),
@@ -1613,7 +1630,8 @@
       // A form for one kind of record. `spec`: title, kind, fields (field defs, [a, b]
       // for two side by side, or { extra: [...] } for "More details"), validate(v),
       // body(v), and optionally change(name, v, set), gated (the on-farm rule applies),
-      // saveLabel.
+      // saveLabel. A field def with showIf(v) is shown only while that holds; a hidden
+      // field still has a value, so body(v) leaves out the ones that don't apply.
       function openForm(spec) {
         var controls = {}
         var form = h("form", { id: "sheet-form", novalidate: true })
@@ -1623,7 +1641,15 @@
           return v
         }
         function set(name, value) { if (controls[name]) controls[name].set(value) }
-        function changed(name) { if (spec.change) spec.change(name, values(), set) }
+        var conditional = []
+        function showFields() {
+          var v = values()
+          conditional.forEach(function (f) { controls[f.name].el.hidden = !f.showIf(v) })
+        }
+        function changed(name) {
+          if (spec.change) spec.change(name, values(), set)
+          showFields()
+        }
         function layout(fields, parent) {
           fields.forEach(function (f) {
             if (Array.isArray(f)) {
@@ -1637,6 +1663,7 @@
             } else {
               var c = control(f, changed)
               controls[f.name] = c
+              if (f.showIf) conditional.push(f)
               parent.appendChild(c.el)
             }
           })
@@ -1644,6 +1671,7 @@
         layout(spec.fields, form)
         // Pre-filled from where the form was opened (an animal's card, a disease case).
         if (spec.preset) Object.keys(spec.preset).forEach(function (k) { set(k, spec.preset[k]); changed(k) })
+        showFields()
 
         var formError = h("div", { class: "form-error", role: "alert", hidden: true })
         var saveText = t(spec.saveLabel || "saveRecord")
@@ -1662,7 +1690,7 @@
           formError.hidden = true
           var v = values()
           var errors = spec.validate(v) || {}
-          Object.keys(controls).forEach(function (k) { controls[k].error(errors[k]) })
+          Object.keys(controls).forEach(function (k) { if (controls[k].el.hidden) delete errors[k]; controls[k].error(errors[k]) })
           var bad = Object.keys(errors).filter(function (k) { return errors[k] })
           if (bad.length) {
             if (controls[bad[0]]) controls[bad[0]].focus()
@@ -1935,6 +1963,10 @@
 
       function inseminationForm(preset) {
         var choices = nameSorted(data.animals.filter(function (a) { return femaleAlive(a) && !pregnant[a.id] }))
+        // Suggested for a bull mating, as in the app; another farm's bull can be typed.
+        var bulls = nameSorted(data.animals.filter(function (a) { return a.gender === "male" && a.status !== "Deceased" }))
+        function isBull(v) { return v.method === "bull" }
+        function isSemen(v) { return v.method !== "bull" }
         openForm({
           title: "newInsemination",
           kind: "insemination",
@@ -1945,15 +1977,21 @@
               return choices.map(animalOption)
             } },
             { name: "date", label: "date", type: "date", required: true, value: todayStr },
-            { name: "semenTypes", label: "semenTypes", type: "checks", required: true, options: function () {
+            { name: "method", label: "method", type: "select", required: true, value: "semen", options: function () {
+              return [["semen", t("methodSemen")], ["bull", t("methodBull")]]
+            } },
+            { name: "semenTypes", label: "semenTypes", type: "checks", required: true, showIf: isSemen, options: function () {
               return SEMEN_TYPES.map(function (s) { return [s, s] })
             } },
+            { name: "bullName", label: "bull", type: "text", optional: true, showIf: isBull, placeholder: "bullPlaceholder",
+              list: bulls.map(function (a) { return a.name }) },
             { name: "expectedBirthDate", label: "expectedBirth", type: "date", optional: true, hint: "autoEstimated" },
             { name: "vetName", label: "vetName", type: "text", optional: true },
             { extra: [
-              { name: "injectionTime", label: "injectionTime", type: "time", optional: true },
+              { name: "injectionTime", label: "injectionTime", type: "time", optional: true, showIf: isSemen },
               [
-                { name: "semenPrice", label: "semenPrice", type: "number", optional: true },
+                { name: "semenPrice", label: "semenPrice", type: "number", optional: true, showIf: isSemen },
+                { name: "bullPrice", label: "bullPrice", type: "number", optional: true, showIf: isBull },
                 { name: "vetPrice", label: "vetPrice", type: "number", optional: true },
               ],
               { name: "notes", label: "notes", type: "textarea", optional: true },
@@ -1970,7 +2008,7 @@
             var animal = animalsById[v.animalId]
             if (!v.animalId) e.animalId = t("selectAnimal")
             else if (animal && !animal.gender) e.animalId = t("genderMissing", { animal: animal.name })
-            if (!v.semenTypes.length) e.semenTypes = t("selectSemen")
+            if (isSemen(v) && !v.semenTypes.length) e.semenTypes = t("selectSemen")
             if (!v.date) e.date = t("selectDate")
             return e
           },
@@ -1978,7 +2016,10 @@
             var animal = animalsById[v.animalId]
             return {
               animalId: v.animalId, animalName: animal ? animal.name : null,
-              semenTypes: v.semenTypes, semenPrice: v.semenPrice, vetPrice: v.vetPrice, injectionTime: v.injectionTime,
+              method: isBull(v) ? "bull" : "semen",
+              semenTypes: isBull(v) ? [] : v.semenTypes, semenPrice: isBull(v) ? "" : v.semenPrice,
+              bullName: isBull(v) ? v.bullName : "", bullPrice: isBull(v) ? v.bullPrice : "",
+              vetPrice: v.vetPrice, injectionTime: isBull(v) ? "" : v.injectionTime,
               expectedBirthDate: v.expectedBirthDate, deliveredBabies: null,
               vetName: v.vetName, vetOrigin: "", date: v.date, notes: v.notes,
               previousRecordId: null, pregnancyFailed: false,
@@ -2065,7 +2106,7 @@
           disease: [b.animalName, [b.diseaseName, day(b.diagnosedDate)]],
           dose: [b.animalName, [b.diseaseName, day(b.date), sessionLabel(b.session)]],
           vaccination: [b.subjectName, [b.vaccineName, day(b.date)]],
-          insemination: [b.animalName, [day(b.date), (b.semenTypes || []).join(", ")]],
+          insemination: [b.animalName, [day(b.date), bredWith(b)]],
           calf: [b.name, [day(b.birthDate)]],
           calfWeight: [b.calfName, [b.weight ? b.weight + " kg" : "", day(b.date)]],
         }[entry.kind] || ["", []]

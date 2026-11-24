@@ -8,6 +8,7 @@ import {
   resolveFarmAccess, logVetAction, diffRecord, provenanceFor, animalBelongsToFarm,
   verifyOnFarmLocation, extractLocationFields,
 } from "@/lib/farm-access"
+import { methodFields } from "@/lib/insemination"
 
 const DB = "ntdm_animal_hospital"
 const MODULE = "insemination" as const
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
               inseminations: { $sum: 1 },
               failedAttempts: { $sum: { $cond: [{ $ifNull: ["$pregnancyFailed", false] }, 1, 0] } },
               babies: { $sum: { $ifNull: ["$deliveredBabies", 0] } },
-              totalCost: { $sum: { $add: [{ $ifNull: ["$semenPrice", 0] }, { $ifNull: ["$vetPrice", 0] }] } },
+              totalCost: { $sum: { $add: [{ $ifNull: ["$semenPrice", 0] }, { $ifNull: ["$bullPrice", 0] }, { $ifNull: ["$vetPrice", 0] }] } },
               lastDate: { $first: "$date" },
             },
           },
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, vetName, vetOrigin, date, notes, previousRecordId } = body
+    const { farmerId, animalId, animalName, vetPrice, injectionTime, expectedBirthDate, vetName, vetOrigin, date, notes, previousRecordId } = body
     if (!farmerId || !date) return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
 
     const access = await resolveFarmAccess(currentUser, farmerId, MODULE, "create")
@@ -151,8 +152,7 @@ export async function POST(req: NextRequest) {
 
     const record = {
       farmerId, animalId: animalId || null, animalName: animalName || null,
-      semenTypes: semenTypes || [],
-      semenPrice: semenPrice ? Number(semenPrice) : null,
+      ...methodFields(body),
       vetPrice: vetPrice ? Number(vetPrice) : null,
       injectionTime: injectionTime || null,
       expectedBirthDate: expectedBirthDate || null,
@@ -202,7 +202,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, deliveredBabies, vetName, vetOrigin, date, notes, previousRecordId, pregnancyFailed } = body
+    const { id, animalId, animalName, vetPrice, injectionTime, expectedBirthDate, deliveredBabies, vetName, vetOrigin, date, notes, previousRecordId, pregnancyFailed } = body
     if (!id) return NextResponse.json({ error: "Record ID required" }, { status: 400 })
 
     const client = await clientPromise
@@ -233,8 +233,14 @@ export async function PUT(req: NextRequest) {
     const updated = {
       animalId: animalId || null,
       animalName: animalName || null,
-      semenTypes: semenTypes || [],
-      semenPrice: semenPrice ? Number(semenPrice) : null,
+      // A page opened before the bull option existed sends no method or bull: the
+      // record keeps the ones it has rather than turning a bull mating into semen.
+      ...methodFields({
+        ...body,
+        method: body.method ?? existing.method,
+        bullName: body.bullName ?? existing.bullName,
+        bullPrice: body.bullPrice ?? existing.bullPrice,
+      }),
       vetPrice: vetPrice ? Number(vetPrice) : null,
       injectionTime: injectionTime || null,
       expectedBirthDate: expectedBirthDate || null,

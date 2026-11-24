@@ -24,6 +24,7 @@ import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
 import { useSaveOffline } from "@/hooks/use-save-offline"
 import { awaitedBirths } from "@/lib/pregnancy"
+import { inseminationCost, inseminationMethod, type InseminationMethod } from "@/lib/insemination"
 
 interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null; status?: string | null }
 interface Vet { _id: string; name: string; specialization: string }
@@ -31,8 +32,12 @@ interface InseminationRecord {
   _id: string
   animalId: string | null
   animalName: string | null
+  /** Missing on records saved before the choice existed - those were all semen. */
+  method?: InseminationMethod | null
   semenTypes: string[]
   semenPrice: number | null
+  bullName?: string | null
+  bullPrice?: number | null
   vetPrice: number | null
   injectionTime: string | null
   expectedBirthDate: string | null
@@ -151,6 +156,8 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   const [vets, setVets] = useState<Vet[]>([])
   // include females + animals with undefined/null gender (exclude confirmed males and deceased animals)
   const femaleAnimals = animals.filter(a => a.gender !== "male" && a.status !== "Deceased")
+  // Suggested for a bull mating; the farmer can also type a bull from another farm.
+  const bulls = animals.filter(a => a.gender === "male" && a.status !== "Deceased")
   const [records, setRecords] = useState<InseminationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -170,8 +177,11 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
 
   // Form fields
   const [animalId, setAnimalId] = useState("")
+  const [method, setMethod] = useState<InseminationMethod>("semen")
   const [semenTypes, setSemenTypes] = useState<string[]>([])
   const [semenPrice, setSemenPrice] = useState("")
+  const [bullName, setBullName] = useState("")
+  const [bullPrice, setBullPrice] = useState("")
   const [vetPrice, setVetPrice] = useState("")
   const [injectionTime, setInjectionTime] = useState("")
   const [expectedBirthDate, setExpectedBirthDate] = useState("")
@@ -199,6 +209,10 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     () => femaleAnimals.filter(a => !pregnantAnimalIds.has(a._id) || a._id === animalId),
     [femaleAnimals, pregnantAnimalIds, animalId]
   )
+
+  // The farm's males of the chosen animal's kind, suggested in the Bull field.
+  const selectedType = animals.find(a => a._id === animalId)?.type?.toLowerCase()
+  const matchingBulls = selectedType ? bulls.filter(b => b.type?.toLowerCase() === selectedType) : bulls
 
   const calcExpectedBirth = (insemDate: string) => {
     if (!insemDate) return ""
@@ -356,14 +370,15 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   const validate = () => {
     const e: Record<string, string> = {}
     if (!animalId) e.animalId = t("insem.selectAnAnimal")
-    if (!semenTypes.length) e.semenTypes = t("insem.selectAtLeastOneSemenType")
+    if (method === "semen" && !semenTypes.length) e.semenTypes = t("insem.selectAtLeastOneSemenType")
     if (!date) e.date = t("insem.selectADate")
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
   const resetForm = () => {
-    setAnimalId(""); setInsuranceId(""); setEarTagId(""); setSemenTypes([]); setSemenPrice(""); setVetPrice("")
+    setAnimalId(""); setInsuranceId(""); setEarTagId(""); setMethod("semen"); setSemenTypes([]); setSemenPrice("")
+    setBullName(""); setBullPrice(""); setVetPrice("")
     setInjectionTime(""); setExpectedBirthDate(""); setDeliveredBabies("")
     setVetName(can.isDelegate ? can.currentUserName : ""); setVetOrigin("")
     setDate(today); setNotes(""); setErrors({}); setEditRecord(null)
@@ -385,7 +400,9 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       farmerId,
       animalId: animalId || null,
       animalName: animal?.name || null,
-      semenTypes, semenPrice, vetPrice, injectionTime,
+      method,
+      ...(method === "bull" ? { semenTypes: [], semenPrice: "", bullName, bullPrice } : { semenTypes, semenPrice, bullName: "", bullPrice: "" }),
+      vetPrice, injectionTime,
       expectedBirthDate, deliveredBabies: deliveredBabies ? Number(deliveredBabies) : null,
       vetName, vetOrigin, date, notes,
       // Preserve lineage/outcome on edit; attach lineage to the previous attempt when re-inseminating
@@ -431,8 +448,9 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: r._id,
-          animalId: r.animalId, animalName: r.animalName, semenTypes: r.semenTypes,
-          semenPrice: r.semenPrice, vetPrice: r.vetPrice, injectionTime: r.injectionTime,
+          animalId: r.animalId, animalName: r.animalName, method: inseminationMethod(r), semenTypes: r.semenTypes,
+          semenPrice: r.semenPrice, bullName: r.bullName ?? null, bullPrice: r.bullPrice ?? null,
+          vetPrice: r.vetPrice, injectionTime: r.injectionTime,
           expectedBirthDate: r.expectedBirthDate, deliveredBabies: r.deliveredBabies,
           vetName: r.vetName, vetOrigin: r.vetOrigin, date: r.date, notes: r.notes,
           previousRecordId: r.previousRecordId || null,
@@ -456,6 +474,8 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     resetForm()
     setReinseminateFrom(r)
     setAnimalId(r.animalId || "")
+    // The new attempt starts with the same method; the farmer can switch it.
+    setMethod(inseminationMethod(r))
     const animal = animals.find(a => a._id === r.animalId)
     setInsuranceId(animal?.insuranceId || "")
     setEarTagId(animal?.earTagId || "")
@@ -468,8 +488,11 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     setAnimalId(r.animalId || "")
     setInsuranceId(animals.find(a => a._id === r.animalId)?.insuranceId || "")
     setEarTagId(animals.find(a => a._id === r.animalId)?.earTagId || "")
+    setMethod(inseminationMethod(r))
     setSemenTypes(r.semenTypes || [])
     setSemenPrice(r.semenPrice != null ? String(r.semenPrice) : "")
+    setBullName(r.bullName || "")
+    setBullPrice(r.bullPrice != null ? String(r.bullPrice) : "")
     setVetPrice(r.vetPrice != null ? String(r.vetPrice) : "")
     setInjectionTime(r.injectionTime || "")
     setExpectedBirthDate(r.expectedBirthDate || "")
@@ -499,7 +522,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   }
 
   const totalCost = useMemo(() =>
-    filteredRecords.reduce((s, r) => s + (r.semenPrice || 0) + (r.vetPrice || 0), 0),
+    filteredRecords.reduce((s, r) => s + inseminationCost(r), 0),
     [filteredRecords]
   )
 
@@ -520,7 +543,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       map[key].inseminations += 1
       if (r.pregnancyFailed) map[key].failedAttempts += 1
       map[key].babies += r.deliveredBabies || 0
-      map[key].totalCost += (r.semenPrice || 0) + (r.vetPrice || 0)
+      map[key].totalCost += inseminationCost(r)
       if (!map[key].lastDate || r.date > map[key].lastDate) map[key].lastDate = r.date
     })
     return Object.values(map).sort((a, b) => b.inseminations - a.inseminations)
@@ -546,7 +569,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     [exportFilteredRecords]
   )
   const exportTotalCost = useMemo(
-    () => exportFilteredRecords.reduce((s, r) => s + (r.semenPrice || 0) + (r.vetPrice || 0), 0),
+    () => exportFilteredRecords.reduce((s, r) => s + inseminationCost(r), 0),
     [exportFilteredRecords]
   )
   const exportAnimalName = exportAnimalFilter ? animals.find(a => a._id === exportAnimalFilter)?.name || "" : ""
@@ -666,8 +689,8 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
         doc.setFontSize(8); doc.setFont("helvetica", "bold")
         doc.text(t("insem.date"), detailCols.date.x, y)
         doc.text(t("insem.animal"), detailCols.animal.x, y)
-        doc.text(t("insem.semenType"), detailCols.semen.x, y)
-        doc.text(t("insem.semenPrice"), detailCols.semenPrice.x, y)
+        doc.text(t("insem.semenOrBull"), detailCols.semen.x, y)
+        doc.text(t("insem.price"), detailCols.semenPrice.x, y)
         doc.text(t("insem.vetPrice"), detailCols.vetPrice.x, y)
         doc.text(t("insem.expBirth"), detailCols.expectedBirth.x, y)
         doc.text(t("insem.babies"), detailCols.babies.x, y)
@@ -679,7 +702,11 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
       drawDetailHeader()
 
       exportFilteredRecords.forEach((r, i) => {
-        const semenText = Array.isArray(r.semenTypes) ? r.semenTypes.join(", ") : r.semenTypes || "—"
+        const isBull = inseminationMethod(r) === "bull"
+        const semenText = isBull
+          ? [t("insem.bull"), r.bullName].filter(Boolean).join(": ")
+          : Array.isArray(r.semenTypes) ? r.semenTypes.join(", ") : r.semenTypes || "—"
+        const breedingPrice = isBull ? r.bullPrice : r.semenPrice
         const semenLines = doc.splitTextToSize(semenText, detailCols.semen.width)
         const animalLines = doc.splitTextToSize(r.animalName || t("insem.general"), detailCols.animal.width)
         const rowHeight = Math.max(semenLines.length, animalLines.length, 1) * 5 + 4
@@ -725,7 +752,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
         doc.text(new Date(r.date).toLocaleDateString(), detailCols.date.x, y)
         doc.text(animalLines, detailCols.animal.x, y)
         doc.text(semenLines, detailCols.semen.x, y)
-        doc.text(r.semenPrice != null ? r.semenPrice.toLocaleString() : "—", detailCols.semenPrice.x, y)
+        doc.text(breedingPrice != null ? breedingPrice.toLocaleString() : "—", detailCols.semenPrice.x, y)
         doc.text(r.vetPrice != null ? r.vetPrice.toLocaleString() : "—", detailCols.vetPrice.x, y)
         doc.text(r.expectedBirthDate || "—", detailCols.expectedBirth.x, y)
 
@@ -849,8 +876,11 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
         Animal: r.animalName || t("insem.general"),
         "Insurance ID": getAnimalInsuranceId(r.animalId),
         "Ear Tag ID": animals.find(a => a._id === r.animalId)?.earTagId || "—",
-        "Semen Types": (r.semenTypes || []).join(", "),
+        Method: inseminationMethod(r) === "bull" ? t("insem.methodBull") : t("insem.methodSemen"),
+        "Semen Types": (r.semenTypes || []).join(", ") || "—",
+        Bull: r.bullName || "—",
         "Semen Price (RWF)": r.semenPrice ?? "—",
+        "Bull Fee (RWF)": r.bullPrice ?? "—",
         "Vet Price (RWF)": r.vetPrice ?? "—",
         "Injection Time": r.injectionTime || "—",
         "Expected Birth Date": r.expectedBirthDate || "—",
@@ -862,7 +892,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
         Notes: r.notes || "—",
       }))
       const ws2 = XLSX.utils.json_to_sheet(localizeColumns(recordsData, t))
-      ws2["!cols"] = [14, 18, 22, 22, 18, 16, 16, 20, 18, 20, 16, 16, 22, 30].map(w => ({ wch: w }))
+      ws2["!cols"] = [14, 18, 22, 22, 20, 18, 18, 16, 14, 16, 16, 20, 18, 16, 16, 22, 22, 30].map(w => ({ wch: w }))
       XLSX.utils.book_append_sheet(wb, ws2, t("insem.allRecords"))
 
       // Sheet 3 — Vet & Injection Details
@@ -998,6 +1028,27 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
+                {/* Semen or bull - decides which of the fields below are asked for. */}
+                <div className="space-y-1 md:col-span-2">
+                  <p className="text-sm font-medium text-gray-700" id="insem-method-label">{t("insem.method")} *</p>
+                  <div role="group" aria-labelledby="insem-method-label" className="grid grid-cols-2 gap-2">
+                    {(["semen", "bull"] as const).map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        aria-pressed={method === m}
+                        onClick={() => { setMethod(m); setErrors(e => ({ ...e, semenTypes: "" })) }}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                          method === m ? "border-green-600 bg-green-50 text-green-700" : "border-input bg-white text-gray-600 hover:bg-gray-50"
+                        )}
+                      >
+                        {m === "bull" ? t("insem.methodBull") : t("insem.methodSemen")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Animal — only non-pregnant females */}
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.animal')} *</label>
@@ -1049,7 +1100,21 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                   />
                 </div>
 
-                {/* Semen Types */}
+                {/* Semen Types, or the bull */}
+                {method === "bull" ? (
+                  <div className="space-y-1">
+                    <label htmlFor="insem-bull" className="text-sm font-medium text-gray-700">{t("insem.bull")} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                    <Input id="insem-bull" list="insem-bull-list" autoComplete="off" placeholder={t("insem.bullPlaceholder")} value={bullName} onChange={e => setBullName(e.target.value)} />
+                    {matchingBulls.length > 0 && (
+                      <>
+                        <datalist id="insem-bull-list">
+                          {matchingBulls.map(b => <option key={b._id} value={b.name} />)}
+                        </datalist>
+                        <p className="text-xs text-gray-500">{t("insem.bullHint")}</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-gray-700">{t('farmer.typesOfSemen')} *</label>
                   <button
@@ -1084,12 +1149,20 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                   )}
                   {errors.semenTypes && <p className="text-xs text-red-500">{errors.semenTypes}</p>}
                 </div>
+                )}
 
-                {/* Semen Price */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.priceOfSemen')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input type="number" min="0" step="0.01" placeholder="e.g. 5000" value={semenPrice} onChange={e => setSemenPrice(e.target.value)} />
-                </div>
+                {/* Semen Price, or the bull's fee */}
+                {method === "bull" ? (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{t("insem.bullPrice")} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                    <Input type="number" min="0" step="0.01" placeholder="e.g. 5000" value={bullPrice} onChange={e => setBullPrice(e.target.value)} />
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.priceOfSemen')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                    <Input type="number" min="0" step="0.01" placeholder="e.g. 5000" value={semenPrice} onChange={e => setSemenPrice(e.target.value)} />
+                  </div>
+                )}
 
                 {/* Vet Price */}
                 <div className="space-y-1">
@@ -1099,7 +1172,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
 
                 {/* Time of Injection */}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.timeOfInjection')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                  <label className="text-sm font-medium text-gray-700">{method === "bull" ? t("insem.matingTime") : t('farmer.timeOfInjection')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
                   <Input type="time" value={injectionTime} onChange={e => setInjectionTime(e.target.value)} />
                 </div>
 
@@ -1260,8 +1333,8 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                     <TableRow>
                       <TableHead>{t('farmer.date')}</TableHead>
                       <TableHead>{t('farmer.animal')}</TableHead>
-                      <TableHead>{t('farmer.semenTypes')}</TableHead>
-                      <TableHead>{t('farmer.semenPrice')}</TableHead>
+                      <TableHead>{t("insem.semenOrBull")}</TableHead>
+                      <TableHead>{t("insem.price")}</TableHead>
                       <TableHead>{t('farmer.vetPrice')}</TableHead>
                       <TableHead>{t('farmer.injectionTime')}</TableHead>
                       <TableHead>{t('farmer.expectedBirthOutcome')}</TableHead>
@@ -1288,13 +1361,25 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {(r.semenTypes || []).map(t => (
-                              <Badge key={t} variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">{t}</Badge>
-                            ))}
-                          </div>
+                          {inseminationMethod(r) === "bull" ? (
+                            <div className="flex flex-wrap items-center gap-1">
+                              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200 text-xs">{t("insem.bull")}</Badge>
+                              {r.bullName && <span className="text-sm">{r.bullName}</span>}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {(r.semenTypes || []).map(t => (
+                                <Badge key={t} variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">{t}</Badge>
+                              ))}
+                            </div>
+                          )}
                         </TableCell>
-                        <TableCell className="text-sm">{r.semenPrice != null ? r.semenPrice : <span className="text-gray-400">—</span>}</TableCell>
+                        <TableCell className="text-sm">
+                          {(() => {
+                            const price = inseminationMethod(r) === "bull" ? r.bullPrice : r.semenPrice
+                            return price != null ? price : <span className="text-gray-400">—</span>
+                          })()}
+                        </TableCell>
                         <TableCell className="text-sm">{r.vetPrice != null ? r.vetPrice : <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell className="text-sm">{r.injectionTime || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell>

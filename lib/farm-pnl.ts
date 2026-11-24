@@ -1,4 +1,5 @@
 import type { Db } from "mongodb"
+import { inseminationCost } from "./insemination"
 
 /**
  * The farm profit & loss rules, shared by the Reports page (app/api/reports/general)
@@ -30,7 +31,7 @@ export async function loadFarmPnl(db: Db, farmerId: string, startDate: string, e
   const totalIncome = milkSales + livestockSales + byProductSales
 
   // ---- Expenses ----
-  const inseminationCosts = inseminationRecords.reduce((s, r) => s + (r.semenPrice || 0) + (r.vetPrice || 0), 0)
+  const inseminationCosts = inseminationRecords.reduce((s, r) => s + inseminationCost(r), 0)
   // Kept separate from veterinaryHealth: that line is treatment of animals that fell
   // ill, whereas vaccination is preventive spend the farmer chooses to budget.
   const vaccinationCosts = vaccinationRecords.reduce((s, r) => s + (r.vaccinePrice || 0) + (r.vetPrice || 0), 0)

@@ -115,7 +115,7 @@ export default function OfflineStatus() {
       disease: [b.animalName, [b.diseaseName, day(b.diagnosedDate)]],
       dose: [b.animalName, [b.diseaseName, day(b.date), session(b.session)]],
       vaccination: [b.subjectName, [b.vaccineName, day(b.date)]],
-      insemination: [b.animalName, [day(b.date), Array.isArray(b.semenTypes) ? b.semenTypes.join(", ") : ""]],
+      insemination: [b.animalName, [day(b.date), b.method === "bull" ? [t("insem.bull"), b.bullName].filter(Boolean).join(": ") : Array.isArray(b.semenTypes) ? b.semenTypes.join(", ") : ""]],
       calf: [b.name, [day(b.birthDate)]],
       calfWeight: [b.calfName, [b.weight ? `${b.weight} kg` : "", day(b.date)]],
     }
