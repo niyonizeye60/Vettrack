@@ -21,7 +21,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { BEHAVIOUR_STATE_COLORS, type BehaviourState } from "@/lib/tracking/behaviour"
 import type { TrackingDashboardData } from "@/lib/tracking/types"
 import { clockTime, stateLabel } from "@/components/tracking/format"
-import { upcomingBirths } from "@/lib/pregnancy"
+import { awaitedBirths } from "@/lib/pregnancy"
 
 interface FarmerDashboardContentProps {
   currentUser: { _id: string; name: string; role: string }
@@ -31,7 +31,7 @@ interface FarmerDashboardContentProps {
 
 interface PnlSnapshot { income: number; expense: number; net: number }
 interface DiseaseStats { active: number; underTreatment: number }
-interface BirthStats { upcomingCount: number; nextDate: string | null; nextAnimal: string | null }
+interface BirthStats { upcomingCount: number; nextDate: string | null; nextAnimal: string | null; overdueAnimals: (string | null)[] }
 interface InboxStats { unreadNotifications: number; unreadMessages: number; openTickets: number }
 interface MilkTrendPoint { date: string; liters: number }
 interface PnlTrendPoint { month: string; income: number; expense: number }
@@ -108,12 +108,13 @@ export default function FarmerDashboardContent({
         try {
           const records = await inseminationRes.value.json()
           if (Array.isArray(records)) {
-            // Same count as the insemination page's "Expected births" card.
-            const future = upcomingBirths(records)
+            // Same counts as the insemination page's "Expected births" card.
+            const { upcoming, overdue } = awaitedBirths(records)
             setBirthStats({
-              upcomingCount: future.length,
-              nextDate: future[0]?.expectedBirthDate ?? null,
-              nextAnimal: future[0]?.animalName ?? null,
+              upcomingCount: upcoming.length,
+              nextDate: upcoming[0]?.expectedBirthDate ?? null,
+              nextAnimal: upcoming[0]?.animalName ?? null,
+              overdueAnimals: overdue.map((r: any) => r.animalName || null),
             })
           }
         } catch { /* leave birthStats null */ }
@@ -424,7 +425,7 @@ export default function FarmerDashboardContent({
         )}
 
         {/* Upcoming births */}
-        {birthStats && birthStats.upcomingCount > 0 && (
+        {birthStats && (birthStats.upcomingCount > 0 || birthStats.overdueAnimals.length > 0) && (
           <Card className="border-sky-200 bg-sky-50 shadow-sm">
             <CardContent className="p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -443,6 +444,13 @@ export default function FarmerDashboardContent({
                         </>
                       )}
                     </p>
+                    {birthStats.overdueAnimals.length > 0 && (
+                      <p className="text-xs font-medium text-red-600 mt-1">
+                        {t("farmer.pastDueBirths")
+                          .replace("{count}", String(birthStats.overdueAnimals.length))
+                          .replace("{animals}", birthStats.overdueAnimals.slice(0, 3).map((n) => n || t("insem.general")).join(", ") + (birthStats.overdueAnimals.length > 3 ? "…" : ""))}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <Button asChild size="sm" variant="outline" className="border-sky-300 text-sky-700 hover:bg-sky-100 flex-shrink-0">

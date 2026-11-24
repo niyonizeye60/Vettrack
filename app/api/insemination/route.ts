@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { farmerId, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, deliveredBabies, vetName, vetOrigin, date, notes, previousRecordId } = body
+    const { farmerId, animalId, animalName, semenTypes, semenPrice, vetPrice, injectionTime, expectedBirthDate, vetName, vetOrigin, date, notes, previousRecordId } = body
     if (!farmerId || !date) return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
 
     const access = await resolveFarmAccess(currentUser, farmerId, MODULE, "create")
@@ -156,7 +156,10 @@ export async function POST(req: NextRequest) {
       vetPrice: vetPrice ? Number(vetPrice) : null,
       injectionTime: injectionTime || null,
       expectedBirthDate: expectedBirthDate || null,
-      deliveredBabies: deliveredBabies != null ? Number(deliveredBabies) : null,
+      // The birth is recorded later, by editing the record. Any number here - 0
+      // included, which would mean "calf lost" (lib/pregnancy.ts) - was a "none yet"
+      // from an old copy of the form, so a new record always starts pending.
+      deliveredBabies: null,
       // A delegated vet performing the insemination is the vet on the record -
       // their own identity, not a client-supplied name.
       vetName: access.via === "grant" ? currentUser.name : (vetName || null),

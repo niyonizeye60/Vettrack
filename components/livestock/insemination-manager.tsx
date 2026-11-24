@@ -23,7 +23,7 @@ import { useLocationGatedRequest, toQueryFields } from "@/components/livestock/l
 import { useLatestRequest } from "@/hooks/use-latest-request"
 import { useActionError } from "@/hooks/use-action-error"
 import { useSaveOffline } from "@/hooks/use-save-offline"
-import { upcomingBirths } from "@/lib/pregnancy"
+import { awaitedBirths } from "@/lib/pregnancy"
 
 interface Animal { _id: string; name: string; type: string; gender?: string | null; insuranceId?: string | null; earTagId?: string | null; status?: string | null }
 interface Vet { _id: string; name: string; specialization: string }
@@ -186,12 +186,13 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
   const [notes, setNotes] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // One live pregnancy per animal (lib/pregnancy.ts). It drives the "Expected births"
-  // card and which animals the form hides, and the dashboard counts it the same way.
-  const upcomingBirthRecords = useMemo(() => upcomingBirths(records), [records])
+  // One live pregnancy per animal (lib/pregnancy.ts), overdue ones included. It drives
+  // the "Expected births" card and which animals the form hides, and the dashboard
+  // counts it the same way.
+  const births = useMemo(() => awaitedBirths(records), [records])
   const pregnantAnimalIds = useMemo(
-    () => new Set(upcomingBirthRecords.filter(r => r.animalId).map(r => r.animalId as string)),
-    [upcomingBirthRecords]
+    () => new Set([...births.upcoming, ...births.overdue].filter(r => r.animalId).map(r => r.animalId as string)),
+    [births]
   )
 
   const availableAnimals = useMemo(
@@ -502,7 +503,8 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
     [filteredRecords]
   )
 
-  const upcoming = upcomingBirthRecords.length
+  const upcoming = births.upcoming.length
+  const overdue = births.overdue.length
 
   const totalBabies = useMemo(() =>
     records.reduce((s, r) => s + (r.deliveredBabies || 0), 0),
@@ -705,7 +707,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
             daysToBirthColor = [220, 38, 38]   // red
           }
         } else if (r.deliveredBabies != null) {
-          daysToBirthText = t("insem.delivered")
+          daysToBirthText = r.deliveredBabies === 0 ? t("insem.noLiveCalf") : t("insem.delivered")
           daysToBirthColor = [100, 116, 139]   // slate
         }
         // ──────────────────────────────────────────────────────────────
@@ -853,7 +855,7 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
         "Injection Time": r.injectionTime || "—",
         "Expected Birth Date": r.expectedBirthDate || "—",
         "Babies Delivered": r.deliveredBabies ?? "—",
-        Outcome: r.pregnancyFailed ? t("insem.notPregnant") : r.deliveredBabies != null ? t("insem.delivered") : t("insem.pending"),
+        Outcome: r.pregnancyFailed ? t("insem.notPregnant") : r.deliveredBabies === 0 ? t("insem.noLiveCalf") : r.deliveredBabies != null ? t("insem.delivered") : t("insem.pending"),
         "Re-attempt Of": r.previousRecordId ? (records.find(x => x._id === r.previousRecordId)?.date || "—") : "—",
         Vet: r.vetName || "—",
         Organization: r.vetOrigin || "—",
@@ -947,6 +949,9 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
             </div>
             <h3 className="text-3xl font-bold text-green-600 mt-2">{upcoming}</h3>
             <p className="text-xs text-gray-400 mt-1">{t('farmer.upcoming')}</p>
+            {overdue > 0 && (
+              <p className="text-xs font-medium text-red-600 mt-0.5">{t("insem.pastDueCount").replace("{count}", String(overdue))}</p>
+            )}
           </CardContent>
         </Card>
         <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
@@ -1129,11 +1134,17 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                   })()}
                 </div>
 
-                {/* Babies Delivered */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">{t('farmer.babiesDelivered')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
-                  <Input type="number" min="0" placeholder="e.g. 1" value={deliveredBabies} onChange={e => setDeliveredBabies(e.target.value)} />
-                </div>
+                {/* Babies Delivered - the outcome, so it's recorded by editing the record
+                    once the birth happens, never at insemination time. A 0 there closes
+                    the pregnancy (calf lost), so asking for it up front invited "0 = none
+                    yet" and the cow would stop counting as pregnant. */}
+                {editRecord && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.babiesDelivered')} <span className="text-gray-400 text-xs">({t('common.optional')})</span></label>
+                    <Input type="number" min="0" placeholder="e.g. 1" value={deliveredBabies} onChange={e => setDeliveredBabies(e.target.value)} />
+                    <p className="text-xs text-gray-500">{t("insem.babiesHint")}</p>
+                  </div>
+                )}
 
                 {/* Vet Name - for the farmer, a roster pick; for a delegated vet, themselves.
                     Shown read-only rather than hidden so the vet can see the attribution
@@ -1287,7 +1298,9 @@ export default function InseminationManager({ farmerId, can, showHeader = true }
                         <TableCell className="text-sm">{r.vetPrice != null ? r.vetPrice : <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell className="text-sm">{r.injectionTime || <span className="text-gray-400">—</span>}</TableCell>
                         <TableCell>
-                          {r.deliveredBabies != null
+                          {r.deliveredBabies === 0
+                            ? <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">{t("insem.noLiveCalf")}</Badge>
+                            : r.deliveredBabies != null
                             ? r.expectedBirthDate
                               ? <span className="text-xs text-gray-400">{r.expectedBirthDate}</span>
                               : <span className="text-gray-400">—</span>

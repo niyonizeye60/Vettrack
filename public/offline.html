@@ -480,6 +480,7 @@
         semenType: "Semen Type",
         expBirth: "Exp. Birth",
         delivered: "Delivered",
+        noLiveCalf: "No live calf",
         babies: "Babies",
         notPregnant: "Not Pregnant",
         dueToday: "Due today",
@@ -677,6 +678,7 @@
         semenType: "Ubwoko bw'intanga",
         expBirth: "Igihe cyo kubyara",
         delivered: "Yabyaye",
+        noLiveCalf: "Nta nyana nzima",
         babies: "Ibyana",
         notPregnant: "Ntihaka",
         dueToday: "Ni uyu munsi",
@@ -858,6 +860,8 @@
     var MILK_TYPES = ["cow", "goat", "sheep"]
     var ROUTINE_FIELDS = ["liters", "homeConsumption", "pricePerLiter", "waterLiters", "foodType", "foodKg", "foodCost", "saltKg", "saltCost"]
     var GESTATION_DAYS = 283
+    // As lib/pregnancy.ts: a birth is still awaited this long past its expected date.
+    var OVERDUE_GRACE_DAYS = 30
 
     // Same choice the site stores in LanguageContext.
     var lang = "en"
@@ -1211,10 +1215,11 @@
         data.inseminations.forEach(function (r) {
           if (r.animalId && !latestInsemination[r.animalId]) latestInsemination[r.animalId] = r.id
         })
-        // As the insemination form decides who can't be inseminated now.
+        // As the insemination form decides who can't be inseminated now (lib/pregnancy.ts).
+        // Any recorded number of babies ends it - 0 means the calf was lost.
         pregnant = {}
         data.inseminations.forEach(function (r) {
-          if (r.animalId && r.expectedBirthDate && r.expectedBirthDate >= todayStr && !r.deliveredBabies && !r.pregnancyFailed) pregnant[r.animalId] = true
+          if (r.animalId && r.expectedBirthDate && r.expectedBirthDate >= addDays(todayStr, -OVERDUE_GRACE_DAYS) && r.deliveredBabies == null && !r.pregnancyFailed) pregnant[r.animalId] = true
         })
       }
       function animalName(id, fallback) { return (animalsById[id] && animalsById[id].name) || fallback || "" }
@@ -1246,6 +1251,7 @@
       }
       function inseminationBadge(r) {
         if (Number(r.deliveredBabies) > 0) return badge(t("delivered") + " (" + r.deliveredBabies + ")", "green")
+        if (r.deliveredBabies != null) return badge(t("noLiveCalf"), "gray")
         if (r.pregnancyFailed) return badge(t("notPregnant"), "gray")
         if (!r.expectedBirthDate || latestInsemination[r.animalId] !== r.id) return null
         var d = daysFromToday(r.expectedBirthDate)
