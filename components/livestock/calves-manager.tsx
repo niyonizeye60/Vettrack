@@ -45,7 +45,7 @@ interface WeightRecord {
 interface CalfExpense {
   _id: string; farmerId: string; calfId: string; calfName: string | null
   expenseType: "milk" | "feed" | "veterinary" | "other"; milkLiters: number | null
-  /** The feeding session - feed expenses only. Feed recorded before sessions existed has none. */
+  /** The feeding session - milk and feed expenses only. Those recorded before sessions existed have none. */
   session?: FeedSession | null
   /** Water the calf drank and what it cost - only recorded on feed expenses. `amount` already includes waterCost. */
   waterLiters?: number | null; waterCost?: number | null
@@ -63,10 +63,12 @@ interface CalvesManagerProps {
 
 const STATUSES = ["active", "weaned", "sold", "deceased"] as const
 const EXPENSE_TYPES = ["milk", "feed", "veterinary", "other"] as const
-// The same two sessions as Milk Production; app/api/calf-expenses allows one feed record per calf per session a day.
+// The same two sessions as Milk Production. Milk and feed are recorded per session, and
+// app/api/calf-expenses allows one record of each per calf per session a day.
 const FEED_SESSIONS = ["Morning", "Evening"] as const
 type FeedSession = (typeof FEED_SESSIONS)[number]
 const isFeedSession = (value: string): value is FeedSession => (FEED_SESSIONS as readonly string[]).includes(value)
+const usesSession = (expenseType: string) => expenseType === "milk" || expenseType === "feed"
 /** The usual feed for a session, kept in this browser like the Milk Production session defaults. */
 interface FeedSessionDefaults { description: string; amount: string; waterLiters: string; waterCost: string }
 const emptyFeedDefaults: FeedSessionDefaults = { description: "", amount: "", waterLiters: "", waterCost: "" }
@@ -656,18 +658,19 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     setExpDate(today); setExpNotes(""); setExpErrors({}); setEditExpense(null)
   }
 
-  // A feed record saved before sessions existed can be edited without picking one (the API allows the same).
-  const editingSessionlessFeed = editExpense?.expenseType === "feed" && !editExpense.session
+  // A milk or feed record saved before sessions existed can be edited without picking one,
+  // as long as it stays the same type (the API allows the same).
+  const editingSessionless = !!editExpense && editExpense.expenseType === expenseType && !editExpense.session
 
   const applyFeedDefaults = (d: FeedSessionDefaults) => {
     setDescription(d.description); setAmount(d.amount); setWaterLiters(d.waterLiters); setWaterCost(d.waterCost)
   }
 
-  // Picking a session fills in its saved defaults, as on Milk Production - but not while
-  // editing, where the form holds what was recorded.
+  // Picking a session for feed fills in its saved defaults, as on Milk Production - but not
+  // while editing, where the form holds what was recorded.
   const handleSessionPick = (value: string) => {
     setExpSession(value)
-    if (editExpense || !isFeedSession(value) || !hasFeedDefaults(feedDefaults[value])) return
+    if (editExpense || expenseType !== "feed" || !isFeedSession(value) || !hasFeedDefaults(feedDefaults[value])) return
     applyFeedDefaults(feedDefaults[value])
     toast({ title: t('farmer.sessionDefaultsApplied'), description: `${sessionLabel(value)} — ${t('farmer.sessionDefaultsAppliedDesc')}` })
   }
@@ -703,7 +706,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
       if (!milkLiters || Number(milkLiters) <= 0) e.milkLiters = t("calves.enterHowManyLitersTheCalf")
       else if (Number(milkLiters) > availableHomeConsumptionForForm) e.milkLiters = t("calves.milkBalanceShort").replace("{liters}", availableHomeConsumptionForForm.toFixed(1))
     }
-    if (expenseType === "feed" && !expSession && !editingSessionlessFeed) e.expSession = t("milk.selectASession")
+    if (usesSession(expenseType) && !expSession && !editingSessionless) e.expSession = t("milk.selectASession")
     if (expenseType === "feed" && waterLiters && !(Number(waterLiters) >= 0)) e.waterLiters = t("calves.enterAValidNumberOfLiters")
     if (expenseType === "feed" && waterCost && !(Number(waterCost) >= 0)) e.waterCost = t("calves.enterAValidWaterCost")
     setExpErrors(e)
@@ -715,7 +718,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     setSaving(true)
     const calf = calves.find(c => c._id === expCalfId)
     const wasAdd = !editExpense
-    const session = expenseType === "feed" ? (expSession || null) : null
+    const session = usesSession(expenseType) ? (expSession || null) : null
     const body = { farmerId, calfId: expCalfId, calfName: calf?.name, expenseType, session, milkLiters, waterLiters, waterCost, description, amount, date: expDate, notes: expNotes }
 
     const res = await (editExpense
@@ -731,8 +734,8 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
 
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: t("calves.failedToSaveExpense") }))
-      // A 409 on feed is that session already being recorded for the calf that day.
-      const field = expenseType === "milk" ? "milkLiters" : expenseType === "feed" && res.status === 409 ? "expSession" : "amount"
+      // A 409 on milk or feed is that session already being recorded for the calf that day.
+      const field = usesSession(expenseType) && res.status === 409 ? "expSession" : expenseType === "milk" ? "milkLiters" : "amount"
       setExpErrors({ [field]: localizeError(error, language) || error })
       setSaving(false)
       return
@@ -800,8 +803,8 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     { name: "Notes", excelWidth: 40, value: e => e.notes || "", pdf: { label: t('exportColumn.Notes'), width: 35 } },
   ]
 
-  // Sessions are only on feed, which a vet never sees; the filter stays out of the way while another type is picked.
-  const showSessionFilter = !delegate && (filterExpType === "" || filterExpType === "feed")
+  // Sessions are only on milk and feed, which a vet never sees; the filter stays out of the way while another type is picked.
+  const showSessionFilter = !delegate && (filterExpType === "" || usesSession(filterExpType))
 
   // A vet's view leaves out the two milk cards.
   const summaryGrid = cn("grid grid-cols-2 gap-3 sm:gap-4", delegate ? "lg:grid-cols-3" : "lg:grid-cols-5")
@@ -1331,9 +1334,9 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                         </Select>
                       </div>
 
-                      {expenseType === "feed" && (
+                      {usesSession(expenseType) && (
                         <div className="space-y-1">
-                          <label className="text-sm font-medium text-gray-700">{t('farmer.session')}{!editingSessionlessFeed && " *"}</label>
+                          <label className="text-sm font-medium text-gray-700">{t('farmer.session')}{!editingSessionless && " *"}</label>
                           <Select value={expSession} onValueChange={handleSessionPick}>
                             <SelectTrigger className={expErrors.expSession ? "border-red-500" : ""}>
                               <SelectValue placeholder={t('farmer.session')} />
@@ -1343,7 +1346,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                             </SelectContent>
                           </Select>
                           {expErrors.expSession && <p className="text-xs text-red-500">{expErrors.expSession}</p>}
-                          {!expErrors.expSession && !editExpense && <p className="text-xs text-gray-400">{t('calves.feedSessionHint')}</p>}
+                          {!expErrors.expSession && !editExpense && expenseType === "feed" && <p className="text-xs text-gray-400">{t('calves.feedSessionHint')}</p>}
                         </div>
                       )}
 
@@ -1443,8 +1446,8 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                   onValueChange={v => {
                     const type = v === "all" ? "" : v
                     setFilterExpType(type)
-                    // Only feed has sessions.
-                    if (type && type !== "feed") setFilterExpSession("")
+                    // Only milk and feed have sessions.
+                    if (type && !usesSession(type)) setFilterExpSession("")
                   }}
                   disabled={delegate}
                 >
@@ -1507,7 +1510,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                         <TableCell>
                           <div className="flex flex-wrap items-center gap-1">
                             <Badge variant="outline" className={typeColor(e.expenseType)}>{typeLabel(e.expenseType)}</Badge>
-                            {e.expenseType === "feed" && e.session && (
+                            {usesSession(e.expenseType) && e.session && (
                               <Badge variant="outline" className={sessionColor(e.session)}>{sessionLabel(e.session)}</Badge>
                             )}
                           </div>
