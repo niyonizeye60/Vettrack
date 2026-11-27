@@ -74,7 +74,12 @@ interface FeedSessionDefaults { description: string; amount: string; waterLiters
 const emptyFeedDefaults: FeedSessionDefaults = { description: "", amount: "", waterLiters: "", waterCost: "" }
 const noFeedDefaults: Record<FeedSession, FeedSessionDefaults> = { Morning: emptyFeedDefaults, Evening: emptyFeedDefaults }
 const feedDefaultsKey = (farmerId: string) => `vettrack_calf_feed_sessions_${farmerId}`
-const hasFeedDefaults = (d: FeedSessionDefaults | undefined) => !!d && Object.values(d).some(v => v !== "")
+/** The usual milk for a session - the liters given and what they cost - kept in this browser too. */
+interface MilkSessionDefaults { milkLiters: string; amount: string }
+const emptyMilkDefaults: MilkSessionDefaults = { milkLiters: "", amount: "" }
+const noMilkDefaults: Record<FeedSession, MilkSessionDefaults> = { Morning: emptyMilkDefaults, Evening: emptyMilkDefaults }
+const milkDefaultsKey = (farmerId: string) => `vettrack_calf_milk_sessions_${farmerId}`
+const hasDefaults = (d: FeedSessionDefaults | MilkSessionDefaults | undefined) => !!d && Object.values(d).some(v => v !== "")
 const today = new Date().toISOString().split("T")[0]
 const PAGE_SIZE = 10
 
@@ -239,17 +244,25 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
   const [filterExpType, setFilterExpType] = useState("")
   const [filterExpSession, setFilterExpSession] = useState("")
 
-  // Feed session defaults (the farmer's own: a vet never records feed)
+  // Milk and feed session defaults (the farmer's own: a vet records neither)
   const [feedDefaults, setFeedDefaults] = useState(noFeedDefaults)
-  const [feedDefaultsOpen, setFeedDefaultsOpen] = useState(false)
-  const [feedDefaultsTab, setFeedDefaultsTab] = useState<FeedSession>("Morning")
+  const [milkDefaults, setMilkDefaults] = useState(noMilkDefaults)
+  const [defaultsOpen, setDefaultsOpen] = useState(false)
+  // Which type's defaults the dialog is editing.
+  const [defaultsFor, setDefaultsFor] = useState<"milk" | "feed">("feed")
+  const [defaultsTab, setDefaultsTab] = useState<FeedSession>("Morning")
   const [feedDefaultsDraft, setFeedDefaultsDraft] = useState(noFeedDefaults)
+  const [milkDefaultsDraft, setMilkDefaultsDraft] = useState(noMilkDefaults)
 
   useEffect(() => {
     if (delegate) return
     try {
       const stored = JSON.parse(localStorage.getItem(feedDefaultsKey(farmerId)) || "null")
       if (stored?.Morning && stored?.Evening) setFeedDefaults({ Morning: { ...emptyFeedDefaults, ...stored.Morning }, Evening: { ...emptyFeedDefaults, ...stored.Evening } })
+    } catch {}
+    try {
+      const stored = JSON.parse(localStorage.getItem(milkDefaultsKey(farmerId)) || "null")
+      if (stored?.Morning && stored?.Evening) setMilkDefaults({ Morning: { ...emptyMilkDefaults, ...stored.Morning }, Evening: { ...emptyMilkDefaults, ...stored.Evening } })
     } catch {}
   }, [farmerId, delegate])
 
@@ -666,31 +679,60 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
     setDescription(d.description); setAmount(d.amount); setWaterLiters(d.waterLiters); setWaterCost(d.waterCost)
   }
 
-  // Picking a session for feed fills in its saved defaults, as on Milk Production - but not
-  // while editing, where the form holds what was recorded.
-  const handleSessionPick = (value: string) => {
-    setExpSession(value)
-    if (editExpense || expenseType !== "feed" || !isFeedSession(value) || !hasFeedDefaults(feedDefaults[value])) return
-    applyFeedDefaults(feedDefaults[value])
-    toast({ title: t('farmer.sessionDefaultsApplied'), description: `${sessionLabel(value)} — ${t('farmer.sessionDefaultsAppliedDesc')}` })
+  const applyMilkDefaults = (d: MilkSessionDefaults) => {
+    setMilkLiters(d.milkLiters); setAmount(d.amount)
   }
 
-  const openFeedDefaults = () => {
+  // Fills in the saved defaults for a milk or feed session, as on Milk Production - but not
+  // while editing, where the form holds what was recorded.
+  const fillSessionDefaults = (type: string, session: string) => {
+    if (editExpense || !isFeedSession(session)) return
+    if (type === "feed" && hasDefaults(feedDefaults[session])) applyFeedDefaults(feedDefaults[session])
+    else if (type === "milk" && hasDefaults(milkDefaults[session])) applyMilkDefaults(milkDefaults[session])
+    else return
+    toast({ title: t('farmer.sessionDefaultsApplied'), description: `${sessionLabel(session)} — ${t('farmer.sessionDefaultsAppliedDesc')}` })
+  }
+  const handleSessionPick = (value: string) => {
+    setExpSession(value)
+    fillSessionDefaults(expenseType, value)
+  }
+  // Milk and feed share the session field, so switching between them keeps the session
+  // and fills in the new type's defaults for it.
+  const handleTypePick = (value: string) => {
+    setExpenseType(value)
+    fillSessionDefaults(value, expSession)
+  }
+
+  const openSessionDefaults = (type: "milk" | "feed") => {
     setFeedDefaultsDraft(feedDefaults)
-    setFeedDefaultsTab(isFeedSession(expSession) ? expSession : "Morning")
-    setFeedDefaultsOpen(true)
+    setMilkDefaultsDraft(milkDefaults)
+    setDefaultsTab(isFeedSession(expSession) ? expSession : "Morning")
+    setDefaultsFor(type)
+    setDefaultsOpen(true)
   }
   const setFeedDefaultsField = (sess: FeedSession, field: keyof FeedSessionDefaults, value: string) => {
     setFeedDefaultsDraft(prev => ({ ...prev, [sess]: { ...prev[sess], [field]: value } }))
   }
-  const saveFeedDefaults = () => {
-    setFeedDefaults(feedDefaultsDraft)
-    try { localStorage.setItem(feedDefaultsKey(farmerId), JSON.stringify(feedDefaultsDraft)) } catch {}
-    // The session already picked on the form takes its new defaults straight away.
-    if (!editExpense && expenseType === "feed" && isFeedSession(expSession) && hasFeedDefaults(feedDefaultsDraft[expSession])) {
-      applyFeedDefaults(feedDefaultsDraft[expSession])
+  const setMilkDefaultsField = (sess: FeedSession, field: keyof MilkSessionDefaults, value: string) => {
+    setMilkDefaultsDraft(prev => ({ ...prev, [sess]: { ...prev[sess], [field]: value } }))
+  }
+  const clearDefaultsTab = () => {
+    if (defaultsFor === "milk") setMilkDefaultsDraft(prev => ({ ...prev, [defaultsTab]: emptyMilkDefaults }))
+    else setFeedDefaultsDraft(prev => ({ ...prev, [defaultsTab]: emptyFeedDefaults }))
+  }
+  // The session already picked on the form takes its new defaults straight away.
+  const saveSessionDefaults = () => {
+    const formSession = !editExpense && expenseType === defaultsFor && isFeedSession(expSession) ? expSession : null
+    if (defaultsFor === "milk") {
+      setMilkDefaults(milkDefaultsDraft)
+      try { localStorage.setItem(milkDefaultsKey(farmerId), JSON.stringify(milkDefaultsDraft)) } catch {}
+      if (formSession && hasDefaults(milkDefaultsDraft[formSession])) applyMilkDefaults(milkDefaultsDraft[formSession])
+    } else {
+      setFeedDefaults(feedDefaultsDraft)
+      try { localStorage.setItem(feedDefaultsKey(farmerId), JSON.stringify(feedDefaultsDraft)) } catch {}
+      if (formSession && hasDefaults(feedDefaultsDraft[formSession])) applyFeedDefaults(feedDefaultsDraft[formSession])
     }
-    setFeedDefaultsOpen(false)
+    setDefaultsOpen(false)
   }
 
   // When editing an existing milk entry, its own liters are already subtracted out of
@@ -1294,9 +1336,9 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                     <div className="w-2 h-2 bg-green-500 rounded-full" />
                     {editExpense ? t('farmer.editExpense') : t('farmer.recordExpense')}
                   </CardTitle>
-                  {expenseType === "feed" && calves.length > 0 && (
-                    <Button type="button" size="sm" onClick={openFeedDefaults} className="rounded-lg gap-1.5 bg-orange-500 hover:bg-orange-600 text-white">
-                      <Wheat className="h-3.5 w-3.5" />
+                  {usesSession(expenseType) && calves.length > 0 && (
+                    <Button type="button" size="sm" onClick={() => openSessionDefaults(expenseType === "milk" ? "milk" : "feed")} className="rounded-lg gap-1.5 bg-orange-500 hover:bg-orange-600 text-white">
+                      {expenseType === "milk" ? <Milk className="h-3.5 w-3.5" /> : <Wheat className="h-3.5 w-3.5" />}
                       {t('farmer.routine')}
                     </Button>
                   )}
@@ -1326,7 +1368,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                       <div className="space-y-1">
                         <label className="text-sm font-medium text-gray-700">{t('farmer.expenseType')} *</label>
                         {/* Fixed to Veterinary for a vet: it's the only type they can record. */}
-                        <Select value={expenseType} onValueChange={setExpenseType} disabled={delegate}>
+                        <Select value={expenseType} onValueChange={handleTypePick} disabled={delegate}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {expenseTypes.map(ty => <SelectItem key={ty} value={ty}>{typeLabel(ty)}</SelectItem>)}
@@ -1346,7 +1388,7 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
                             </SelectContent>
                           </Select>
                           {expErrors.expSession && <p className="text-xs text-red-500">{expErrors.expSession}</p>}
-                          {!expErrors.expSession && !editExpense && expenseType === "feed" && <p className="text-xs text-gray-400">{t('calves.feedSessionHint')}</p>}
+                          {!expErrors.expSession && !editExpense && <p className="text-xs text-gray-400">{t('calves.feedSessionHint')}</p>}
                         </div>
                       )}
 
@@ -1589,33 +1631,48 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
         }
       />
 
-      {/* Feed session defaults */}
-      <Dialog open={feedDefaultsOpen} onOpenChange={setFeedDefaultsOpen}>
+      {/* Milk and feed session defaults */}
+      <Dialog open={defaultsOpen} onOpenChange={setDefaultsOpen}>
         <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wheat className="h-5 w-5 text-orange-500" />
+              {defaultsFor === "milk" ? <Milk className="h-5 w-5 text-orange-500" /> : <Wheat className="h-5 w-5 text-orange-500" />}
               {t('farmer.routine')}
             </DialogTitle>
-            <p className="text-sm text-gray-500">{t('calves.feedSessionDefaultsDesc')}</p>
+            <p className="text-sm text-gray-500">{t(defaultsFor === "milk" ? 'calves.milkSessionDefaultsDesc' : 'calves.feedSessionDefaultsDesc')}</p>
           </DialogHeader>
 
-          <Tabs value={feedDefaultsTab} onValueChange={v => isFeedSession(v) && setFeedDefaultsTab(v)}>
+          <Tabs value={defaultsTab} onValueChange={v => isFeedSession(v) && setDefaultsTab(v)}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <TabsList className="grid grid-cols-2 w-full max-w-xs">
                 {FEED_SESSIONS.map(sess => (
                   <TabsTrigger key={sess} value={sess} className="gap-1.5">
                     {sessionLabel(sess)}
-                    {hasFeedDefaults(feedDefaultsDraft[sess]) && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
+                    {hasDefaults(defaultsFor === "milk" ? milkDefaultsDraft[sess] : feedDefaultsDraft[sess]) && <span className="h-1.5 w-1.5 rounded-full bg-green-500" />}
                   </TabsTrigger>
                 ))}
               </TabsList>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setFeedDefaultsDraft(prev => ({ ...prev, [feedDefaultsTab]: emptyFeedDefaults }))} className="text-gray-500 hover:text-red-600 h-8 px-2">
+              <Button type="button" variant="ghost" size="sm" onClick={clearDefaultsTab} className="text-gray-500 hover:text-red-600 h-8 px-2">
                 {t('common.clear')}
               </Button>
             </div>
 
-            {FEED_SESSIONS.map(sess => (
+            {defaultsFor === "milk" && FEED_SESSIONS.map(sess => (
+              <TabsContent key={sess} value={sess} className="pt-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.milkLitersGiven')}</label>
+                    <Input type="number" min="0" step="0.1" placeholder="e.g. 3" value={milkDefaultsDraft[sess].milkLiters} onChange={e => setMilkDefaultsField(sess, "milkLiters", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{t('farmer.amount')}</label>
+                    <Input type="number" min="0" placeholder="e.g. 1500" value={milkDefaultsDraft[sess].amount} onChange={e => setMilkDefaultsField(sess, "amount", e.target.value)} />
+                  </div>
+                </div>
+              </TabsContent>
+            ))}
+
+            {defaultsFor === "feed" && FEED_SESSIONS.map(sess => (
               <TabsContent key={sess} value={sess} className="pt-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1 md:col-span-2">
@@ -1640,10 +1697,10 @@ export default function CalvesManager({ farmerId, can, showHeader = true }: Calv
           </Tabs>
 
           <div className="flex gap-3 pt-2">
-            <Button onClick={saveFeedDefaults} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
+            <Button onClick={saveSessionDefaults} className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-6">
               {t('farmer.applyRoutine')}
             </Button>
-            <Button variant="outline" onClick={() => setFeedDefaultsOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
+            <Button variant="outline" onClick={() => setDefaultsOpen(false)} className="rounded-lg">{t('farmer.cancel')}</Button>
           </div>
         </DialogContent>
       </Dialog>
